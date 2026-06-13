@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "projectName": { "type": "string" },
+          "completedTasks": { "type": "array", "items": { "type": "string" } },
+          "inProgressTasks": { "type": "array", "items": { "type": "string" } },
+          "issues": { "type": "array", "items": { "type": "string" } },
+          "requests": { "type": "array", "items": { "type": "string" } },
+          "nextPlans": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": [
+          "projectName",
+          "completedTasks",
+          "inProgressTasks",
+          "issues",
+          "requests",
+          "nextPlans"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["projects"],
+  "additionalProperties": false
+}
