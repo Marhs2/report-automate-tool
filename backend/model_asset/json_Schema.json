@@ -1,18 +1,62 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DailyReportExtractionResult",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "projects": {
       "type": "array",
+      "description": "프로젝트별 업무 현황 목록",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "properties": {
-          "projectName": { "type": "string" },
-          "completedTasks": { "type": "array", "items": { "type": "string" } },
-          "inProgressTasks": { "type": "array", "items": { "type": "string" } },
-          "issues": { "type": "array", "items": { "type": "string" } },
-          "requests": { "type": "array", "items": { "type": "string" } },
-          "nextPlans": { "type": "array", "items": { "type": "string" } }
+          "projectName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "프로젝트명. 알 수 없지만 업무가 있으면 '미분류 프로젝트'"
+          },
+          "completedTasks": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 160
+            }
+          },
+          "inProgressTasks": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 160
+            }
+          },
+          "issues": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 180
+            }
+          },
+          "requests": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 180
+            }
+          },
+          "nextPlans": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 180
+            }
+          }
         },
         "required": [
           "projectName",
@@ -21,11 +65,17 @@
           "issues",
           "requests",
           "nextPlans"
-        ],
-        "additionalProperties": false
+        ]
       }
+    },
+    "importantSummary": {
+      "type": "string",
+      "maxLength": 700,
+      "description": "전체 중요사항 요약. 업무 정보가 없으면 빈 문자열"
     }
   },
-  "required": ["projects"],
-  "additionalProperties": false
+  "required": [
+    "projects",
+    "importantSummary"
+  ]
 }
