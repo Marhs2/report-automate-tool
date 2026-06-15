@@ -31,22 +31,22 @@ def read_root():
 
 @app.get("/model-list")
 def read_model_list():
-    req = requests.get("http://localhost:1234/v1/models")
+    req = requests.get("http://127.0.0.1:9000/v1/models")
     return req.json()   
 
 
 @app.post("/send-report")
 def send_report(data: ReportRequest ):
-    client = OpenAI(base_url="http://localhost:9000", api_key="llamaCpp")
+    client = OpenAI(base_url="http://127.0.0.1:9000/v1", api_key="llamaCpp")
 
 
     completion = client.chat.completions.create(
-        model="local-model",
+        model="Qwen3.5-4B-Q4_K_M.gguf",
         messages=[
             {"role": "system", "content": daily_prompt},
             {"role": "user", "content": data.report}
         ],
-        temperature=0,
+        temperature=0.1,
         response_format={
             "type": "json_schema",
             "json_schema": {
@@ -57,21 +57,21 @@ def send_report(data: ReportRequest ):
         }
     )
 
-    return  {completion.choices[0].message.content}
+    return  completion.choices[0].message.content
 
 
 
 @app.post("/gen_weekly_report")
 def gen_weekly_report(data: WeeklyReportRequest ):
-    client = OpenAI(base_url="http://localhost:9000", api_key="llamaCpp")
+    client = OpenAI(base_url="http://127.0.0.1:9000/v1", api_key="llamaCpp")
 
     completion = client.chat.completions.create(
-        model="local-model",
+        model="Qwen3.5-4B-Q4_K_M.gguf",
         messages=[
             {"role": "system", "content": weekly_prompt},
             {"role": "user", "content": "\n".join(data.reports)}
         ],
-        temperature=0,
+        temperature=0.1,
         response_format={
             "type": "json_schema",
             "json_schema": {
@@ -82,5 +82,5 @@ def gen_weekly_report(data: WeeklyReportRequest ):
         }
     )
     
-    return  {completion.choices[0].message.content}
+    return  completion.choices[0].message.content
 
