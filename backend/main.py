@@ -3,8 +3,23 @@ import requests
 from openai import OpenAI
 import json
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:5173"
+]
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 with open("./model_asset/json_Schema.json", "r", encoding="utf-8") as f:
     daily_schema = json.load(f)
@@ -57,7 +72,7 @@ def send_report(data: ReportRequest ):
         }
     )
 
-    return  completion.choices[0].message.content
+    return json.loads(completion.choices[0].message.content)
 
 
 
@@ -82,5 +97,5 @@ def gen_weekly_report(data: WeeklyReportRequest ):
         }
     )
     
-    return  completion.choices[0].message.content
+    return json.loads(completion.choices[0].message.content)
 
