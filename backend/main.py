@@ -41,6 +41,112 @@ class ReportRequest(BaseModel):
 class WeeklyReportRequest(BaseModel):
     reports: list[str] 
 
+
+from collections import defaultdict
+
+
+PROJECT_FIX = {
+    "기술보증기금": "이노비즈 인증",
+    "대한전선": "경영지원",
+    "우리은행": "경영지원",
+    "세방전지": "경영지원",
+    "홈페이지": "경영지원",
+    "BC": "경영지원",
+    "DC": "경영지원",
+    "TC": "경영지원",
+}
+
+KEYWORD_FIX = {
+    "기술보증기금": "이노비즈 인증",
+    "이노비즈": "이노비즈 인증",
+    "대한전선": "경영지원",
+    "우리은행": "경영지원",
+    "세방전지": "경영지원",
+    "서울디지텍고": "서울디지텍고 3자협약",
+    "산업체 방문조사카드": "서울디지텍고 3자협약",
+    "선도기업신청서": "서울디지텍고 3자협약",
+    "직무분석": "서울디지텍고 3자협약",
+    "AI자율제조": "AI자율제조",
+    "RCMS": "AI자율제조",
+    "OCR": "Yak-Map",
+    "약품": "Yak-Map",
+    "복약": "Yak-Map",
+    "여우비": "여우비",
+}
+
+
+def guess_project(project):
+    text = " ".join(
+        project["completedTasks"]
+        + project["inProgressTasks"]
+        + project["issues"]
+        + project["requests"]
+        + project["nextPlans"]
+    )
+    for keyword, target in KEYWORD_FIX.items():
+        if keyword in text:
+            return target
+    return project["projectName"]
+
+
+def normalize_projects(report_data):
+
+    merged = defaultdict(
+        lambda: {
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+        }
+    )
+
+    for project in report_data["projects"]:
+
+        project_name = guess_project(project)
+
+        project_name = PROJECT_FIX.get(
+            project_name,
+            project_name
+        )
+
+        merged[project_name]["completedTasks"].extend(
+            project["completedTasks"]
+        )
+
+        merged[project_name]["inProgressTasks"].extend(
+            project["inProgressTasks"]
+        )
+
+        merged[project_name]["issues"].extend(
+            project["issues"]
+        )
+
+        merged[project_name]["requests"].extend(
+            project["requests"]
+        )
+
+        merged[project_name]["nextPlans"].extend(
+            project["nextPlans"]
+        )
+
+    result = []
+
+    for name, data in merged.items():
+
+        result.append({
+            "projectName": name,
+            "completedTasks": list(dict.fromkeys(data["completedTasks"])),
+            "inProgressTasks": list(dict.fromkeys(data["inProgressTasks"])),
+            "issues": list(dict.fromkeys(data["issues"])),
+            "requests": list(dict.fromkeys(data["requests"])),
+            "nextPlans": list(dict.fromkeys(data["nextPlans"]))
+        })
+
+    report_data["projects"] = result
+
+    return report_data
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
@@ -75,17 +181,9 @@ def send_report(data: ReportRequest ):
     
     report_data = json.loads(completion.choices[0].message.content)
 
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO daily_reports (member_id, raw_text, parsed_json) VALUES (?, ?, ?)",
-            (1, data.report, json.dumps(report_data))
-        )
-        conn.commit()
-    
+    report_data = normalize_projects(report_data)
 
-    return json.loads(completion.choices[0].message.content)
-
+    return report_data
 
 
 @app.post("/gen_weekly_report")
@@ -109,7 +207,11 @@ def gen_weekly_report(data: WeeklyReportRequest ):
         }
     )
     
-    return json.loads(completion.choices[0].message.content)
+    report_data = json.loads(completion.choices[0].message.content)
+
+    report_data = normalize_projects(report_data)
+
+    return report_data
 
 
 @app.get("/reports")
