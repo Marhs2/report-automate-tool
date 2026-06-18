@@ -23,9 +23,10 @@ CREATE TABLE IF NOT EXISTS members (
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS daily_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    member_id INTEGER NOT NULL,
-    report_date DATE NOT NULL,
+    member_id INTEGER NOT NULL ,
+    report_date DATE NOT NULL DEFAULT CURRENT_DATE,
     raw_text TEXT NOT NULL,
+    parsed_json TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (member_id) REFERENCES members(id)
 )

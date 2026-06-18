@@ -17,5 +17,15 @@ export default function useAPI() {
     }
   };
 
-  return { PostReport };
+  const GetReports = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/reports`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      throw error;
+    }
+  };
+
+  return { PostReport, GetReports };
 }

@@ -4,6 +4,7 @@ from openai import OpenAI
 import json
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from db import get_db
 
 app = FastAPI()
 
@@ -71,6 +72,17 @@ def send_report(data: ReportRequest ):
             }
         }
     )
+    
+    report_data = json.loads(completion.choices[0].message.content)
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO daily_reports (member_id, raw_text, parsed_json) VALUES (?, ?, ?)",
+            (1, data.report, json.dumps(report_data))
+        )
+        conn.commit()
+    
 
     return json.loads(completion.choices[0].message.content)
 
@@ -99,3 +111,21 @@ def gen_weekly_report(data: WeeklyReportRequest ):
     
     return json.loads(completion.choices[0].message.content)
 
+
+@app.get("/reports")
+def get_reports():
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, member_id, report_date, raw_text, parsed_json, created_at FROM daily_reports")
+        rows = cursor.fetchall()
+        reports = []
+        for row in rows:
+            reports.append({
+                "id": row[0],
+                "member_id": row[1],
+                "report_date": row[2],
+                "raw_text": row[3],
+                "parsed_json": json.loads(row[4]) if row[4] else None,
+                "created_at": row[5]
+            })
+    return reports
