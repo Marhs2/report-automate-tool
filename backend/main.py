@@ -169,6 +169,7 @@ def send_report(data: ReportRequest ):
             {"role": "user", "content": data.report}
         ],
         temperature=0.1,
+        reasoning_effort="medium",
         response_format={
             "type": "json_schema",
             "json_schema": {
@@ -183,7 +184,7 @@ def send_report(data: ReportRequest ):
 
     report_data = normalize_projects(report_data)
 
-    return report_data
+    return json.loads(completion.choices[0].message.content)
 
 
 @app.post("/gen_weekly_report")

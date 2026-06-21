@@ -1,24 +1,3 @@
-<script setup>
-import { ref, onMounted } from "vue";
-
-
-const reportData = ref(null);
-const rawData = ref(null);
-
-onMounted(() => {
-  const stored = sessionStorage.getItem("reportData");
-
-  if (stored) {
-    reportData.value = JSON.parse(stored);
-  }
-  const storedRaw = sessionStorage.getItem("reportRaw");
-  if (storedRaw) {
-    rawData.value = storedRaw.replace(/\\n/g, "\n").replace(/^"(.*)"$/, "$1");
-  }
-  console.log("Loaded report data:", reportData.value);
-});
-</script>
-
 <template>
   <h1>분석 결과</h1>
 
@@ -87,3 +66,111 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<script setup>
+import { ref, onMounted } from "vue";
+
+
+const reportData = ref(null);
+const rawData = ref(null);
+
+onMounted(() => {
+  const stored = sessionStorage.getItem("reportData");
+
+  if (stored) {
+    reportData.value = JSON.parse(stored);
+  }
+  const storedRaw = sessionStorage.getItem("reportRaw");
+  if (storedRaw) {
+    rawData.value = storedRaw.replace(/\\n/g, "\n").replace(/^"(.*)"$/, "$1");
+  }
+  console.log("Loaded report data:", reportData.value);
+});
+</script>
+
+<style scoped>
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: #1f2937;
+}
+
+.report-section {
+  max-width: 850px;
+  margin: 0 auto;
+}
+
+.report-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin: 28px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.report-section > div > div {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin-bottom: 16px;
+}
+
+.report-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+  color: #6b7280;
+}
+
+ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+li {
+  line-height: 1.7;
+  color: #374151;
+  font-size: 14px;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 28px 0;
+}
+
+.raw-section {
+  max-width: 850px;
+  margin: 0 auto;
+}
+
+.raw-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 14px;
+}
+
+.raw-section > div {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 22px;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #374151;
+}
+
+p {
+  line-height: 1.75;
+  color: #374151;
+  font-size: 14px;
+}
+</style>
