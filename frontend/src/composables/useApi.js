@@ -17,6 +17,16 @@ export default function useAPI() {
     }
   };
 
+  const PostSaveReport = async (data) => {
+    try {
+      const response = await axios.post(`${baseURL}/reports`, data);
+      return response.data;
+    } catch (error) {
+      console.error("Error saving report:", error);
+      throw error;
+    }
+  };
+
   const GetReports = async () => {
     try {
       const response = await axios.get(`${baseURL}/reports`);
@@ -27,5 +37,5 @@ export default function useAPI() {
     }
   };
 
-  return { PostReport, GetReports };
+  return { PostReport, PostSaveReport, GetReports };
 }

@@ -41,6 +41,11 @@ class ReportRequest(BaseModel):
 class WeeklyReportRequest(BaseModel):
     reports: list[str] 
 
+class SaveReportData(BaseModel):
+    report: str
+    parsed_json: dict
+    member_id: int
+
 
 from collections import defaultdict
 
@@ -184,7 +189,7 @@ def send_report(data: ReportRequest ):
 
     report_data = normalize_projects(report_data)
 
-    return json.loads(completion.choices[0].message.content)
+    return report_data
 
 
 @app.post("/gen_weekly_report")
@@ -232,3 +237,12 @@ def get_reports():
                 "created_at": row[5]
             })
     return reports
+
+
+@app.post("/reports")
+def save_report(data: SaveReportData):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO daily_reports (raw_text, parsed_json , member_id) VALUES (?, ?, ?)", (data.report, json.dumps(data.parsed_json), data.member_id))
+        conn.commit()
+    return {"message": "Report saved successfully."}
