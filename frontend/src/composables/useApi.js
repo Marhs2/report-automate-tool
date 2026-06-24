@@ -17,9 +17,13 @@ export default function useAPI() {
     }
   };
 
-  const PostSaveReport = async (data) => {
+  const PostSaveReport = async (jsonData, rawData, memberId) => {
     try {
-      const response = await axios.post(`${baseURL}/reports`, data);
+      const response = await axios.post(`${baseURL}/reports`, {
+        report: jsonData,
+        raw: rawData,
+        memberId: memberId
+      });
       return response.data;
     } catch (error) {
       console.error("Error saving report:", error);
