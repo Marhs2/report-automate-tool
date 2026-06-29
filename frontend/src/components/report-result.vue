@@ -134,7 +134,7 @@ const saveReport = () => {
   if (reportData.value) {
     const jsonData = JSON.stringify(reportData.value, null, 2);
 
-    PostSaveReport(jsonData, rawData.value, memberId.value)
+    PostSaveReport(jsonData, rawData.value, parseInt(memberId.value))
       .then((response) => {
         console.log("보고서 저장 성공:", response);
         alert("보고서가 성공적으로 저장되었습니다.");

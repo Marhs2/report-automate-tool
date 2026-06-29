@@ -43,7 +43,7 @@ class WeeklyReportRequest(BaseModel):
 
 class SaveReportData(BaseModel):
     report: str
-    parsed_json: dict
+    parsed_json: str
     member_id: int
 
 
