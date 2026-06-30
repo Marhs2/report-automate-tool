@@ -43,8 +43,8 @@ class WeeklyReportRequest(BaseModel):
 
 class SaveReportData(BaseModel):
     report: str
-    parsed_json: dict
-    member_id: int
+    raw: dict
+    memberId: int
 
 
 from collections import defaultdict
