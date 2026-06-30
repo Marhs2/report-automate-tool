@@ -162,41 +162,13 @@ def send_report(data: ReportRequest):
             {"role": "user", "content": data.report},
         ],
         temperature=0.1,
-        reasoning_effort="max",
         response_format={
             "type": "json_schema",
+            "reasoning_effort": "max",
             "json_schema": {
                 "name": "daily_report",
                 "strict": True,
                 "schema": daily_schema,
-            },
-        },
-    )
-
-    report_data = json.loads(completion.choices[0].message.content)
-
-    report_data = normalize_projects(report_data)
-
-    return report_data
-
-
-@app.post("/gen_weekly_report")
-def gen_weekly_report(data: WeeklyReportRequest):
-    client = OpenAI(base_url="http://127.0.0.1:9000/v1", api_key="llamaCpp")
-
-    completion = client.chat.completions.create(
-        model="Qwen3.5-4B-Q4_K_M.gguf",
-        messages=[
-            {"role": "system", "content": weekly_prompt},
-            {"role": "user", "content": "\n".join(data.reports)},
-        ],
-        temperature=0.1,
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "weekly_report",
-                "strict": True,
-                "schema": weekly_schema,
             },
         },
     )
@@ -240,4 +212,41 @@ def save_report(data: SaveReportData):
             (data.report, json.dumps(data.parsed_json), data.member_id),
         )
         conn.commit()
+        save_projects(json.loads(data.parsed_json), data.member_id)
     return {"message": "Report saved successfully."}
+
+
+def save_projects(report_data, member_id):
+    with get_db() as conn:
+        cursor = conn.cursor()
+
+        print(report_data["projects"])
+
+        for project in report_data["projects"]:
+            cursor.execute(
+                """
+                INSERT INTO projects (
+                    member_id,
+                    name,
+                    completed_tasks,
+                    in_progress_tasks,
+                    issues,
+                    requests,
+                    next_plans,
+                    important_summary
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    member_id,
+                    project["projectName"],
+                    project["completedTasks"],
+                    project["inProgressTasks"],
+                    project["issues"],
+                    project["requests"],
+                    project["nextPlans"],
+                    report_data["importantSummary"],
+                ),
+            )
+
+        conn.commit()

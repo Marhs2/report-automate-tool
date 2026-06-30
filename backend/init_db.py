@@ -1,5 +1,5 @@
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
 
@@ -31,6 +31,22 @@ CREATE TABLE IF NOT EXISTS daily_reports (
     FOREIGN KEY (member_id) REFERENCES members(id)
 )
 """)
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    completed_tasks TEXT,
+    in_progress_tasks TEXT,
+    issues TEXT,
+    requests TEXT,
+    next_plans TEXT,
+    important_summary TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+""")
+
 
 conn.commit()
 conn.close()
