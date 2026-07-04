@@ -4,6 +4,7 @@ import useAPI from "../composables/useAPI";
 
 const { GetReports } = useAPI();
 const reports = ref([]);
+const filteredReports = ref([]);
 const isLoading = ref(false);
 const filterDate = ref("");
 const filterMember = ref("");
@@ -14,6 +15,7 @@ const getReports = async () => {
     try {
         const response = await GetReports();
         reports.value = response;
+        filteredReports.value = response;
         console.log("Reports:", response);
     } catch (error) {
         console.error("Error fetching reports:", error);
@@ -22,7 +24,16 @@ const getReports = async () => {
     }
 };
 
-const applyFilter = () => {};
+const applyFilter = () => {
+    filteredReports.value = reports.value.filter((report) => {
+        return (
+            (filterDate.value === "" ||
+                report.report_date.includes(filterDate.value)) &&
+            (filterMember.value === "" ||
+                report.member_id.includes(filterMember.value))
+        );
+    });
+};
 
 onMounted(() => {
     getReports();
@@ -46,9 +57,13 @@ onMounted(() => {
                     placeholder="프로젝트"
                     v-model="filterProject"
                 />
-                <button>필터 확인</button>
+                <button @click="applyFilter">필터 확인</button>
             </div>
-            <div v-for="report in reports" :key="report.id" class="report-item">
+            <div
+                v-for="report in filteredReports"
+                :key="report.id"
+                class="report-item"
+            >
                 <div class="report-header">
                     <h3 class="report-id">Report ID: {{ report.id }}</h3>
                     <div class="report-meta">
