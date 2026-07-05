@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 
 import requests
 from db import get_db
@@ -47,8 +48,6 @@ class SaveReportData(BaseModel):
     parsed_json: str
     member_id: int
 
-
-from collections import defaultdict
 
 PROJECT_FIX = {
     "기술보증기금": "이노비즈 인증",
@@ -147,16 +146,16 @@ def read_root():
 
 @app.get("/model-list")
 def read_model_list():
-    req = requests.get("http://127.0.0.1:9000/v1/models")
+    req = requests.get("http://127.0.0.1:1234/v1/models")
     return req.json()
 
 
 @app.post("/send-report")
 def send_report(data: ReportRequest):
-    client = OpenAI(base_url="http://127.0.0.1:9000/v1", api_key="llamaCpp")
+    client = OpenAI(base_url="http://127.0.0.1:1234/v1", api_key="lm-studio")
 
     completion = client.chat.completions.create(
-        model="Qwen3.5-4B-Q4_K_M.gguf",
+        model="nuextract3",
         messages=[
             {"role": "system", "content": daily_prompt},
             {"role": "user", "content": data.report},
@@ -203,6 +202,30 @@ def get_reports():
     return reports
 
 
+@app.get("/projects")
+def get_projects():
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM projects")
+        rows = cursor.fetchall()
+        projects = []
+        for row in rows:
+            projects.append(
+                {
+                    "id": row[0],
+                    "member_id": row[1],
+                    "name": row[2],
+                    "completed_tasks": json.loads(row[3]),
+                    "in_progress_tasks": json.loads(row[4]),
+                    "issues": json.loads(row[5]),
+                    "requests": json.loads(row[6]),
+                    "next_plans": json.loads(row[7]),
+                    "important_summary": row[8],
+                }
+            )
+    return projects
+
+
 @app.post("/reports")
 def save_report(data: SaveReportData):
     with get_db() as conn:
@@ -240,11 +263,11 @@ def save_projects(report_data, member_id):
                 (
                     member_id,
                     project["projectName"],
-                    project["completedTasks"],
-                    project["inProgressTasks"],
-                    project["issues"],
-                    project["requests"],
-                    project["nextPlans"],
+                    json.dumps(project["completedTasks"]),
+                    json.dumps(project["inProgressTasks"]),
+                    json.dumps(project["issues"]),
+                    json.dumps(project["requests"]),
+                    json.dumps(project["nextPlans"]),
                     report_data["importantSummary"],
                 ),
             )

@@ -22,7 +22,7 @@ export default function useAPI() {
       const response = await axios.post(`${baseURL}/reports`, {
         report: rawData,
         parsed_json: parsed_json,
-        member_id: parseInt(member_id), 
+        member_id: parseInt(member_id),
       });
       return response.data;
     } catch (error) {
@@ -41,5 +41,15 @@ export default function useAPI() {
     }
   };
 
-  return { PostReport, PostSaveReport, GetReports };
+  const GetProjects = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/projects`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+      throw error;
+    }
+  };
+
+  return { PostReport, PostSaveReport, GetReports, GetProjects };
 }

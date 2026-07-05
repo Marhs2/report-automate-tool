@@ -1,10 +1,9 @@
 <script setup>
-import { onMounted, ref } from "vue";
-import useAPI from "../composables/useAPI";
+import { onMounted, ref, computed } from "vue";
+import useAPI from "../composables/useApi";
 
 const { GetReports } = useAPI();
 const reports = ref([]);
-const filteredReports = ref([]);
 const isLoading = ref(false);
 const filterDate = ref("");
 const filterMember = ref("");
@@ -15,7 +14,6 @@ const getReports = async () => {
     try {
         const response = await GetReports();
         reports.value = response;
-        filteredReports.value = response;
         console.log("Reports:", response);
     } catch (error) {
         console.error("Error fetching reports:", error);
@@ -24,16 +22,36 @@ const getReports = async () => {
     }
 };
 
-const applyFilter = () => {
-    filteredReports.value = reports.value.filter((report) => {
-        return (
-            (filterDate.value === "" ||
-                report.report_date.includes(filterDate.value)) &&
-            (filterMember.value === "" ||
-                report.member_id.includes(filterMember.value))
-        );
+const filteredReports = computed(() => {
+    return reports.value.filter((report) => {
+        const matchDate =
+            filterDate.value === "" ||
+            report.report_date?.includes(filterDate.value);
+        const matchMember =
+            filterMember.value === "" ||
+            String(report.member_id).includes(filterMember.value);
+        return matchDate && matchMember;
     });
+});
+
+const matchesProjectFilter = (parsedJson) => {
+    if (filterProject.value === "") return true;
+    let parsed;
+    try {
+        parsed = JSON.parse(parsedJson);
+    } catch {
+        return false;
+    }
+    return (parsed.projects ?? []).some((p) =>
+        p.projectName?.includes(filterProject.value),
+    );
 };
+
+const filteredReportsByProject = computed(() => {
+    return filteredReports.value.filter((report) =>
+        matchesProjectFilter(report.parsed_json),
+    );
+});
 
 onMounted(() => {
     getReports();
@@ -57,10 +75,9 @@ onMounted(() => {
                     placeholder="프로젝트"
                     v-model="filterProject"
                 />
-                <button @click="applyFilter">필터 확인</button>
             </div>
             <div
-                v-for="report in filteredReports"
+                v-for="report in filteredReportsByProject"
                 :key="report.id"
                 class="report-item"
             >
