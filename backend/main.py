@@ -172,11 +172,34 @@ def send_report(data: ReportRequest):
         },
     )
 
-    report_data = json.loads(completion.choices[0].message.content)
+    content = completion.choices[0].message.content
+    if content is None:
+        content = "{}"
+    report_data = json.loads(content)
 
     report_data = normalize_projects(report_data)
 
     return report_data
+
+
+@app.get("/reports/status")
+def get_report_status(report_date: str):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT m.id, m.name,
+                   CASE WHEN dr.id IS NULL THEN 0 ELSE 1 END AS submitted
+            FROM members m
+            LEFT JOIN daily_reports dr
+                ON dr.member_id = m.id AND dr.report_date = ?
+            """,
+            (report_date,),
+        )
+        rows = cursor.fetchall()
+        return [
+            {"member_id": r[0], "name": r[1], "submitted": bool(r[2])} for r in rows
+        ]
 
 
 @app.get("/reports")

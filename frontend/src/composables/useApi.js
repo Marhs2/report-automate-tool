@@ -17,6 +17,16 @@ export default function useAPI() {
     }
   };
 
+  const GetUserActivities = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/user-activities`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching user activities:", error);
+      throw error;
+    }
+  };
+
   const PostSaveReport = async (parsed_json, rawData, member_id) => {
     try {
       const response = await axios.post(`${baseURL}/reports`, {
@@ -51,5 +61,11 @@ export default function useAPI() {
     }
   };
 
-  return { PostReport, PostSaveReport, GetReports, GetProjects };
+  return {
+    PostReport,
+    PostSaveReport,
+    GetReports,
+    GetProjects,
+    GetUserActivities,
+    };
 }
