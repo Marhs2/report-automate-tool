@@ -1,6 +1,8 @@
 <script setup>
-import { onMounted } from "vue";
-import { GetUserActivities } from "../composables/useApi";
+import { onMounted ,ref } from "vue";
+import useApi from "../composables/useApi";
+
+const { GetUserActivities } = useApi();
 
 const userActivities = ref([]);
 

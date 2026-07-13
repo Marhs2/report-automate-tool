@@ -10,17 +10,19 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-origins = ["http://localhost:5173"]
 
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 with open("./model_asset/json_Schema.json", "r", encoding="utf-8") as f:
     daily_schema = json.load(f)
@@ -182,8 +184,8 @@ def send_report(data: ReportRequest):
     return report_data
 
 
-@app.get("/reports/status")
-def get_report_status(report_date: str):
+@app.get("/user-activities")
+def get_user_activities():
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -192,14 +194,14 @@ def get_report_status(report_date: str):
                    CASE WHEN dr.id IS NULL THEN 0 ELSE 1 END AS submitted
             FROM members m
             LEFT JOIN daily_reports dr
-                ON dr.member_id = m.id AND dr.report_date = ?
-            """,
-            (report_date,),
-        )
+                ON dr.member_id = m.id
+                AND dr.report_date = DATE('now')
+            """)
         rows = cursor.fetchall()
         return [
             {"member_id": r[0], "name": r[1], "submitted": bool(r[2])} for r in rows
         ]
+
 
 
 @app.get("/reports")
