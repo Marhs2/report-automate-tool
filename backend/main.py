@@ -1,5 +1,6 @@
 import json
 from collections import defaultdict
+from datetime import date, timedelta
 
 import requests
 from db import get_db
@@ -184,23 +185,60 @@ def send_report(data: ReportRequest):
     return report_data
 
 
+
 @app.get("/user-activities")
-def get_user_activities():
+def get_user_activities(year: int, month: int):
+    first_day = date(year, month, 1)
+    last_day_of_month = date(
+        year + (month == 12), (month % 12) + 1, 1
+    ) - timedelta(days=1)
+
+    today = date.today()
+    last_day = min(last_day_of_month, today) if (year, month) == (today.year, today.month) else last_day_of_month
+
+    start_date = first_day.isoformat()
+    end_date = last_day_of_month.isoformat()
+
     with get_db() as conn:
         cursor = conn.cursor()
+
+        cursor.execute("SELECT id, name FROM members ORDER BY id")
+        members = cursor.fetchall()
+
         cursor.execute(
             """
-            SELECT m.id, m.name,
-                   CASE WHEN dr.id IS NULL THEN 0 ELSE 1 END AS submitted
-            FROM members m
-            LEFT JOIN daily_reports dr
-                ON dr.member_id = m.id
-                AND dr.report_date = DATE('now')
-            """)
-        rows = cursor.fetchall()
-        return [
-            {"member_id": r[0], "name": r[1], "submitted": bool(r[2])} for r in rows
-        ]
+            SELECT report_date, member_id, COUNT(id)
+            FROM daily_reports
+            WHERE report_date >= ? AND report_date <= ?
+            GROUP BY report_date, member_id
+            """,
+            (start_date, end_date),
+        )
+
+        counts = defaultdict(dict)
+        for report_date, member_id, count in cursor.fetchall():
+            counts[report_date][member_id] = count
+
+    result = []
+    current = first_day
+    while current <= last_day:
+        report_date = current.isoformat()
+        day_counts = counts.get(report_date, {})
+        result.append({
+            "report_date": report_date,
+            "members": [
+                {
+                    "member_id": member_id,
+                    "name": name,
+                    "count": day_counts.get(member_id, 0),
+                }
+                for member_id, name in members
+            ],
+        })
+        current += timedelta(days=1)
+
+    result.reverse()
+    return result
 
 
 

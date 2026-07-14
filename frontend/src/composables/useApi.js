@@ -17,9 +17,11 @@ export default function useAPI() {
     }
   };
 
-  const GetUserActivities = async () => {
+  const GetUserActivities = async (year, month) => {
     try {
-      const response = await axios.get(`${baseURL}/user-activities`);
+      const response = await axios.get(`${baseURL}/user-activities`, {
+        params: { year, month },
+      });
       return response.data;
     } catch (error) {
       console.error("Error fetching user activities:", error);
