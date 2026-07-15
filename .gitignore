@@ -1,0 +1,92 @@
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+*.manifest
+*.spec
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.cover
+.hypothesis/
+
+# ── SQLite runtime files ────────────────────────────────
+*.db-shm
+*.db-wal
+*.db-journal
+
+# ── SQL Workbench local state ───────────────────────────
+sql_workbench/.workbench_config.json
+
+# ── Node / frontend (root-level safety) ─────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+
+# ── Env / secrets ───────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ── OS ──────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── IDE / editors ───────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.code-workspace
+
+# ── Agent / tooling local state ─────────────────────────
+.omg/
+omg_wiki/
+.cursor/
+.codegraph/
+
+# ── Logs / temp ─────────────────────────────────────────
+logs/
+*.log
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig

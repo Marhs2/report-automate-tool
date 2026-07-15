@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import re
 import sqlite3
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Optional
@@ -18,12 +19,22 @@ class QueryResult:
     message: str
     is_select: bool
     affected: int = 0
+    elapsed_ms: float = 0.0
+    statements: int = 1
+
+
+@dataclass
+class TableSummary:
+    name: str
+    kind: str  # table | view
+    row_count: Optional[int] = None
 
 
 class DatabaseManager:
     def __init__(self) -> None:
         self.conn: Optional[sqlite3.Connection] = None
         self.db_path: Optional[Path] = None
+        self._table_info_cache: dict[str, list[dict[str, Any]]] = {}
 
     @property
     def is_connected(self) -> bool:
@@ -35,16 +46,29 @@ class DatabaseManager:
             raise FileNotFoundError(f"DB 파일을 찾을 수 없습니다: {path}")
 
         self.close()
-        self.conn = sqlite3.connect(str(path))
+        self.conn = sqlite3.connect(str(path), timeout=30.0)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
+        # 읽기 성능
+        try:
+            self.conn.execute("PRAGMA journal_mode = WAL")
+        except Exception:
+            pass
+        try:
+            self.conn.execute("PRAGMA synchronous = NORMAL")
+            self.conn.execute("PRAGMA cache_size = -8000")  # ~8MB
+            self.conn.execute("PRAGMA temp_store = MEMORY")
+        except Exception:
+            pass
         self.db_path = path
+        self._table_info_cache.clear()
 
     def close(self) -> None:
         if self.conn is not None:
             self.conn.close()
             self.conn = None
             self.db_path = None
+            self._table_info_cache.clear()
 
     def _require(self) -> sqlite3.Connection:
         if self.conn is None:
@@ -73,9 +97,18 @@ class DatabaseManager:
         )
         return [row[0] for row in cur.fetchall()]
 
-    def get_table_info(self, table: str) -> list[dict[str, Any]]:
-        conn = self._require()
+    def list_schema_objects(self) -> list[TableSummary]:
+        """테이블/뷰 목록 (카운트 없이 빠르게)."""
+        items = [TableSummary(n, "table") for n in self.list_tables()]
+        items.extend(TableSummary(n, "view") for n in self.list_views())
+        return items
+
+    def get_table_info(self, table: str, *, use_cache: bool = True) -> list[dict[str, Any]]:
         self._validate_identifier(table)
+        if use_cache and table in self._table_info_cache:
+            return self._table_info_cache[table]
+
+        conn = self._require()
         cur = conn.execute(f'PRAGMA table_info("{table}")')
         cols = []
         for row in cur.fetchall():
@@ -89,7 +122,14 @@ class DatabaseManager:
                     "pk": bool(row[5]),
                 }
             )
+        self._table_info_cache[table] = cols
         return cols
+
+    def invalidate_cache(self, table: Optional[str] = None) -> None:
+        if table is None:
+            self._table_info_cache.clear()
+        else:
+            self._table_info_cache.pop(table, None)
 
     def get_create_sql(self, table: str) -> str:
         conn = self._require()
@@ -100,6 +140,19 @@ class DatabaseManager:
         )
         row = cur.fetchone()
         return row[0] if row and row[0] else ""
+
+    def get_indexes(self, table: str) -> list[dict[str, Any]]:
+        conn = self._require()
+        self._validate_identifier(table)
+        cur = conn.execute(f'PRAGMA index_list("{table}")')
+        indexes = []
+        for r in cur.fetchall():
+            name = r[1]
+            unique = bool(r[2])
+            cols_cur = conn.execute(f'PRAGMA index_info("{name}")')
+            col_names = [c[2] for c in cols_cur.fetchall()]
+            indexes.append({"name": name, "unique": unique, "columns": col_names})
+        return indexes
 
     def get_foreign_keys(self, table: str) -> list[dict[str, Any]]:
         conn = self._require()
@@ -161,16 +214,19 @@ class DatabaseManager:
 
         params = list(params or [])
         statements = self._split_statements(sql)
+        t0 = time.perf_counter()
 
         last_select: Optional[QueryResult] = None
         total_affected = 0
         messages: list[str] = []
+        ran = 0
 
         for stmt in statements:
             if not stmt.strip():
                 continue
+            ran += 1
+            # multi-statement 시 파라미터는 단일 문에만 바인딩
             cur = conn.execute(stmt, params if len(statements) == 1 else [])
-            # Only bind params for single-statement runs; multi-statement uses no params.
             if self._is_select_like(stmt):
                 rows = cur.fetchall()
                 columns = [d[0] for d in cur.description] if cur.description else []
@@ -185,22 +241,32 @@ class DatabaseManager:
             else:
                 total_affected += cur.rowcount if cur.rowcount >= 0 else 0
                 messages.append(f"OK (영향 행: {cur.rowcount})")
+                # DDL 후 캐시 무효화
+                self.invalidate_cache()
 
         conn.commit()
+        elapsed = (time.perf_counter() - t0) * 1000.0
 
         if last_select is not None:
             if messages:
                 last_select.message = "; ".join(messages) + " | " + last_select.message
                 last_select.affected = total_affected
+            last_select.elapsed_ms = elapsed
+            last_select.statements = ran
+            last_select.message = f"{last_select.message}  ·  {elapsed:.1f}ms"
             return last_select
 
         return QueryResult(
             columns=[],
             rows=[],
             rowcount=0,
-            message="; ".join(messages) if messages else "실행 완료",
+            message=(
+                f"{'; '.join(messages) if messages else '실행 완료'}  ·  {elapsed:.1f}ms"
+            ),
             is_select=False,
             affected=total_affected,
+            elapsed_ms=elapsed,
+            statements=ran,
         )
 
     def insert_row(self, table: str, data: dict[str, Any]) -> int:
@@ -258,8 +324,7 @@ class DatabaseManager:
 
     def get_primary_keys(self, table: str) -> list[str]:
         info = self.get_table_info(table)
-        pks = [c["name"] for c in info if c["pk"]]
-        return pks
+        return [c["name"] for c in info if c["pk"]]
 
     def export_csv(self, path: str | Path, columns: list[str], rows: list[tuple]) -> None:
         path = Path(path)

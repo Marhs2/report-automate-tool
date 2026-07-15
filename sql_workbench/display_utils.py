@@ -19,11 +19,13 @@ LONG_TEXT_COLS = {
     "important_summary",
 }
 
+NULL_MARK = "∅"
+
 
 def format_cell(value: Any, col_name: str = "", max_len: int = 80) -> str:
     """Treeview용 한 줄 미리보기."""
     if value is None:
-        return "∅"
+        return NULL_MARK
     text = str(value)
     text = _WS_RE.sub(" ", text).strip()
     if col_name.lower().endswith("json") or col_name.lower() == "parsed_json":
@@ -82,20 +84,20 @@ def suggest_col_width(col_name: str, sample_values: list[Any] | None = None) -> 
     """컬럼 기본 폭 추정."""
     name = col_name.lower()
     if name in {"id"} or name.endswith("_id"):
-        return 70
+        return 72
     if "date" in name or name.endswith("_at"):
-        return 140
+        return 150
     if name in LONG_TEXT_COLS or name.endswith("json") or "text" in name:
-        return 220
+        return 240
     if name in {"name", "title"}:
-        return 160
+        return 170
 
-    max_w = max(len(col_name) * 10 + 24, 90)
+    max_w = max(len(col_name) * 10 + 28, 96)
     if sample_values:
         for v in sample_values[:20]:
             s = format_cell(v, col_name, max_len=60)
-            max_w = max(max_w, min(320, len(s) * 8 + 20))
-    return min(max_w, 320)
+            max_w = max(max_w, min(340, len(s) * 8 + 22))
+    return min(max_w, 340)
 
 
 def is_long_text_column(col_name: str, col_type: str = "") -> bool:
@@ -108,3 +110,16 @@ def is_long_text_column(col_name: str, col_type: str = "") -> bool:
     if t in {"TEXT", "BLOB", "CLOB"} and name not in {"name"}:
         return name not in {"name", "type", "status"}
     return False
+
+
+def estimate_row_bytes(row: tuple) -> int:
+    """대략적 행 크기 (대용량 셀 감지용)."""
+    total = 0
+    for v in row:
+        if v is None:
+            continue
+        if isinstance(v, (bytes, bytearray)):
+            total += len(v)
+        else:
+            total += len(str(v))
+    return total

@@ -186,6 +186,7 @@ def send_report(data: ReportRequest):
 
 
 
+
 @app.get("/user-activities")
 def get_user_activities(year: int, month: int):
     first_day = date(year, month, 1)
@@ -193,53 +194,55 @@ def get_user_activities(year: int, month: int):
         year + (month == 12), (month % 12) + 1, 1
     ) - timedelta(days=1)
 
-    today = date.today()
-    last_day = min(last_day_of_month, today) if (year, month) == (today.year, today.month) else last_day_of_month
-
     start_date = first_day.isoformat()
     end_date = last_day_of_month.isoformat()
 
     with get_db() as conn:
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id, name FROM members ORDER BY id")
+        cursor.execute("""
+            SELECT id, name
+            FROM members
+            ORDER BY id
+        """)
         members = cursor.fetchall()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT report_date, member_id, COUNT(id)
             FROM daily_reports
-            WHERE report_date >= ? AND report_date <= ?
+            WHERE report_date BETWEEN ? AND ?
             GROUP BY report_date, member_id
-            """,
-            (start_date, end_date),
-        )
+        """, (start_date, end_date))
 
         counts = defaultdict(dict)
         for report_date, member_id, count in cursor.fetchall():
-            counts[report_date][member_id] = count
+            counts[member_id][report_date] = count
 
     result = []
-    current = first_day
-    while current <= last_day:
-        report_date = current.isoformat()
-        day_counts = counts.get(report_date, {})
+
+    for member_id, name in members:
+        activities = []
+
+        current = first_day
+        while current <= last_day_of_month:  # 수정
+            report_date = current.isoformat()
+
+            activities.append({
+                "report_date": report_date,
+                "count": counts[member_id].get(report_date, 0)
+            })
+
+            current += timedelta(days=1)
+
+        activities.reverse()
+
         result.append({
-            "report_date": report_date,
-            "members": [
-                {
-                    "member_id": member_id,
-                    "name": name,
-                    "count": day_counts.get(member_id, 0),
-                }
-                for member_id, name in members
-            ],
+            "member_id": member_id,
+            "name": name,
+            "activities": activities
         })
-        current += timedelta(days=1)
 
-    result.reverse()
     return result
-
 
 
 @app.get("/reports")

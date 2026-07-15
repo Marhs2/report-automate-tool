@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted ,ref } from "vue";
+import { onMounted, ref } from "vue";
 import useApi from "../composables/useApi";
 
 const { GetUserActivities } = useApi();
@@ -17,14 +17,14 @@ onMounted(() => {
 </script>
 
 <template>
-    <div>
-        <div v-for="activity in userActivities" :key="activity.report_date">
-            <h3>{{ activity.report_date }}</h3>
-            <ul>
-                <li v-for="member in activity.members" :key="member.member_id">
-                    {{ member.name }} - {{ member.count > 0 ? `제출 ${member.count}회` : '미제출' }}
-                </li>
-            </ul>
+    <div style="max-width: 800px; ">
+        <div v-for="activity in userActivities" :key="activity.report_date" style="display: flex; flex-direction: row; justify-content: space-evenly; align-items: center">
+            <h4>{{ activity.name }}</h4>
+            <div v-for="item in activity.activities" :key="item.id">
+                <input type="checkbox" :checked="item.count > 0" readonly />
+            </div>
         </div>
     </div>
 </template>
+
+<style></style>
