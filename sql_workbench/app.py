@@ -498,7 +498,11 @@ class SqlWorkbench(tk.Tk):
         )
         vpaned.add(editor_frame, weight=2)
 
-        self.sql_editor = SqlEditor(editor_frame, self.palette)
+        self.sql_editor = SqlEditor(
+            editor_frame,
+            self.palette,
+            schema_provider=self._sql_schema_for_autocomplete,
+        )
         self.sql_editor.pack(fill="both", expand=True)
         # expose .sql_text for any legacy refs
         self.sql_text = self.sql_editor.text
@@ -718,6 +722,24 @@ class SqlWorkbench(tk.Tk):
             self._reload_table()
             self._load_structure(self.current_table)
         self._set_status("새로고침 완료")
+
+    def _sql_schema_for_autocomplete(self) -> dict[str, Any]:
+        """SQL 편집기 자동완성용 스키마 스냅샷."""
+        if not self.db.is_connected:
+            return {"tables": [], "views": [], "columns": {}}
+        try:
+            tables = self.db.list_tables()
+            views = self.db.list_views()
+        except Exception:
+            return {"tables": [], "views": [], "columns": {}}
+
+        columns: dict[str, list[str]] = {}
+        for name in list(tables) + list(views):
+            try:
+                columns[name] = [c["name"] for c in self.db.get_table_info(name)]
+            except Exception:
+                columns[name] = []
+        return {"tables": tables, "views": views, "columns": columns}
 
     def _refresh_schema(self) -> None:
         self.schema_tree.delete(*self.schema_tree.get_children())

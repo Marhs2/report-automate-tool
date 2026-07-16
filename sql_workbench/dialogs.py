@@ -322,7 +322,7 @@ class ShortcutsDialog(tk.Toplevel):
     def __init__(self, parent: tk.Misc, palette: Optional[Palette] = None) -> None:
         super().__init__(parent)
         self.title("단축키")
-        self.geometry("480x420")
+        self.geometry("520x520")
         self.resizable(False, False)
         self.transient(parent)
         if palette:
@@ -331,6 +331,10 @@ class ShortcutsDialog(tk.Toplevel):
         items = [
             ("F5 / Ctrl+Enter", "SQL 실행"),
             ("Ctrl+Shift+Enter", "선택 영역 실행"),
+            ("Ctrl+Space", "SQL 자동완성 (키워드/테이블/컬럼)"),
+            ("↑ / ↓", "자동완성 항목 이동"),
+            ("Tab / Enter", "자동완성 선택"),
+            ("Esc", "자동완성 닫기"),
             ("Ctrl+O", "DB 열기"),
             ("Ctrl+R", "스키마/데이터 새로고침"),
             ("Ctrl+S", "행 편집 저장 (다이얼로그)"),

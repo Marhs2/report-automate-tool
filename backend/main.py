@@ -1,15 +1,12 @@
 import json
 from collections import defaultdict
 from datetime import date, timedelta
-
-import requests
-from db import get_db
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from pydantic import BaseModel
-
-app = FastAPI()
+import requests
+from db import get_db
 
 
 app = FastAPI()
@@ -185,6 +182,18 @@ def send_report(data: ReportRequest):
     return report_data
 
 
+@app.get("/export-report/{report_id}")
+def export_report(report_id: int):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            select * from daily_reports
+            where id = ?
+        """, (report_id,))
+        report = cursor.fetchone()
+        if report is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return report
 
 
 @app.get("/user-activities")

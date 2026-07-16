@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from "vue";
 import useAPI from "../composables/useApi";
 
 const { GetReports } = useAPI();
+
 const reports = ref([]);
 const isLoading = ref(false);
 const filterDate = ref("");
@@ -53,9 +54,6 @@ const filteredReportsByProject = computed(() => {
     );
 });
 
-const downloadReport = async (reportId) => {
-
-};
 
 onMounted(() => {
     getReports();
@@ -96,8 +94,6 @@ onMounted(() => {
                             ><strong>Report Date:</strong>
                             {{ report.report_date }}</span
                         >
-                        <span style="border: 1px solid white; padding: 5px 5px; border-radius: 5px;"> 복사 </span>
-                        <span style="border: 1px solid white; padding: 5px 5px; border-radius: 5px;"> 다운로드 </span>
                     </div>
                 </div>
                 <div class="projects-list">
