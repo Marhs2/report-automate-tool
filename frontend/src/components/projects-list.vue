@@ -53,6 +53,10 @@ const filteredReportsByProject = computed(() => {
     );
 });
 
+const downloadReport = async (reportId) => {
+
+};
+
 onMounted(() => {
     getReports();
 });
@@ -83,7 +87,7 @@ onMounted(() => {
             >
                 <div class="report-header">
                     <h3 class="report-id">Report ID: {{ report.id }}</h3>
-                    <div class="report-meta">
+                    <div class="report-meta" style="display: flex;align-items: center;">
                         <span class="meta-item"
                             ><strong>Member ID:</strong>
                             {{ report.member_id }}</span
@@ -92,6 +96,8 @@ onMounted(() => {
                             ><strong>Report Date:</strong>
                             {{ report.report_date }}</span
                         >
+                        <span style="border: 1px solid white; padding: 5px 5px; border-radius: 5px;"> 복사 </span>
+                        <span style="border: 1px solid white; padding: 5px 5px; border-radius: 5px;"> 다운로드 </span>
                     </div>
                 </div>
                 <div class="projects-list">
