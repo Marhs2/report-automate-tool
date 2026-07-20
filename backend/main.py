@@ -1,13 +1,14 @@
 import json
 from collections import defaultdict
 from datetime import date, timedelta
+from select import select
+
+import requests
+from db import get_db
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from pydantic import BaseModel
-import requests
-from db import get_db
-
 
 app = FastAPI()
 
@@ -40,7 +41,8 @@ class ReportRequest(BaseModel):
 
 
 class WeeklyReportRequest(BaseModel):
-    reports: list[str]
+    userId: int
+    selects: list[str]
 
 
 class SaveReportData(BaseModel):
@@ -150,6 +152,37 @@ def read_model_list():
     return req.json()
 
 
+@app.post("/weekly-report")
+def weekly_report(data: WeeklyReportRequest):
+    # client = OpenAI(base_url="http://127.0.0.1:1234/v1", api_key="lm-studio")
+    #
+    # completion = client.chat.completions.create(
+    #     model="nuextract3",
+    #     messages=[
+    #         {"role": "system", "content": weekly_prompt},
+    #         {"role": "user", "content": reports_text},
+    #     ],
+    #     temperature=0.1,
+    #     response_format={
+    #         "type": "json_schema",
+    #         "json_schema": {
+    #             "name": "weekly_report",
+    #             "strict": True,
+    #             "schema": weekly_schema,
+    #         },
+    #     },
+    # )
+    #
+    # content = completion.choices[0].message.content
+    # if content is None:
+    #     content = "{}"
+    # report_data = json.loads(content)
+    #
+    # report_data = normalize_projects(report_data)
+
+    return data.userId, data.selects
+
+
 @app.post("/send-report")
 def send_report(data: ReportRequest):
     client = OpenAI(base_url="http://127.0.0.1:1234/v1", api_key="lm-studio")
@@ -186,10 +219,13 @@ def send_report(data: ReportRequest):
 def export_report(report_id: int):
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             select * from daily_reports
             where id = ?
-        """, (report_id,))
+        """,
+            (report_id,),
+        )
         report = cursor.fetchone()
         if report is None:
             raise HTTPException(status_code=404, detail="Report not found")
@@ -199,9 +235,9 @@ def export_report(report_id: int):
 @app.get("/user-activities")
 def get_user_activities(year: int, month: int):
     first_day = date(year, month, 1)
-    last_day_of_month = date(
-        year + (month == 12), (month % 12) + 1, 1
-    ) - timedelta(days=1)
+    last_day_of_month = date(year + (month == 12), (month % 12) + 1, 1) - timedelta(
+        days=1
+    )
 
     start_date = first_day.isoformat()
     end_date = last_day_of_month.isoformat()
@@ -216,12 +252,15 @@ def get_user_activities(year: int, month: int):
         """)
         members = cursor.fetchall()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT report_date, member_id, COUNT(id)
             FROM daily_reports
             WHERE report_date BETWEEN ? AND ?
             GROUP BY report_date, member_id
-        """, (start_date, end_date))
+        """,
+            (start_date, end_date),
+        )
 
         counts = defaultdict(dict)
         for report_date, member_id, count in cursor.fetchall():
@@ -236,20 +275,18 @@ def get_user_activities(year: int, month: int):
         while current <= last_day_of_month:  # 수정
             report_date = current.isoformat()
 
-            activities.append({
-                "report_date": report_date,
-                "count": counts[member_id].get(report_date, 0)
-            })
+            activities.append(
+                {
+                    "report_date": report_date,
+                    "count": counts[member_id].get(report_date, 0),
+                }
+            )
 
             current += timedelta(days=1)
 
         activities.reverse()
 
-        result.append({
-            "member_id": member_id,
-            "name": name,
-            "activities": activities
-        })
+        result.append({"member_id": member_id, "name": name, "activities": activities})
 
     return result
 
