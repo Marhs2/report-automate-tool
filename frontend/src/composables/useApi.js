@@ -17,6 +17,15 @@ export default function useAPI() {
     }
   };
 
+  const postWeekly = async (userId, selects) => {
+    const response = await axios.post(`${baseURL}/weekly-report`, {
+      userId,
+      selects: toRaw(selects),
+    });
+
+    return response;
+  };
+
   const GetUserActivities = async (year, month) => {
     try {
       const response = await axios.get(`${baseURL}/user-activities`, {
@@ -63,14 +72,12 @@ export default function useAPI() {
     }
   };
 
-
-
-
   return {
     PostReport,
     PostSaveReport,
     GetReports,
     GetProjects,
     GetUserActivities,
-    };
+    postWeekly
+  };
 }

@@ -1,37 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "WeeklyReportGenerationResult",
-  "description": "일일 업무 보고를 기간 단위(기본값: 해당 주 월요일~금요일)로 병합·요약한 주간보고서 생성 결과. 여러 날 반복 기재된 동일 업무는 하나로 합치고, 이슈는 해결/미해결로 구분한다. 이 결과는 화면 복사용 뷰와 워드(.docx) 파일 다운로드 생성에 그대로 사용된다.",
+  "title": "WeeklyReportResult",
+  "description": "주간보고 초안. 명세서 4.4) 기준. 요약 없음, dateRange 없음. 일간의 requests/nextPlans -> nextWeekPlans로 병합.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "dateRange": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "주간보고 기간. 별도 지정이 없으면 해당 주의 월요일~금요일을 기본값으로 사용한다.",
-      "properties": {
-        "startDate": {
-          "type": "string",
-          "description": "주간보고 시작일 (기본값: 해당 주 월요일). 형식 예: YYYY-MM-DD"
-        },
-        "endDate": {
-          "type": "string",
-          "description": "주간보고 종료일 (기본값: 해당 주 금요일). 형식 예: YYYY-MM-DD"
-        }
-      },
-      "required": [
-        "startDate",
-        "endDate"
-      ]
-    },
-    "weeklySummary": {
-      "type": "string",
-      "maxLength": 1000,
-      "description": "전체 주간보고 핵심 요약. 주요 완료 사항, 주요 진행 사항, 미해결 이슈, 다음 주 계획을 한 문단으로 요약한다."
-    },
     "projects": {
       "type": "array",
-      "description": "프로젝트별 주간보고 내용. 완료 업무, 진행 중 업무, 이슈(해결/미해결 구분), 요청, 다음 주 계획으로 구성된다.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -39,116 +14,40 @@
           "projectName": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 100,
-            "description": "프로젝트명"
-          },
-          "projectSummary": {
-            "type": "string",
-            "maxLength": 600,
-            "description": "해당 프로젝트의 주간 핵심 요약"
+            "maxLength": 100
           },
           "completedTasks": {
             "type": "array",
-            "description": "이번 주 완료된 업무. 여러 날 반복 기재된 동일 업무는 하나로 병합한다.",
             "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "maxLength": 180
-            }
+            "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           },
           "inProgressTasks": {
             "type": "array",
-            "description": "이번 주 말 기준 아직 진행 중인 업무. 여러 날 반복 기재된 동일 업무는 하나로 병합하며, 이후 완료된 업무는 제외한다.",
             "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "maxLength": 180
-            }
+            "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           },
-          "resolvedIssues": {
+          "issues": {
             "type": "array",
-            "description": "이번 주 중 해결된 이슈. 오류 수정 완료, 문제 해결, 해결됨 등이 확인된 항목. unresolvedIssues와 명확히 구분하여 표시한다.",
             "uniqueItems": true,
             "items": {
-              "type": "string",
-              "maxLength": 180
-            }
-          },
-          "unresolvedIssues": {
-            "type": "array",
-            "description": "이번 주 말 기준 해결되지 않은 이슈. 미해결, 원인 확인 중, 계속 발생, 남아 있음 등이 포함된 항목. resolvedIssues와 명확히 구분하여 표시한다.",
-            "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "maxLength": 180
-            }
-          },
-          "requests": {
-            "type": "array",
-            "description": "협조 요청, 확인 필요, 자료 요청, 검토 요청 등",
-            "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "maxLength": 180
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "content": { "type": "string", "minLength": 1, "maxLength": 300 },
+                "status": { "type": "string", "enum": ["해결", "미해결"] }
+              },
+              "required": ["content", "status"]
             }
           },
           "nextWeekPlans": {
             "type": "array",
-            "description": "다음 주 계획 또는 주간보고 이후 진행 예정 작업",
             "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "maxLength": 180
-            }
-          },
-          "contributors": {
-            "type": "array",
-            "description": "해당 프로젝트를 보고한 작성자 목록",
-            "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "maxLength": 50
-            }
+            "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           }
         },
-        "required": [
-          "projectName",
-          "projectSummary",
-          "completedTasks",
-          "inProgressTasks",
-          "resolvedIssues",
-          "unresolvedIssues",
-          "requests",
-          "nextWeekPlans",
-          "contributors"
-        ]
-      }
-    },
-    "missingSubmissions": {
-      "type": "array",
-      "description": "미제출자 목록. 입력에 제공된 미제출 정보를 그대로 정리한다.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "date": {
-            "type": "string"
-          },
-          "author": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "date",
-          "author"
-        ]
+        "required": ["projectName", "completedTasks", "inProgressTasks", "issues", "nextWeekPlans"]
       }
     }
   },
-  "required": [
-    "dateRange",
-    "weeklySummary",
-    "projects",
-    "missingSubmissions"
-  ]
+  "required": ["projects"]
 }

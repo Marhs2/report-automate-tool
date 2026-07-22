@@ -1,7 +1,6 @@
 import json
 from collections import defaultdict
 from datetime import date, timedelta
-from select import select
 
 import requests
 from db import get_db
@@ -82,21 +81,27 @@ KEYWORD_FIX = {
 
 
 def guess_project(project):
+    issues = [
+        issue["content"] if isinstance(issue, dict) else issue
+        for issue in project.get("issues", [])
+    ]
+
     text = " ".join(
-        project["completedTasks"]
-        + project["inProgressTasks"]
-        + project["issues"]
-        + project["requests"]
-        + project["nextPlans"]
+        project.get("completedTasks", [])
+        + project.get("inProgressTasks", [])
+        + issues
+        + project.get("requests", [])
+        + project.get("nextPlans", project.get("nextWeekPlans", []))
     )
+
     for keyword, target in KEYWORD_FIX.items():
         if keyword in text:
             return target
+
+    # 키워드가 없으면 원래 프로젝트명 유지
     return project["projectName"]
 
-
 def normalize_projects(report_data):
-
     merged = defaultdict(
         lambda: {
             "completedTasks": [],
@@ -108,37 +113,69 @@ def normalize_projects(report_data):
     )
 
     for project in report_data["projects"]:
-        project_name = guess_project(project)
+        completed_tasks = [task for task in project.get("completedTasks", []) if task and str(task).strip()]
+        in_progress_tasks = [task for task in project.get("inProgressTasks", []) if task and str(task).strip()]
+        issues_list = [
+            issue
+            for issue in project.get("issues", [])
+            if issue and (str(issue).strip() if not isinstance(issue, dict) else any(issue.values()))
+        ]
+        requests_list = [req for req in project.get("requests", []) if req and str(req).strip()]
+        next_plans_list = [
+            plan
+            for plan in project.get("nextPlans", project.get("nextWeekPlans", []))
+            if plan and str(plan).strip()
+        ]
 
+        # 모든 항목이 비어있는 프로젝트는 병합 전에 배제
+        if not (completed_tasks or in_progress_tasks or issues_list or requests_list or next_plans_list):
+            continue
+
+        project_name = guess_project(project)
         project_name = PROJECT_FIX.get(project_name, project_name)
 
-        merged[project_name]["completedTasks"].extend(project["completedTasks"])
-
-        merged[project_name]["inProgressTasks"].extend(project["inProgressTasks"])
-
-        merged[project_name]["issues"].extend(project["issues"])
-
-        merged[project_name]["requests"].extend(project["requests"])
-
-        merged[project_name]["nextPlans"].extend(project["nextPlans"])
+        merged[project_name]["completedTasks"].extend(completed_tasks)
+        merged[project_name]["inProgressTasks"].extend(in_progress_tasks)
+        merged[project_name]["issues"].extend(issues_list)
+        merged[project_name]["requests"].extend(requests_list)
+        merged[project_name]["nextPlans"].extend(next_plans_list)
 
     result = []
 
     for name, data in merged.items():
+        unique_issues = []
+        for issue in data["issues"]:
+            if issue not in unique_issues:
+                # issue가 딕셔너리인 경우와 일반 문자열인 경우 모두 처리
+                if isinstance(issue, dict):
+                    if any(issue.values()):
+                        unique_issues.append(issue)
+                elif str(issue).strip():
+                    unique_issues.append(issue)
+
+        completed = [x for x in list(dict.fromkeys(data["completedTasks"])) if str(x).strip()]
+        in_progress = [x for x in list(dict.fromkeys(data["inProgressTasks"])) if str(x).strip()]
+        requests = [x for x in list(dict.fromkeys(data["requests"])) if str(x).strip()]
+        next_plans = [x for x in list(dict.fromkeys(data["nextPlans"])) if str(x).strip()]
+
+        # 모든 리스트가 비어있으면 결과에 추가하지 않고 제외 (이름만 있는 경우 삭제)
+        if not (completed or in_progress or unique_issues or requests or next_plans):
+            continue
+
         result.append(
             {
                 "projectName": name,
-                "completedTasks": list(dict.fromkeys(data["completedTasks"])),
-                "inProgressTasks": list(dict.fromkeys(data["inProgressTasks"])),
-                "issues": list(dict.fromkeys(data["issues"])),
-                "requests": list(dict.fromkeys(data["requests"])),
-                "nextPlans": list(dict.fromkeys(data["nextPlans"])),
+                "completedTasks": completed,
+                "inProgressTasks": in_progress,
+                "issues": unique_issues,
+                "requests": requests,
+                "nextPlans": next_plans,
             }
         )
 
     report_data["projects"] = result
-
     return report_data
+
 
 
 @app.get("/")
@@ -154,33 +191,50 @@ def read_model_list():
 
 @app.post("/weekly-report")
 def weekly_report(data: WeeklyReportRequest):
-    # client = OpenAI(base_url="http://127.0.0.1:1234/v1", api_key="lm-studio")
-    #
-    # completion = client.chat.completions.create(
-    #     model="nuextract3",
-    #     messages=[
-    #         {"role": "system", "content": weekly_prompt},
-    #         {"role": "user", "content": reports_text},
-    #     ],
-    #     temperature=0.1,
-    #     response_format={
-    #         "type": "json_schema",
-    #         "json_schema": {
-    #             "name": "weekly_report",
-    #             "strict": True,
-    #             "schema": weekly_schema,
-    #         },
-    #     },
-    # )
-    #
-    # content = completion.choices[0].message.content
-    # if content is None:
-    #     content = "{}"
-    # report_data = json.loads(content)
-    #
-    # report_data = normalize_projects(report_data)
+    with get_db() as db:
+        res = db.execute(
+            "SELECT parsed_json FROM daily_reports WHERE member_id = ? AND report_date IN ({})".format(
+                ",".join(["?"] * len(data.selects))
+            ),
+            (data.userId, *data.selects),
+        ).fetchall()
 
-    return data.userId, data.selects
+        reports = [json.loads(row[0]) for row in res]
+
+        client = OpenAI(base_url="http://127.0.0.1:1234/v1", api_key="lm-studio")
+
+        completion = client.chat.completions.create(
+            model="models--lmstudio-community--gemma-4-12b-it-qat",
+            messages=[
+                {"role": "system", "content": weekly_prompt},
+                {"role": "user", "content": json.dumps(reports)},
+            ],
+            temperature=0.1,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "weekly_report",
+                    "strict": True,
+                    "schema": weekly_schema,
+                },
+            },
+        )
+
+        content = completion.choices[0].message.content
+        print(len(content))
+        print(content[-1000:])
+        if content is None:
+            content = "{}"
+        report_data = json.loads(content)
+
+        report_data = normalize_projects(report_data)
+
+        db.execute(
+            "INSERT INTO weekly_reports (member_id, selected_date, report_json) VALUES (?, ?, ?)",
+            (data.userId, json.dumps(data.selects), json.dumps(report_data)),
+        )
+
+        return report_data
 
 
 @app.post("/send-report")
@@ -188,7 +242,7 @@ def send_report(data: ReportRequest):
     client = OpenAI(base_url="http://127.0.0.1:1234/v1", api_key="lm-studio")
 
     completion = client.chat.completions.create(
-        model="nuextract3",
+        model="models--lmstudio-community--gemma-4-12b-it-qat",
         messages=[
             {"role": "system", "content": daily_prompt},
             {"role": "user", "content": data.report},
@@ -196,7 +250,6 @@ def send_report(data: ReportRequest):
         temperature=0.1,
         response_format={
             "type": "json_schema",
-            "reasoning_effort": "max",
             "json_schema": {
                 "name": "daily_report",
                 "strict": True,
@@ -209,8 +262,6 @@ def send_report(data: ReportRequest):
     if content is None:
         content = "{}"
     report_data = json.loads(content)
-
-    report_data = normalize_projects(report_data)
 
     return report_data
 
@@ -332,7 +383,6 @@ def get_projects():
                     "issues": json.loads(row[5]),
                     "requests": json.loads(row[6]),
                     "next_plans": json.loads(row[7]),
-                    "important_summary": row[8],
                 }
             )
     return projects
@@ -367,10 +417,9 @@ def save_projects(report_data, member_id):
                     in_progress_tasks,
                     issues,
                     requests,
-                    next_plans,
-                    important_summary
+                    next_plans
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     member_id,
@@ -380,7 +429,6 @@ def save_projects(report_data, member_id):
                     json.dumps(project["issues"]),
                     json.dumps(project["requests"]),
                     json.dumps(project["nextPlans"]),
-                    report_data["importantSummary"],
                 ),
             )
 

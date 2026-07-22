@@ -356,10 +356,13 @@ onMounted(() => {
     font-size: 13px;
     line-height: 1.5;
     color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
 }
 
 .project-section li {
     margin-bottom: 6px;
+    list-style-type: disc;
 }
 
 .empty-msg {

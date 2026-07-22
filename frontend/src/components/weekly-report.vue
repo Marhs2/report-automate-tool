@@ -1,11 +1,12 @@
 <script setup>
 import { ref } from "vue";
-import useExport from "../composables/useExport";
+import useAPI from "../composables/useApi";
 
-const { exportDocx } = useExport();
+const { postWeekly } = useAPI();
 
 const selects = ref([]);
 const userId = ref();
+const isLoading = ref(false);
 
 const date = new Date();
 const day = date.getDay();
@@ -21,8 +22,11 @@ const getThisWeek = () => {
 };
 
 const sendDates = async () => {
-  const response = await exportDocx(userId.value, selects.value);
-  console.log(response);};
+    isLoading.value = true;
+    const response = await postWeekly(userId.value, selects.value);
+    console.log(response);
+    isLoading.value = false;
+};
 
 const { monday } = getThisWeek();
 </script>
@@ -60,7 +64,16 @@ const { monday } = getThisWeek();
 
         <ul>
             <input type="number" placeholder="user Id" v-model="userId" />
-            <button v-on:click="() => sendDates()">주간 보고서 생성</button>
+            <button v-on:click="() => sendDates()" :disabled="isLoading">
+                {{ isLoading ? "로딩 중..." : "주간 보고서 생성" }}
+            </button>
+        </ul>
+    </div>
+
+    <div>
+        <h2>주간 보고서 다운로드</h2>
+        <ul>
+            <li></li>
         </ul>
     </div>
 </template>

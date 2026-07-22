@@ -1,4 +1,3 @@
-```vue
 <template>
     <h1>분석 결과</h1>
 
