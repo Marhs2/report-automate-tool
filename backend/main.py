@@ -2,9 +2,8 @@ import json
 from collections import defaultdict
 from datetime import date, timedelta
 
-import requests
 from db import get_db
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from pydantic import BaseModel
@@ -101,6 +100,7 @@ def guess_project(project):
     # 키워드가 없으면 원래 프로젝트명 유지
     return project["projectName"]
 
+
 def normalize_projects(report_data):
     merged = defaultdict(
         lambda: {
@@ -113,14 +113,29 @@ def normalize_projects(report_data):
     )
 
     for project in report_data["projects"]:
-        completed_tasks = [task for task in project.get("completedTasks", []) if task and str(task).strip()]
-        in_progress_tasks = [task for task in project.get("inProgressTasks", []) if task and str(task).strip()]
+        completed_tasks = [
+            task
+            for task in project.get("completedTasks", [])
+            if task and str(task).strip()
+        ]
+        in_progress_tasks = [
+            task
+            for task in project.get("inProgressTasks", [])
+            if task and str(task).strip()
+        ]
         issues_list = [
             issue
             for issue in project.get("issues", [])
-            if issue and (str(issue).strip() if not isinstance(issue, dict) else any(issue.values()))
+            if issue
+            and (
+                str(issue).strip()
+                if not isinstance(issue, dict)
+                else any(issue.values())
+            )
         ]
-        requests_list = [req for req in project.get("requests", []) if req and str(req).strip()]
+        requests_list = [
+            req for req in project.get("requests", []) if req and str(req).strip()
+        ]
         next_plans_list = [
             plan
             for plan in project.get("nextPlans", project.get("nextWeekPlans", []))
@@ -128,7 +143,13 @@ def normalize_projects(report_data):
         ]
 
         # 모든 항목이 비어있는 프로젝트는 병합 전에 배제
-        if not (completed_tasks or in_progress_tasks or issues_list or requests_list or next_plans_list):
+        if not (
+            completed_tasks
+            or in_progress_tasks
+            or issues_list
+            or requests_list
+            or next_plans_list
+        ):
             continue
 
         project_name = guess_project(project)
@@ -153,10 +174,16 @@ def normalize_projects(report_data):
                 elif str(issue).strip():
                     unique_issues.append(issue)
 
-        completed = [x for x in list(dict.fromkeys(data["completedTasks"])) if str(x).strip()]
-        in_progress = [x for x in list(dict.fromkeys(data["inProgressTasks"])) if str(x).strip()]
+        completed = [
+            x for x in list(dict.fromkeys(data["completedTasks"])) if str(x).strip()
+        ]
+        in_progress = [
+            x for x in list(dict.fromkeys(data["inProgressTasks"])) if str(x).strip()
+        ]
         requests = [x for x in list(dict.fromkeys(data["requests"])) if str(x).strip()]
-        next_plans = [x for x in list(dict.fromkeys(data["nextPlans"])) if str(x).strip()]
+        next_plans = [
+            x for x in list(dict.fromkeys(data["nextPlans"])) if str(x).strip()
+        ]
 
         # 모든 리스트가 비어있으면 결과에 추가하지 않고 제외 (이름만 있는 경우 삭제)
         if not (completed or in_progress or unique_issues or requests or next_plans):
@@ -177,16 +204,9 @@ def normalize_projects(report_data):
     return report_data
 
 
-
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
-
-
-@app.get("/model-list")
-def read_model_list():
-    req = requests.get("http://127.0.0.1:1234/v1/models")
-    return req.json()
 
 
 @app.post("/weekly-report")
@@ -266,23 +286,6 @@ def send_report(data: ReportRequest):
     return report_data
 
 
-@app.get("/export-report/{report_id}")
-def export_report(report_id: int):
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            select * from daily_reports
-            where id = ?
-        """,
-            (report_id,),
-        )
-        report = cursor.fetchone()
-        if report is None:
-            raise HTTPException(status_code=404, detail="Report not found")
-        return report
-
-
 @app.get("/user-activities")
 def get_user_activities(year: int, month: int):
     first_day = date(year, month, 1)
@@ -340,6 +343,28 @@ def get_user_activities(year: int, month: int):
         result.append({"member_id": member_id, "name": name, "activities": activities})
 
     return result
+
+
+@app.get("/weekly")
+def get_weekly():
+    with get_db() as db:
+        rows = db.execute("""
+            SELECT w.id, w.member_id, m.name, w.selected_date, w.report_json, w.created_at
+            FROM weekly_reports w
+            LEFT JOIN members m ON w.member_id = m.id
+        """).fetchall()
+
+    return [
+        {
+            "id": row[0],
+            "memberId": row[1],
+            "memberName": row[2],
+            "selectedDate": json.loads(row[3]),
+            "report": json.loads(row[4]),
+            "createdAt": row[5],
+        }
+        for row in rows
+    ]
 
 
 @app.get("/reports")

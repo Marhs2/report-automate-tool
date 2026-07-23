@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toRaw } from "vue";
 
 const baseURL = "http://127.0.0.1:8000";
 
@@ -24,6 +25,16 @@ export default function useAPI() {
     });
 
     return response;
+  };
+
+  const GetWeeklyReport = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/weekly`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching weekly report:", error);
+      throw error;
+    }
   };
 
   const GetUserActivities = async (year, month) => {
@@ -78,6 +89,7 @@ export default function useAPI() {
     GetReports,
     GetProjects,
     GetUserActivities,
-    postWeekly
+    postWeekly,
+    GetWeeklyReport,
   };
 }
