@@ -9,7 +9,7 @@ import { Download } from "lucide-vue-next";
 const { postWeekly, GetWeeklyReport } = useAPI();
 
 const selects = ref([]);
-const userId = ref();
+const userId = ref(sessionStorage.getItem("selectedUser") || "");
 const weeklyReport = ref(null);
 const isLoading = ref(false);
 
@@ -129,7 +129,10 @@ const downloadReport = async (report) => {
   }
 };
 
-onMounted(fetchWeeklyReport);
+onMounted(() => {
+    userId.value = sessionStorage.getItem("selectedUser") || "";
+    fetchWeeklyReport();
+});
 </script>
 
 <template>
@@ -171,7 +174,7 @@ onMounted(fetchWeeklyReport);
       </div>
 
       <div class="generate-bar">
-        <input type="number" placeholder="user Id" v-model="userId" class="input user-id-input" required    />
+        <span class="user-id-display">선택된 사용자 ID: {{ userId }}</span>
         <button class="btn btn-primary" v-on:click="() => sendDates()" :disabled="isLoading">
           {{ isLoading ? "로딩 중..." : "주간 보고서 생성" }}
         </button>
@@ -239,9 +242,9 @@ onMounted(fetchWeeklyReport);
   border-top: 1px solid var(--border);
 }
 
-.user-id-input {
-  width: auto;
-  max-width: 160px;
+.user-id-display {
+  font-size: 14px;
+  color: var(--text-h);
 }
 
 .report-list {

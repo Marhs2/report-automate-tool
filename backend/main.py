@@ -38,6 +38,10 @@ class ReportRequest(BaseModel):
     report: str
 
 
+class UserRequest(BaseModel):
+    name: str
+
+
 class WeeklyReportRequest(BaseModel):
     userId: int
     selects: list[str]
@@ -411,6 +415,26 @@ def get_projects():
                 }
             )
     return projects
+
+
+@app.post("/users")
+def save_user(data: UserRequest):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO members (name) VALUES (?)",
+            (data.name,),
+        )
+        conn.commit()
+    return {"message": "User saved successfully."}
+
+
+@app.get("/users")
+def get_users():
+    with get_db() as db:
+        users = db.execute("SELECT * FROM members").fetchall()
+
+    return [dict(user) for user in users]
 
 
 @app.post("/reports")

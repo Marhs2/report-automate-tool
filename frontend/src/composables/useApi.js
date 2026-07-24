@@ -83,6 +83,28 @@ export default function useAPI() {
     }
   };
 
+  const postUsers = async (name) => {
+    try {
+      const response = await axios.post(`${baseURL}/users`, {
+        name: name,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      throw error;
+    }
+  };
+
+  const getUsers = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/users`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      throw error;
+    }
+  };
+
   return {
     PostReport,
     PostSaveReport,
@@ -91,5 +113,7 @@ export default function useAPI() {
     GetUserActivities,
     postWeekly,
     GetWeeklyReport,
+    postUsers,
+    getUsers,
   };
 }

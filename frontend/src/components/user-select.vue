@@ -1,29 +1,86 @@
 <script setup>
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
+import useAPI from "../composables/useApi";
 
-const users = ref([
-    { id: 1, name: "User 1" },
-    { id: 2, name: "User 2" },
-    { id: 3, name: "User 3" },
-]);
+const { getUsers, postUsers } = useAPI();
+
+const users = ref([]);
 const newUser = ref("");
+const selectedUser = ref(sessionStorage.getItem("selectedUser") || "선택");
 
-const createUser = () => {
-    users.value.push({ id: users.value.length + 1, name: newUser.value });
+const setUser = () => {
+    if (selectedUser.value === "선택") return alert("유저를 선택해주세요");
+    sessionStorage.setItem("selectedUser", selectedUser.value);
 };
+
+const saveUser = async () => {
+    const res = await postUsers(newUser.value);
+    window.location.reload();
+};
+
+onMounted(async () => {
+    const data = await getUsers();
+    users.value = data;
+    console.log(users.value);
+});
 </script>
 <template>
-    <div>
-        <select>
-            <option v-for="user in users" :key="user.id" :value="user.id">
-                {{ user.name }}
-            </option>
-        </select>
+    <div class="page">
+        <div class="page-header">
+            <div>
+                <h1>사용자 선택</h1>
+                <p class="page-subtitle">
+                    보고서 작성자를 선택하거나 새로운 사용자를 생성하세요
+                </p>
+            </div>
+        </div>
 
-        <button @click="selectUser">Select</button>
+        <div class="card">
+            <h2>사용자 선택</h2>
+            <div class="field">
+                <label for="user-select">사용자</label>
+                <select id="user-select" v-model="selectedUser" class="input">
+                    <option value="선택">선택</option>
+                    <option
+                        v-for="user in users"
+                        :key="user.id"
+                        :value="user.id"
+                    >
+                        {{ user.name }}
+                    </option>
+                </select>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-primary" @click="setUser">선택</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>새 사용자 생성</h2>
+            <div class="field">
+                <label for="new-user">이름</label>
+                <input
+                    id="new-user"
+                    type="text"
+                    v-model="newUser"
+                    class="input"
+                    placeholder="사용자 이름을 입력하세요"
+                    required
+                />
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-primary" @click="saveUser">생성</button>
+            </div>
+        </div>
     </div>
-
-    <div>만약 사용자가 없다면 생성하세요</div>
-    <input type="text" v-model="newUser" />
-    <button @click="createUser">Create</button>
 </template>
+
+<style scoped>
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+</style>

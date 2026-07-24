@@ -3,7 +3,9 @@
         <div class="page-header">
             <div>
                 <h1>분석 결과</h1>
-                <p class="page-subtitle">AI가 정리한 내용을 확인하고 필요한 부분을 수정하세요</p>
+                <p class="page-subtitle">
+                    AI가 정리한 내용을 확인하고 필요한 부분을 수정하세요
+                </p>
             </div>
         </div>
 
@@ -14,7 +16,10 @@
                     :key="project.projectName || projectIndex"
                     class="card projects-container"
                 >
-                    <input class="input project-name-input" :value="project.projectName" />
+                    <input
+                        class="input project-name-input"
+                        :value="project.projectName"
+                    />
 
                     <div class="field-group completedTasks">
                         <h2>완료된 업무</h2>
@@ -26,8 +31,15 @@
                             :value="task"
                             v-model="project.completedTasks[taskIndex]"
                         />
-                        <div v-else class="empty-msg">완료된 업무가 없습니다</div>
-                        <button class="btn add-btn" @click="addCompletedTask(project)">+</button>
+                        <div v-else class="empty-msg">
+                            완료된 업무가 없습니다
+                        </div>
+                        <button
+                            class="btn add-btn"
+                            @click="addCompletedTask(project)"
+                        >
+                            +
+                        </button>
                     </div>
 
                     <div class="field-group inProgressTasks">
@@ -41,9 +53,16 @@
                             v-model="project.inProgressTasks[taskIndex]"
                         />
 
-                        <div v-else class="empty-msg">진행 중인 업무가 없습니다</div>
+                        <div v-else class="empty-msg">
+                            진행 중인 업무가 없습니다
+                        </div>
 
-                        <button class="btn add-btn" @click="addInProgressTask(project)">+</button>
+                        <button
+                            class="btn add-btn"
+                            @click="addInProgressTask(project)"
+                        >
+                            +
+                        </button>
                     </div>
 
                     <div class="field-group issues">
@@ -53,11 +72,13 @@
                             v-for="(issue, issueIndex) in project.issues"
                             :key="`issue-${issueIndex}`"
                             class="input"
-                            :value="issue"
+                            :value="issue.content"
                             v-model="project.issues[issueIndex]"
                         />
                         <div v-else class="empty-msg">이슈가 없습니다</div>
-                        <button class="btn add-btn" @click="addIssue(project)">+</button>
+                        <button class="btn add-btn" @click="addIssue(project)">
+                            +
+                        </button>
                     </div>
 
                     <div class="field-group requests">
@@ -71,7 +92,12 @@
                             v-model="project.requests[requestIndex]"
                         />
                         <div v-else class="empty-msg">요청사항이 없습니다</div>
-                        <button class="btn add-btn" @click="addRequest(project)">+</button>
+                        <button
+                            class="btn add-btn"
+                            @click="addRequest(project)"
+                        >
+                            +
+                        </button>
                     </div>
 
                     <div class="field-group nextPlans">
@@ -86,18 +112,22 @@
                         />
 
                         <div v-else class="empty-msg">다음 계획이 없습니다</div>
-                        <button class="btn add-btn" @click="addNextPlan(project)">+</button>
+                        <button
+                            class="btn add-btn"
+                            @click="addNextPlan(project)"
+                        >
+                            +
+                        </button>
                     </div>
                 </div>
 
                 <div class="card save-bar">
-                    <input
-                        type="text"
-                        class="input"
-                        v-model="memberId"
-                        placeholder="회원 ID를 입력하세요"
-                    />
-                    <button class="btn btn-primary" @click="saveReport">저장하기</button>
+                    <span class="member-id-display"
+                        >선택된 사용자 ID: {{ memberId }}</span
+                    >
+                    <button class="btn btn-primary" @click="saveReport">
+                        저장하기
+                    </button>
                 </div>
             </div>
 
@@ -122,7 +152,7 @@ const router = useRouter();
 
 const reportData = ref(null);
 const rawData = ref(null);
-const memberId = ref("");
+const memberId = ref(sessionStorage.getItem("selectedUser") || "");
 const { PostSaveReport } = useAPI();
 
 watch(
@@ -151,6 +181,8 @@ onMounted(() => {
     }
 
     console.log("Loaded report data:", reportData.value);
+
+    memberId.value = sessionStorage.getItem("selectedUser") || "";
 });
 
 const addCompletedTask = (project) => {
@@ -294,7 +326,8 @@ const saveReport = () => {
     align-items: center;
 }
 
-.save-bar .input {
-    flex: 1;
+.save-bar .member-id-display {
+    font-size: 14px;
+    color: var(--text-h);
 }
 </style>
