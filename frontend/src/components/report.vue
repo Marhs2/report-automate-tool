@@ -29,18 +29,45 @@ const sendReport = async () => {
 </script>
 
 <template>
-    <textarea
-        v-model="input"
-        placeholder="보고서 내용을 입력하세요"
-        rows="50"
-        cols="30"
-    ></textarea>
+    <div class="page">
+        <div class="page-header">
+            <div>
+                <h1>보고서 작성</h1>
+                <p class="page-subtitle">
+                    오늘의 업무 내용을 자유롭게 작성하면 AI가 항목별로 정리해줍니다
+                </p>
+            </div>
+        </div>
 
-    <button
-        @click="sendReport"
-        :disabled="aiLoading"
-        style="margin-top: 10px; padding: 10px 20px; font-size: 16px"
-    >
-        {{ aiLoading ? "전송 중..." : "보내기" }}
-    </button>
+        <div class="card">
+            <div class="field">
+                <label for="report-input">업무 내용</label>
+                <textarea
+                    id="report-input"
+                    v-model="input"
+                    placeholder="보고서 내용을 입력하세요"
+                    rows="16"
+                    class="textarea"
+                ></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button
+                    class="btn btn-primary"
+                    @click="sendReport"
+                    :disabled="aiLoading"
+                >
+                    {{ aiLoading ? "전송 중..." : "보내기" }}
+                </button>
+            </div>
+        </div>
+    </div>
 </template>
+
+<style scoped>
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+</style>

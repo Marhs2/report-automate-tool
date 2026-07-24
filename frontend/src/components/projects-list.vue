@@ -1,6 +1,13 @@
 <script setup>
 import { onMounted, ref, computed } from "vue";
 import useAPI from "../composables/useApi";
+import {
+    CheckCircle2,
+    CircleDot,
+    AlertTriangle,
+    MessageSquare,
+    ArrowRightCircle,
+} from "lucide-vue-next";
 
 const { GetReports } = useAPI();
 
@@ -9,6 +16,14 @@ const isLoading = ref(false);
 const filterDate = ref("");
 const filterMember = ref("");
 const filterProject = ref("");
+
+const sections = [
+    { key: "completedTasks", label: "완료된 업무", icon: CheckCircle2, tone: "completed" },
+    { key: "inProgressTasks", label: "진행 중인 업무", icon: CircleDot, tone: "in-progress" },
+    { key: "issues", label: "이슈", icon: AlertTriangle, tone: "issues" },
+    { key: "requests", label: "요청사항", icon: MessageSquare, tone: "request" },
+    { key: "nextPlans", label: "다음 계획", icon: ArrowRightCircle, tone: "next-plans" },
+];
 
 const getReports = async () => {
     isLoading.value = true;
@@ -61,31 +76,43 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="reports-wrapper">
-        <h2 class="page-title">Reports List</h2>
-        <div v-if="isLoading" class="loading-state">Loading reports...</div>
-        <div v-else class="reports-container">
-            <div class="filter-btns">
-                <input type="date" v-model="filterDate" />
-                <input
-                    type="text"
-                    placeholder="사람별로"
-                    v-model="filterMember"
-                />
-                <input
-                    type="text"
-                    placeholder="프로젝트"
-                    v-model="filterProject"
-                />
+    <div class="page">
+        <div class="page-header">
+            <div>
+                <h1>프로젝트 목록</h1>
+                <p class="page-subtitle">제출된 보고서를 날짜, 작성자, 프로젝트로 조회합니다</p>
             </div>
+        </div>
+
+        <div class="toolbar">
+            <input type="date" v-model="filterDate" class="input filter-input" />
+            <input
+                type="text"
+                placeholder="사람별로"
+                v-model="filterMember"
+                class="input filter-input"
+            />
+            <input
+                type="text"
+                placeholder="프로젝트"
+                v-model="filterProject"
+                class="input filter-input"
+            />
+        </div>
+
+        <div v-if="isLoading" class="empty-state">Loading reports...</div>
+        <div v-else-if="filteredReportsByProject.length === 0" class="empty-state">
+            조건에 맞는 보고서가 없습니다
+        </div>
+        <div v-else class="reports-container">
             <div
                 v-for="report in filteredReportsByProject"
                 :key="report.id"
-                class="report-item"
+                class="card report-item"
             >
                 <div class="report-header">
                     <h3 class="report-id">Report ID: {{ report.id }}</h3>
-                    <div class="report-meta" style="display: flex;align-items: center;">
+                    <div class="report-meta">
                         <span class="meta-item"
                             ><strong>Member ID:</strong>
                             {{ report.member_id }}</span
@@ -101,107 +128,35 @@ onMounted(() => {
                         v-for="(item, index) in JSON.parse(report.parsed_json)
                             .projects"
                         :key="index"
-                        class="project-card"
+                        class="project-block"
                     >
                         <div class="project-name">
-                            <strong>Project Name:</strong>
-                            <span>{{ item.projectName }}</span>
+                            <span class="project-name-label">Project</span>
+                            <span class="project-name-value">{{ item.projectName }}</span>
                         </div>
 
-                        <div class="project-grid">
-                            <div class="project-section project-completed">
-                                <h4>Completed Tasks</h4>
-                                <ul
-                                    v-if="
-                                        item.completedTasks &&
-                                        item.completedTasks.length > 0
-                                    "
-                                >
-                                    <li
-                                        v-for="(
-                                            task, idx
-                                        ) in item.completedTasks"
-                                        :key="idx"
-                                    >
-                                        {{ task }}
-                                    </li>
-                                </ul>
-                                <p v-else class="empty-msg">
-                                    No completed tasks
-                                </p>
-                            </div>
-
-                            <div class="project-section project-in-progress">
-                                <h4>In-Progress Tasks</h4>
-                                <ul
-                                    v-if="
-                                        item.inProgressTasks &&
-                                        item.inProgressTasks.length > 0
-                                    "
-                                >
-                                    <li
-                                        v-for="(
-                                            task, idx
-                                        ) in item.inProgressTasks"
-                                        :key="idx"
-                                    >
-                                        {{ task }}
-                                    </li>
-                                </ul>
-                                <p v-else class="empty-msg">
-                                    No in-progress tasks
-                                </p>
-                            </div>
-
-                            <div class="project-section project-issues">
-                                <h4>Issues</h4>
-                                <ul
-                                    v-if="item.issues && item.issues.length > 0"
-                                >
-                                    <li
-                                        v-for="(task, idx) in item.issues"
-                                        :key="idx"
-                                    >
-                                        {{ task }}
-                                    </li>
-                                </ul>
-                                <p v-else class="empty-msg">No issues</p>
-                            </div>
-
-                            <div class="project-section project-request">
-                                <h4>Requests</h4>
-                                <ul
-                                    v-if="
-                                        item.requests &&
-                                        item.requests.length > 0
-                                    "
-                                >
-                                    <li
-                                        v-for="(task, idx) in item.requests"
-                                        :key="idx"
-                                    >
-                                        {{ task }}
-                                    </li>
-                                </ul>
-                                <p v-else class="empty-msg">No requests</p>
-                            </div>
-
-                            <div class="project-section project-next-plans">
-                                <h4>Next Plans</h4>
-                                <ul
-                                    v-if="
-                                        item.nextPlans &&
-                                        item.nextPlans.length > 0
-                                    "
-                                >
-                                    <li
-                                        v-for="(task, idx) in item.nextPlans"
-                                        :key="idx"
-                                    >
-                                        {{ task }}
-                                    </li>
-                                </ul>
-                                <p v-else class="empty-msg">No next plans</p>
+                        <div class="detail-list">
+                            <div
+                                v-for="section in sections"
+                                :key="section.key"
+                                class="detail-row"
+                                :class="'tone-' + section.tone"
+                            >
+                                <div class="detail-label">
+                                    <component :is="section.icon" :size="15" />
+                                    <span>{{ section.label }}</span>
+                                </div>
+                                <div class="detail-content">
+                                    <ul v-if="item[section.key] && item[section.key].length > 0">
+                                        <li
+                                            v-for="(task, idx) in item[section.key]"
+                                            :key="idx"
+                                        >
+                                            {{ task }}
+                                        </li>
+                                    </ul>
+                                    <p v-else class="empty-msg">해당 없음</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -212,54 +167,26 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.reports-wrapper {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-    font-family:
-        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
-        sans-serif;
-    color: #e2e8f0;
-    background-color: #0f172a;
-    min-height: 100vh;
-}
-
-.page-title {
-    font-size: 24px;
-    margin-bottom: 24px;
-    font-weight: 700;
-    border-bottom: 2px solid #334155;
-    padding-bottom: 10px;
-    color: #f8fafc;
-}
-
-.loading-state {
-    text-align: center;
-    font-size: 18px;
-    color: #94a3b8;
-    padding: 40px;
+.filter-input {
+    width: auto;
+    min-width: 160px;
 }
 
 .reports-container {
     display: flex;
     flex-direction: column;
-    gap: 30px;
+    gap: 20px;
 }
 
 .report-item {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    box-shadow:
-        0 4px 6px -1px rgba(0, 0, 0, 0.2),
-        0 2px 4px -1px rgba(0, 0, 0, 0.1);
+    padding: 0;
     overflow: hidden;
 }
 
 .report-header {
-    background-color: #1e293b;
-    padding: 16px 20px;
-    border-bottom: 1px solid #334155;
+    background: var(--bg-soft);
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -269,106 +196,122 @@ onMounted(() => {
 
 .report-id {
     margin: 0;
-    font-size: 18px;
-    color: #38bdf8;
+    font-size: 15px;
+    color: var(--accent);
 }
 
 .report-meta {
     display: flex;
+    align-items: center;
     gap: 20px;
-    font-size: 14px;
-    color: #94a3b8;
+    font-size: 13px;
+    color: var(--text);
 }
 
 .projects-list {
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+    padding: 4px 20px 20px;
 }
 
-.project-card {
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 16px;
-    background: #0f172a;
+.project-block {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.project-block:last-child {
+    border-bottom: none;
+    padding-bottom: 4px;
 }
 
 .project-name {
-    font-size: 16px;
-    margin-bottom: 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px dashed #334155;
-    color: #f1f5f9;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 14px;
 }
 
-.project-name strong {
-    color: #94a3b8;
-}
-
-.project-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-}
-
-.project-section {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 12px;
-}
-
-.project-section h4 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 14px;
+.project-name-label {
+    font-size: 11px;
     font-weight: 600;
-    padding-bottom: 6px;
-    border-bottom: 2px solid #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text);
+    opacity: 0.7;
 }
 
-/* Section specific heading colors optimized for dark mode */
-.project-completed h4 {
-    color: #4ade80;
-    border-bottom-color: #4ade80;
-}
-.project-in-progress h4 {
-    color: #60a5fa;
-    border-bottom-color: #60a5fa;
-}
-.project-issues h4 {
-    color: #f87171;
-    border-bottom-color: #f87171;
-}
-.project-request h4 {
-    color: #fbbf24;
-    border-bottom-color: #fbbf24;
-}
-.project-next-plans h4 {
-    color: #2dd4bf;
-    border-bottom-color: #2dd4bf;
+.project-name-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-h);
 }
 
-.project-section ul {
-    margin: 0;
-    padding-left: 20px;
-    font-size: 13px;
-    line-height: 1.5;
-    color: #cbd5e1;
+.detail-list {
     display: flex;
     flex-direction: column;
 }
 
-.project-section li {
-    margin-bottom: 6px;
-    list-style-type: disc;
+.detail-row {
+    display: flex;
+    gap: 16px;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+}
+
+.detail-row:first-child {
+    border-top: none;
+}
+
+.detail-label {
+    flex: 0 0 150px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-h);
+}
+
+.detail-label svg {
+    flex-shrink: 0;
+}
+
+.tone-completed .detail-label svg {
+    color: var(--success);
+}
+.tone-in-progress .detail-label svg {
+    color: var(--accent);
+}
+.tone-issues .detail-label svg {
+    color: var(--danger);
+}
+.tone-request .detail-label svg {
+    color: var(--warning);
+}
+.tone-next-plans .detail-label svg {
+    color: #14b8a6;
+}
+
+.detail-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.detail-content ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+}
+
+.detail-content li {
+    list-style: disc;
 }
 
 .empty-msg {
     margin: 0;
     font-size: 13px;
-    color: #64748b;
+    color: var(--text);
     font-style: italic;
+    opacity: 0.6;
 }
 </style>
