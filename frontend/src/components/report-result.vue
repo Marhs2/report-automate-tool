@@ -73,7 +73,7 @@
                             :key="`issue-${issueIndex}`"
                             class="input"
                             :value="issue.content"
-                            v-model="project.issues[issueIndex]"
+                            v-model="project.issues[issueIndex].content"
                         />
                         <div v-else class="empty-msg">이슈가 없습니다</div>
                         <button class="btn add-btn" @click="addIssue(project)">
@@ -123,11 +123,16 @@
 
                 <div class="card save-bar">
                     <span class="member-id-display"
-                        >선택된 사용자 ID: {{ memberId }}</span
+                        >사용자: {{ userName }}</span
                     >
-                    <button class="btn btn-primary" @click="saveReport">
-                        저장하기
-                    </button>
+                    <div class="save-actions">
+                        <button class="btn" @click="retryExtract">
+                            재추출
+                        </button>
+                        <button class="btn btn-primary" @click="saveReport">
+                            저장하기
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -152,8 +157,9 @@ const router = useRouter();
 
 const reportData = ref(null);
 const rawData = ref(null);
-const memberId = ref(sessionStorage.getItem("selectedUser") || "");
-const { PostSaveReport } = useAPI();
+const userName = ref("");
+const aiLoading = ref(false);
+const { PostSaveReport, PostReport, getUsers } = useAPI();
 
 watch(
     reportData,
@@ -182,7 +188,19 @@ onMounted(() => {
 
     console.log("Loaded report data:", reportData.value);
 
-    memberId.value = sessionStorage.getItem("selectedUser") || "";
+    const userId = localStorage.getItem("report-selectedUser") || "";
+    if (userId) {
+        getUsers()
+            .then((users) => {
+                const found = users.find(
+                    (u) => String(u.id) === String(userId),
+                );
+                userName.value = found ? found.name : `사용자 ${userId}`;
+            })
+            .catch(() => {
+                userName.value = `사용자 ${userId}`;
+            });
+    }
 });
 
 const addCompletedTask = (project) => {
@@ -194,7 +212,7 @@ const addInProgressTask = (project) => {
 };
 
 const addIssue = (project) => {
-    project.issues.push("");
+    project.issues.push({ content: "", status: "미해결" });
 };
 
 const addRequest = (project) => {
@@ -208,19 +226,55 @@ const addNextPlan = (project) => {
 const saveReport = () => {
     if (reportData.value) {
         const jsonData = JSON.stringify(reportData.value, null, 2);
+        const reportDate =
+            sessionStorage.getItem("reportDate") ||
+            new Date().toISOString().split("T")[0];
 
-        PostSaveReport(jsonData, rawData.value, parseInt(memberId.value))
+        PostSaveReport(
+            jsonData,
+            rawData.value,
+            parseInt(sessionStorage.getItem("selectedUser") || "0"),
+            reportDate,
+        )
             .then((response) => {
                 console.log("보고서 저장 성공:", response);
                 alert("보고서가 성공적으로 저장되었습니다.");
                 sessionStorage.removeItem("reportData");
                 sessionStorage.removeItem("reportRaw");
+                sessionStorage.removeItem("reportDate");
                 router.push("/");
             })
             .catch((error) => {
                 console.error("보고서 저장 실패:", error);
                 alert("보고서 저장에 실패했습니다. 다시 시도해주세요.");
             });
+    }
+};
+
+const retryExtract = async () => {
+    if (!rawData.value) return;
+    const userId = localStorage.getItem("report-selectedUser") || "";
+    if (!userId) {
+        alert("사용자 정보가 없습니다.");
+        return;
+    }
+    try {
+        aiLoading.value = true;
+        const reportDate =
+            sessionStorage.getItem("reportDate") ||
+            new Date().toISOString().split("T")[0];
+        const res = await PostReport(
+            { content: rawData.value },
+            reportDate,
+            userId,
+        );
+        reportData.value = res;
+        sessionStorage.setItem("reportData", JSON.stringify(res));
+    } catch (error) {
+        console.error("재추출 실패:", error);
+        alert("재추출에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+        aiLoading.value = false;
     }
 };
 </script>
@@ -319,7 +373,7 @@ const saveReport = () => {
     font-size: 13px;
 }
 
-/* 하단 저장 영역 및 회원 ID 입력란 */
+/* 하단 저장 영역 */
 .save-bar {
     display: flex;
     gap: 12px;
@@ -329,5 +383,11 @@ const saveReport = () => {
 .save-bar .member-id-display {
     font-size: 14px;
     color: var(--text-h);
+}
+
+.save-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
 }
 </style>

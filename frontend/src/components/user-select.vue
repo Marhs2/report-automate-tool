@@ -1,21 +1,24 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import useAPI from "../composables/useApi";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
 
 const { getUsers, postUsers } = useAPI();
 
 const users = ref([]);
 const newUser = ref("");
-const selectedUser = ref(sessionStorage.getItem("selectedUser") || "선택");
+const selectedUser = ref(localStorage.getItem("report-selectedUser") || "선택");
 
 const setUser = () => {
     if (selectedUser.value === "선택") return alert("유저를 선택해주세요");
-    sessionStorage.setItem("selectedUser", selectedUser.value);
+    localStorage.setItem("report-selectedUser", selectedUser.value);
+    router.push("/");
 };
 
 const saveUser = async () => {
     const res = await postUsers(newUser.value);
-    window.location.reload();
 };
 
 onMounted(async () => {

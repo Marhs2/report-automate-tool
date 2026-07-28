@@ -310,6 +310,11 @@ code {
   cursor: not-allowed;
 }
 
+.btn-small {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);

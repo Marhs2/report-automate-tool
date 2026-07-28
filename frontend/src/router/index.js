@@ -5,6 +5,7 @@ import projectList from "../components/projects-list.vue";
 import activities from "../components/user-activities.vue";
 import weekly from "../components/weekly-report.vue";
 import users from "../components/user-select.vue";
+import weeklyDetail from "../components/weekly-detail.vue";
 
 const routes = [
   {
@@ -36,7 +37,12 @@ const routes = [
     path: "/users",
     name: "users",
     component: users,
-  }
+  },
+  {
+    path: "/weekly-detail/:id",
+    name: "weekly-detail",
+    component: weeklyDetail,
+  },
 ];
 const router = createRouter({
   history: createWebHistory("/"),

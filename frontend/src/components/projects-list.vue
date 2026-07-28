@@ -16,13 +16,35 @@ const isLoading = ref(false);
 const filterDate = ref("");
 const filterMember = ref("");
 const filterProject = ref("");
+const filterDateFrom = ref("");
+const filterDateTo = ref("");
 
 const sections = [
-    { key: "completedTasks", label: "완료된 업무", icon: CheckCircle2, tone: "completed" },
-    { key: "inProgressTasks", label: "진행 중인 업무", icon: CircleDot, tone: "in-progress" },
+    {
+        key: "completedTasks",
+        label: "완료된 업무",
+        icon: CheckCircle2,
+        tone: "completed",
+    },
+    {
+        key: "inProgressTasks",
+        label: "진행 중인 업무",
+        icon: CircleDot,
+        tone: "in-progress",
+    },
     { key: "issues", label: "이슈", icon: AlertTriangle, tone: "issues" },
-    { key: "requests", label: "요청사항", icon: MessageSquare, tone: "request" },
-    { key: "nextPlans", label: "다음 계획", icon: ArrowRightCircle, tone: "next-plans" },
+    {
+        key: "requests",
+        label: "요청사항",
+        icon: MessageSquare,
+        tone: "request",
+    },
+    {
+        key: "nextPlans",
+        label: "다음 계획",
+        icon: ArrowRightCircle,
+        tone: "next-plans",
+    },
 ];
 
 const getReports = async () => {
@@ -35,6 +57,7 @@ const getReports = async () => {
         console.error("Error fetching reports:", error);
     } finally {
         isLoading.value = false;
+        console.log(isLoading.value);
     }
 };
 
@@ -43,10 +66,16 @@ const filteredReports = computed(() => {
         const matchDate =
             filterDate.value === "" ||
             report.report_date?.includes(filterDate.value);
+        const matchRange =
+            (!filterDateFrom.value && !filterDateTo.value) ||
+            (filterDateFrom.value &&
+                report.report_date >= filterDateFrom.value &&
+                filterDateTo.value &&
+                report.report_date <= filterDateTo.value);
         const matchMember =
             filterMember.value === "" ||
             String(report.member_id).includes(filterMember.value);
-        return matchDate && matchMember;
+        return (matchDate || matchRange) && matchMember;
     });
 });
 
@@ -69,7 +98,6 @@ const filteredReportsByProject = computed(() => {
     );
 });
 
-
 onMounted(() => {
     getReports();
 });
@@ -80,12 +108,25 @@ onMounted(() => {
         <div class="page-header">
             <div>
                 <h1>프로젝트 목록</h1>
-                <p class="page-subtitle">제출된 보고서를 날짜, 작성자, 프로젝트로 조회합니다</p>
+                <p class="page-subtitle">
+                    제출된 보고서를 날짜, 작성자, 프로젝트로 조회합니다
+                </p>
             </div>
         </div>
 
         <div class="toolbar">
-            <input type="date" v-model="filterDate" class="input filter-input" />
+            <input
+                type="date"
+                v-model="filterDateFrom"
+                class="input filter-input"
+                placeholder="시작일"
+            />
+            <input
+                type="date"
+                v-model="filterDateTo"
+                class="input filter-input"
+                placeholder="종료일"
+            />
             <input
                 type="text"
                 placeholder="사람별로"
@@ -101,7 +142,10 @@ onMounted(() => {
         </div>
 
         <div v-if="isLoading" class="empty-state">Loading reports...</div>
-        <div v-else-if="filteredReportsByProject.length === 0" class="empty-state">
+        <div
+            v-else-if="filteredReportsByProject.length === 0"
+            class="empty-state"
+        >
             조건에 맞는 보고서가 없습니다
         </div>
         <div v-else class="reports-container">
@@ -125,14 +169,15 @@ onMounted(() => {
                 </div>
                 <div class="projects-list">
                     <div
-                        v-for="(item, index) in JSON.parse(report.parsed_json)
-                            .projects"
+                        v-for="(item, index) in report.parsed_json.projects"
                         :key="index"
                         class="project-block"
                     >
                         <div class="project-name">
                             <span class="project-name-label">Project</span>
-                            <span class="project-name-value">{{ item.projectName }}</span>
+                            <span class="project-name-value">{{
+                                item.projectName
+                            }}</span>
                         </div>
 
                         <div class="detail-list">
@@ -147,9 +192,16 @@ onMounted(() => {
                                     <span>{{ section.label }}</span>
                                 </div>
                                 <div class="detail-content">
-                                    <ul v-if="item[section.key] && item[section.key].length > 0">
+                                    <ul
+                                        v-if="
+                                            item[section.key] &&
+                                            item[section.key].length > 0
+                                        "
+                                    >
                                         <li
-                                            v-for="(task, idx) in item[section.key]"
+                                            v-for="(task, idx) in item[
+                                                section.key
+                                            ]"
                                             :key="idx"
                                         >
                                             {{ task }}

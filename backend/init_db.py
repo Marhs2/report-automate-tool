@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS daily_reports (
     raw_text TEXT NOT NULL,
     parsed_json TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (member_id) REFERENCES members(id)
+    FOREIGN KEY (member_id) REFERENCES members(id),
+    UNIQUE(member_id, report_date)
 )
 """)
 

@@ -7,7 +7,11 @@ const { GetUserActivities } = useApi();
 
 const userActivities = ref([]);
 
-const date = new Date();
+const currentDate = new Date();
+const selectedYear = ref(currentDate.getFullYear());
+const selectedMonth = ref(currentDate.getMonth() + 1);
+const viewMode = ref("month");
+const weekDays = ref([]);
 
 const tooltip = reactive({
     visible: false,
@@ -17,6 +21,21 @@ const tooltip = reactive({
 });
 
 let hideTimer = null;
+
+const getWeekDays = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMonday = now.getDate() - (day === 0 ? 7 : day) + 1;
+    const monday = new Date(now.setDate(diffToMonday));
+    const formatDate = (d) => d.toISOString().split("T")[0];
+    const days = [];
+    for (let i = 0; i < 5; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        days.push(formatDate(d));
+    }
+    return days;
+};
 
 function showTooltip(e, dateStr, count) {
     clearTimeout(hideTimer);
@@ -43,13 +62,34 @@ function hideTooltip() {
 
 async function fetchUserActivities() {
     const activities = await GetUserActivities(
-        date.getFullYear(),
-        date.getMonth() + 1,
+        selectedYear.value,
+        selectedMonth.value,
     );
     userActivities.value = activities;
 }
 
+function prevMonth() {
+    if (selectedMonth.value === 1) {
+        selectedMonth.value = 12;
+        selectedYear.value--;
+    } else {
+        selectedMonth.value--;
+    }
+    fetchUserActivities();
+}
+
+function nextMonth() {
+    if (selectedMonth.value === 12) {
+        selectedMonth.value = 1;
+        selectedYear.value++;
+    } else {
+        selectedMonth.value++;
+    }
+    fetchUserActivities();
+}
+
 onMounted(() => {
+    weekDays.value = getWeekDays();
     fetchUserActivities();
 });
 </script>
@@ -59,12 +99,38 @@ onMounted(() => {
         <div class="page-header">
             <div>
                 <h1>
-                    {{ date.getFullYear() }}년 {{ date.getMonth() + 1 }}월 활동
-                    기록
+                    {{ currentDate.getFullYear() }}년
+                    {{ currentDate.getMonth() + 1 }}월 활동 기록
                 </h1>
                 <p class="page-subtitle">
                     팀원별 보고서 제출 현황을 한눈에 확인하세요
                 </p>
+            </div>
+        </div>
+
+        <div class="view-controls">
+            <div class="month-nav">
+                <button class="btn btn-small" @click="prevMonth">&lt;</button>
+                <span class="current-period"
+                    >{{ selectedYear }}년 {{ selectedMonth }}월</span
+                >
+                <button class="btn btn-small" @click="nextMonth">&gt;</button>
+            </div>
+            <div class="view-toggle">
+                <button
+                    class="btn btn-small"
+                    :class="{ active: viewMode === 'month' }"
+                    @click="viewMode = 'month'"
+                >
+                    월별
+                </button>
+                <button
+                    class="btn btn-small"
+                    :class="{ active: viewMode === 'week' }"
+                    @click="viewMode = 'week'"
+                >
+                    주간
+                </button>
             </div>
         </div>
 
@@ -90,11 +156,21 @@ onMounted(() => {
                     <h4 class="activity-name">{{ activity.name }}</h4>
                     <div class="activity-days">
                         <div
-                            v-for="item in activity.activities"
+                            v-for="item in viewMode === 'week'
+                                ? activity.activities.filter((a) =>
+                                      weekDays.includes(a.report_date),
+                                  )
+                                : activity.activities"
                             :key="item.id"
                             class="log"
                             :class="item.count > 0 ? 'committed' : ''"
-                            @mouseenter="showTooltip($event, item.report_date, item.count)"
+                            @mouseenter="
+                                showTooltip(
+                                    $event,
+                                    item.report_date,
+                                    item.count,
+                                )
+                            "
                             @mousemove="moveTooltip"
                             @mouseleave="hideTooltip"
                         >
@@ -140,6 +216,35 @@ onMounted(() => {
 .legend-icon.none {
     color: var(--text);
     opacity: 0.5;
+}
+
+.view-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.month-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.current-period {
+    font-weight: 600;
+    color: var(--text-h);
+}
+
+.view-toggle {
+    display: flex;
+    gap: 4px;
+}
+
+.view-toggle .btn.active {
+    background: var(--accent-bg);
+    border-color: var(--accent-border);
+    color: var(--text-h);
 }
 
 .activity-row {
@@ -215,7 +320,9 @@ onMounted(() => {
 
 .tooltip-fade-enter-active,
 .tooltip-fade-leave-active {
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease;
 }
 
 .tooltip-fade-enter-from,

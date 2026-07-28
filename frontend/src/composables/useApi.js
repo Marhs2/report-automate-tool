@@ -4,12 +4,14 @@ import { toRaw } from "vue";
 const baseURL = "http://127.0.0.1:8000";
 
 export default function useAPI() {
-  const PostReport = async (reportData) => {
+  const PostReport = async (reportData, dateData, memberId) => {
     const replacedData = reportData.content.replace(/\n/g, "<br>");
 
     try {
       const response = await axios.post(`${baseURL}/send-report`, {
         report: replacedData,
+        date: dateData,
+        member_id: memberId,
       });
       return response.data;
     } catch (error) {
@@ -49,13 +51,22 @@ export default function useAPI() {
     }
   };
 
-  const PostSaveReport = async (parsed_json, rawData, member_id) => {
+  const PostSaveReport = async (
+    parsed_json,
+    rawData,
+    member_id,
+    report_date,
+  ) => {
     try {
-      const response = await axios.post(`${baseURL}/reports`, {
+      const payload = {
         report: rawData,
         parsed_json: parsed_json,
         member_id: parseInt(member_id),
-      });
+      };
+      if (report_date) {
+        payload.report_date = report_date;
+      }
+      const response = await axios.post(`${baseURL}/reports`, payload);
       return response.data;
     } catch (error) {
       console.error("Error saving report:", error);

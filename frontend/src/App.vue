@@ -5,14 +5,25 @@ import {
     CalendarDays,
     FileBarChart,
 } from "lucide-vue-next";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
 
 const navItems = [
     { to: "/", label: "프로젝트 목록", icon: FolderKanban },
     { to: "/report", label: "보고서 작성", icon: PenSquare },
     { to: "/activities", label: "활동 기록", icon: CalendarDays },
     { to: "/weekly", label: "주간 보고서", icon: FileBarChart },
-    { to: "/users", label: "사용자 선택", icon: FileBarChart },
 ];
+
+const user = localStorage.getItem("report-selectedUser");
+
+window.addEventListener("DOMContentLoaded", () => {
+    if (user == null) {
+        alert("사용자를 선택해주세요");
+        router.push("/users");
+    }
+});
 </script>
 
 <template>

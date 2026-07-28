@@ -1,9 +1,10 @@
 import json
+import os
 from collections import defaultdict
 from datetime import date, timedelta
 
 from db import get_db
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from pydantic import BaseModel
@@ -33,9 +34,15 @@ with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
 with open("./model_asset/weekly_prompt.txt", "r", encoding="utf-8") as f:
     weekly_prompt = f.read()
 
+MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "nuextract3")
+LM_BASE_URL = os.environ.get("LM_BASE_URL", "http://127.0.0.1:1234/v1")
+LM_API_KEY = os.environ.get("LM_API_KEY", "lm-studio")
+
 
 class ReportRequest(BaseModel):
     report: str
+    date: str
+    member_id: int
 
 
 class UserRequest(BaseModel):
@@ -51,6 +58,7 @@ class SaveReportData(BaseModel):
     report: str
     parsed_json: str
     member_id: int
+    report_date: str | None = None
 
 
 PROJECT_FIX = {
@@ -146,7 +154,6 @@ def normalize_projects(report_data):
             if plan and str(plan).strip()
         ]
 
-        # 모든 항목이 비어있는 프로젝트는 병합 전에 배제
         if not (
             completed_tasks
             or in_progress_tasks
@@ -171,12 +178,17 @@ def normalize_projects(report_data):
         unique_issues = []
         for issue in data["issues"]:
             if issue not in unique_issues:
-                # issue가 딕셔너리인 경우와 일반 문자열인 경우 모두 처리
                 if isinstance(issue, dict):
-                    if any(issue.values()):
-                        unique_issues.append(issue)
+                    content = issue.get("content", "")
+                    status = issue.get("status", "미해결")
+                    if content and str(content).strip():
+                        unique_issues.append(
+                            {"content": str(content).strip(), "status": status}
+                        )
                 elif str(issue).strip():
-                    unique_issues.append(issue)
+                    unique_issues.append(
+                        {"content": str(issue).strip(), "status": "미해결"}
+                    )
 
         completed = [
             x for x in list(dict.fromkeys(data["completedTasks"])) if str(x).strip()
@@ -189,7 +201,6 @@ def normalize_projects(report_data):
             x for x in list(dict.fromkeys(data["nextPlans"])) if str(x).strip()
         ]
 
-        # 모든 리스트가 비어있으면 결과에 추가하지 않고 제외 (이름만 있는 경우 삭제)
         if not (completed or in_progress or unique_issues or requests or next_plans):
             continue
 
@@ -225,10 +236,10 @@ def weekly_report(data: WeeklyReportRequest):
 
         reports = [json.loads(row[0]) for row in res]
 
-        client = OpenAI(base_url="http://127.0.0.1:1234/v1", api_key="lm-studio")
+        client = OpenAI(base_url=LM_BASE_URL, api_key=LM_API_KEY)
 
         completion = client.chat.completions.create(
-            model="models--lmstudio-community--gemma-4-12b-it-qat",
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": weekly_prompt},
                 {"role": "user", "content": json.dumps(reports)},
@@ -262,32 +273,48 @@ def weekly_report(data: WeeklyReportRequest):
 
 
 @app.post("/send-report")
-def send_report(data: ReportRequest):
-    client = OpenAI(base_url="http://127.0.0.1:1234/v1", api_key="lm-studio")
-
-    completion = client.chat.completions.create(
-        model="models--lmstudio-community--gemma-4-12b-it-qat",
-        messages=[
-            {"role": "system", "content": daily_prompt},
-            {"role": "user", "content": data.report},
-        ],
-        temperature=0.1,
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "daily_report",
-                "strict": True,
-                "schema": daily_schema,
+async def send_report(request: Request, data: ReportRequest):
+    body = await request.json()
+    print(f"[send-report] raw body: {body}")
+    print(f"[send-report] validated data.report: {repr(data.report)}")
+    client = OpenAI(base_url=LM_BASE_URL, api_key=LM_API_KEY)
+    try:
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": daily_prompt},
+                {"role": "user", "content": data.report},
+            ],
+            temperature=0.1,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "daily_report",
+                    "strict": True,
+                    "schema": daily_schema,
+                },
             },
-        },
-    )
+        )
 
-    content = completion.choices[0].message.content
-    if content is None:
-        content = "{}"
-    report_data = json.loads(content)
+        content = completion.choices[0].message.content
+        if content is None:
+            content = "{}"
+        report_data = json.loads(content)
 
-    return report_data
+        save_projects(report_data, data.member_id)
+
+        return report_data
+    except Exception as e:
+        resp = getattr(e, "response", None)
+        if resp is not None:
+            try:
+                body = resp.json()
+            except Exception:
+                body = resp.text
+            print(f"[send-report] upstream status={resp.status_code} body={body}")
+        else:
+            print(f"[send-report] error: {e}")
+        raise
 
 
 @app.get("/user-activities")
@@ -381,13 +408,16 @@ def get_reports():
         rows = cursor.fetchall()
         reports = []
         for row in rows:
+            parsed = json.loads(row[4]) if row[4] else None
+            if parsed:
+                parsed = normalize_issues(parsed)
             reports.append(
                 {
                     "id": row[0],
                     "member_id": row[1],
                     "report_date": row[2],
                     "raw_text": row[3],
-                    "parsed_json": json.loads(row[4]) if row[4] else None,
+                    "parsed_json": parsed,
                     "created_at": row[5],
                 }
             )
@@ -437,17 +467,66 @@ def get_users():
     return [dict(user) for user in users]
 
 
+def normalize_issues(report_data):
+    if isinstance(report_data, str):
+        try:
+            report_data = json.loads(report_data)
+        except json.JSONDecodeError:
+            return report_data
+    if not isinstance(report_data, dict):
+        return report_data
+    for project in report_data.get("projects", []):
+        normalized = []
+        for issue in project.get("issues", []):
+            if isinstance(issue, dict):
+                content = issue.get("content", "")
+                status = issue.get("status", "미해결")
+                if content and str(content).strip():
+                    normalized.append(
+                        {"content": str(content).strip(), "status": status}
+                    )
+            elif issue and str(issue).strip():
+                normalized.append({"content": str(issue).strip(), "status": "미해결"})
+        project["issues"] = normalized
+    return report_data
+
+
 @app.post("/reports")
 def save_report(data: SaveReportData):
+    parsed = (
+        json.loads(data.parsed_json)
+        if isinstance(data.parsed_json, str)
+        else data.parsed_json
+    )
+    parsed = normalize_issues(parsed)
+
+    report_date = data.report_date or date.today().isoformat()
+    raw_text = data.report
+    member_id = data.member_id
+
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO daily_reports (raw_text, parsed_json , member_id) VALUES (?, ?, ?)",
-            (data.report, json.dumps(data.parsed_json), data.member_id),
+            "SELECT id FROM daily_reports WHERE member_id = ? AND report_date = ?",
+            (member_id, report_date),
         )
+        existing = cursor.fetchone()
+
+        if existing:
+            cursor.execute(
+                "UPDATE daily_reports SET raw_text = ?, parsed_json = ? WHERE id = ?",
+                (raw_text, json.dumps(parsed), existing["id"]),
+            )
+            cursor.execute("DELETE FROM projects WHERE member_id = ?", (member_id,))
+        else:
+            cursor.execute(
+                "INSERT INTO daily_reports (member_id, report_date, raw_text, parsed_json) VALUES (?, ?, ?, ?)",
+                (member_id, report_date, raw_text, json.dumps(parsed)),
+            )
+
         conn.commit()
-        save_projects(json.loads(data.parsed_json), data.member_id)
-    return {"message": "Report saved successfully."}
+        save_projects(parsed, member_id)
+    return {"message": "Report saved successfully.", "report_date": report_date}
 
 
 def save_projects(report_data, member_id):
