@@ -48,6 +48,26 @@ CREATE TABLE IF NOT EXISTS projects (
 )
 """)
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS weekly_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    selected_date TEXT NOT NULL,
+    report_json TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (member_id) REFERENCES members(id)
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS project_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alias_name TEXT NOT NULL UNIQUE,
+    canonical_name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+""")
+
 
 conn.commit()
 conn.close()

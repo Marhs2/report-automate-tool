@@ -1,47 +1,67 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "WeeklyReportResult",
-  "description": "주간보고 초안. 명세서 4.4) 기준. 요약 없음, dateRange 없음. 일간의 requests/nextPlans -> nextWeekPlans로 병합.",
+  "description": "주간보고 병합 결과. 여러 일일보고 JSON을 프로젝트별로 병합하고, 상태 승격 및 중복 제거를 적용한 결과물. 원문에 없는 업무를 생성하지 않는다. 입력이 비어있으면 projects는 빈 배열이다.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "projects": {
       "type": "array",
+      "description": "프로젝트별 주간 업무 목록. 동일 projectName은 하나의 요소로 병합한다. 4개 배열이 모두 비는 프로젝트는 포함하지 않는다. 입력 JSON에 없는 projectName을 새로 만들지 않는다.",
+      "maxItems": 15,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "projectName": {
             "type": "string",
+            "description": "입력 일일보고 JSON의 projectName을 그대로 복사한다. 새로 만들거나 수정·축약하지 않는다. 동일 프로젝트가 여러 일에 등장하면 하나로 병합한다.",
             "minLength": 1,
             "maxLength": 100
           },
           "completedTasks": {
             "type": "array",
+            "description": "주간 기간 중 완료된 업무. 일일보고의 completedTasks를 모아 중복을 제거한다. 주간 중 inProgressTasks/nextPlans에서 completedTasks로 승격된 업무도 여기에 넣고 다른 필드에서는 제거한다. issues에서 해결된 항목의 조치 내용도 여기에 포함한다.",
             "uniqueItems": true,
+            "maxItems": 30,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           },
           "inProgressTasks": {
             "type": "array",
+            "description": "주간 마지막 시점에도 진행 중인 업무. 일일보고의 inProgressTasks를 모아 중복을 제거한다. 이미 completedTasks로 승격된 업무는 여기에 넣지 않는다. nextPlans에서 inProgressTasks로 승격된 업무는 여기에 넣고 nextWeekPlans에서는 제거한다.",
             "uniqueItems": true,
+            "maxItems": 20,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           },
           "issues": {
             "type": "array",
+            "description": "주간 마지막 시점에 남아 있는 문제·미결 사항. 동일 이슈가 여러 일에 반복되면 하나만 유지한다. 주간 중 해결된 이슈는 status를 '해결'로 바꾸거나, completedTasks에 해결 내용을 넣고 여기서 제거한다. 같은 문제를 completedTasks와 issues(status:미해결)에 동시에 넣지 않는다.",
             "uniqueItems": true,
+            "maxItems": 20,
             "items": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "content": { "type": "string", "minLength": 1, "maxLength": 300 },
-                "status": { "type": "string", "enum": ["해결", "미해결"] }
+                "content": {
+                  "type": "string",
+                  "description": "문제 내용. 입력 JSON의 issues.content를 그대로 복사한다.",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                "status": {
+                  "type": "string",
+                  "description": "해결 여부. 주간 마지막까지 미해결이면 '미해결'. 주간 중 해결되었으면 '해결' (이 경우 completedTasks에 해결 업무도 기재).",
+                  "enum": ["해결", "미해결"]
+                }
               },
               "required": ["content", "status"]
             }
           },
           "nextWeekPlans": {
             "type": "array",
+            "description": "다음 주 예정 업무. 일일보고의 requests와 nextPlans를 모두 여기로 병합한다. 주간 중 이미 inProgressTasks나 completedTasks로 승격된 업무는 여기에 넣지 않는다. 중복을 제거하고 원문 문장을 그대로 복사한다.",
             "uniqueItems": true,
+            "maxItems": 20,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           }
         },

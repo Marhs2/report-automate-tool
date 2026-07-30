@@ -27,7 +27,12 @@ const getWeekDays = () => {
     const day = now.getDay();
     const diffToMonday = now.getDate() - (day === 0 ? 7 : day) + 1;
     const monday = new Date(now.setDate(diffToMonday));
-    const formatDate = (d) => d.toISOString().split("T")[0];
+    const formatDate = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    };
     const days = [];
     for (let i = 0; i < 5; i++) {
         const d = new Date(monday);
@@ -161,7 +166,7 @@ onMounted(() => {
                                       weekDays.includes(a.report_date),
                                   )
                                 : activity.activities"
-                            :key="item.id"
+                            :key="item.report_date"
                             class="log"
                             :class="item.count > 0 ? 'committed' : ''"
                             @mouseenter="

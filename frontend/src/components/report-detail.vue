@@ -2,11 +2,16 @@
     <div class="page">
         <div class="page-header">
             <div>
-                <h1>주간 요약</h1>
+                <h1>분석 결과</h1>
+                <p class="page-subtitle">
+                    AI가 정리한 내용을 확인하고 필요한 부분을 수정하세요
+                </p>
             </div>
         </div>
 
-        <div v-if="reportData" class="content-container">
+        <div v-if="isLoading" class="empty-state">불러오는 중...</div>
+
+        <div v-else-if="reportData" class="content-container">
             <div class="json-container">
                 <div
                     v-for="(project, projectIndex) in reportData.projects"
@@ -16,7 +21,7 @@
                     <input
                         readonly
                         class="input project-name-input"
-                        :value="project.projectName"
+                        v-model="project.projectName"
                     />
 
                     <div class="field-group completedTasks">
@@ -54,28 +59,15 @@
 
                     <div class="field-group issues">
                         <h2>이슈</h2>
-                        <template v-if="project.issues.length > 0">
-                            <div
-                                v-for="(issue, issueIndex) in project.issues"
-                                :key="`issue-${issueIndex}`"
-                                class="issue-row"
-                            >
-                                <input
-                                    readonly
-                                    class="input"
-                                    :value="issueText(issue)"
-                                />
-                                <span
-                                    class="issue-badge"
-                                    :class="
-                                        issueStatus(issue) === '해결'
-                                            ? 'resolved'
-                                            : 'unresolved'
-                                    "
-                                    >{{ issueStatus(issue) }}</span
-                                >
-                            </div>
-                        </template>
+                        <input
+                            readonly
+                            v-if="project.issues.length > 0"
+                            v-for="(issue, issueIndex) in project.issues"
+                            :key="`issue-${issueIndex}`"
+                            class="input"
+                            :value="issue.content"
+                            v-model="project.issues[issueIndex].content"
+                        />
                         <div v-else class="empty-msg">이슈가 없습니다</div>
                     </div>
 
@@ -113,22 +105,25 @@
                     <span class="member-id-display"
                         >사용자: {{ userName }}</span
                     >
-                    <div class="save-actions">
-                        <button class="btn btn-primary" @click="copyReport">
-                            복사
-                        </button>
-                    </div>
+                    <div class="save-actions"></div>
                 </div>
+            </div>
+
+            <div class="card raw-container">
+                <h2>원본 보고서</h2>
+                <pre class="raw-content">{{ rawData }}</pre>
             </div>
         </div>
 
-        <div v-else class="empty-state">보고서 데이터가 없습니다.</div>
+        <div v-else class="empty-state">
+            보고서 데이터가 없습니다. 보고서를 먼저 제출해주세요.
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from "vue";
-import useAPI from "../composables/useAPI";
+import { ref, onMounted } from "vue";
+import useAPI from "../composables/useApi";
 import { useRoute } from "vue-router";
 
 const route = useRoute();
@@ -136,141 +131,33 @@ const route = useRoute();
 const reportData = ref(null);
 const rawData = ref(null);
 const userName = ref("");
-const { getUsers, GetWeeklyReportById } = useAPI();
+const isLoading = ref(false);
 
-watch(
-    reportData,
-    (newVal) => {
-        if (newVal) {
-            sessionStorage.setItem("reportData", JSON.stringify(newVal));
-        }
-    },
-    { deep: true },
-);
+const { getUsers, GetReportById } = useAPI();
 
 onMounted(async () => {
-    const reportId = route.params.id;
+    const id = route.params.id;
+    if (!id) return;
 
-    if (reportId) {
-        try {
-            const data = await GetWeeklyReportById(reportId);
-            reportData.value = data.report;
-            rawData.value = null;
-            userName.value = data.memberName || `사용자 ${data.memberId}`;
+    isLoading.value = true;
+    try {
+        const data = await GetReportById(id);
+        reportData.value = data.parsed_json;
+        rawData.value = data.raw_text;
 
-            sessionStorage.setItem("reportData", JSON.stringify(data.report));
-            sessionStorage.setItem("selectedUser", String(data.memberId));
-            if (data.createdAt) {
-                sessionStorage.setItem(
-                    "reportDate",
-                    new Date(data.createdAt).toISOString().split("T")[0],
-                );
-            }
-        } catch (error) {
-            console.error("보고서 불러오기 실패:", error);
-            alert("보고서를 불러오는데 실패했습니다.");
-        }
-        return;
-    }
-
-    const stored = sessionStorage.getItem("reportData");
-
-    if (stored) {
-        reportData.value = JSON.parse(stored);
-    }
-
-    const storedRaw = sessionStorage.getItem("reportRaw");
-
-    if (storedRaw) {
-        rawData.value = storedRaw;
-    }
-
-    console.log("Loaded report data:", reportData.value);
-
-    const userId = localStorage.getItem("report-selectedUser") || "";
-    if (userId) {
-        getUsers()
-            .then((users) => {
-                const found = users.find(
-                    (u) => String(u.id) === String(userId),
-                );
-                userName.value = found ? found.name : `사용자 ${userId}`;
-            })
-            .catch(() => {
-                userName.value = `사용자 ${userId}`;
-            });
+        // 사용자 이름 조회
+        const users = await getUsers();
+        const found = users.find(
+            (u) => String(u.id) === String(data.member_id),
+        );
+        userName.value = found ? found.name : `사용자 ${data.member_id}`;
+    } catch (error) {
+        console.error("보고서 불러오기 실패:", error);
+        alert("보고서를 불러오는데 실패했습니다.");
+    } finally {
+        isLoading.value = false;
     }
 });
-
-const issueText = (issue) =>
-    typeof issue === "string" ? issue : (issue?.content ?? "");
-
-const issueStatus = (issue) =>
-    typeof issue === "string" ? "미해결" : (issue?.status ?? "미해결");
-
-const formatReport = (report) => {
-    if (!report?.projects) return "";
-    const lines = [];
-    for (const project of report.projects) {
-        lines.push(`[${project.projectName}]`);
-
-        if (project.completedTasks?.length) {
-            lines.push("완료된 업무:");
-            for (const task of project.completedTasks) {
-                lines.push(`- ${task}`);
-            }
-        }
-
-        if (project.inProgressTasks?.length) {
-            lines.push("진행 중인 업무:");
-            for (const task of project.inProgressTasks) {
-                lines.push(`- ${task}`);
-            }
-        }
-
-        if (project.issues?.length) {
-            lines.push("이슈:");
-            for (const issue of project.issues) {
-                const content =
-                    typeof issue === "string" ? issue : issue.content || "";
-                const status =
-                    typeof issue === "string"
-                        ? "미해결"
-                        : issue.status || "미해결";
-                lines.push(`- ${content} (${status})`);
-            }
-        }
-
-        if (project.requests?.length) {
-            lines.push("요청사항:");
-            for (const req of project.requests) {
-                lines.push(`- ${req}`);
-            }
-        }
-
-        if (project.nextPlans?.length) {
-            lines.push("다음 계획:");
-            for (const plan of project.nextPlans) {
-                lines.push(`- ${plan}`);
-            }
-        }
-
-        lines.push("");
-    }
-    return lines.join("\n").trim();
-};
-
-const copyReport = async () => {
-    if (!reportData.value) return;
-    try {
-        const text = formatReport(reportData.value);
-        await navigator.clipboard.writeText(text);
-        alert("보고서가 클립보드에 복사되었습니다.");
-    } catch (error) {
-        console.error("복사 실패:", error);
-        alert("복사에 실패했습니다.");
-    }
-};
 </script>
 
 <style scoped>
@@ -358,36 +245,6 @@ const copyReport = async () => {
     color: var(--text);
     font-style: italic;
     opacity: 0.7;
-}
-
-.issue-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.issue-row .input {
-    flex: 1;
-    min-width: 0;
-}
-
-.issue-badge {
-    flex-shrink: 0;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    border: 1px solid;
-}
-
-.issue-badge.unresolved {
-    color: var(--danger);
-    border-color: var(--danger);
-}
-
-.issue-badge.resolved {
-    color: var(--success);
-    border-color: var(--success);
 }
 
 /* 추가 (+) 버튼 */

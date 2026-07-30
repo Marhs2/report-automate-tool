@@ -18,7 +18,18 @@ const setUser = () => {
 };
 
 const saveUser = async () => {
-    const res = await postUsers(newUser.value);
+    const name = newUser.value.trim();
+    if (!name) return alert("이름을 입력해주세요");
+    try {
+        await postUsers(name);
+        newUser.value = "";
+        // 생성 후 목록을 다시 불러와야 select 에 바로 나타난다.
+        users.value = await getUsers();
+        alert(`'${name}' 사용자를 생성했습니다.`);
+    } catch (error) {
+        console.error("사용자 생성 실패:", error);
+        alert("사용자 생성에 실패했습니다. 중복된 이름인지 확인해주세요.");
+    }
 };
 
 onMounted(async () => {

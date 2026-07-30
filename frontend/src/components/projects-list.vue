@@ -8,44 +8,18 @@ import {
     MessageSquare,
     ArrowRightCircle,
 } from "lucide-vue-next";
+import { useRouter } from "vue-router";
+
+const route = useRouter();
 
 const { GetReports } = useAPI();
 
 const reports = ref([]);
 const isLoading = ref(false);
-const filterDate = ref("");
 const filterMember = ref("");
 const filterProject = ref("");
 const filterDateFrom = ref("");
-const filterDateTo = ref("");
-
-const sections = [
-    {
-        key: "completedTasks",
-        label: "완료된 업무",
-        icon: CheckCircle2,
-        tone: "completed",
-    },
-    {
-        key: "inProgressTasks",
-        label: "진행 중인 업무",
-        icon: CircleDot,
-        tone: "in-progress",
-    },
-    { key: "issues", label: "이슈", icon: AlertTriangle, tone: "issues" },
-    {
-        key: "requests",
-        label: "요청사항",
-        icon: MessageSquare,
-        tone: "request",
-    },
-    {
-        key: "nextPlans",
-        label: "다음 계획",
-        icon: ArrowRightCircle,
-        tone: "next-plans",
-    },
-];
+const filterDateEnd = ref("");
 
 const getReports = async () => {
     isLoading.value = true;
@@ -63,30 +37,35 @@ const getReports = async () => {
 
 const filteredReports = computed(() => {
     return reports.value.filter((report) => {
-        const matchDate =
-            filterDate.value === "" ||
-            report.report_date?.includes(filterDate.value);
-        const matchRange =
-            (!filterDateFrom.value && !filterDateTo.value) ||
-            (filterDateFrom.value &&
-                report.report_date >= filterDateFrom.value &&
-                filterDateTo.value &&
-                report.report_date <= filterDateTo.value);
+        const reportDate = report.report_date ?? "";
+        const matchFrom =
+            !filterDateFrom.value || reportDate == filterDateFrom.value;
+        const matchEnd =
+            !filterDateEnd.value || reportDate == filterDateEnd.value;
+
         const matchMember =
             filterMember.value === "" ||
-            String(report.member_id).includes(filterMember.value);
-        return (matchDate || matchRange) && matchMember;
+            String(report.member_name).includes(filterMember.value);
+        return matchFrom && matchEnd && matchMember;
     });
 });
 
+const toParsed = (parsedJson) => {
+    if (!parsedJson) return null;
+    if (typeof parsedJson === "string") {
+        try {
+            return JSON.parse(parsedJson);
+        } catch {
+            return null;
+        }
+    }
+    return parsedJson;
+};
+
 const matchesProjectFilter = (parsedJson) => {
     if (filterProject.value === "") return true;
-    let parsed;
-    try {
-        parsed = JSON.parse(parsedJson);
-    } catch {
-        return false;
-    }
+    const parsed = toParsed(parsedJson);
+    if (!parsed) return false;
     return (parsed.projects ?? []).some((p) =>
         p.projectName?.includes(filterProject.value),
     );
@@ -97,6 +76,20 @@ const filteredReportsByProject = computed(() => {
         matchesProjectFilter(report.parsed_json),
     );
 });
+
+const reportDetail = (report) => {
+    route.push(`/report/${report}`);
+};
+
+const itemText = (value) =>
+    value && typeof value === "object"
+        ? (value.content ?? "")
+        : String(value ?? "");
+
+const isUnresolved = (value) =>
+    value && typeof value === "object" ? value.status !== "해결" : false;
+
+const projectsOf = (report) => toParsed(report.parsed_json)?.projects ?? [];
 
 onMounted(() => {
     getReports();
@@ -115,18 +108,24 @@ onMounted(() => {
         </div>
 
         <div class="toolbar">
+            <label for="filterDateFrom">시작 날짜:</label>
             <input
                 type="date"
                 v-model="filterDateFrom"
+                id="filterDateFrom"
                 class="input filter-input"
-                placeholder="시작일"
+                placeholder="시작 날짜"
             />
+
+            <label for="filterDateEnd">종료 날짜:</label>
             <input
                 type="date"
-                v-model="filterDateTo"
+                v-model="filterDateEnd"
+                id="filterDateEnd"
                 class="input filter-input"
-                placeholder="종료일"
+                placeholder="종료 날짜"
             />
+
             <input
                 type="text"
                 placeholder="사람별로"
@@ -158,18 +157,24 @@ onMounted(() => {
                     <h3 class="report-id">Report ID: {{ report.id }}</h3>
                     <div class="report-meta">
                         <span class="meta-item"
-                            ><strong>Member ID:</strong>
-                            {{ report.member_id }}</span
+                            ><strong>Member Name:</strong>
+                            {{ report.member_name }}</span
                         >
                         <span class="meta-item"
                             ><strong>Report Date:</strong>
                             {{ report.report_date }}</span
                         >
+                        <button
+                            class="btn"
+                            v-on:click="() => reportDetail(report.id)"
+                        >
+                            자세히 보기
+                        </button>
                     </div>
                 </div>
                 <div class="projects-list">
                     <div
-                        v-for="(item, index) in report.parsed_json.projects"
+                        v-for="(item, index) in projectsOf(report)"
                         :key="index"
                         class="project-block"
                     >
@@ -181,32 +186,139 @@ onMounted(() => {
                         </div>
 
                         <div class="detail-list">
-                            <div
-                                v-for="section in sections"
-                                :key="section.key"
-                                class="detail-row"
-                                :class="'tone-' + section.tone"
-                            >
+                            <!-- 완료된 업무 -->
+                            <div class="detail-row">
                                 <div class="detail-label">
-                                    <component :is="section.icon" :size="15" />
-                                    <span>{{ section.label }}</span>
+                                    <CheckCircle2 :size="15" />
+                                    <span>완료된 업무</span>
                                 </div>
+
                                 <div class="detail-content">
                                     <ul
                                         v-if="
-                                            item[section.key] &&
-                                            item[section.key].length > 0
+                                            item.completedTasks &&
+                                            item.completedTasks.length
                                         "
                                     >
                                         <li
-                                            v-for="(task, idx) in item[
-                                                section.key
-                                            ]"
-                                            :key="idx"
+                                            v-for="(
+                                                task, index
+                                            ) in item.completedTasks"
+                                            :key="index"
                                         >
                                             {{ task }}
                                         </li>
                                     </ul>
+
+                                    <p v-else class="empty-msg">해당 없음</p>
+                                </div>
+                            </div>
+
+                            <!-- 진행 중인 업무 -->
+                            <div class="detail-row">
+                                <div class="detail-label">
+                                    <CircleDot :size="15" />
+                                    <span>진행 중인 업무</span>
+                                </div>
+
+                                <div class="detail-content">
+                                    <ul
+                                        v-if="
+                                            item.inProgressTasks &&
+                                            item.inProgressTasks.length
+                                        "
+                                    >
+                                        <li
+                                            v-for="(
+                                                task, index
+                                            ) in item.inProgressTasks"
+                                            :key="index"
+                                        >
+                                            {{ task }}
+                                        </li>
+                                    </ul>
+
+                                    <p v-else class="empty-msg">해당 없음</p>
+                                </div>
+                            </div>
+
+                            <!-- 이슈 -->
+                            <div class="detail-row">
+                                <div class="detail-label">
+                                    <AlertTriangle :size="15" />
+                                    <span>이슈</span>
+                                </div>
+
+                                <div class="detail-content">
+                                    <ul
+                                        v-if="item.issues && item.issues.length"
+                                    >
+                                        <li
+                                            v-for="(
+                                                issue, index
+                                            ) in item.issues"
+                                            :key="index"
+                                        >
+                                            {{ issue.content || issue }}
+                                        </li>
+                                    </ul>
+
+                                    <p v-else class="empty-msg">해당 없음</p>
+                                </div>
+                            </div>
+
+                            <!-- 요청사항 -->
+                            <div class="detail-row">
+                                <div class="detail-label">
+                                    <MessageSquare :size="15" />
+                                    <span>요청사항</span>
+                                </div>
+
+                                <div class="detail-content">
+                                    <ul
+                                        v-if="
+                                            item.requests &&
+                                            item.requests.length
+                                        "
+                                    >
+                                        <li
+                                            v-for="(
+                                                task, index
+                                            ) in item.requests"
+                                            :key="index"
+                                        >
+                                            {{ task }}
+                                        </li>
+                                    </ul>
+
+                                    <p v-else class="empty-msg">해당 없음</p>
+                                </div>
+                            </div>
+
+                            <!-- 다음 계획 -->
+                            <div class="detail-row">
+                                <div class="detail-label">
+                                    <ArrowRightCircle :size="15" />
+                                    <span>다음 계획</span>
+                                </div>
+
+                                <div class="detail-content">
+                                    <ul
+                                        v-if="
+                                            item.nextPlans &&
+                                            item.nextPlans.length
+                                        "
+                                    >
+                                        <li
+                                            v-for="(
+                                                task, index
+                                            ) in item.nextPlans"
+                                            :key="index"
+                                        >
+                                            {{ task }}
+                                        </li>
+                                    </ul>
+
                                     <p v-else class="empty-msg">해당 없음</p>
                                 </div>
                             </div>
@@ -357,6 +469,18 @@ onMounted(() => {
 
 .detail-content li {
     list-style: disc;
+}
+
+.badge-unresolved {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: middle;
 }
 
 .empty-msg {

@@ -7,7 +7,10 @@ const { PostReport } = useAPI();
 const router = useRouter();
 
 const input = ref("");
-const date = ref(new Date().toISOString().substring(0, 10));
+const today = new Date();
+const date = ref(
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+);
 
 const aiLoading = ref(false);
 
@@ -23,11 +26,18 @@ const sendReport = async () => {
         console.log("보고서 전송 성공:", res);
 
         sessionStorage.setItem("reportData", JSON.stringify(res));
-        sessionStorage.setItem("reportRaw", JSON.stringify(input.value));
+        // 원문은 문자열 그대로 보관한다. JSON.stringify 후 정규식으로 되돌리면
+        // 개행이 섞인 텍스트에서 앞뒤 따옴표가 남는다.
+        sessionStorage.setItem("reportRaw", input.value);
         sessionStorage.setItem("reportDate", date.value);
         await router.push({ name: "report-result" });
     } catch (error) {
         console.error("보고서 전송 실패:", error);
+        const detail = error.response?.data?.detail;
+        alert(
+            detail ||
+                "보고서 전송에 실패했습니다. 입력한 내용은 유지되니 다시 시도해주세요.",
+        );
     } finally {
         aiLoading.value = false;
     }

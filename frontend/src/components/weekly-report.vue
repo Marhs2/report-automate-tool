@@ -4,7 +4,10 @@ import useAPI from "../composables/useApi";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
-import { Download } from "lucide-vue-next";
+import { Download, Copy } from "lucide-vue-next";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
 
 const { postWeekly, GetWeeklyReport } = useAPI();
 
@@ -14,36 +17,55 @@ const userId = ref(sessionStorage.getItem("selectedUser") || "");
 const weeklyReport = ref(null);
 const isLoading = ref(false);
 
-const date = new Date();
-const day = date.getDay();
-const getThisWeek = () => {
-    const diffToMonday = date.getDate() - (day === 0 ? 7 : day) + 1;
-    const monday = new Date(date.setDate(diffToMonday));
+// 로컬 시간대 기준으로 YYYY-MM-DD 포맷. toISOString()은 UTC로 바뀌어
+// KST(+9)에서 날짜가 하루 밀리므로 사용하지 않는다.
+const formatLocalDate = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-    const formatDate = (d) => d.toISOString().split("T")[0];
+const getThisWeek = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 7 : day) + 1);
+
     const days = [];
     for (let i = 0; i < 5; i++) {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
-        days.push(formatDate(d));
+        days.push(formatLocalDate(d));
     }
     return {
-        monday: formatDate(monday),
+        monday: formatLocalDate(monday),
         days,
     };
 };
 
 const { monday, days } = getThisWeek();
 weekDays.value = days;
+// 기본값: 해당 주 월~금 전체 선택
+selects.value = [...days];
 
 const sendDates = async () => {
+    if (!userId.value) {
+        alert("사용자를 먼저 선택해주세요.");
+        return;
+    }
+    if (selects.value.length === 0) {
+        alert("기간(날짜)을 최소 1개 선택해주세요.");
+        return;
+    }
     isLoading.value = true;
-    const response = await postWeekly(userId.value, selects.value);
-    console.log(response);
-    await fetchWeeklyReport();
-    isLoading.value = false;
-    alert("생성완료");
-    window.location.reload();
+    try {
+        await postWeekly(userId.value, selects.value);
+        await fetchWeeklyReport();
+        alert("생성완료");
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        console.error("주간 보고서 생성 실패:", error);
+        alert(detail || "주간 보고서 생성에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+        isLoading.value = false;
+    }
 };
 
 const fetchWeeklyReport = async () => {
@@ -53,12 +75,16 @@ const fetchWeeklyReport = async () => {
     isLoading.value = false;
 };
 
+const viewReport = (report) => {
+    router.push(`/weekly-detail/${report.id}`);
+};
+
 const downloadReport = async (report) => {
     try {
         isLoading.value = true;
 
         // 1. Fetch the docx template as an array buffer.
-        const response = await fetch("/asset/주간_보고서_템플릿.docx.docx");
+        const response = await fetch("/asset/주간_보고서_템플릿.docx");
         if (!response.ok) {
             throw new Error("템플릿 파일을 찾을 수 없습니다.");
         }
@@ -80,9 +106,7 @@ const downloadReport = async (report) => {
 
         const createdDateRaw =
             report.createdAt || report.created_at || new Date().toISOString();
-        const created_date = new Date(createdDateRaw)
-            .toISOString()
-            .split("T")[0];
+        const created_date = formatLocalDate(new Date(createdDateRaw));
 
         const projectsList = (report.report?.projects || []).map((p) => ({
             project_name: p.projectName || "",
@@ -206,6 +230,14 @@ onMounted(() => {
                                 {{ report.selectedDate?.join(", ") }}
                             </div>
                         </div>
+                        <button
+                            class="btn"
+                            :disabled="isLoading"
+                            @click="viewReport(report)"
+                        >
+                            보기
+                        </button>
+
                         <button
                             class="btn"
                             v-on:click="() => downloadReport(report)"

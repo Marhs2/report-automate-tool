@@ -18,19 +18,29 @@
                 >
                     <input
                         class="input project-name-input"
-                        :value="project.projectName"
+                        v-model="project.projectName"
                     />
 
                     <div class="field-group completedTasks">
                         <h2>완료된 업무</h2>
-                        <input
+                        <div
                             v-if="project.completedTasks.length > 0"
                             v-for="(task, taskIndex) in project.completedTasks"
-                            :key="`completed-${taskIndex}`"
-                            class="input"
-                            :value="task"
-                            v-model="project.completedTasks[taskIndex]"
-                        />
+                        >
+                            <input
+                                :key="`completed-${taskIndex}`"
+                                class="input"
+                                :value="task"
+                                v-model="project.completedTasks[taskIndex]"
+                            />
+                            <button
+                                class="btn"
+                                @click="removeCompletedTask(project, taskIndex)"
+                            >
+                                -
+                            </button>
+                        </div>
+
                         <div v-else class="empty-msg">
                             완료된 업무가 없습니다
                         </div>
@@ -44,14 +54,25 @@
 
                     <div class="field-group inProgressTasks">
                         <h2>진행 중인 업무</h2>
-                        <input
+                        <div
                             v-if="project.inProgressTasks.length > 0"
                             v-for="(task, taskIndex) in project.inProgressTasks"
-                            :key="`progress-${taskIndex}`"
-                            class="input"
-                            :value="task"
-                            v-model="project.inProgressTasks[taskIndex]"
-                        />
+                        >
+                            <input
+                                :key="`progress-${taskIndex}`"
+                                class="input"
+                                :value="task"
+                                v-model="project.inProgressTasks[taskIndex]"
+                            />
+                            <button
+                                class="btn remove-btn"
+                                @click="
+                                    removeInProgressTask(project, taskIndex)
+                                "
+                            >
+                                -
+                            </button>
+                        </div>
 
                         <div v-else class="empty-msg">
                             진행 중인 업무가 없습니다
@@ -67,14 +88,24 @@
 
                     <div class="field-group issues">
                         <h2>이슈</h2>
-                        <input
+                        <div
                             v-if="project.issues.length > 0"
                             v-for="(issue, issueIndex) in project.issues"
-                            :key="`issue-${issueIndex}`"
-                            class="input"
-                            :value="issue.content"
-                            v-model="project.issues[issueIndex].content"
-                        />
+                        >
+                            <input
+                                :key="`issue-${issueIndex}`"
+                                class="input"
+                                :value="issue.content"
+                                v-model="project.issues[issueIndex].content"
+                            />
+                            <button
+                                class="btn remove-btn"
+                                @click="removeIssue(project, issueIndex)"
+                            >
+                                -
+                            </button>
+                        </div>
+
                         <div v-else class="empty-msg">이슈가 없습니다</div>
                         <button class="btn add-btn" @click="addIssue(project)">
                             +
@@ -83,14 +114,23 @@
 
                     <div class="field-group requests">
                         <h2>요청사항</h2>
-                        <input
+                        <div
                             v-if="project.requests.length > 0"
                             v-for="(request, requestIndex) in project.requests"
-                            :key="`request-${requestIndex}`"
-                            class="input"
-                            :value="request"
-                            v-model="project.requests[requestIndex]"
-                        />
+                        >
+                            <input
+                                :key="`request-${requestIndex}`"
+                                class="input"
+                                :value="request"
+                                v-model="project.requests[requestIndex]"
+                            />
+                            <button
+                                class="btn remove-btn"
+                                @click="removeRequest(project, requestIndex)"
+                            >
+                                -
+                            </button>
+                        </div>
                         <div v-else class="empty-msg">요청사항이 없습니다</div>
                         <button
                             class="btn add-btn"
@@ -102,14 +142,23 @@
 
                     <div class="field-group nextPlans">
                         <h2>다음 계획</h2>
-                        <input
+                        <div
                             v-if="project.nextPlans.length > 0"
                             v-for="(plan, planIndex) in project.nextPlans"
-                            :key="`plan-${planIndex}`"
-                            class="input"
-                            :value="plan"
-                            v-model="project.nextPlans[planIndex]"
-                        />
+                        >
+                            <input
+                                :key="`plan-${planIndex}`"
+                                class="input"
+                                :value="plan"
+                                v-model="project.nextPlans[planIndex]"
+                            />
+                            <button
+                                class="btn remove-btn"
+                                @click="removeNextPlan(project, planIndex)"
+                            >
+                                -
+                            </button>
+                        </div>
 
                         <div v-else class="empty-msg">다음 계획이 없습니다</div>
                         <button
@@ -153,7 +202,7 @@ import { ref, onMounted, watch } from "vue";
 import useAPI from "../composables/useAPI";
 import { useRouter } from "vue-router";
 
-const router = useRouter();
+const route = useRouter();
 
 const reportData = ref(null);
 const rawData = ref(null);
@@ -181,9 +230,7 @@ onMounted(() => {
     const storedRaw = sessionStorage.getItem("reportRaw");
 
     if (storedRaw) {
-        rawData.value = storedRaw
-            .replace(/\\n/g, "\n")
-            .replace(/^"(.*)"$/, "$1");
+        rawData.value = storedRaw;
     }
 
     console.log("Loaded report data:", reportData.value);
@@ -207,20 +254,40 @@ const addCompletedTask = (project) => {
     project.completedTasks.push("");
 };
 
+const removeCompletedTask = (project, index) => {
+    project.completedTasks.splice(index, 1);
+};
+
 const addInProgressTask = (project) => {
     project.inProgressTasks.push("");
+};
+
+const removeInProgressTask = (project, index) => {
+    project.inProgressTasks.splice(index, 1);
 };
 
 const addIssue = (project) => {
     project.issues.push({ content: "", status: "미해결" });
 };
 
+const removeIssue = (project, index) => {
+    project.issues.splice(index, 1);
+};
+
 const addRequest = (project) => {
     project.requests.push("");
 };
 
+const removeRequest = (project, index) => {
+    project.requests.splice(index, 1);
+};
+
 const addNextPlan = (project) => {
     project.nextPlans.push("");
+};
+
+const removeNextPlan = (project, index) => {
+    project.nextPlans.splice(index, 1);
 };
 
 const saveReport = () => {
@@ -228,12 +295,15 @@ const saveReport = () => {
         const jsonData = JSON.stringify(reportData.value, null, 2);
         const reportDate =
             sessionStorage.getItem("reportDate") ||
-            new Date().toISOString().split("T")[0];
+            (() => {
+                const d = new Date();
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            })();
 
         PostSaveReport(
             jsonData,
             rawData.value,
-            parseInt(sessionStorage.getItem("selectedUser") || "0"),
+            parseInt(localStorage.getItem("report-selectedUser") || "0"),
             reportDate,
         )
             .then((response) => {
@@ -242,7 +312,7 @@ const saveReport = () => {
                 sessionStorage.removeItem("reportData");
                 sessionStorage.removeItem("reportRaw");
                 sessionStorage.removeItem("reportDate");
-                router.push("/");
+                route.push("/");
             })
             .catch((error) => {
                 console.error("보고서 저장 실패:", error);
@@ -262,7 +332,10 @@ const retryExtract = async () => {
         aiLoading.value = true;
         const reportDate =
             sessionStorage.getItem("reportDate") ||
-            new Date().toISOString().split("T")[0];
+            (() => {
+                const d = new Date();
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            })();
         const res = await PostReport(
             { content: rawData.value },
             reportDate,

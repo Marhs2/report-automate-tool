@@ -5,11 +5,9 @@ const baseURL = "http://127.0.0.1:8000";
 
 export default function useAPI() {
   const PostReport = async (reportData, dateData, memberId) => {
-    const replacedData = reportData.content.replace(/\n/g, "<br>");
-
     try {
       const response = await axios.post(`${baseURL}/send-report`, {
-        report: replacedData,
+        report: reportData.content,
         date: dateData,
         member_id: memberId,
       });
@@ -35,6 +33,17 @@ export default function useAPI() {
       return response.data;
     } catch (error) {
       console.error("Error fetching weekly report:", error);
+      throw error;
+    }
+  };
+
+  const GetWeeklyReportById = async (weeklyId) => {
+    try {
+      const response = await axios.get(`${baseURL}/weeklyById/${weeklyId}`);
+      console.log(response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching weekly report by id:", error);
       throw error;
     }
   };
@@ -84,6 +93,16 @@ export default function useAPI() {
     }
   };
 
+  const GetReportById = async (reportId) => {
+    try {
+      const response = await axios.get(`${baseURL}/reports/${reportId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching report by id:", error);
+      throw error;
+    }
+  };
+
   const GetProjects = async () => {
     try {
       const response = await axios.get(`${baseURL}/projects`);
@@ -116,15 +135,81 @@ export default function useAPI() {
     }
   };
 
+  const getProjectAliases = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/project-aliases`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching project aliases:", error);
+      throw error;
+    }
+  };
+
+  const postProjectAlias = async (alias_name, canonical_name) => {
+    try {
+      const response = await axios.post(`${baseURL}/project-aliases`, {
+        alias_name,
+        canonical_name,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error creating project alias:", error);
+      throw error;
+    }
+  };
+
+  const deleteProjectAlias = async (aliasId) => {
+    try {
+      const response = await axios.delete(
+        `${baseURL}/project-aliases/${aliasId}`,
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting project alias:", error);
+      throw error;
+    }
+  };
+
+  const getProjectNames = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/project-names`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching project names:", error);
+      throw error;
+    }
+  };
+
+  const getProjectTimeline = async (name, memberId) => {
+    try {
+      const params = { name };
+      if (memberId) params.member_id = memberId;
+      const response = await axios.get(`${baseURL}/project-timeline`, {
+        params,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching project timeline:", error);
+      throw error;
+    }
+  };
+
   return {
     PostReport,
     PostSaveReport,
     GetReports,
+    GetReportById,
     GetProjects,
     GetUserActivities,
     postWeekly,
     GetWeeklyReport,
+    GetWeeklyReportById,
     postUsers,
     getUsers,
+    getProjectAliases,
+    postProjectAlias,
+    deleteProjectAlias,
+    getProjectNames,
+    getProjectTimeline,
   };
 }
