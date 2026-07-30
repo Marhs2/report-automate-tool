@@ -1,0 +1,35 @@
+설정: reasoning=high max_tokens=16384 preload=True ctx=32768 parallel=1
+프롬프트: backend/model_asset/prompt.txt (known_projects=none, 16536자)
+출력: benchmark\results\raw_v2_noreg
+
+=== qwen3.5-4b === (남은 케이스 32/32)
+  preload qwen3.5-4b ctx=32768 parallel=1 -> ok
+  warmup[json_schema+reasoning=high] ok: 13.73s
+  [1/32] D01 147.481s/10222tok
+  [2/32] D02 46.124s/3258tok
+  [3/32] D03 49.279s/3442tok
+설정: reasoning=high max_tokens=16384 preload=True ctx=32768 parallel=1
+프롬프트: backend/model_asset/prompt.txt (known_projects=none, 16536자)
+출력: benchmark\results\raw_v2_noreg
+
+=== nuextract3 === (남은 케이스 32/32)
+  preload nuextract3 ctx=32768 parallel=1 -> ok
+  warmup[json_schema+reasoning=high] ok: 20.6s
+  [1/32] D01 24.425s/709tok
+  [2/32] D02 23.57s/681tok
+  [4/32] D04 ERR(empty_content(finish=length))
+  [3/32] D03 27.609s/799tok
+  [4/32] D04 22.075s/608tok
+  [5/32] D05 19.809s/834tok
+  [6/32] D06 23.447s/639tok
+  [5/32] D05 ERR(empty_content(finish=length))
+  [7/32] D07 27.241s/787tok
+  [8/32] D08 26.584s/719tok
+  [9/32] D09 14.059s/418tok
+  [10/32] D10 26.687s/638tok
+  [11/32] D11 28.864s/830tok
+  [6/32] D06 ERR(empty_content(finish=length))
+  [12/32] D12 27.363s/795tok
+  [13/32] D13 25.085s/727tok
+  [14/32] D14 27.033s/792tok
+  [7/32] D07 ERR(BadRequestError: Error code: 400 - {'err)

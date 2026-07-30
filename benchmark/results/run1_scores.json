@@ -1,0 +1,2281 @@
+{
+  "dataset": {
+    "name": "daily-report-extraction-gold-v1",
+    "description": "일일보고 자동 구조화 벤치마크용 정답 데이터셋. 가상 인물 4명, 가상 프로젝트 3개(+미분류), 2주치(2026-07-13 ~ 2026-07-24) 32건. 작성 스타일은 개조식/줄글/메신저체/표/혼합/엣지케이스를 섞음.",
+    "members": [
+      "김민수",
+      "박서연",
+      "이준호",
+      "최지우"
+    ],
+    "projects": [
+      "A사 MES",
+      "여우비",
+      "Yak-Map"
+    ],
+    "label_spec": "backend/model_asset/prompt.txt + backend/model_asset/json_Schema.json 규칙에 따라 사람이 직접 라벨링"
+  },
+  "results": [
+    {
+      "model": "google/gemma-4-e2b",
+      "cases_total": 32,
+      "cases_called": 32,
+      "api_errors": 7,
+      "truncated": 0,
+      "json_valid_rate": 0.7812,
+      "schema_valid_rate": 0.7812,
+      "output_mode": "json_schema",
+      "project_precision": 0.8723,
+      "project_recall": 0.7455,
+      "project_f1": 0.8039,
+      "micro_precision": 0.8317,
+      "micro_recall": 0.6364,
+      "micro_f1": 0.721,
+      "macro_f1": 0.6925,
+      "issue_status_accuracy": 1.0,
+      "empty_report_accuracy": 1.0,
+      "latency_mean_s": 11.53,
+      "latency_median_s": 10.96,
+      "latency_max_s": 16.45,
+      "tokens_per_s": 87.3,
+      "fields": {
+        "completedTasks": {
+          "tp": 37,
+          "fp": 3,
+          "fn": 16,
+          "precision": 0.925,
+          "recall": 0.6981,
+          "f1": 0.7957
+        },
+        "inProgressTasks": {
+          "tp": 15,
+          "fp": 6,
+          "fn": 9,
+          "precision": 0.7143,
+          "recall": 0.625,
+          "f1": 0.6667
+        },
+        "issues": {
+          "tp": 12,
+          "fp": 4,
+          "fn": 10,
+          "precision": 0.75,
+          "recall": 0.5455,
+          "f1": 0.6316
+        },
+        "requests": {
+          "tp": 6,
+          "fp": 2,
+          "fn": 5,
+          "precision": 0.75,
+          "recall": 0.5455,
+          "f1": 0.6316
+        },
+        "nextPlans": {
+          "tp": 14,
+          "fp": 2,
+          "fn": 8,
+          "precision": 0.875,
+          "recall": 0.6364,
+          "f1": 0.7368
+        }
+      },
+      "per_case": [
+        {
+          "case_id": "D01",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.432,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D02",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.726,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D03",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.585,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D04",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 7.781,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D05",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 14.567,
+          "f1": 0.8
+        },
+        {
+          "case_id": "D06",
+          "style": "표",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 11.963,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D07",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D08",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 13.549,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D09",
+          "style": "한 줄",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 6.887,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D10",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.523,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D11",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 12.654,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D12",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D13",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D14",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D15",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 14.72,
+          "f1": 0.7273
+        },
+        {
+          "case_id": "D16",
+          "style": "업무 없음",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 3.974,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D17",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.221,
+          "f1": 0.9091
+        },
+        {
+          "case_id": "D18",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.569,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D19",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.623,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D20",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.956,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D21",
+          "style": "표",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 11.433,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D22",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.812,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D23",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D24",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D25",
+          "style": "한 줄",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D26",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 14.355,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D27",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 16.448,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D28",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 13.364,
+          "f1": 0.4444
+        },
+        {
+          "case_id": "D29",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.094,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D30",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 13.464,
+          "f1": 0.5714
+        },
+        {
+          "case_id": "D31",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 13.666,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D32",
+          "style": "혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 14.759,
+          "f1": 0.5714
+        }
+      ]
+    },
+    {
+      "model": "nvidia/nemotron-3-nano-4b",
+      "cases_total": 32,
+      "cases_called": 32,
+      "api_errors": 0,
+      "truncated": 3,
+      "json_valid_rate": 0.9062,
+      "schema_valid_rate": 0.9062,
+      "output_mode": "json_schema",
+      "project_precision": 0.92,
+      "project_recall": 0.8364,
+      "project_f1": 0.8762,
+      "micro_precision": 0.7627,
+      "micro_recall": 0.6818,
+      "micro_f1": 0.72,
+      "macro_f1": 0.6971,
+      "issue_status_accuracy": 1.0,
+      "empty_report_accuracy": 1.0,
+      "latency_mean_s": 9.02,
+      "latency_median_s": 8.72,
+      "latency_max_s": 15.7,
+      "tokens_per_s": 74.9,
+      "fields": {
+        "completedTasks": {
+          "tp": 39,
+          "fp": 10,
+          "fn": 14,
+          "precision": 0.7959,
+          "recall": 0.7358,
+          "f1": 0.7647
+        },
+        "inProgressTasks": {
+          "tp": 17,
+          "fp": 8,
+          "fn": 7,
+          "precision": 0.68,
+          "recall": 0.7083,
+          "f1": 0.6939
+        },
+        "issues": {
+          "tp": 10,
+          "fp": 5,
+          "fn": 12,
+          "precision": 0.6667,
+          "recall": 0.4545,
+          "f1": 0.5405
+        },
+        "requests": {
+          "tp": 7,
+          "fp": 4,
+          "fn": 4,
+          "precision": 0.6364,
+          "recall": 0.6364,
+          "f1": 0.6364
+        },
+        "nextPlans": {
+          "tp": 17,
+          "fp": 1,
+          "fn": 5,
+          "precision": 0.9444,
+          "recall": 0.7727,
+          "f1": 0.85
+        }
+      },
+      "per_case": [
+        {
+          "case_id": "D01",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 4.192,
+          "f1": 0.9091
+        },
+        {
+          "case_id": "D02",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 12.3,
+          "f1": 0.9091
+        },
+        {
+          "case_id": "D03",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 4.653,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D04",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 3.988,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D05",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 12.918,
+          "f1": 0.8
+        },
+        {
+          "case_id": "D06",
+          "style": "표",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 5.205,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D07",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 13.773,
+          "f1": 0.8
+        },
+        {
+          "case_id": "D08",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 5.564,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D09",
+          "style": "한 줄",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 3.455,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D10",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 7.327,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D11",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 15.619,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D12",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 13.919,
+          "f1": 0.8889
+        },
+        {
+          "case_id": "D13",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.028,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D14",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 12.532,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D15",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 15.696,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D16",
+          "style": "업무 없음",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.37,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D17",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 4.931,
+          "f1": 0.9091
+        },
+        {
+          "case_id": "D18",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.604,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D19",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 5.538,
+          "f1": 0.7273
+        },
+        {
+          "case_id": "D20",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 12.172,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D21",
+          "style": "표",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 5.571,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D22",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 7.898,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D23",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 4.663,
+          "f1": 0.8
+        },
+        {
+          "case_id": "D24",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.523,
+          "f1": 0.6667
+        },
+        {
+          "case_id": "D25",
+          "style": "한 줄",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 4.213,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D26",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 13.764,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D27",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 12.336,
+          "f1": 0.8889
+        },
+        {
+          "case_id": "D28",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 14.894,
+          "f1": 0.4
+        },
+        {
+          "case_id": "D29",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 4.379,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D30",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "json_error",
+          "elapsed_s": 15.319,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D31",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 7.919,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D32",
+          "style": "혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 13.309,
+          "f1": 0.5714
+        }
+      ]
+    },
+    {
+      "model": "nuextract3",
+      "cases_total": 32,
+      "cases_called": 32,
+      "api_errors": 0,
+      "truncated": 0,
+      "json_valid_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "output_mode": "json_schema",
+      "project_precision": 0.8167,
+      "project_recall": 0.8909,
+      "project_f1": 0.8522,
+      "micro_precision": 0.7121,
+      "micro_recall": 0.7121,
+      "micro_f1": 0.7121,
+      "macro_f1": 0.6818,
+      "issue_status_accuracy": 1.0,
+      "empty_report_accuracy": 0.0,
+      "latency_mean_s": 10.23,
+      "latency_median_s": 10.23,
+      "latency_max_s": 16.95,
+      "tokens_per_s": 67.2,
+      "fields": {
+        "completedTasks": {
+          "tp": 42,
+          "fp": 11,
+          "fn": 11,
+          "precision": 0.7925,
+          "recall": 0.7925,
+          "f1": 0.7925
+        },
+        "inProgressTasks": {
+          "tp": 17,
+          "fp": 6,
+          "fn": 7,
+          "precision": 0.7391,
+          "recall": 0.7083,
+          "f1": 0.7234
+        },
+        "issues": {
+          "tp": 12,
+          "fp": 10,
+          "fn": 10,
+          "precision": 0.5455,
+          "recall": 0.5455,
+          "f1": 0.5455
+        },
+        "requests": {
+          "tp": 7,
+          "fp": 4,
+          "fn": 4,
+          "precision": 0.6364,
+          "recall": 0.6364,
+          "f1": 0.6364
+        },
+        "nextPlans": {
+          "tp": 16,
+          "fp": 7,
+          "fn": 6,
+          "precision": 0.6957,
+          "recall": 0.7273,
+          "f1": 0.7111
+        }
+      },
+      "per_case": [
+        {
+          "case_id": "D01",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.415,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D02",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 8.908,
+          "f1": 0.9091
+        },
+        {
+          "case_id": "D03",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 11.874,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D04",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 7.667,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D05",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 11.676,
+          "f1": 0.6667
+        },
+        {
+          "case_id": "D06",
+          "style": "표",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 11.209,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D07",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.373,
+          "f1": 0.8
+        },
+        {
+          "case_id": "D08",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.671,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D09",
+          "style": "한 줄",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 6.714,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D10",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.295,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D11",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 11.285,
+          "f1": 0.3636
+        },
+        {
+          "case_id": "D12",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.086,
+          "f1": 0.5
+        },
+        {
+          "case_id": "D13",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 11.031,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D14",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.396,
+          "f1": 0.5714
+        },
+        {
+          "case_id": "D15",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.374,
+          "f1": 0.7273
+        },
+        {
+          "case_id": "D16",
+          "style": "업무 없음",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 7.775,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D17",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 10.56,
+          "f1": 0.9091
+        },
+        {
+          "case_id": "D18",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.705,
+          "f1": 0.6667
+        },
+        {
+          "case_id": "D19",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.46,
+          "f1": 0.8
+        },
+        {
+          "case_id": "D20",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.792,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D21",
+          "style": "표",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.212,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D22",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.496,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D23",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 8.692,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D24",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 12.594,
+          "f1": 0.8
+        },
+        {
+          "case_id": "D25",
+          "style": "한 줄",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 6.874,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D26",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 11.685,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D27",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 16.955,
+          "f1": 0.2
+        },
+        {
+          "case_id": "D28",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 12.783,
+          "f1": 0.6667
+        },
+        {
+          "case_id": "D29",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 9.031,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D30",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 12.057,
+          "f1": 0.25
+        },
+        {
+          "case_id": "D31",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 11.908,
+          "f1": 0.25
+        },
+        {
+          "case_id": "D32",
+          "style": "혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 7.936,
+          "f1": 0.8571
+        }
+      ]
+    },
+    {
+      "model": "kanana-2-3b-instruct-i1",
+      "cases_total": 32,
+      "cases_called": 32,
+      "api_errors": 0,
+      "truncated": 0,
+      "json_valid_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "output_mode": "json_schema",
+      "project_precision": 0.8,
+      "project_recall": 0.6545,
+      "project_f1": 0.72,
+      "micro_precision": 0.464,
+      "micro_recall": 0.4394,
+      "micro_f1": 0.4514,
+      "macro_f1": 0.4236,
+      "issue_status_accuracy": 1.0,
+      "empty_report_accuracy": 1.0,
+      "latency_mean_s": 1.24,
+      "latency_median_s": 1.2,
+      "latency_max_s": 2.4,
+      "tokens_per_s": 69.1,
+      "fields": {
+        "completedTasks": {
+          "tp": 25,
+          "fp": 8,
+          "fn": 28,
+          "precision": 0.7576,
+          "recall": 0.4717,
+          "f1": 0.5814
+        },
+        "inProgressTasks": {
+          "tp": 13,
+          "fp": 17,
+          "fn": 11,
+          "precision": 0.4333,
+          "recall": 0.5417,
+          "f1": 0.4815
+        },
+        "issues": {
+          "tp": 5,
+          "fp": 21,
+          "fn": 17,
+          "precision": 0.1923,
+          "recall": 0.2273,
+          "f1": 0.2083
+        },
+        "requests": {
+          "tp": 5,
+          "fp": 11,
+          "fn": 6,
+          "precision": 0.3125,
+          "recall": 0.4545,
+          "f1": 0.3704
+        },
+        "nextPlans": {
+          "tp": 10,
+          "fp": 10,
+          "fn": 12,
+          "precision": 0.5,
+          "recall": 0.4545,
+          "f1": 0.4762
+        }
+      },
+      "per_case": [
+        {
+          "case_id": "D01",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.201,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D02",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.946,
+          "f1": 0.6667
+        },
+        {
+          "case_id": "D03",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.01,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D04",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.261,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D05",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.09,
+          "f1": 0.2222
+        },
+        {
+          "case_id": "D06",
+          "style": "표",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.703,
+          "f1": 0.8571
+        },
+        {
+          "case_id": "D07",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.352,
+          "f1": 0.6
+        },
+        {
+          "case_id": "D08",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.315,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D09",
+          "style": "한 줄",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.697,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D10",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.914,
+          "f1": 0.8571
+        },
+        {
+          "case_id": "D11",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 2.178,
+          "f1": 0.5
+        },
+        {
+          "case_id": "D12",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.897,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D13",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.315,
+          "f1": 0.5
+        },
+        {
+          "case_id": "D14",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.304,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D15",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.468,
+          "f1": 0.3636
+        },
+        {
+          "case_id": "D16",
+          "style": "업무 없음",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.167,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D17",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.448,
+          "f1": 0.7273
+        },
+        {
+          "case_id": "D18",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.987,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D19",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.203,
+          "f1": 0.25
+        },
+        {
+          "case_id": "D20",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.985,
+          "f1": 0.25
+        },
+        {
+          "case_id": "D21",
+          "style": "표",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.738,
+          "f1": 0.75
+        },
+        {
+          "case_id": "D22",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.892,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D23",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.726,
+          "f1": 0.3333
+        },
+        {
+          "case_id": "D24",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.043,
+          "f1": 0.2857
+        },
+        {
+          "case_id": "D25",
+          "style": "한 줄",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.67,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D26",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 2.399,
+          "f1": 0.5
+        },
+        {
+          "case_id": "D27",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.863,
+          "f1": 0.2222
+        },
+        {
+          "case_id": "D28",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 2.187,
+          "f1": 0.1818
+        },
+        {
+          "case_id": "D29",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.333,
+          "f1": 0.8571
+        },
+        {
+          "case_id": "D30",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 0.866,
+          "f1": 0.2857
+        },
+        {
+          "case_id": "D31",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.04,
+          "f1": 0.25
+        },
+        {
+          "case_id": "D32",
+          "style": "혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 1.45,
+          "f1": 0.6667
+        }
+      ]
+    },
+    {
+      "model": "lfm2.5-8b-a1b",
+      "cases_total": 32,
+      "cases_called": 32,
+      "api_errors": 0,
+      "truncated": 17,
+      "json_valid_rate": 0.4688,
+      "schema_valid_rate": 0.4688,
+      "output_mode": "json_schema",
+      "project_precision": 1.0,
+      "project_recall": 0.1091,
+      "project_f1": 0.1967,
+      "micro_precision": 0.4667,
+      "micro_recall": 0.053,
+      "micro_f1": 0.0952,
+      "macro_f1": 0.0642,
+      "issue_status_accuracy": null,
+      "empty_report_accuracy": 1.0,
+      "latency_mean_s": 7.73,
+      "latency_median_s": 9.81,
+      "latency_max_s": 10.24,
+      "tokens_per_s": 152.7,
+      "fields": {
+        "completedTasks": {
+          "tp": 5,
+          "fp": 2,
+          "fn": 48,
+          "precision": 0.7143,
+          "recall": 0.0943,
+          "f1": 0.1667
+        },
+        "inProgressTasks": {
+          "tp": 1,
+          "fp": 2,
+          "fn": 23,
+          "precision": 0.3333,
+          "recall": 0.0417,
+          "f1": 0.0741
+        },
+        "issues": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 22,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "requests": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 11,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "nextPlans": {
+          "tp": 1,
+          "fp": 2,
+          "fn": 21,
+          "precision": 0.3333,
+          "recall": 0.0455,
+          "f1": 0.08
+        }
+      },
+      "per_case": [
+        {
+          "case_id": "D01",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.928,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D02",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 7.826,
+          "f1": 0.5
+        },
+        {
+          "case_id": "D03",
+          "style": "메신저체",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 2.977,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D04",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.941,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D05",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.87,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D06",
+          "style": "표",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 7.428,
+          "f1": 0.8571
+        },
+        {
+          "case_id": "D07",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.894,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D08",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.913,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D09",
+          "style": "한 줄",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 2.319,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D10",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 5.264,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D11",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 4.585,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D12",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.915,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D13",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 4.606,
+          "f1": 0.4444
+        },
+        {
+          "case_id": "D14",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 5.754,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D15",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.949,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D16",
+          "style": "업무 없음",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 2.933,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D17",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.836,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D18",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.845,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D19",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 8.35,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D20",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "json_error",
+          "elapsed_s": 9.934,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D21",
+          "style": "표",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 10.025,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D22",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 10.237,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D23",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.926,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D24",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 2.405,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D25",
+          "style": "한 줄",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 5.217,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D26",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 6.512,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D27",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.979,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D28",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 9.787,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D29",
+          "style": "개조식",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 3.726,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D30",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 10.166,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D31",
+          "style": "줄글",
+          "json_ok": true,
+          "parse_error": null,
+          "elapsed_s": 8.382,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D32",
+          "style": "혼합",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 10.026,
+          "f1": 0.0
+        }
+      ]
+    },
+    {
+      "model": "minicpm5-1b",
+      "cases_total": 32,
+      "cases_called": 32,
+      "api_errors": 32,
+      "truncated": 0,
+      "json_valid_rate": 0.0,
+      "schema_valid_rate": 0.0,
+      "output_mode": "json_object",
+      "project_precision": 0.0,
+      "project_recall": 0.0,
+      "project_f1": 0.0,
+      "micro_precision": 0.0,
+      "micro_recall": 0.0,
+      "micro_f1": 0.0,
+      "macro_f1": 0.0,
+      "issue_status_accuracy": null,
+      "empty_report_accuracy": 1.0,
+      "latency_mean_s": null,
+      "latency_median_s": null,
+      "latency_max_s": null,
+      "tokens_per_s": null,
+      "fields": {
+        "completedTasks": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 53,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "inProgressTasks": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 24,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "issues": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 22,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "requests": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 11,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "nextPlans": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 22,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "per_case": [
+        {
+          "case_id": "D01",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D02",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D03",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D04",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D05",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D06",
+          "style": "표",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D07",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D08",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D09",
+          "style": "한 줄",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D10",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D11",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D12",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D13",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D14",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D15",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D16",
+          "style": "업무 없음",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D17",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D18",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D19",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D20",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D21",
+          "style": "표",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D22",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D23",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D24",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D25",
+          "style": "한 줄",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D26",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D27",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D28",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D29",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D30",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D31",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D32",
+          "style": "혼합",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": null,
+          "f1": 0.0
+        }
+      ]
+    },
+    {
+      "model": "qwen3.5-4b",
+      "cases_total": 32,
+      "cases_called": 32,
+      "api_errors": 0,
+      "truncated": 32,
+      "json_valid_rate": 0.0,
+      "schema_valid_rate": 0.0,
+      "output_mode": "json_schema",
+      "project_precision": 0.0,
+      "project_recall": 0.0,
+      "project_f1": 0.0,
+      "micro_precision": 0.0,
+      "micro_recall": 0.0,
+      "micro_f1": 0.0,
+      "macro_f1": 0.0,
+      "issue_status_accuracy": null,
+      "empty_report_accuracy": 1.0,
+      "latency_mean_s": 23.2,
+      "latency_median_s": 22.59,
+      "latency_max_s": 29.93,
+      "tokens_per_s": 66.5,
+      "fields": {
+        "completedTasks": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 53,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "inProgressTasks": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 24,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "issues": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 22,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "requests": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 11,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "nextPlans": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 22,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "per_case": [
+        {
+          "case_id": "D01",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.805,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D02",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.563,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D03",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.083,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D04",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.622,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D05",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 21.891,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D06",
+          "style": "표",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 21.936,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D07",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 21.946,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D08",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 24.651,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D09",
+          "style": "한 줄",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 24.683,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D10",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 23.913,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D11",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 23.978,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D12",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 23.179,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D13",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 23.298,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D14",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 24.201,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D15",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 24.192,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D16",
+          "style": "업무 없음",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 24.206,
+          "f1": 1.0
+        },
+        {
+          "case_id": "D17",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 25.696,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D18",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 23.788,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D19",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 29.928,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D20",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 24.689,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D21",
+          "style": "표",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 23.206,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D22",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.115,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D23",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.08,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D24",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.063,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D25",
+          "style": "한 줄",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.004,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D26",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.079,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D27",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.083,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D28",
+          "style": "줄글 + 영문 혼합",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.05,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D29",
+          "style": "개조식",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.062,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D30",
+          "style": "메신저체",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.089,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D31",
+          "style": "줄글",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.073,
+          "f1": 0.0
+        },
+        {
+          "case_id": "D32",
+          "style": "혼합",
+          "json_ok": false,
+          "parse_error": "empty",
+          "elapsed_s": 22.18,
+          "f1": 0.0
+        }
+      ]
+    }
+  ]
+}

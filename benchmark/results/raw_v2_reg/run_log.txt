@@ -1,0 +1,6 @@
+설정: reasoning=high max_tokens=16384 preload=True ctx=32768 parallel=1
+프롬프트: backend/model_asset/prompt.txt (known_projects=dataset, 16920자)
+출력: benchmark\results\raw_v2_reg
+
+=== nuextract3 === (남은 케이스 32/32)
+  preload nuextract3 ctx=32768 parallel=1 -> ok
