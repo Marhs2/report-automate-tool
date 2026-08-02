@@ -62,6 +62,31 @@ MAX_ATTEMPTS = 3
 # 벤치마크에서는 프로젝트 단위 정보만 넣고 개별 케이스의 정답은 넣지 않는다.
 KNOWN_PROJECTS_NONE = "(등록된 프로젝트가 없다. 원문에서 직접 판단한다.)"
 
+# backend/main.py 의 get_known_projects_block() 과 동일한 형태: 이름 + 별칭만.
+# 실제 서비스가 주입하는 것과 같은 조건을 재현한다 (주요 구성 요소는 넣지 않는다).
+KNOWN_PROJECTS_NAMES_ONLY = """- A사 MES
+  · 표기 변형: MES, A사 MES 구축, A사 MES 시스템
+- 여우비
+  · 표기 변형: 여우비 앱
+- Yak-Map
+  · 표기 변형: 약맵, 약품 지도"""
+
+# gold_dataset_diverse.json 의 프로젝트 (실제 서비스 DB와 동일). names_only 와 같은 형식.
+KNOWN_PROJECTS_DIVERSE = """- 일일보고 취합·주간보고 자동화 도구
+  · 표기 변형: 자동화 도구, 일일보고 자동화 도구, 자동화
+- 명함 관리 웹
+  · 표기 변형: 명함 관리, 명함 웹
+- 스모크
+  · 표기 변형: 스모크 테스트"""
+
+# gold_dataset_fresh.json 의 프로젝트. 이전 데이터셋과 완전히 다르다.
+KNOWN_PROJECTS_FRESH = """- AI면접코치
+  · 표기 변형: 면접코치, AI면접, 면접AI
+- 물류추적시스템
+  · 표기 변형: 물류추적, 추적시스템
+- 전자계약
+  · 표기 변형: 전자계약시스템, 계약시스템"""
+
 KNOWN_PROJECTS_DATASET = """- A사 MES
   · 표기 변형: MES, A사 MES 구축, A사 MES 시스템
   · 주요 구성 요소: 설비 데이터 수집 배치, 실시간 알림 이력 화면, 알림 조건 설정,
@@ -80,15 +105,22 @@ def safe_name(model: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", model)
 
 
-def load_assets(prompt_path=None, known_projects="none"):
+def load_assets(prompt_path=None, known_projects="none", dataset_name="gold"):
     path = pathlib.Path(prompt_path) if prompt_path else ROOT / "backend" / "model_asset" / "prompt.txt"
     with open(path, encoding="utf-8") as f:
         prompt = f.read()
     filler = KNOWN_PROJECTS_DATASET if known_projects == "dataset" else KNOWN_PROJECTS_NONE
+    if known_projects == "names_only":
+        filler = KNOWN_PROJECTS_NAMES_ONLY
+    if known_projects == "diverse":
+        filler = KNOWN_PROJECTS_DIVERSE
+    if known_projects == "fresh":
+        filler = KNOWN_PROJECTS_FRESH
     prompt = prompt.replace("{{KNOWN_PROJECTS}}", filler)
     with open(ROOT / "backend" / "model_asset" / "json_Schema.json", encoding="utf-8") as f:
         schema = json.load(f)
-    with open(BENCH / "dataset" / "gold_dataset.json", encoding="utf-8") as f:
+    dataset_file = "gold_dataset.json" if dataset_name == "gold" else f"gold_dataset_{dataset_name}.json"
+    with open(BENCH / "dataset" / dataset_file, encoding="utf-8") as f:
         dataset = json.load(f)
     return prompt, schema, dataset
 
@@ -320,12 +352,16 @@ def main():
     )
     ap.add_argument("--prompt", default=None, help="사용할 프롬프트 파일 (기본 backend/model_asset/prompt.txt)")
     ap.add_argument(
-        "--known-projects", default="none", choices=["none", "dataset"],
+        "--known-projects", default="none", choices=["none", "dataset", "names_only", "diverse", "fresh"],
         help="prompt의 {{KNOWN_PROJECTS}} 슬롯 채우기. dataset은 DB에 프로젝트가 등록된 상황을 재현",
+    )
+    ap.add_argument(
+        "--dataset", default="gold", choices=["gold", "diverse", "fresh"],
+        help="사용할 데이터셋 (gold=기존 32건, diverse=신규 32건)",
     )
     args = ap.parse_args()
 
-    prompt, schema, dataset = load_assets(args.prompt, args.known_projects)
+    prompt, schema, dataset = load_assets(args.prompt, args.known_projects, args.dataset)
     cases = dataset["cases"]
     targets = args.models or MODELS
     out_dir = pathlib.Path(args.out_dir)

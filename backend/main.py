@@ -26,6 +26,40 @@ app.add_middleware(
 with open("./model_asset/json_Schema.json", "r", encoding="utf-8") as f:
     daily_schema = json.load(f)
 
+def get_known_projects_block():
+    """DB의 projects/aliases로 {{KNOWN_PROJECTS}} 슬롯을 채운다.
+
+    prompt.txt 의 [C0] 등록된 프로젝트 목록 형식과 맞춘다.
+    등록된 프로젝트가 없으면 빈 문장을 돌려주고, 사용자는 원문에서 직접 판단한다.
+    """
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT name FROM projects WHERE name IS NOT NULL AND TRIM(name) != ''"
+        ).fetchall()
+        aliases = conn.execute(
+            "SELECT alias_name, canonical_name FROM project_aliases"
+        ).fetchall()
+    names = sorted({r[0] for r in rows})
+    if not names:
+        return "(등록된 프로젝트가 없다. 원문에서 직접 판단한다.)"
+    alias_by = {}
+    for alias, canon in aliases:
+        alias_by.setdefault(canon, []).append(alias)
+    lines = []
+    for name in names:
+        lines.append(f"- {name}")
+        if name in alias_by:
+            lines.append(f"  · 표기 변형: {', '.join(alias_by[name])}")
+    return "\n".join(lines)
+
+
+def load_daily_prompt():
+    """daily_prompt 을 읽되 {{KNOWN_PROJECTS}} 슬롯을 DB에서 채워 반환한다."""
+    with open("./model_asset/prompt.txt", "r", encoding="utf-8") as f:
+        prompt = f.read()
+    return prompt.replace("{{KNOWN_PROJECTS}}", get_known_projects_block())
+
+
 with open("./model_asset/prompt.txt", "r", encoding="utf-8") as f:
     daily_prompt = f.read()
 
@@ -42,6 +76,9 @@ LM_API_KEY = os.environ.get("LM_API_KEY", "lm-studio")
 # 출력 토큰 상한. 지정하지 않으면 LM Studio가 컨텍스트가 찰 때까지 계속 생성한다.
 DAILY_MAX_TOKENS = int(os.environ.get("DAILY_MAX_TOKENS", "1024"))
 WEEKLY_MAX_TOKENS = int(os.environ.get("WEEKLY_MAX_TOKENS", "2048"))
+# reasoning_effort: none|low|medium|high. 기본은 none(끔).
+# 벤치마크상 기존 32건은 high가 +2.7pp, 신규 데이터셋은 -3.7pp라 기본값은 none이 안전하다.
+DAILY_REASONING = os.environ.get("DAILY_REASONING", "none") or None
 
 
 class ReportRequest(BaseModel):
@@ -512,14 +549,15 @@ def weekly_report(data: WeeklyReportRequest):
 async def send_report(data: ReportRequest):
     client = OpenAI(base_url=LM_BASE_URL, api_key=LM_API_KEY)
     try:
-        completion = client.chat.completions.create(
+        max_tokens = 16384 if DAILY_REASONING else DAILY_MAX_TOKENS
+        kwargs = dict(
             model=MODEL_NAME,
             messages=[
-                {"role": "system", "content": daily_prompt},
+                {"role": "system", "content": load_daily_prompt()},
                 {"role": "user", "content": data.report},
             ],
             temperature=0.1,
-            max_tokens=DAILY_MAX_TOKENS,
+            max_tokens=max_tokens,
             response_format={
                 "type": "json_schema",
                 "json_schema": {
@@ -529,6 +567,9 @@ async def send_report(data: ReportRequest):
                 },
             },
         )
+        if DAILY_REASONING:
+            kwargs["reasoning_effort"] = DAILY_REASONING
+        completion = client.chat.completions.create(**kwargs)
 
         content = read_completion(completion, "send-report")
         report_data = coerce_report_data(content)

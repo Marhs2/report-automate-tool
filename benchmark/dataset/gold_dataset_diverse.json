@@ -1,0 +1,725 @@
+{
+  "meta": {
+    "name": "daily-report-extraction-gold-diverse",
+    "description": "일일보고 자동 구조화 벤치마크용 두 번째 데이터셋. 실제 서비스 DB의 프로젝트(일일보고 취합·주간보고 자동화 도구, 명함 관리 웹, 스모크)와 실제 팀원 4명 사용. 2주치 32건. 작성 스타일은 개조식/줄글/메신저체/표/혼합/엣지케이스 + 원본 데이터셋에 없던 케이스(중복 제출 처리, 반복 업무 병합, 회신 대기, 진행률 40%/70%, 한글 깨짐, 디자인 시안 보류 등).",
+    "members": ["정동일", "박현빈", "여권우", "신하성"],
+    "projects": ["일일보고 취합·주간보고 자동화 도구", "명함 관리 웹", "스모크"],
+    "aliases": {
+      "자동화도구": "일일보고취합주간보고자동화도구",
+      "일일보고자동화": "일일보고취합주간보고자동화도구",
+      "자동화": "일일보고취합주간보고자동화도구",
+      "명함관리": "명함관리웹",
+      "명함웹": "명함관리웹",
+      "스모크테스트": "스모크"
+    },
+    "label_spec": "backend/model_asset/prompt_v2.txt 규칙에 따라 사람이 직접 라벨링 (원본 gold_dataset.json과 동일 규칙)"
+  },
+  "cases": [
+    {
+      "id": "E01",
+      "date": "2026-07-27",
+      "member": "정동일",
+      "style": "개조식",
+      "raw": "[자동화 도구]\n- 일일보고 입력 화면 퍼블리싱 완료\n- 주간보고 초안 생성 API 개발 중\n- 보고 중복 제출 처리 기준 미정, 확인 필요\n- DB팀에 프로젝트명 별칭 테이블 스키마 검토 요청드립니다\n- 내일 모아보기 화면 착수 예정",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["일일보고 입력 화면 퍼블리싱 완료"],
+            "inProgressTasks": ["주간보고 초안 생성 API 개발 중"],
+            "issues": [{"content": "보고 중복 제출 처리 기준 미정", "status": "미해결"}],
+            "requests": ["DB팀에 프로젝트명 별칭 테이블 스키마 검토 요청"],
+            "nextPlans": ["내일 모아보기 화면 착수 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E02",
+      "date": "2026-07-27",
+      "member": "박현빈",
+      "style": "줄글",
+      "raw": "명함 관리 웹에서 명함 목록 엑셀 내보내기 기능을 개발 완료했습니다. 사진 등록 화면은 아직 구현 중이고, 명함 OCR 인식률이 흐릿한 사진에서 떨어지는 문제가 있어 전처리 방안을 검토 중입니다. 디자인팀에 명함 상세 화면 시안 확인 부탁드립니다. 다음 주에는 태그 분류 기능을 시작할 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 목록 엑셀 내보내기 기능 개발 완료"],
+            "inProgressTasks": ["사진 등록 화면 구현 중", "명함 OCR 전처리 방안 검토 중"],
+            "issues": [{"content": "흐릿한 사진에서 명함 OCR 인식률 저하", "status": "미해결"}],
+            "requests": ["디자인팀에 명함 상세 화면 시안 확인 요청"],
+            "nextPlans": ["다음 주 태그 분류 기능 시작 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E03",
+      "date": "2026-07-27",
+      "member": "여권우",
+      "style": "메신저체",
+      "raw": "[17:50] 여권우: 주간보고 화면 프로젝트별 병합 로직 구현 완료했습니다\n[17:51] 여권우: 미제출 현황 표시는 아직 작업 중입니다\n[17:52] 팀장: 이번 주 보고 정리 언제까지 가능해?\n[17:53] 여권우: 내일까지 마무리하겠습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["주간보고 화면 프로젝트별 병합 로직 구현 완료"],
+            "inProgressTasks": ["주간보고 미제출 현황 표시 작업 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["내일 주간보고 정리 마무리 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E04",
+      "date": "2026-07-27",
+      "member": "신하성",
+      "style": "개조식",
+      "raw": "스모크\n- 스모크 테스트 시나리오 15건 작성 완료\n- 자동화 실행 스크립트 정리 중\n- 테스트 환경 접속 불가 이슈 발생, 원인 확인 필요\n- 인프라팀에 테스트 서버 재기동 요청드립니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스모크",
+            "completedTasks": ["스모크 테스트 시나리오 15건 작성 완료"],
+            "inProgressTasks": ["자동화 실행 스크립트 정리 중"],
+            "issues": [{"content": "테스트 환경 접속 불가", "status": "미해결"}],
+            "requests": ["인프라팀에 테스트 서버 재기동 요청"],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E05",
+      "date": "2026-07-28",
+      "member": "정동일",
+      "style": "줄글",
+      "raw": "어제 확인했던 주간보고 다운로드 시 한글 깨짐 이슈는 서버 인코딩 문제로 확인해 수정 완료했습니다. 명함 관리 웹 쪽은 명함 중복 등록 방지 로직을 검토 중입니다. 오늘 발견한 문제는 없습니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["주간보고 다운로드 한글 깨짐 이슈 서버 인코딩 문제로 수정 완료"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": [],
+            "inProgressTasks": ["명함 중복 등록 방지 로직 검토 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E06",
+      "date": "2026-07-28",
+      "member": "박현빈",
+      "style": "표",
+      "raw": "| 구분 | 업무내용 | 진행률 |\n| 명함 관리 웹 | 명함 상세 화면 퍼블리싱 | 완료 |\n| 명함 관리 웹 | 태그 분류 기능 개발 | 70% |\n| 일일보고 자동화 도구 | 주간보고 워드 다운로드 | 진행 중 |\n| 스모크 | 회귀 테스트 케이스 보강 | 완료 |",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 상세 화면 퍼블리싱 완료"],
+            "inProgressTasks": ["태그 분류 기능 개발 (70%)"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": [],
+            "inProgressTasks": ["주간보고 워드 다운로드 진행 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "스모크",
+            "completedTasks": ["회귀 테스트 케이스 보강 완료"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E07",
+      "date": "2026-07-28",
+      "member": "여권우",
+      "style": "줄글 + 영문 혼합",
+      "raw": "자동화 도구 CI pipeline에 ESLint와 prettier를 추가해서 build time을 90초에서 40초로 줄였습니다. 명함 관리 웹 staging 배포는 아직 진행 중이고, SSL 인증서 갱신은 인프라 담당자 회신 대기라 blocked 상태입니다. 보안팀에 방화벽 정책 추가 승인 요청드립니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["CI pipeline에 ESLint와 prettier 추가로 build time 90초에서 40초로 단축"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": [],
+            "inProgressTasks": ["staging 배포 진행 중"],
+            "issues": [{"content": "SSL 인증서 갱신이 인프라 담당자 회신 대기로 blocked", "status": "미해결"}],
+            "requests": ["보안팀에 방화벽 정책 추가 승인 요청"],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E08",
+      "date": "2026-07-28",
+      "member": "신하성",
+      "style": "메신저체",
+      "raw": "[10:02] 신하성: 스모크 테스트 3차 실행 결과 전건 통과했습니다\n[10:03] 신하성: 다만 결제 시나리오에서 간헐적 타임아웃이 재현됩니다\n[10:05] 팀장: 그거 오늘 안에 해결돼?\n[10:06] 신하성: 원인 분석 중입니다. 내일까지 결과 정리하겠습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스모크",
+            "completedTasks": ["스모크 테스트 3차 실행 전건 통과"],
+            "inProgressTasks": ["결제 시나리오 간헐적 타임아웃 원인 분석 중"],
+            "issues": [{"content": "결제 시나리오에서 간헐적 타임아웃 재현", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": ["내일 테스트 결과 정리 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E09",
+      "date": "2026-07-28",
+      "member": "정동일",
+      "style": "한 줄",
+      "raw": "명함 관리 웹 명함 검색 성능 개선 작업 완료했습니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 검색 성능 개선 완료"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E10",
+      "date": "2026-07-29",
+      "member": "박현빈",
+      "style": "개조식",
+      "raw": "[자동화 도구]\n- 회원별 보고 조회 API 개발 완료\n- 주간보고 초안 생성 로직 리팩토링 진행 중\n- 워드 파일 다운로드 시 스타일 깨짐 이슈 발생, 확인 필요\n- 다음 주 월요일 운영 반영 예정",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["회원별 보고 조회 API 개발 완료"],
+            "inProgressTasks": ["주간보고 초안 생성 로직 리팩토링 진행 중"],
+            "issues": [{"content": "워드 파일 다운로드 시 스타일 깨짐", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": ["다음 주 월요일 운영 반영 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E11",
+      "date": "2026-07-29",
+      "member": "여권우",
+      "style": "줄글",
+      "raw": "일일보고 자동화 도구의 보고 저장 시 덮어쓰기 로직을 구현 완료했고, 같은 날 중복 제출 시 이전 내용을 덮도록 처리했습니다. 명함 관리 웹의 명함 OCR 결과 저장은 아직 완료하지 못했고 내일까지 마무리할 예정입니다. DB팀에 명함 이미지 저장 용량 정책 검토 요청드립니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["보고 저장 시 덮어쓰기 로직 구현 완료", "같은 날 중복 제출 시 이전 내용 덮어쓰기 처리"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": [],
+            "inProgressTasks": ["명함 OCR 결과 저장 개발 (아직 완료하지 못함)"],
+            "issues": [],
+            "requests": ["DB팀에 명함 이미지 저장 용량 정책 검토 요청"],
+            "nextPlans": ["명함 OCR 결과 저장 내일까지 마무리 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E12",
+      "date": "2026-07-29",
+      "member": "정동일",
+      "style": "메신저체",
+      "raw": "[18:20] 정동일: 오늘 주간보고 초안 생성 테스트 2차 돌렸습니다\n[18:21] 정동일: 프로젝트 병합에서 중복 제거는 잘 되는데 이슈 정렬이 어긋나는 게 확인됐습니다\n[18:22] 팀장: 우선순위로 고쳐주세요\n[18:23] 정동일: 네 내일 이슈 정렬 로직 수정하겠습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["주간보고 초안 생성 테스트 2차 수행"],
+            "inProgressTasks": [],
+            "issues": [{"content": "프로젝트 병합 시 이슈 정렬이 어긋나는 문제", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": ["내일 이슈 정렬 로직 수정 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E13",
+      "date": "2026-07-29",
+      "member": "신하성",
+      "style": "개조식",
+      "raw": "명함 관리 웹\n- 명함 등록 화면 유효성 검사 추가 완료\n- 명함 상세 화면 반응형 적용 중\n- 사진 업로드 시 용량 초과 에러 미표시 문제, 확인 필요\n- 다음 주 태그 필터 개발 예정",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 등록 화면 유효성 검사 추가 완료"],
+            "inProgressTasks": ["명함 상세 화면 반응형 적용 중"],
+            "issues": [{"content": "사진 업로드 시 용량 초과 에러가 표시되지 않는 문제", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": ["다음 주 태그 필터 개발 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E14",
+      "date": "2026-07-30",
+      "member": "박현빈",
+      "style": "줄글",
+      "raw": "어제 확인한 명함 중복 등록 이슈는 DB 유니크 제약 추가로 해결 완료했습니다. 명함 관리 웹 명함 수정 화면은 개발 중입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 중복 등록 이슈 DB 유니크 제약 추가로 해결 완료"],
+            "inProgressTasks": ["명함 수정 화면 개발 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E15",
+      "date": "2026-07-30",
+      "member": "여권우",
+      "style": "줄글 + 영문 혼합",
+      "raw": "자동화 도구 weekly report 생성 시 반복 업무 병합 로직을 구현해 5일치 보고를 3건으로 정리했습니다. 명함 관리 웹은 명함 OCR 인식률이 40%에서 68%로 개선된 것을 확인했으나, 정식 적용 여부는 개발팀 검토가 필요해 미결정 상태입니다. 내일은 자동화 도구 회원별 모아보기 테스트를 진행할 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["weekly report 반복 업무 병합 로직 구현으로 5일치 보고를 3건으로 정리"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["내일 회원별 모아보기 테스트 진행 예정"]
+          },
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 OCR 인식률 40%에서 68%로 개선 확인"],
+            "inProgressTasks": [],
+            "issues": [{"content": "명함 OCR 전처리 정식 적용 여부가 개발팀 검토 필요로 미결정", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E16",
+      "date": "2026-07-30",
+      "member": "신하성",
+      "style": "업무 없음",
+      "raw": "안녕하세요. 오늘은 종일 사내 보안 교육을 받았습니다. 특별한 이슈 없습니다. 수고하셨습니다.",
+      "gold": {
+        "projects": []
+      }
+    },
+    {
+      "id": "E17",
+      "date": "2026-07-30",
+      "member": "정동일",
+      "style": "개조식",
+      "raw": "[자동화 도구]\n- 주간보고 워드 다운로드 구현 완료\n- 화면 복사용 텍스트 포맷 정리 중\n- 다운로드 시 파일명 한글 깨짐 문제 발생, 원인 확인 중\n- 고객사에 일정 확정 회신 요청드립니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["주간보고 워드 다운로드 구현 완료"],
+            "inProgressTasks": ["화면 복사용 텍스트 포맷 정리 중", "다운로드 시 파일명 한글 깨짐 원인 확인 중"],
+            "issues": [{"content": "주간보고 다운로드 시 파일명 한글 깨짐 문제", "status": "미해결"}],
+            "requests": ["고객사에 일정 확정 회신 요청"],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E18",
+      "date": "2026-07-31",
+      "member": "박현빈",
+      "style": "줄글",
+      "raw": "명함 관리 웹 명함 검색 화면에서 필터 조합 검색을 개발 완료했습니다. 명함 상세 화면의 태그 표시 영역은 작업 중입니다. 디자인팀에 명함 카드 레이아웃 시안 전달 요청드렸습니다. 내일은 명함 목록 무한 스크롤을 적용할 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 검색 화면 필터 조합 검색 개발 완료"],
+            "inProgressTasks": ["명함 상세 화면 태그 표시 영역 작업 중"],
+            "issues": [],
+            "requests": ["디자인팀에 명함 카드 레이아웃 시안 전달 요청"],
+            "nextPlans": ["내일 명함 목록 무한 스크롤 적용 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E19",
+      "date": "2026-07-31",
+      "member": "여권우",
+      "style": "개조식",
+      "raw": "스모크\n- 회귀 테스트 케이스 10건 추가 완료\n- 테스트 결과 리포트 자동 생성 진행 중\n- 특정 브라우저에서 테스트가 멈추는 문제, 미해결\n- 인프라팀에 테스트 환경 리소스 증설 요청드립니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스모크",
+            "completedTasks": ["회귀 테스트 케이스 10건 추가 완료"],
+            "inProgressTasks": ["테스트 결과 리포트 자동 생성 진행 중"],
+            "issues": [{"content": "특정 브라우저에서 테스트가 멈추는 문제", "status": "미해결"}],
+            "requests": ["인프라팀에 테스트 환경 리소스 증설 요청"],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E20",
+      "date": "2026-07-31",
+      "member": "정동일",
+      "style": "줄글",
+      "raw": "자동화 도구의 사용자별 주간보고 이메일 발송을 개발 완료했고 운영 반영했습니다. 반영 후 발송 시간이 지연되는 문제가 있어 스케줄러 설정을 확인 중입니다. 명함 관리 웹은 명함 가져오기 기능을 설계 중이며 다음 주에 착수할 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["사용자별 주간보고 이메일 발송 개발 완료 및 운영 반영"],
+            "inProgressTasks": ["발송 시간 지연 문제 스케줄러 설정 확인 중"],
+            "issues": [{"content": "운영 반영 후 주간보고 발송 시간 지연 문제", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": [],
+            "inProgressTasks": ["명함 가져오기 기능 설계 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["다음 주 명함 가져오기 착수 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E21",
+      "date": "2026-08-03",
+      "member": "정동일",
+      "style": "표",
+      "raw": "| 구분 | 업무내용 | 진행률 |\n| 일일보고 자동화 도구 | 프로젝트별 모아보기 화면 | 완료 |\n| 일일보고 자동화 도구 | 사람별 기간 조회 | 진행 중 |\n| 명함 관리 웹 | 명함 삭제 기능 | 완료 |\n| 명함 관리 웹 | 명함 가져오기 | 40% |",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["프로젝트별 모아보기 화면 완료"],
+            "inProgressTasks": ["사람별 기간 조회 진행 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 삭제 기능 완료"],
+            "inProgressTasks": ["명함 가져오기 (40%)"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E22",
+      "date": "2026-08-03",
+      "member": "박현빈",
+      "style": "메신저체",
+      "raw": "[18:00] 박현빈: 명함 상세 화면 퍼블리싱 완료했습니다\n[18:01] 박현빈: 명함 검색 정렬 기능은 아직 작업 중입니다\n[18:02] 팀장: 디자인 QA 일정은?\n[18:03] 박현빈: 목요일에 요청드릴 수 있을 것 같습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 상세 화면 퍼블리싱 완료"],
+            "inProgressTasks": ["명함 검색 정렬 기능 작업 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["목요일 디자인 QA 요청 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E23",
+      "date": "2026-08-03",
+      "member": "신하성",
+      "style": "개조식",
+      "raw": "[자동화 도구]\n- 보고 자동 저장 배치 구현 완료\n- 주간보고 미제출 현황 화면 개발 중\n- 배치 실행 시 특정 회원 데이터 누락 문제, 확인 필요\n- 금주 내 배치 재실행 예정",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["보고 자동 저장 배치 구현 완료"],
+            "inProgressTasks": ["주간보고 미제출 현황 화면 개발 중"],
+            "issues": [{"content": "배치 실행 시 특정 회원 데이터 누락 문제", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": ["금주 내 배치 재실행 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E24",
+      "date": "2026-08-03",
+      "member": "여권우",
+      "style": "줄글",
+      "raw": "명함 관리 웹의 명함 가져오기 기능을 시작했는데 디자인 시안이 확정되지 않아 일단 보류했습니다. 대신 명함 검색 화면의 정렬 옵션을 수정 완료했습니다. 명함 관리 웹에서 명함 이미지가 깨져 보이는 버그가 있어 원인 확인 중입니다. 기획팀에 명함 가져오기 시안 확정 요청드립니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": ["명함 검색 화면 정렬 옵션 수정 완료"],
+            "inProgressTasks": ["명함 이미지 깨짐 버그 원인 확인 중"],
+            "issues": [
+              {"content": "명함 가져오기 기능 디자인 시안 미확정으로 보류", "status": "미해결"},
+              {"content": "명함 이미지가 깨져 보이는 버그", "status": "미해결"}
+            ],
+            "requests": ["기획팀에 명함 가져오기 시안 확정 요청"],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E25",
+      "date": "2026-08-04",
+      "member": "박현빈",
+      "style": "한 줄",
+      "raw": "일일보고 자동화 도구 주간보고 초안 생성 결과 확인 화면 완료했습니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["주간보고 초안 생성 결과 확인 화면 완료"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E26",
+      "date": "2026-08-04",
+      "member": "정동일",
+      "style": "줄글",
+      "raw": "자동화 도구에 AI 모델 버전 Qwen 3.5 2B를 적용해 초안 생성을 테스트했습니다. 생성 품질은 만족스러운데 처리 시간이 건당 30초에서 2분으로 늘었습니다. 성능 개선을 위해 모델 양자화를 검토 중입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["AI 모델 Qwen 3.5 2B 적용 초안 생성 테스트"],
+            "inProgressTasks": ["처리 시간 개선을 위한 모델 양자화 검토 중"],
+            "issues": [{"content": "초안 생성 처리 시간이 건당 30초에서 2분으로 증가", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E27",
+      "date": "2026-08-04",
+      "member": "신하성",
+      "style": "줄글",
+      "raw": "스모크 테스트에서 결제 시나리오 타임아웃 이슈가 해결되어 4차 실행 전건 통과를 확인했습니다. 자동화 도구 쪽은 주간보고 병합 시 같은 업무 중복 제거가 잘 되는지 검증 중입니다. 내일 스모크 회귀 테스트를 추가로 돌릴 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스모크",
+            "completedTasks": ["결제 시나리오 타임아웃 이슈 해결 확인", "스모크 테스트 4차 실행 전건 통과"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["내일 스모크 회귀 테스트 추가 실행 예정"]
+          },
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": [],
+            "inProgressTasks": ["주간보고 병합 시 같은 업무 중복 제거 검증 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E28",
+      "date": "2026-08-04",
+      "member": "여권우",
+      "style": "줄글 + 영문 혼합",
+      "raw": "자동화 도구 production 서버의 disk usage가 80%까지 올라와서 log rotation 정책을 조정 중입니다. 명함 관리 웹 alert 규칙에서 false positive가 많이 발생하는 문제가 남아 있습니다. 개발팀에 alert threshold 기준값 협의 요청드립니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": [],
+            "inProgressTasks": ["production 서버 disk usage 80% 도달로 log rotation 정책 조정 중"],
+            "issues": [{"content": "production 서버 disk usage가 80%까지 상승", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [{"content": "alert 규칙에서 false positive가 많이 발생", "status": "미해결"}],
+            "requests": ["개발팀에 alert threshold 기준값 협의 요청"],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E29",
+      "date": "2026-08-05",
+      "member": "박현빈",
+      "style": "개조식",
+      "raw": "[자동화 도구]\n- 주간보고 프로젝트별 정리 화면 구현 완료\n- 워드 템플릿 커스터마이징 진행 중\n- 템플릿에 한글 폰트 미적용 문제, 확인 필요\n- 다음 주 화요일 최종 시연 준비 예정",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["주간보고 프로젝트별 정리 화면 구현 완료"],
+            "inProgressTasks": ["워드 템플릿 커스터마이징 진행 중"],
+            "issues": [{"content": "워드 템플릿에 한글 폰트 미적용 문제", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": ["다음 주 화요일 최종 시연 준비 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E30",
+      "date": "2026-08-05",
+      "member": "정동일",
+      "style": "메신저체",
+      "raw": "[17:40] 정동일: 주간보고 미제출 현황 화면 작업 완료했습니다\n[17:41] 정동일: 금요일 미제출 인원이 2명으로 확인됐습니다\n[17:42] 팀장: 알림 기능은?\n[17:43] 정동일: 다음 주에 추가하겠습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["주간보고 미제출 현황 화면 작업 완료", "금요일 미제출 인원 2명 확인"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["다음 주 미제출 알림 기능 추가 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "E31",
+      "date": "2026-08-06",
+      "member": "신하성",
+      "style": "줄글",
+      "raw": "오늘은 스모크 테스트 자동화를 위해 테스트 케이스를 관리하는 설정 파일을 정리했고, 실행 결과 리포트를 메신저로 보내는 기능을 붙였습니다. 명함 관리 웹은 명함 태그 필터 기능을 개발 중이고 내일 마무리할 예정입니다. 자동화 도구는 어제 회신을 받아 SSL 인증서 갱신을 진행했습니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스모크",
+            "completedTasks": ["테스트 케이스 관리 설정 파일 정리", "실행 결과 리포트 메신저 전송 기능 추가"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": [],
+            "inProgressTasks": ["명함 태그 필터 기능 개발 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["명함 태그 필터 내일 마무리 예정"]
+          },
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["SSL 인증서 갱신 진행"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "E32",
+      "date": "2026-08-07",
+      "member": "박현빈",
+      "style": "혼합",
+      "raw": "금주 인프라 작업 정리\n\n자동화 도구: 주간보고 생성 서버 배포 스크립트 점검 완료했습니다. 배포 후 로그 확인 중입니다.\n명함 관리 웹: 명함 이미지 저장 서버 이전은 클라우드팀 회신 대기 중입니다.\n스모크: 별건 없습니다.\n\n다음 주에는 자동화 도구 백업 절차를 점검할 예정입니다.\n감사합니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "일일보고 취합·주간보고 자동화 도구",
+            "completedTasks": ["주간보고 생성 서버 배포 스크립트 점검 완료"],
+            "inProgressTasks": ["배포 후 로그 확인 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["다음 주 자동화 도구 백업 절차 점검 예정"]
+          },
+          {
+            "projectName": "명함 관리 웹",
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [{"content": "명함 이미지 저장 서버 이전이 클라우드팀 회신 대기 중", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    }
+  ]
+}

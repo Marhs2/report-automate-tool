@@ -98,6 +98,15 @@
                                 :value="issue.content"
                                 v-model="project.issues[issueIndex].content"
                             />
+                            <select
+                                :key="`issue-status-${issueIndex}`"
+                                class="input issue-status-select"
+                                :value="issue.status || '미해결'"
+                                @change="toggleIssueStatus(issue, $event)"
+                            >
+                                <option value="미해결">미해결</option>
+                                <option value="해결">해결</option>
+                            </select>
                             <button
                                 class="btn remove-btn"
                                 @click="removeIssue(project, issueIndex)"
@@ -268,6 +277,10 @@ const removeInProgressTask = (project, index) => {
 
 const addIssue = (project) => {
     project.issues.push({ content: "", status: "미해결" });
+};
+
+const toggleIssueStatus = (issue, event) => {
+    issue.status = event.target.value;
 };
 
 const removeIssue = (project, index) => {
@@ -444,6 +457,11 @@ const retryExtract = async () => {
     align-self: flex-start;
     padding: 5px 14px;
     font-size: 13px;
+}
+
+/* 이슈 상태 선택 (미해결/해결) */
+.issue-status-select {
+    max-width: 110px;
 }
 
 /* 하단 저장 영역 */

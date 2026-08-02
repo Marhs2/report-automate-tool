@@ -81,6 +81,8 @@ $RECYCLE.BIN/
 omg_wiki/
 .cursor/
 .codegraph/
+.omo/
+.senpi/
 
 # ── Logs / temp ─────────────────────────────────────────
 logs/
@@ -90,3 +92,9 @@ temp/
 *.tmp
 *.bak
 *.orig
+
+# ── Benchmark run artifacts (regenerated on each run) ───
+benchmark/results/raw_*/
+benchmark/results/*_scores.json
+benchmark/results/*_summary.csv
+benchmark/results/*_tables.md

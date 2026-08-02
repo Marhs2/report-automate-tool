@@ -348,12 +348,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw-dir", default=None, help="채점할 원시 응답 디렉터리")
     ap.add_argument("--prefix", default="", help="출력 파일 접두어 (예: run1_)")
+    ap.add_argument("--dataset", default="gold", choices=["gold", "diverse", "fresh"], help="사용할 데이터셋")
     args = ap.parse_args()
     if args.raw_dir:
         RAW_DIR = pathlib.Path(args.raw_dir)
     prefix = args.prefix
 
-    with open(BENCH / "dataset" / "gold_dataset.json", encoding="utf-8") as f:
+    dataset_file = "gold_dataset.json" if args.dataset == "gold" else f"gold_dataset_{args.dataset}.json"
+    with open(BENCH / "dataset" / dataset_file, encoding="utf-8") as f:
         dataset = json.load(f)
     with open(ROOT / "backend" / "model_asset" / "json_Schema.json", encoding="utf-8") as f:
         schema = json.load(f)
