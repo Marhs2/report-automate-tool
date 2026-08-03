@@ -1,11 +1,12 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import useAPI from "../composables/useApi";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
 import { Download, Copy } from "lucide-vue-next";
 import { useRouter } from "vue-router";
+import userActivities from "./user-activities.vue";
 
 const router = useRouter();
 
@@ -17,16 +18,17 @@ const userId = ref(sessionStorage.getItem("selectedUser") || "");
 const weeklyReport = ref(null);
 const isLoading = ref(false);
 
-// 로컬 시간대 기준으로 YYYY-MM-DD 포맷. toISOString()은 UTC로 바뀌어
-// KST(+9)에서 날짜가 하루 밀리므로 사용하지 않는다.
 const formatLocalDate = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-const getThisWeek = () => {
+// weekOffset: 0 = 이번 주, -1 = 지난주, +1 = 다음주
+const weekOffset = ref(0);
+
+const getWeekDays = (offset) => {
     const now = new Date();
     const day = now.getDay();
     const monday = new Date(now);
-    monday.setDate(now.getDate() - (day === 0 ? 7 : day) + 1);
+    monday.setDate(now.getDate() - (day === 0 ? 7 : day) + 1 + offset * 7);
 
     const days = [];
     for (let i = 0; i < 5; i++) {
@@ -34,16 +36,27 @@ const getThisWeek = () => {
         d.setDate(monday.getDate() + i);
         days.push(formatLocalDate(d));
     }
-    return {
-        monday: formatLocalDate(monday),
-        days,
-    };
+    return days;
 };
 
-const { monday, days } = getThisWeek();
-weekDays.value = days;
-// 기본값: 해당 주 월~금 전체 선택
-selects.value = [...days];
+const loadWeek = (offset) => {
+    weekOffset.value = offset;
+    weekDays.value = getWeekDays(offset);
+    selects.value = [...weekDays.value];
+};
+
+const weekLabel = computed(() => {
+    if (weekDays.value.length < 5) return "";
+    const start = weekDays.value[0];
+    const end = weekDays.value[4];
+    const suffix = weekOffset.value === 0 ? " (이번 주)" : "";
+    return `${start} ~ ${end}${suffix}`;
+});
+
+const prevWeek = () => loadWeek(weekOffset.value - 1);
+const nextWeek = () => loadWeek(weekOffset.value + 1);
+
+loadWeek(0);
 
 const sendDates = async () => {
     if (!userId.value) {
@@ -70,7 +83,7 @@ const sendDates = async () => {
 
 const fetchWeeklyReport = async () => {
     isLoading.value = true;
-    const response = await GetWeeklyReport();
+    const response = await GetWeeklyReport(userId.value);
     weeklyReport.value = response;
     isLoading.value = false;
 };
@@ -173,7 +186,8 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="page">
+    <div class="page weekly-report-page">
+        <userActivities :embedded="true"></userActivities>
         <div class="page-header">
             <div>
                 <h1>주간 보고서</h1>
@@ -185,6 +199,31 @@ onMounted(() => {
 
         <div class="card">
             <h2>이번 주 보고서 생성</h2>
+            <div class="week-nav">
+                <button
+                    class="btn btn-small"
+                    @click="prevWeek"
+                    :disabled="isLoading"
+                >
+                    &lt; 이전 주
+                </button>
+                <span class="week-label">{{ weekLabel }}</span>
+                <button
+                    class="btn btn-small"
+                    @click="nextWeek"
+                    :disabled="isLoading"
+                >
+                    다음 주 &gt;
+                </button>
+                <button
+                    v-if="weekOffset !== 0"
+                    class="btn btn-small"
+                    @click="loadWeek(0)"
+                    :disabled="isLoading"
+                >
+                    이번 주로
+                </button>
+            </div>
             <div class="day-grid">
                 <label
                     v-for="(dayDate, index) in weekDays"
@@ -266,6 +305,20 @@ onMounted(() => {
     flex-wrap: wrap;
     gap: 8px;
     margin: 16px 0;
+}
+
+.week-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0 4px;
+    flex-wrap: wrap;
+}
+
+.week-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-h);
 }
 
 .day-chip {

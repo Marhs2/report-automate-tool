@@ -68,6 +68,18 @@ CREATE TABLE IF NOT EXISTS project_aliases (
 )
 """)
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS report_drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    report_date DATE NOT NULL,
+    raw_text TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (member_id) REFERENCES members(id),
+    UNIQUE(member_id, report_date)
+)
+""")
+
 
 conn.commit()
 conn.close()

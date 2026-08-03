@@ -18,6 +18,13 @@ export default function useAPI() {
     }
   };
 
+  const GetReportDraft = async (memberId, reportDate) => {
+    const response = await axios.get(
+      `${baseURL}/report-drafts/${memberId}/${reportDate}`,
+    );
+    return response.data;
+  };
+
   const postWeekly = async (userId, selects) => {
     const response = await axios.post(`${baseURL}/weekly-report`, {
       userId,
@@ -27,9 +34,9 @@ export default function useAPI() {
     return response;
   };
 
-  const GetWeeklyReport = async () => {
+  const GetWeeklyReport = async (userId) => {
     try {
-      const response = await axios.get(`${baseURL}/weekly`);
+      const response = await axios.get(`${baseURL}/weekly/${userId}`);
       return response.data;
     } catch (error) {
       console.error("Error fetching weekly report:", error);
@@ -48,10 +55,28 @@ export default function useAPI() {
     }
   };
 
-  const GetUserActivities = async (year, month) => {
+  const updateWeeklyReport = async (weeklyId, reportJson) => {
+    try {
+      const response = await axios.put(`${baseURL}/weekly/${weeklyId}`, {
+        report_json: reportJson,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error updating weekly report:", error);
+      throw error;
+    }
+  };
+
+  const GetUserActivities = async (year, month, startDate, endDate) => {
     try {
       const response = await axios.get(`${baseURL}/user-activities`, {
-        params: { year, month },
+        params: {
+          year,
+          month,
+          ...(startDate && endDate
+            ? { start_date: startDate, end_date: endDate }
+            : {}),
+        },
       });
       return response.data;
     } catch (error) {
@@ -196,6 +221,7 @@ export default function useAPI() {
 
   return {
     PostReport,
+    GetReportDraft,
     PostSaveReport,
     GetReports,
     GetReportById,
@@ -204,6 +230,7 @@ export default function useAPI() {
     postWeekly,
     GetWeeklyReport,
     GetWeeklyReportById,
+    updateWeeklyReport,
     postUsers,
     getUsers,
     getProjectAliases,

@@ -1,9 +1,9 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import useAPI from "../composables/useAPI";
 
-const { PostReport } = useAPI();
+const { PostReport, GetReportDraft } = useAPI();
 const router = useRouter();
 
 const input = ref("");
@@ -13,6 +13,22 @@ const date = ref(
 );
 
 const aiLoading = ref(false);
+
+const loadDraft = async () => {
+    const memberId = localStorage.getItem("report-selectedUser");
+    if (!memberId || input.value.trim()) return;
+    try {
+        const draft = await GetReportDraft(memberId, date.value);
+        input.value = draft.raw_text;
+    } catch (error) {
+        if (error.response?.status !== 404) {
+            console.error("원문 초안 불러오기 실패:", error);
+        }
+    }
+};
+
+onMounted(loadDraft);
+watch(date, loadDraft);
 
 const sendReport = async () => {
     aiLoading.value = true;

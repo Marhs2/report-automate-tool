@@ -14,42 +14,68 @@
                     class="card projects-container"
                 >
                     <input
-                        readonly
                         class="input project-name-input"
-                        :value="project.projectName"
+                        v-model="project.projectName"
                     />
 
                     <div class="field-group completedTasks">
                         <h2>완료된 업무</h2>
-                        <input
-                            readonly
+                        <div
                             v-if="project.completedTasks.length > 0"
                             v-for="(task, taskIndex) in project.completedTasks"
                             :key="`completed-${taskIndex}`"
-                            class="input"
-                            :value="task"
-                            v-model="project.completedTasks[taskIndex]"
-                        />
-                        <div v-else class="empty-msg">
-                            완료된 업무가 없습니다
+                            class="task-row"
+                        >
+                            <input
+                                class="input"
+                                v-model="project.completedTasks[taskIndex]"
+                            />
+                            <button
+                                class="btn remove-btn"
+                                @click="
+                                    removeItem(project, 'completedTasks', taskIndex)
+                                "
+                            >
+                                -
+                            </button>
                         </div>
+                        <div v-else class="empty-msg">완료된 업무가 없습니다</div>
+                        <button
+                            class="btn add-btn"
+                            @click="addItem(project, 'completedTasks')"
+                        >
+                            +
+                        </button>
                     </div>
 
                     <div class="field-group inProgressTasks">
                         <h2>진행 중인 업무</h2>
-                        <input
-                            readonly
+                        <div
                             v-if="project.inProgressTasks.length > 0"
                             v-for="(task, taskIndex) in project.inProgressTasks"
                             :key="`progress-${taskIndex}`"
-                            class="input"
-                            :value="task"
-                            v-model="project.inProgressTasks[taskIndex]"
-                        />
-
-                        <div v-else class="empty-msg">
-                            진행 중인 업무가 없습니다
+                            class="task-row"
+                        >
+                            <input
+                                class="input"
+                                v-model="project.inProgressTasks[taskIndex]"
+                            />
+                            <button
+                                class="btn remove-btn"
+                                @click="
+                                    removeItem(project, 'inProgressTasks', taskIndex)
+                                "
+                            >
+                                -
+                            </button>
                         </div>
+                        <div v-else class="empty-msg">진행 중인 업무가 없습니다</div>
+                        <button
+                            class="btn add-btn"
+                            @click="addItem(project, 'inProgressTasks')"
+                        >
+                            +
+                        </button>
                     </div>
 
                     <div class="field-group issues">
@@ -61,51 +87,59 @@
                                 class="issue-row"
                             >
                                 <input
-                                    readonly
                                     class="input"
                                     :value="issueText(issue)"
-                                />
-                                <span
-                                    class="issue-badge"
-                                    :class="
-                                        issueStatus(issue) === '해결'
-                                            ? 'resolved'
-                                            : 'unresolved'
+                                    @input="
+                                        (e) => setIssueContent(issue, e.target.value)
                                     "
-                                    >{{ issueStatus(issue) }}</span
+                                />
+                                <select
+                                    class="input issue-status-select"
+                                    :value="issueStatus(issue)"
+                                    @change="
+                                        (e) => setIssueStatus(issue, e.target.value)
+                                    "
                                 >
+                                    <option value="미해결">미해결</option>
+                                    <option value="해결">해결</option>
+                                </select>
+                                <button
+                                    class="btn remove-btn"
+                                    @click="removeItem(project, 'issues', issueIndex)"
+                                >
+                                    -
+                                </button>
                             </div>
                         </template>
                         <div v-else class="empty-msg">이슈가 없습니다</div>
-                    </div>
-
-                    <div class="field-group requests">
-                        <h2>요청사항</h2>
-                        <input
-                            readonly
-                            v-if="project.requests.length > 0"
-                            v-for="(request, requestIndex) in project.requests"
-                            :key="`request-${requestIndex}`"
-                            class="input"
-                            :value="request"
-                            v-model="project.requests[requestIndex]"
-                        />
-                        <div v-else class="empty-msg">요청사항이 없습니다</div>
+                        <button class="btn add-btn" @click="addIssue(project)">
+                            +
+                        </button>
                     </div>
 
                     <div class="field-group nextPlans">
                         <h2>다음 계획</h2>
-                        <input
-                            readonly
+                        <div
                             v-if="project.nextPlans.length > 0"
                             v-for="(plan, planIndex) in project.nextPlans"
                             :key="`plan-${planIndex}`"
-                            class="input"
-                            :value="plan"
-                            v-model="project.nextPlans[planIndex]"
-                        />
-
+                            class="task-row"
+                        >
+                            <input
+                                class="input"
+                                v-model="project.nextPlans[planIndex]"
+                            />
+                            <button
+                                class="btn remove-btn"
+                                @click="removeItem(project, 'nextPlans', planIndex)"
+                            >
+                                -
+                            </button>
+                        </div>
                         <div v-else class="empty-msg">다음 계획이 없습니다</div>
+                        <button class="btn add-btn" @click="addItem(project, 'nextPlans')">
+                            +
+                        </button>
                     </div>
                 </div>
 
@@ -114,8 +148,11 @@
                         >사용자: {{ userName }}</span
                     >
                     <div class="save-actions">
-                        <button class="btn btn-primary" @click="copyReport">
+                        <button class="btn" @click="copyReport" :disabled="isSaving">
                             복사
+                        </button>
+                        <button class="btn btn-primary" @click="saveReport" :disabled="isSaving">
+                            {{ isSaving ? "저장 중..." : "저장" }}
                         </button>
                     </div>
                 </div>
@@ -136,7 +173,8 @@ const route = useRoute();
 const reportData = ref(null);
 const rawData = ref(null);
 const userName = ref("");
-const { getUsers, GetWeeklyReportById } = useAPI();
+const isSaving = ref(false);
+const { getUsers, GetWeeklyReportById, updateWeeklyReport } = useAPI();
 
 watch(
     reportData,
@@ -208,6 +246,30 @@ const issueText = (issue) =>
 const issueStatus = (issue) =>
     typeof issue === "string" ? "미해결" : (issue?.status ?? "미해결");
 
+const setIssueContent = (issue, value) => {
+    if (typeof issue === "object") {
+        issue.content = value;
+    }
+};
+
+const setIssueStatus = (issue, value) => {
+    if (typeof issue === "object") {
+        issue.status = value;
+    }
+};
+
+const addItem = (project, field) => {
+    project[field].push("");
+};
+
+const addIssue = (project) => {
+    project.issues.push({ content: "", status: "미해결" });
+};
+
+const removeItem = (project, field, index) => {
+    project[field].splice(index, 1);
+};
+
 const formatReport = (report) => {
     if (!report?.projects) return "";
     const lines = [];
@@ -241,13 +303,6 @@ const formatReport = (report) => {
             }
         }
 
-        if (project.requests?.length) {
-            lines.push("요청사항:");
-            for (const req of project.requests) {
-                lines.push(`- ${req}`);
-            }
-        }
-
         if (project.nextPlans?.length) {
             lines.push("다음 계획:");
             for (const plan of project.nextPlans) {
@@ -269,6 +324,25 @@ const copyReport = async () => {
     } catch (error) {
         console.error("복사 실패:", error);
         alert("복사에 실패했습니다.");
+    }
+};
+
+const saveReport = async () => {
+    if (!reportData.value) return;
+    const reportId = route.params.id;
+    if (!reportId) {
+        alert("저장할 주간 보고서 ID가 없습니다.");
+        return;
+    }
+    isSaving.value = true;
+    try {
+        await updateWeeklyReport(reportId, JSON.stringify(reportData.value));
+        alert("주간 보고서가 저장되었습니다.");
+    } catch (error) {
+        console.error("저장 실패:", error);
+        alert("주간 보고서 저장에 실패했습니다.");
+    } finally {
+        isSaving.value = false;
     }
 };
 </script>
@@ -360,41 +434,45 @@ const copyReport = async () => {
     opacity: 0.7;
 }
 
+/* 추가 (+) 버튼 */
+.add-btn {
+    align-self: flex-start;
+    padding: 5px 14px;
+    font-size: 13px;
+}
+
+/* 항목 행 (입력 + 삭제 버튼) */
+.task-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.task-row .input {
+    flex: 1;
+    min-width: 0;
+}
+
+.remove-btn {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    font-size: 13px;
+}
+
 .issue-row {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.issue-row .input {
+.issue-row .input:first-child {
     flex: 1;
     min-width: 0;
 }
 
-.issue-badge {
+.issue-status-select {
     flex-shrink: 0;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    border: 1px solid;
-}
-
-.issue-badge.unresolved {
-    color: var(--danger);
-    border-color: var(--danger);
-}
-
-.issue-badge.resolved {
-    color: var(--success);
-    border-color: var(--success);
-}
-
-/* 추가 (+) 버튼 */
-.add-btn {
-    align-self: flex-start;
-    padding: 5px 14px;
-    font-size: 13px;
+    max-width: 110px;
 }
 
 /* 하단 저장 영역 */

@@ -1,9 +1,15 @@
 <script setup>
-import { onMounted, ref, reactive } from "vue";
+import { onMounted, ref, reactive, computed, watch } from "vue";
 import useApi from "../composables/useApi";
 import { Check, Minus } from "lucide-vue-next";
 
 const { GetUserActivities } = useApi();
+
+const props = defineProps({
+    startDate: { type: String, default: "" },
+    endDate: { type: String, default: "" },
+    embedded: { type: Boolean, default: false },
+});
 
 const userActivities = ref([]);
 
@@ -69,6 +75,8 @@ async function fetchUserActivities() {
     const activities = await GetUserActivities(
         selectedYear.value,
         selectedMonth.value,
+        props.startDate,
+        props.endDate,
     );
     userActivities.value = activities;
 }
@@ -97,15 +105,47 @@ onMounted(() => {
     weekDays.value = getWeekDays();
     fetchUserActivities();
 });
+
+watch(
+    () => [props.startDate, props.endDate],
+    ([startDate, endDate], [previousStartDate, previousEndDate] = []) => {
+        if (
+            startDate &&
+            endDate &&
+            (startDate !== previousStartDate || endDate !== previousEndDate)
+        ) {
+            fetchUserActivities();
+        }
+    },
+);
+
+const displayDates = computed(() => {
+    if (props.startDate && props.endDate) {
+        return (
+            userActivities.value[0]?.activities.map(
+                (item) => item.report_date,
+            ) || []
+        );
+    }
+    return (
+        userActivities.value[0]?.activities.map((item) => item.report_date) ||
+        []
+    );
+});
+
+const periodLabel = computed(() =>
+    props.startDate && props.endDate
+        ? `${props.startDate} ~ ${props.endDate} 제출 현황`
+        : `${selectedYear.value}년 ${selectedMonth.value}월 활동 기록`,
+);
 </script>
 
 <template>
-    <div class="page">
+    <div :class="embedded ? 'activity-section' : 'page'">
         <div class="page-header">
             <div>
                 <h1>
-                    {{ currentDate.getFullYear() }}년
-                    {{ currentDate.getMonth() + 1 }}월 활동 기록
+                    {{ periodLabel }}
                 </h1>
                 <p class="page-subtitle">
                     팀원별 보고서 제출 현황을 한눈에 확인하세요
@@ -120,22 +160,6 @@ onMounted(() => {
                     >{{ selectedYear }}년 {{ selectedMonth }}월</span
                 >
                 <button class="btn btn-small" @click="nextMonth">&gt;</button>
-            </div>
-            <div class="view-toggle">
-                <button
-                    class="btn btn-small"
-                    :class="{ active: viewMode === 'month' }"
-                    @click="viewMode = 'month'"
-                >
-                    월별
-                </button>
-                <button
-                    class="btn btn-small"
-                    :class="{ active: viewMode === 'week' }"
-                    @click="viewMode = 'week'"
-                >
-                    주간
-                </button>
             </div>
         </div>
 
@@ -152,36 +176,35 @@ onMounted(() => {
                     함</span
                 >
             </div>
-            <div class="card">
+            <div
+                class="card activity-card"
+                :style="{ '--day-count': Math.max(displayDates.length, 1) }"
+            >
+                <div class="activity-date-header">
+                    <span class="activity-date-spacer"></span>
+                    <span v-for="date in displayDates" :key="date">
+                        {{ date.slice(5).replace("-", "/") }}
+                    </span>
+                </div>
                 <div
                     v-for="activity in userActivities"
                     :key="activity.report_date"
                     class="activity-row"
                 >
                     <h4 class="activity-name">{{ activity.name }}</h4>
-                    <div class="activity-days">
-                        <div
-                            v-for="item in viewMode === 'week'
-                                ? activity.activities.filter((a) =>
-                                      weekDays.includes(a.report_date),
-                                  )
-                                : activity.activities"
-                            :key="item.report_date"
-                            class="log"
-                            :class="item.count > 0 ? 'committed' : ''"
-                            @mouseenter="
-                                showTooltip(
-                                    $event,
-                                    item.report_date,
-                                    item.count,
-                                )
-                            "
-                            @mousemove="moveTooltip"
-                            @mouseleave="hideTooltip"
-                        >
-                            <Check v-if="item.count > 0" :size="10" />
-                            <Minus v-else :size="10" />
-                        </div>
+                    <div
+                        v-for="item in activity.activities"
+                        :key="item.report_date"
+                        class="log"
+                        :class="item.count > 0 ? 'committed' : ''"
+                        @mouseenter="
+                            showTooltip($event, item.report_date, item.count)
+                        "
+                        @mousemove="moveTooltip"
+                        @mouseleave="hideTooltip"
+                    >
+                        <Check v-if="item.count > 0" :size="12" />
+                        <Minus v-else :size="12" />
                     </div>
                 </div>
             </div>
@@ -200,6 +223,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.activity-section {
+    margin-bottom: 32px;
+}
+
 .legend {
     display: flex;
     gap: 16px;
@@ -252,12 +279,43 @@ onMounted(() => {
     color: var(--text-h);
 }
 
+.activity-card {
+    overflow-x: auto;
+}
+
+.activity-date-header,
 .activity-row {
-    display: flex;
+    display: grid;
+    grid-template-columns:
+        84px
+        repeat(var(--day-count), 32px);
+    column-gap: 8px;
+    justify-content: start;
+    min-width: max-content;
+}
+
+.activity-row {
     align-items: center;
-    gap: 20px;
-    padding: 12px 0;
+    padding: 16px 0;
     border-bottom: 1px solid var(--border);
+    gap: 15px;
+}
+
+.activity-date-header {
+    margin-bottom: 10px;
+    color: var(--text);
+    font-size: 11px;
+    gap: 15px;
+    font-weight: bold;
+}
+
+.activity-date-header span:not(.activity-date-spacer) {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.activity-date-spacer {
+    display: block;
 }
 
 .activity-row:last-child {
@@ -270,24 +328,20 @@ onMounted(() => {
 }
 
 .activity-name {
-    flex: 0 0 40px;
+    min-width: 0;
     margin: 0;
     color: var(--text-h);
-}
-
-.activity-days {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    white-space: nowrap;
 }
 
 .log {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
+    width: min(100%, 32px);
+    height: 28px;
+    justify-self: center;
+    border-radius: 6px;
     border: 1.5px solid var(--border);
     background: var(--bg-soft);
     color: var(--text);

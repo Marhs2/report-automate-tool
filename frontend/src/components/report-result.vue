@@ -433,6 +433,10 @@ const retryExtract = async () => {
     border-radius: var(--radius-sm);
 }
 
+.field-group > div {
+    display: flex;
+}
+
 .field-group:last-of-type {
     margin-bottom: 0;
 }

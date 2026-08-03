@@ -39,9 +39,9 @@ const filteredReports = computed(() => {
     return reports.value.filter((report) => {
         const reportDate = report.report_date ?? "";
         const matchFrom =
-            !filterDateFrom.value || reportDate == filterDateFrom.value;
+            !filterDateFrom.value || reportDate >= filterDateFrom.value;
         const matchEnd =
-            !filterDateEnd.value || reportDate == filterDateEnd.value;
+            !filterDateEnd.value || reportDate <= filterDateEnd.value;
 
         const matchMember =
             filterMember.value === "" ||
