@@ -1,0 +1,749 @@
+{
+  "meta": {
+    "name": "daily-report-extraction-gold-validation",
+    "description": "네 번째 벤치마크 데이터셋(검증용). 이전 데이터셋(gold/diverse/fresh)과 완전히 다른 프로젝트 3개(스마트팩토리, 헬스케어앱, 전자상거래플랫폼)와 인물 4명(윤지호, 배수아, 문태양, 서예린)을 사용. 기존 fresh보다 더 어려운 케이스(중복 제출, 프로젝트 간 업무, 긴 복합 줄글, 영문·기술용어 혼합, 부정형+예정, 대기/보류/차단, 표+진행률+상태, 메신저 다중 화자, 업무 없음, 이름만 있는 헤더, projectName 역추적)를 의도적으로 구성해 qwen3.5-4b 추론 끄기 결정의 일반화를 검증한다. 32건.",
+    "members": ["윤지호", "배수아", "문태양", "서예린"],
+    "projects": ["스마트팩토리", "헬스케어앱", "전자상거래플랫폼"],
+    "aliases": {
+      "스마트팩토리": "스마트팩토리",
+      "스마트공장": "스마트팩토리",
+      "공장자동화": "스마트팩토리",
+      "헬스케어앱": "헬스케어앱",
+      "건강관리앱": "헬스케어앱",
+      "헬스케어": "헬스케어앱",
+      "전자상거래플랫폼": "전자상거래플랫폼",
+      "쇼핑몰": "전자상거래플랫폼",
+      "이커머스": "전자상거래플랫폼"
+    },
+    "label_spec": "backend/model_asset/prompt.txt(prompt_v4) 규칙에 따라 사람이 직접 라벨링"
+  },
+  "cases": [
+    {
+      "id": "V01",
+      "date": "2026-09-14",
+      "member": "윤지호",
+      "style": "개조식",
+      "raw": "[스마트팩토리]\n- 설비 센서 데이터 수집 배치 완료\n- 실시간 대시보드 화면 개발 중\n- PLC 연동 지연 이슈 발생\n- 인프라팀에 서버 증설 요청드립니다\n- 내일 알람 규칙 설정 착수 예정",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["설비 센서 데이터 수집 배치 완료"],
+            "inProgressTasks": ["실시간 대시보드 화면 개발 중"],
+            "issues": [{"content": "PLC 연동 지연 이슈", "status": "미해결"}],
+            "requests": ["인프라팀에 서버 증설 요청"],
+            "nextPlans": ["내일 알람 규칙 설정 착수 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V02",
+      "date": "2026-09-14",
+      "member": "배수아",
+      "style": "줄글",
+      "raw": "헬스케어앱의 걸음 수 연동 API를 개발 완료했고, 수면 분석 기능은 아직 개발 중입니다. 심박수 측정 정확도가 낮다는 피드백이 있어 원인을 확인 중입니다. 의료팀에 사용자 테스트 일정 협의 요청드립니다. 다음 주에 칼로리 추적 기능을 착수할 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["걸음 수 연동 API 개발 완료"],
+            "inProgressTasks": ["수면 분석 기능 개발 중"],
+            "issues": [{"content": "심박수 측정 정확도가 낮은 문제", "status": "미해결"}],
+            "requests": ["의료팀에 사용자 테스트 일정 협의 요청"],
+            "nextPlans": ["다음 주 칼로리 추적 기능 착수 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V03",
+      "date": "2026-09-14",
+      "member": "문태양",
+      "style": "메신저체",
+      "raw": "[09:10] 문태양: 전자상거래플랫폼 주문 API 연동 완료했습니다\n[09:12] 문태양: 장바구니 화면은 작업 중이에요\n[09:15] 팀장: 배송 상태 추적은 언제 되나요?\n[09:20] 문태양: 금요일에 요청드릴 수 있을 것 같습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": ["주문 API 연동 완료"],
+            "inProgressTasks": ["장바구니 화면 작업 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["금요일 배송 상태 추적 요청 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V04",
+      "date": "2026-09-15",
+      "member": "서예린",
+      "style": "줄글",
+      "raw": "스마트팩토리 설비 데이터 수집 배치를 운영 반영했습니다. 헬스케어앱의 마이페이지 프로필 수정 기능도 완료했어요. 오늘은 두 프로젝트 모두 이슈 없었습니다. 내일은 전자상거래플랫폼 결제 모듈 검토 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["설비 데이터 수집 배치 운영 반영"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["마이페이지 프로필 수정 기능 완료"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["내일 결제 모듈 검토 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V05",
+      "date": "2026-09-15",
+      "member": "윤지호",
+      "style": "줄글 + 영문 혼합",
+      "raw": "스마트팩토리 생산 라인 모니터링 dashboard의 alert 규칙을 설정 완료했습니다. 다만 webhook 전송이 retry 3회에도 실패하는 문제가 남아 있습니다. 인프라팀에 alert threshold 기준값 협의 요청드립니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["생산 라인 모니터링 dashboard alert 규칙 설정 완료"],
+            "inProgressTasks": [],
+            "issues": [{"content": "webhook 전송이 retry 3회에도 실패하는 문제", "status": "미해결"}],
+            "requests": ["인프라팀에 alert threshold 기준값 협의 요청"],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V06",
+      "date": "2026-09-15",
+      "member": "배수아",
+      "style": "표",
+      "raw": "| 프로젝트 | 작업 | 진행률 | 상태 |\n| --- | --- | --- | --- |\n| 헬스케어앱 | 식단 기록 기능 개발 | 80% | 진행 중 |\n| 헬스케어앱 | 목표 설정 화면 퍼블리싱 | 100% | 완료 |\n| 전자상거래플랫폼 | 주문 내역 조회 API | 60% | 진행 중 |",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["목표 설정 화면 퍼블리싱"],
+            "inProgressTasks": ["식단 기록 기능 개발 (80%)"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": [],
+            "inProgressTasks": ["주문 내역 조회 API (60%)"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V07",
+      "date": "2026-09-16",
+      "member": "문태양",
+      "style": "메신저체",
+      "raw": "[10:00] 문태양: 전자상거래플랫폼 결제 모듈 개발 중입니다\n[10:05] 문태양: 무통장입금 확인 로직이 안 되는 문제가 있어요\n[10:10] 고객: 언제까지 가능한가요?\n[10:12] 문태양: 내일까지 확인해 보겠습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": [],
+            "inProgressTasks": ["결제 모듈 개발 중"],
+            "issues": [{"content": "무통장입금 확인 로직 오류", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": ["내일 무통장입금 확인 로직 점검"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V08",
+      "date": "2026-09-16",
+      "member": "서예린",
+      "style": "줄글",
+      "raw": "스마트팩토리 설비 마스터 데이터 마이그레이션을 진행 중입니다. 아직 완료하지 못했고, 내일 마무리할 예정입니다. 헬스케어앱은 오늘 작업이 없었습니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": [],
+            "inProgressTasks": ["설비 마스터 데이터 마이그레이션 진행 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["내일 설비 마스터 데이터 마이그레이션 마무리 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V09",
+      "date": "2026-09-16",
+      "member": "윤지호",
+      "style": "한 줄",
+      "raw": "스마트팩토리 PLC 연동 이슈 해결 완료",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["PLC 연동 이슈 해결 완료"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V10",
+      "date": "2026-09-17",
+      "member": "배수아",
+      "style": "줄글",
+      "raw": "헬스케어앱 수면 분석 기능 개발을 완료했습니다. 칼로리 추적 기능도 착수해서 개발 중입니다. 의료팀이 요청한 사용자 테스트는 진행 중이고, 다음 주에 결과를 공유할 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["수면 분석 기능 개발 완료"],
+            "inProgressTasks": ["칼로리 추적 기능 개발 중", "의료팀 사용자 테스트 진행 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["다음 주 사용자 테스트 결과 공유 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V11",
+      "date": "2026-09-17",
+      "member": "문태양",
+      "style": "줄글",
+      "raw": "전자상거래플랫폼 장바구니 화면 퍼블리싱을 완료했고, 배송 상태 추적 기능은 개발 중입니다. 무통장입금 확인 로직 오류는 수정 완료했습니다. 결제 모듈은 다음 주에 테스트 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": ["장바구니 화면 퍼블리싱 완료", "무통장입금 확인 로직 오류 수정 완료"],
+            "inProgressTasks": ["배송 상태 추적 기능 개발 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["다음 주 결제 모듈 테스트 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V12",
+      "date": "2026-09-17",
+      "member": "서예린",
+      "style": "메신저체",
+      "raw": "[11:00] 서예린: 스마트팩토리 실시간 대시보드 개발 완료했습니다\n[11:02] 서예린: 생산 라인 모니터링 화면은 아직 QA 중이에요\n[11:05] 팀장: 어제 이슈였던 webhook은?\n[11:08] 서예린: 해결해서 반영 완료했습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["실시간 대시보드 개발 완료", "webhook 전송 실패 이슈 해결 반영 완료"],
+            "inProgressTasks": ["생산 라인 모니터링 화면 QA 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V13",
+      "date": "2026-09-18",
+      "member": "윤지호",
+      "style": "개조식",
+      "raw": "- 스마트팩토리 알람 규칙 설정 완료\n- PLC 데이터 수집 정상화 확인\n- 헬스케어앱 걸음 수 동기화 오류 확인 필요\n- 보안팀에 취약점 점검 일정 공유 요청드립니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["알람 규칙 설정 완료", "PLC 데이터 수집 정상화 확인"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": ["보안팀에 취약점 점검 일정 공유 요청"],
+            "nextPlans": []
+          },
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [{"content": "걸음 수 동기화 오류", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V14",
+      "date": "2026-09-18",
+      "member": "배수아",
+      "style": "표 + 진행률",
+      "raw": "| 작업 | 진행률 |\n| --- | --- |\n| 헬스케어앱 칼로리 API 개발 | 40% |\n| 헬스케어앱 사용자 테스트 분석 | 100% |\n| 전자상거래플랫폼 쿠폰 기능 설계 | 70% |",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["사용자 테스트 분석"],
+            "inProgressTasks": ["칼로리 API 개발 (40%)"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": [],
+            "inProgressTasks": ["쿠폰 기능 설계 (70%)"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V15",
+      "date": "2026-09-18",
+      "member": "문태양",
+      "style": "줄글 + 영문 혼합",
+      "raw": "전자상거래플랫폼 production 서버의 disk usage가 95%까지 올라와서 로그 압축 정책을 조정 중입니다. 검색 기능에서 false positive가 많이 발생하는 문제가 남아 있습니다. 인프라팀에 disk usage 알림 threshold 기준값 협의 요청드립니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": [],
+            "inProgressTasks": ["production 서버 disk usage 95% 도달로 로그 압축 정책 조정 중"],
+            "issues": [{"content": "검색 기능 false positive 문제", "status": "미해결"}],
+            "requests": ["인프라팀에 disk usage 알림 threshold 기준값 협의 요청"],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V16",
+      "date": "2026-09-18",
+      "member": "서예린",
+      "style": "업무 없음",
+      "raw": "안녕하세요. 오늘은 종일 사내 정보보안 교육을 참석했습니다. 특별한 이슈 없습니다.",
+      "gold": {
+        "projects": []
+      }
+    },
+    {
+      "id": "V17",
+      "date": "2026-09-21",
+      "member": "윤지호",
+      "style": "줄글",
+      "raw": "스마트팩토리 실시간 대시보드에 재고 현황 위젯을 추가했습니다. 헬스케어앱은 칼로리 추적 기능을 진행 중입니다. 전자상거래플랫폼 검색 기능 false positive 문제는 조사 중입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["실시간 대시보드에 재고 현황 위젯 추가"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": [],
+            "inProgressTasks": ["칼로리 추적 기능 진행 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [{"content": "검색 기능 false positive 문제", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V18",
+      "date": "2026-09-21",
+      "member": "배수아",
+      "style": "메신저체",
+      "raw": "[14:00] 배수아: 헬스케어앱 칼로리 추적 기능 개발 완료했습니다\n[14:03] 배수아: 목표 달성 분석 화면은 작업 중이에요\n[14:05] 팀장: 개인정보 처리방침은 업데이트했어?\n[14:07] 배수아: 네, 법무팀 검토 받아서 반영 완료했습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["칼로리 추적 기능 개발 완료", "개인정보 처리방침 업데이트 반영"],
+            "inProgressTasks": ["목표 달성 분석 화면 작업 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V19",
+      "date": "2026-09-21",
+      "member": "문태양",
+      "style": "줄글",
+      "raw": "전자상거래플랫폼 배송 상태 추적 기능을 개발 완료했습니다. 검색 기능 개선은 진행 중입니다. 쿠폰 기능은 다음 주에 착수할 예정입니다. 검색 false positive 문제는 아직 남아 있어서 원인을 분석 중입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": ["배송 상태 추적 기능 개발 완료"],
+            "inProgressTasks": ["검색 기능 개선 진행 중"],
+            "issues": [{"content": "검색 false positive 문제", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": ["다음 주 쿠폰 기능 착수 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V20",
+      "date": "2026-09-21",
+      "member": "서예린",
+      "style": "한 줄",
+      "raw": "스마트팩토리 PLC 연동 재점검 완료, 이상 없음",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["PLC 연동 재점검 완료"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V21",
+      "date": "2026-09-22",
+      "member": "윤지호",
+      "style": "줄글 + 영문 혼합",
+      "raw": "스마트팩토리 설비 센서 데이터 수집 배치의 throughput이 낮아서 batch size를 조정 중입니다. 헬스케어앱 걸음 수 동기화 오류는 수정 완료했습니다. 전자상거래플랫폼 쿠폰 기능 API 설계를 시작했습니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": [],
+            "inProgressTasks": ["설비 센서 데이터 수집 배치 throughput 개선 (batch size 조정 중)"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["걸음 수 동기화 오류 수정 완료"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": [],
+            "inProgressTasks": ["쿠폰 기능 API 설계 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V22",
+      "date": "2026-09-22",
+      "member": "배수아",
+      "style": "줄글",
+      "raw": "헬스케어앱 목표 달성 분석 화면 개발을 완료했습니다. 사용자 테스트 결과 리포트를 팀 채널에 공유했습니다. 다음 주에 A/B 테스트를 시작할 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["목표 달성 분석 화면 개발 완료", "사용자 테스트 결과 리포트 팀 채널 공유"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["다음 주 A/B 테스트 시작 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V23",
+      "date": "2026-09-22",
+      "member": "문태양",
+      "style": "메신저체",
+      "raw": "[09:30] 문태양: 전자상거래플랫폼 쿠폰 기능 개발 시작했습니다\n[09:35] 문태양: 할인율 계산 로직에서 반올림 오차가 있는 것 같아요\n[09:40] 팀장: 결제 모듈 테스트는 끝났어?\n[09:42] 문태양: 네, 테스트 완료했습니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": ["결제 모듈 테스트 완료"],
+            "inProgressTasks": ["쿠폰 기능 개발 중"],
+            "issues": [{"content": "할인율 계산 로직 반올림 오차", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V24",
+      "date": "2026-09-22",
+      "member": "서예린",
+      "style": "줄글",
+      "raw": "스마트팩토리 생산 라인 모니터링 화면 QA를 완료했습니다. 헬스케어앱 개인정보 처리방침 관련 법무팀 검토를 요청드렸습니다. 전자상거래플랫폼은 오늘 작업이 없습니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["생산 라인 모니터링 화면 QA 완료"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": ["법무팀에 개인정보 처리방침 검토 요청"],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V25",
+      "date": "2026-09-23",
+      "member": "윤지호",
+      "style": "표 + 상태",
+      "raw": "| 프로젝트 | 작업 | 상태 |\n| --- | --- | --- |\n| 스마트팩토리 | 알람 이력 화면 개발 | 진행 중 |\n| 스마트팩토리 | 배치 성능 최적화 | 완료 |\n| 헬스케어앱 | A/B 테스트 준비 | 예정 |",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["배치 성능 최적화"],
+            "inProgressTasks": ["알람 이력 화면 개발 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["A/B 테스트 준비"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V26",
+      "date": "2026-09-23",
+      "member": "배수아",
+      "style": "줄글",
+      "raw": "헬스케어앱 A/B 테스트를 시작했습니다. 테스트 그룹 설정을 완료했고, 데이터 수집은 진행 중입니다. 개인정보 처리방침은 법무팀 검토 반영까지 완료했습니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["개인정보 처리방침 법무팀 검토 반영 완료"],
+            "inProgressTasks": ["A/B 테스트 데이터 수집 진행 중", "A/B 테스트 그룹 설정 완료"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V27",
+      "date": "2026-09-23",
+      "member": "문태양",
+      "style": "줄글",
+      "raw": "전자상거래플랫폼 쿠폰 기능을 개발 완료했습니다. 할인율 반올림 오차도 수정했습니다. 배송 추적 알림 기능은 다음 주에 추가 예정입니다. 검색 false positive 문제는 아직 미해결입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": ["쿠폰 기능 개발 완료", "할인율 반올림 오차 수정"],
+            "inProgressTasks": [],
+            "issues": [{"content": "검색 false positive 문제", "status": "미해결"}],
+            "requests": [],
+            "nextPlans": ["다음 주 배송 추적 알림 기능 추가 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V28",
+      "date": "2026-09-23",
+      "member": "서예린",
+      "style": "한 줄",
+      "raw": "오늘은 스마트팩토리 알람 이력 화면만 작업했고, 내일 헬스케어앱 쪽 도와드릴 예정입니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": [],
+            "inProgressTasks": ["알람 이력 화면 작업 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["내일 헬스케어앱 지원 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V29",
+      "date": "2026-09-24",
+      "member": "윤지호",
+      "style": "줄글",
+      "raw": "스마트팩토리 알람 이력 화면을 개발 완료했습니다. 배치 throughput도 정상 수준으로 회복했습니다. 전자상거래플랫폼 쿠폰 발급 화면은 다음 주에 시작 예정입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["알람 이력 화면 개발 완료", "배치 throughput 정상화"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": [],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["다음 주 쿠폰 발급 화면 시작 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V30",
+      "date": "2026-09-24",
+      "member": "배수아",
+      "style": "메신저체",
+      "raw": "[15:00] 배수아: 헬스케어앱 A/B 테스트 중간 결과 확인했습니다\n[15:02] 배수아: 실험군 전환율 3.2%p 높게 나왔어요\n[15:05] 팀장: 그럼 이번 주에 롤아웃할까?\n[15:07] 배수아: 다음 주 월요일에 롤아웃 예정입니다",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": ["A/B 테스트 중간 결과 확인 (실험군 전환율 3.2%p 상승)"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": ["다음 주 월요일 A/B 테스트 롤아웃 예정"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "V31",
+      "date": "2026-09-24",
+      "member": "문태양",
+      "style": "줄글",
+      "raw": "전자상거래플랫폼 검색 기능 개선을 완료했습니다. false positive도 크게 줄었습니다. 배송 추적 알림 기능 개발을 시작했습니다. 스마트팩토리 생산 대시보드 개선 요청이 들어와서 검토 중입니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": ["검색 기능 개선 완료", "검색 false positive 감소"],
+            "inProgressTasks": ["배송 추적 알림 기능 개발 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": [],
+            "inProgressTasks": ["생산 대시보드 개선 요청 검토 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "V32",
+      "date": "2026-09-24",
+      "member": "서예린",
+      "style": "줄글",
+      "raw": "스마트팩토리 알람 이력 화면을 운영에 반영했습니다. 전자상거래플랫폼 배송 추적 알림은 개발 중이고, 헬스케어앱은 A/B 테스트 롤아웃 준비를 하고 있습니다.",
+      "gold": {
+        "projects": [
+          {
+            "projectName": "스마트팩토리",
+            "completedTasks": ["알람 이력 화면 운영 반영"],
+            "inProgressTasks": [],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "전자상거래플랫폼",
+            "completedTasks": [],
+            "inProgressTasks": ["배송 추적 알림 개발 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          },
+          {
+            "projectName": "헬스케어앱",
+            "completedTasks": [],
+            "inProgressTasks": ["A/B 테스트 롤아웃 준비 중"],
+            "issues": [],
+            "requests": [],
+            "nextPlans": []
+          }
+        ]
+      }
+    }
+  ]
+}

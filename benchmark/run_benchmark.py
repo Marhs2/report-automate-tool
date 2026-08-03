@@ -87,6 +87,13 @@ KNOWN_PROJECTS_FRESH = """- AI면접코치
 - 전자계약
   · 표기 변형: 전자계약시스템, 계약시스템"""
 
+KNOWN_PROJECTS_VALIDATION = """- 스마트팩토리
+  · 표기 변형: 스마트공장, 공장자동화
+- 헬스케어앱
+  · 표기 변형: 건강관리앱, 헬스케어
+- 전자상거래플랫폼
+  · 표기 변형: 쇼핑몰, 이커머스"""
+
 KNOWN_PROJECTS_DATASET = """- A사 MES
   · 표기 변형: MES, A사 MES 구축, A사 MES 시스템
   · 주요 구성 요소: 설비 데이터 수집 배치, 실시간 알림 이력 화면, 알림 조건 설정,
@@ -116,6 +123,8 @@ def load_assets(prompt_path=None, known_projects="none", dataset_name="gold"):
         filler = KNOWN_PROJECTS_DIVERSE
     if known_projects == "fresh":
         filler = KNOWN_PROJECTS_FRESH
+    if known_projects == "validation":
+        filler = KNOWN_PROJECTS_VALIDATION
     prompt = prompt.replace("{{KNOWN_PROJECTS}}", filler)
     with open(ROOT / "backend" / "model_asset" / "json_Schema.json", encoding="utf-8") as f:
         schema = json.load(f)
@@ -352,12 +361,12 @@ def main():
     )
     ap.add_argument("--prompt", default=None, help="사용할 프롬프트 파일 (기본 backend/model_asset/prompt.txt)")
     ap.add_argument(
-        "--known-projects", default="none", choices=["none", "dataset", "names_only", "diverse", "fresh"],
+        "--known-projects", default="none", choices=["none", "dataset", "names_only", "diverse", "fresh", "validation"],
         help="prompt의 {{KNOWN_PROJECTS}} 슬롯 채우기. dataset은 DB에 프로젝트가 등록된 상황을 재현",
     )
     ap.add_argument(
-        "--dataset", default="gold", choices=["gold", "diverse", "fresh"],
-        help="사용할 데이터셋 (gold=기존 32건, diverse=신규 32건)",
+        "--dataset", default="gold", choices=["gold", "diverse", "fresh", "validation"],
+        help="사용할 데이터셋 (gold=기존 32건, diverse=신규 32건, fresh=신규 32건, validation=검증 32건)",
     )
     args = ap.parse_args()
 

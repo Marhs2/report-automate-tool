@@ -7,19 +7,19 @@
 
 ## 요구 사양
 
-모델 **nuextract3**(4.2B 파라미터, 컨텍스트 최대 262,144토큰)의 Q4 양자화 추론 기준:
+모델 **qwen3.5-4b**(4B 파라미터, 컨텍스트 최대 262,144토큰, 추론 끄기)의 Q4 양자화 추론 기준:
 
 | 항목     | 최소                               | 권장                 | 비고                                                                        |
 | -------- | ---------------------------------- | -------------------- | --------------------------------------------------------------------------- |
 | CPU      | 4코어                              | 6코어 이상           | LLM 추론은 주로 GPU가 담당                                                  |
-| GPU      | NVIDIA 6GB VRAM                    | NVIDIA 8GB VRAM 이상 | Q4 가중치 약 3.2GB + 컨텍스트 KV 캐시. 벤치마크 측정 환경은 12GB (RTX 3060) |
+| GPU      | NVIDIA 6GB VRAM                    | NVIDIA 8GB VRAM 이상 | Q4 가중치 약 3.7GB + 컨텍스트 KV 캐시. 벤치마크 측정 환경은 12GB (RTX 3060) |
 | RAM      | 16GB                               | 32GB                 | 모델 로딩 + LM Studio 공유                                                  |
 | OS       | Windows 10/11 (macOS/Linux도 동작) |                      |                                                                             |
-| 저장공간 | 5GB 여유                           | 10GB 여유            | 모델 파일(nuextract3 Q4_K_M ≈ 3.2GB) + 앱                                   |
+| 저장공간 | 5GB 여유                           | 10GB 여유            | 모델 파일(qwen3.5-4b Q4_K_S ≈ 3.7GB) + 앱                                   |
 
-GPU가 없으면 CPU로도 동작하나 속도가 크게 느려진다. (권장 사양 근거: nuextract3 Q4 파일 크기 3.2GB — [docs/model-benchmark.md](docs/model-benchmark.md) §2; Qwen3.5-4B Q4 추론 VRAM 3.3~6.5GB — [llmrun.dev](https://llmrun.dev/llms/Qwen3.5-4B), [canitrun.net](https://www.canitrun.net/ai-model/qwen3.5-4b-q4-k-m), [willitrunai.com](https://www.willitrunai.com/ai-model/Qwen3.5-4B); FP16은 약 10GB)
+GPU가 없으면 CPU로도 동작하나 속도가 크게 느려진다. (권장 사양 근거: qwen3.5-4b Q4 파일 크기 3.7GB — [docs/nuextract3-vs-qwen3.5-benchmark.md](docs/nuextract3-vs-qwen3.5-benchmark.md); Qwen3.5-4B Q4 추론 VRAM 3.3~6.5GB — [llmrun.dev](https://llmrun.dev/llms/Qwen3.5-4B), [canitrun.net](https://www.canitrun.net/ai-model/qwen3.5-4b-q4-k-m), [willitrunai.com](https://www.willitrunai.com/ai-model/Qwen3.5-4B); FP16은 약 10GB)
 
-**성능 목표**: 보고 1건 구조화 10분 이내 (채택 모델 실제 평균 약 10초)
+**성능 목표**: 보고 1건 구조화 10분 이내 (채택 모델 실제 평균 약 2초)
 
 ---
 
@@ -35,7 +35,7 @@ docs/      모델·도구 선정 근거, 정확도 자체 평가
 - **백엔드**: FastAPI (`backend/main.py`), SQLite (`backend/data/daily_reports.db`)
 - **프론트엔드**: Vue 3 + Vite, docx 다운로드는 docxtemplater
 - **LLM 런타임**: LM Studio (OpenAI 호환 API, `http://127.0.0.1:1234/v1`)
-- **채택 모델**: nuextract3 (GGUF Q4) — 선정 근거는 [docs/model-benchmark.md](docs/model-benchmark.md)
+- **채택 모델**: qwen3.5-4b (GGUF Q4, 추론 끄기) — 선정 근거는 [docs/nuextract3-vs-qwen3.5-benchmark.md](docs/nuextract3-vs-qwen3.5-benchmark.md)
 
 ---
 
@@ -44,8 +44,9 @@ docs/      모델·도구 선정 근거, 정확도 자체 평가
 ### 1) LM Studio (LLM 로컬 서버) 준비
 
 1. [LM Studio](https://lmstudio.ai/) 설치 후 모델을 다운로드한다.
-   - **권장: nuextract3** (Q4_K_M, ≈ 3.2GB). 대안: qwen3.5-4b, gemma-4-e2b
-   - 선정 근거: [docs/model-benchmark.md](docs/model-benchmark.md)
+   - **권장: qwen3.5-4b** (Q4_K_S, ≈ 3.7GB, 추론 끄기). 대안: nuextract3, gemma-4-e2b
+   - 선정 근거: [docs/nuextract3-vs-qwen3.5-benchmark.md](docs/nuextract3-vs-qwen3.5-benchmark.md)
+   - **로드 시 추론 끄기 조건 보장**: `lms load qwen3.5-4b --context-length 32768 --parallel 1`
 
 ### 2) 백엔드
 
@@ -62,12 +63,12 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 | 변수                | 기본값                     | 설명                                                                  |
 | ------------------- | -------------------------- | --------------------------------------------------------------------- |
-| `REPORT_MODEL_NAME` | `nuextract3`               | LM Studio에 로드한 모델명. **nuextract3 (기본)**                      |
+| `REPORT_MODEL_NAME` | `qwen3.5-4b`               | LM Studio에 로드한 모델명. **qwen3.5-4b (기본)** — 추론 끄기 기준 최고 정확도·속도 (문서 `docs/nuextract3-vs-qwen3.5-benchmark.md`)                       |
 | `LM_BASE_URL`       | `http://127.0.0.1:1234/v1` | LM Studio 주소                                                        |
 | `LM_API_KEY`        | `lm-studio`                | 더미 키 (LM Studio 무관)                                              |
 | `DAILY_MAX_TOKENS`  | `16384`                    | 일일 구조화 출력 상한                                                 |
 | `WEEKLY_MAX_TOKENS` | `2048`                     | 주간보고 생성 출력 상한                                               |
-| `DAILY_REASONING`   | `high`                     | `none`/`low`/`medium`/`high`. 정확도 vs 속도 트레이드오프 (문서 §7.2) |
+| `DAILY_REASONING`   | `none`                     | `none`/`low`/`medium`/`high`. qwen3.5-4b는 추론 꺼도 최고 정확도 (0.883). nuextract3로 바꿀 경우에만 `high` 고려 (문서 §7.2, `docs/nuextract3-vs-qwen3.5-benchmark.md`) |
 
 ### 3) 프론트엔드
 
@@ -123,13 +124,15 @@ bun run dev        # http://localhost:5173
 - 모델 선정 근거 및 후보 7종 비교: [docs/model-benchmark.md](docs/model-benchmark.md)
 - 재현 방법·산출물: 위 문서 §9, §10
 
-**결과 요약 (micro F1, 추론 최대 설정)**:
+**결과 요약 (채택: qwen3.5-4b + 추론 끄기, 2026-08-03 fresh 32건)**:
 
-| 모델                  | micro F1  | 보고 1건 평균 |
+| 모델 / 설정                  | micro F1  | 보고 1건 평균 |
 | --------------------- | --------- | ------------- |
-| **nuextract3 (채택)** | **77.1%** | 10.2초        |
-| gemma-4-e2b           | 79.1%     | 10.7초        |
-| qwen3.5-4b            | 88.9%     | 69초          |
+| **qwen3.5-4b + 추론 끄기 (채택)** | **88.3%** | **2.2초**     |
+| nuextract3 + 추론 끄기      | 88.3%     | 1.7초        |
+| nuextract3 + 추론 high      | 86.6%     | 8.1초        |
 
-- 77.1% = 항목 132개 중 약 30개 오류 → **화면 확인·수정 단계가 필수**라는 설계 근거
-- 항목별 정확도(완료/진행/이슈/협조 요청/다음 계획 F1), 작성 스타일별, 속도는 문서 §7 참고
+(2026-07-30 1차 벤치마크: nuextract3 high 77.1% / qwen high 88.9%·69초 — [docs/model-benchmark.md](docs/model-benchmark.md))
+
+- 88.3% = 항목 119개 중 약 14개 오류 → **화면 확인·수정 단계가 필수**라는 설계 근거
+- 항목별 정확도(완료/진행/이슈/협조 요청/다음 계획 F1), 작성 스타일별, 속도는 [docs/nuextract3-vs-qwen3.5-benchmark.md](docs/nuextract3-vs-qwen3.5-benchmark.md) 참고

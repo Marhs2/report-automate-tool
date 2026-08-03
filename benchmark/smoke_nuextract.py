@@ -19,7 +19,7 @@ from openai import OpenAI
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BENCH = ROOT / "benchmark"
 sys.path.insert(0, str(BENCH))
-from run_benchmark import KNOWN_PROJECTS_DATASET, KNOWN_PROJECTS_DIVERSE, KNOWN_PROJECTS_FRESH, KNOWN_PROJECTS_NAMES_ONLY, KNOWN_PROJECTS_NONE, load_assets
+from run_benchmark import KNOWN_PROJECTS_DATASET, KNOWN_PROJECTS_DIVERSE, KNOWN_PROJECTS_FRESH, KNOWN_PROJECTS_NAMES_ONLY, KNOWN_PROJECTS_NONE, KNOWN_PROJECTS_VALIDATION, load_assets
 
 LM_BASE_URL = "http://127.0.0.1:1234/v1"
 LM_API_KEY = "lm-studio"
@@ -126,8 +126,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--prompt", default=None)
     ap.add_argument("--cases", nargs="*", default=DEFAULT_CASES)
-    ap.add_argument("--known-projects", default="none", choices=["none", "dataset", "names_only", "diverse", "fresh"])
-    ap.add_argument("--dataset", default="gold", choices=["gold", "diverse", "fresh"])
+    ap.add_argument("--known-projects", default="none", choices=["none", "dataset", "names_only", "diverse", "fresh", "validation"])
+    ap.add_argument("--dataset", default="gold", choices=["gold", "diverse", "fresh", "validation"])
     ap.add_argument("--max-tokens", type=int, default=6144)
     ap.add_argument("--reasoning", default="none", choices=["none", "low", "medium", "high"])
     args = ap.parse_args()
@@ -140,6 +140,8 @@ def main():
         filler = KNOWN_PROJECTS_DIVERSE
     if args.known_projects == "fresh":
         filler = KNOWN_PROJECTS_FRESH
+    if args.known_projects == "validation":
+        filler = KNOWN_PROJECTS_VALIDATION
     prompt = prompt.replace("{{KNOWN_PROJECTS}}", filler)
     cases = {c["id"]: c for c in dataset["cases"]}
     todo = [cases[cid] for cid in args.cases if cid in cases]
