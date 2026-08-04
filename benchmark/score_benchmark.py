@@ -49,6 +49,15 @@ PROJECT_ALIASES = {
     "약품지도": "yakmap",
     "미분류프로젝트": "미분류",
     "미분류": "미분류",
+    "스마트팩토리": "스마트팩토리",
+    "스마트공장": "스마트팩토리",
+    "공장자동화": "스마트팩토리",
+    "헬스케어앱": "헬스케어앱",
+    "건강관리앱": "헬스케어앱",
+    "헬스케어": "헬스케어앱",
+    "전자상거래플랫폼": "전자상거래플랫폼",
+    "쇼핑몰": "전자상거래플랫폼",
+    "이커머스": "전자상거래플랫폼",
 }
 
 
@@ -348,7 +357,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw-dir", default=None, help="채점할 원시 응답 디렉터리")
     ap.add_argument("--prefix", default="", help="출력 파일 접두어 (예: run1_)")
-    ap.add_argument("--dataset", default="gold", choices=["gold", "diverse", "fresh"], help="사용할 데이터셋")
+    ap.add_argument("--dataset", default="gold", choices=["gold", "diverse", "fresh", "validation"], help="사용할 데이터셋")
     args = ap.parse_args()
     if args.raw_dir:
         RAW_DIR = pathlib.Path(args.raw_dir)
