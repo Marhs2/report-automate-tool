@@ -16,7 +16,6 @@ const userActivities = ref([]);
 const currentDate = new Date();
 const selectedYear = ref(currentDate.getFullYear());
 const selectedMonth = ref(currentDate.getMonth() + 1);
-const viewMode = ref("month");
 const weekDays = ref([]);
 
 const tooltip = reactive({
@@ -119,19 +118,21 @@ watch(
     },
 );
 
-const displayDates = computed(() => {
-    if (props.startDate && props.endDate) {
-        return (
-            userActivities.value[0]?.activities.map(
-                (item) => item.report_date,
-            ) || []
-        );
-    }
-    return (
-        userActivities.value[0]?.activities.map((item) => item.report_date) ||
-        []
-    );
-});
+const orderedActivities = computed(() =>
+    userActivities.value.map((activity) => ({
+        ...activity,
+        activities: [...(activity.activities || [])].sort((left, right) =>
+            left.report_date.localeCompare(right.report_date),
+        ),
+    })),
+);
+
+const displayDates = computed(
+    () =>
+        orderedActivities.value[0]?.activities.map(
+            (item) => item.report_date,
+        ) || [],
+);
 
 const periodLabel = computed(() =>
     props.startDate && props.endDate
@@ -153,7 +154,7 @@ const periodLabel = computed(() =>
             </div>
         </div>
 
-        <div class="view-controls">
+        <div v-if="!embedded" class="view-controls">
             <div class="month-nav">
                 <button class="btn btn-small" @click="prevMonth">&lt;</button>
                 <span class="current-period"
@@ -163,7 +164,7 @@ const periodLabel = computed(() =>
             </div>
         </div>
 
-        <div v-if="userActivities.length === 0" class="empty-state">
+        <div v-if="orderedActivities.length === 0" class="empty-state">
             표시할 활동 기록이 없습니다
         </div>
         <template v-else>
@@ -187,8 +188,8 @@ const periodLabel = computed(() =>
                     </span>
                 </div>
                 <div
-                    v-for="activity in userActivities"
-                    :key="activity.report_date"
+                    v-for="activity in orderedActivities"
+                    :key="activity.member_id"
                     class="activity-row"
                 >
                     <h4 class="activity-name">{{ activity.name }}</h4>
@@ -290,7 +291,7 @@ const periodLabel = computed(() =>
         84px
         repeat(var(--day-count), 32px);
     column-gap: 8px;
-    justify-content: start;
+    justify-content: space-evenly;
     min-width: max-content;
 }
 

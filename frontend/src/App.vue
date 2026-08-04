@@ -16,9 +16,10 @@ const navItems = [
     { to: "/", label: "프로젝트 목록", icon: FolderKanban },
     { to: "/project-timeline", label: "프로젝트 흐름", icon: GitGraph },
     { to: "/report", label: "보고서 작성", icon: PenSquare },
-    { to: "/activities", label: "활동 기록", icon: CalendarDays },
+    { to: "/activities", label: "사용자 활동", icon: CalendarDays },
     { to: "/weekly", label: "주간 보고서", icon: FileBarChart },
     { to: "/aliases", label: "별칭 관리", icon: GitMerge },
+    { to: "/project-name", label: "프로젝트 명 관리", icon: FolderKanban },
 ];
 
 // DOMContentLoaded 는 Vue 마운트 이전에 이미 발생하므로 리스너가 실행되지 않는다.

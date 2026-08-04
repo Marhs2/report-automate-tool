@@ -205,6 +205,38 @@ export default function useAPI() {
     }
   };
 
+  const getRegisteredProjectNames = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/project-names/registered`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching registered project names:", error);
+      throw error;
+    }
+  };
+
+  const postProjectName = async (name) => {
+    try {
+      const response = await axios.post(`${baseURL}/project-names`, { name });
+      return response.data;
+    } catch (error) {
+      console.error("Error creating project name:", error);
+      throw error;
+    }
+  };
+
+  const deleteProjectName = async (projectName) => {
+    try {
+      const response = await axios.delete(
+        `${baseURL}/project-names/${encodeURIComponent(projectName)}`,
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting project name:", error);
+      throw error;
+    }
+  };
+
   const getProjectTimeline = async (name, memberId) => {
     try {
       const params = { name };
@@ -237,6 +269,9 @@ export default function useAPI() {
     postProjectAlias,
     deleteProjectAlias,
     getProjectNames,
+    getRegisteredProjectNames,
+    postProjectName,
+    deleteProjectName,
     getProjectTimeline,
   };
 }

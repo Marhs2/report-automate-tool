@@ -3,6 +3,7 @@ import os
 import sqlite3
 from collections import defaultdict
 from datetime import date, timedelta
+from urllib.parse import urlparse
 
 from db import get_db
 from fastapi import FastAPI, HTTPException
@@ -18,6 +19,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -28,19 +30,22 @@ with open("./model_asset/json_Schema.json", "r", encoding="utf-8") as f:
 
 
 def get_known_projects_block():
-    """DB의 projects/aliases로 {{KNOWN_PROJECTS}} 슬롯을 채운다.
+    """DB의 known_projects/aliases로 {{KNOWN_PROJECTS}} 슬롯을 채운다.
 
     prompt.txt 의 [C0] 등록된 프로젝트 목록 형식과 맞춘다.
     등록된 프로젝트가 없으면 빈 문장을 돌려주고, 사용자는 원문에서 직접 판단한다.
     """
     with get_db() as conn:
+        registered = conn.execute(
+            "SELECT name FROM known_projects WHERE TRIM(name) != ''"
+        ).fetchall()
         rows = conn.execute(
             "SELECT DISTINCT name FROM projects WHERE name IS NOT NULL AND TRIM(name) != ''"
         ).fetchall()
         aliases = conn.execute(
             "SELECT alias_name, canonical_name FROM project_aliases"
         ).fetchall()
-    names = sorted({r[0] for r in rows})
+    names = sorted({r[0] for r in registered} | {r[0] for r in rows})
     if not names:
         return "(등록된 프로젝트가 없다. 원문에서 직접 판단한다.)"
     alias_by = {}
@@ -73,22 +78,29 @@ def load_weekly_prompt():
     return prompt.replace("{{KNOWN_PROJECTS}}", get_known_projects_block())
 
 
-with open("./model_asset/prompt_v3.txt", "r", encoding="utf-8") as f:
-    daily_prompt = f.read()
-
 with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
     weekly_schema = json.load(f)
 
-MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "qwen3.5-4b")
+MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "nuextract3")
 LM_BASE_URL = os.environ.get("LM_BASE_URL", "http://127.0.0.1:1234/v1")
 LM_API_KEY = os.environ.get("LM_API_KEY", "lm-studio")
+LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
 
 DAILY_MAX_TOKENS = int(os.environ.get("DAILY_MAX_TOKENS", "16384"))
 WEEKLY_MAX_TOKENS = int(os.environ.get("WEEKLY_MAX_TOKENS", "2048"))
-DAILY_REASONING = os.environ.get("DAILY_REASONING", "none") or None
+_daily_reasoning = (os.environ.get("DAILY_REASONING") or "high").lower()
+DAILY_REASONING = (
+    _daily_reasoning if _daily_reasoning in {"low", "medium", "high"} else None
+)
 _weekly_reasoning = (os.environ.get("WEEKLY_REASONING") or "none").lower()
-# This Qwen model supports only "on" and "off"; "off" is the lowest supported mode.
-WEEKLY_REASONING = _weekly_reasoning if _weekly_reasoning in {"low", "none"} else "none"
+WEEKLY_REASONING = (
+    _weekly_reasoning if _weekly_reasoning in {"low", "medium", "high"} else None
+)
+
+if urlparse(LM_BASE_URL).hostname not in {"localhost", "127.0.0.1", "::1"}:
+    raise RuntimeError(
+        "LM_BASE_URL은 인터넷 차단 환경을 위해 로컬 주소만 사용할 수 있습니다."
+    )
 
 
 class ReportRequest(BaseModel):
@@ -118,6 +130,10 @@ class AliasRequest(BaseModel):
     canonical_name: str
 
 
+class ProjectNameRequest(BaseModel):
+    name: str
+
+
 class UpdateWeeklyData(BaseModel):
     report_json: str
 
@@ -137,6 +153,31 @@ def ensure_runtime_schema():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS known_projects (
+                name TEXT PRIMARY KEY,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        # 이전 버전의 project_names 테이블이 남아 있으면 known_projects 로 옮기고 제거한다.
+        has_old = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_names'"
+        ).fetchone()
+        if has_old:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO known_projects (name, created_at)
+                SELECT name, created_at FROM project_names
+                """
+            )
+            conn.execute("DROP TABLE project_names")
+        project_columns = conn.execute("PRAGMA table_info(projects)").fetchall()
+        if project_columns and not any(
+            column["name"] == "report_date" for column in project_columns
+        ):
+            conn.execute("ALTER TABLE projects ADD COLUMN report_date DATE")
         conn.commit()
 
 
@@ -173,15 +214,21 @@ KEYWORD_FIX = {
 }
 
 
-def coerce_report_data(content):
-    """LLM 응답을 안전하게 파싱한다. 실패하거나 형식이 어긋나면 빈 결과를 돌려준다.
+def coerce_report_data(content, *, strict=False):
+    """LLM/DB 응답을 안전하게 파싱한다.
 
     DB에 이중 인코딩(JSON 문자열이 다시 JSON 문자열로 감싸진)으로 저장된
     parsed_json 이 있을 수 있어, 문자열이 나오면 dict 가 나올 때까지 한 번 더
     파싱한다.
     """
-    if not content or not str(content).strip():
+    def fail(message):
+        if strict:
+            raise ValueError(message)
+        print(f"[coerce_report_data] {message}")
         return {"projects": []}
+
+    if not content or not str(content).strip():
+        return fail("응답 내용이 비어 있습니다.")
     data = content
     for _ in range(3):
         if not isinstance(data, str):
@@ -189,13 +236,13 @@ def coerce_report_data(content):
         try:
             data = json.loads(data)
         except json.JSONDecodeError:
-            print(f"[coerce_report_data] JSON 파싱 실패: {content[:200]}")
-            return {"projects": []}
+            return fail(f"JSON 파싱 실패: {str(content)[:200]}")
     if not isinstance(data, dict):
-        print(f"[coerce_report_data] dict 아님: {type(data)}")
-        return {"projects": []}
+        return fail(f"dict 아님: {type(data)}")
     projects = data.get("projects")
     if not isinstance(projects, list):
+        if strict:
+            raise ValueError("projects 배열이 없습니다.")
         print(f"[coerce_report_data] projects 누락 또는 배열 아님: {projects!r}")
         data["projects"] = []
         return data
@@ -389,24 +436,6 @@ def read_root():
 # ─── 프로젝트별 타임라인 조회 ────────────────────────────────────────
 
 
-@app.get("/project-names")
-def get_project_names():
-    """모든 보고서에서 등장한 고유 프로젝트명 목록 (정규화 적용)."""
-    alias_map = get_alias_map()
-    with get_db() as conn:
-        rows = conn.execute("SELECT parsed_json FROM daily_reports").fetchall()
-
-    names = set()
-    for row in rows:
-        parsed = coerce_report_data(row[0])
-        for project in parsed.get("projects", []):
-            canonical = guess_project(project, alias_map)
-            if canonical:
-                names.add(canonical)
-
-    return sorted(names)
-
-
 @app.get("/project-timeline")
 def get_project_timeline(name: str, member_id: int = None):
     """프로젝트명으로 시간순 보고 이력 조회."""
@@ -526,7 +555,100 @@ def delete_project_alias(alias_id: int):
     return {"message": "별칭이 삭제되었습니다."}
 
 
+# ─── 프로젝트 명 관리 ──────────────────────────────────────────────
+
+
+@app.get("/project-names")
+def get_project_names():
+    """모든 보고서에서 등장한 고유 프로젝트명 목록 (정규화 적용).
+
+    등록된 프로젝트 명(known_projects)도 함께 포함한다.
+    """
+    alias_map = get_alias_map()
+    with get_db() as conn:
+        rows = conn.execute("SELECT parsed_json FROM daily_reports").fetchall()
+        registered = conn.execute(
+            "SELECT name FROM known_projects WHERE TRIM(name) != ''"
+        ).fetchall()
+
+    names = set()
+    for row in rows:
+        parsed = coerce_report_data(row[0])
+        for project in parsed.get("projects", []):
+            canonical = guess_project(project, alias_map)
+            if canonical:
+                names.add(canonical)
+    names.update(r[0] for r in registered)
+
+    return sorted(names)
+
+
+@app.get("/project-names/registered")
+def get_registered_project_names():
+    """등록된 프로젝트 명 전체 조회."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT name, created_at FROM known_projects ORDER BY name"
+        ).fetchall()
+    return [
+        {"name": row[0], "created_at": row[1]} for row in rows
+    ]
+
+
+@app.post("/project-names")
+def create_project_name(data: ProjectNameRequest):
+    """새 프로젝트 명 등록. 같은 이름이 이미 있으면 409."""
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="프로젝트 명을 입력해주세요.")
+    with get_db() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO known_projects (name) VALUES (?)", (name,)
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            raise HTTPException(
+                status_code=409, detail=f"'{name}' 프로젝트 명이 이미 등록되어 있습니다."
+            )
+    return {"message": f"'{name}' 프로젝트 명이 등록되었습니다."}
+
+
+@app.delete("/project-names/{project_name}")
+def delete_project_name(project_name: str):
+    """프로젝트 명 삭제."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM known_projects WHERE name = ?", (project_name,)
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=404, detail="해당 프로젝트 명을 찾을 수 없습니다."
+            )
+        conn.commit()
+    return {"message": "프로젝트 명이 삭제되었습니다."}
+
+
+def normalize_selected_dates(selects):
+    normalized = set()
+    for value in selects or []:
+        try:
+            normalized.add(date.fromisoformat(value).isoformat())
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail="기간의 날짜는 YYYY-MM-DD 형식이어야 합니다.",
+            )
+    if not normalized:
+        raise HTTPException(
+            status_code=400, detail="기간(날짜)을 최소 1개 선택해주세요."
+        )
+    return sorted(normalized)
+
+
 def generate_weekly_report(member_id, selects):
+    selects = normalize_selected_dates(selects)
     with get_db() as db:
         res = db.execute(
             """
@@ -545,31 +667,47 @@ def generate_weekly_report(member_id, selects):
             return None
 
         reports = [coerce_report_data(row[0]) for row in res]
-        client = OpenAI(base_url=LM_BASE_URL, api_key=LM_API_KEY)
-        kwargs = dict(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": load_weekly_prompt()},
-                {"role": "user", "content": json.dumps(reports)},
-            ],
-            temperature=0.1,
-            max_tokens=WEEKLY_MAX_TOKENS,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "weekly_report",
-                    "strict": True,
-                    "schema": weekly_schema,
+        try:
+            client = OpenAI(
+                base_url=LM_BASE_URL,
+                api_key=LM_API_KEY,
+                timeout=LLM_TIMEOUT_SECONDS,
+            )
+            kwargs = dict(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": load_weekly_prompt()},
+                    {"role": "user", "content": json.dumps(reports)},
+                ],
+                temperature=0.1,
+                max_tokens=WEEKLY_MAX_TOKENS,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "weekly_report",
+                        "strict": True,
+                        "schema": weekly_schema,
+                    },
                 },
-            },
-        )
-        if WEEKLY_REASONING:
-            kwargs["reasoning_effort"] = WEEKLY_REASONING
-        completion = client.chat.completions.create(**kwargs)
+            )
+            if WEEKLY_REASONING:
+                kwargs["reasoning_effort"] = WEEKLY_REASONING
+            completion = client.chat.completions.create(**kwargs)
 
-        report_data = normalize_projects(
-            coerce_report_data(read_completion(completion, "weekly-report"))
-        )
+            report_data = normalize_projects(
+                coerce_report_data(
+                    read_completion(completion, "weekly-report"),
+                    strict=True,
+                )
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            print(f"[weekly-report] error: {exc}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"로컬 AI 모델 호출 실패: {exc}",
+            )
         db.execute(
             "INSERT INTO weekly_reports (member_id, selected_date, report_json) VALUES (?, ?, ?)",
             (member_id, json.dumps(selects), json.dumps(report_data)),
@@ -580,11 +718,8 @@ def generate_weekly_report(member_id, selects):
 
 @app.post("/weekly-report")
 def weekly_report(data: WeeklyReportRequest):
-    if not data.selects:
-        raise HTTPException(
-            status_code=400, detail="기간(날짜)을 최소 1개 선택해주세요."
-        )
-    report_data = generate_weekly_report(data.userId, data.selects)
+    selects = normalize_selected_dates(data.selects)
+    report_data = generate_weekly_report(data.userId, selects)
     if report_data is None:
         raise HTTPException(
             status_code=404, detail="선택한 기간에 저장된 일일보고가 없습니다."
@@ -610,9 +745,13 @@ async def send_report(data: ReportRequest):
         )
         conn.commit()
 
-    client = OpenAI(base_url=LM_BASE_URL, api_key=LM_API_KEY)
+    client = OpenAI(
+        base_url=LM_BASE_URL,
+        api_key=LM_API_KEY,
+        timeout=LLM_TIMEOUT_SECONDS,
+    )
     try:
-        max_tokens = 16384 if DAILY_REASONING else DAILY_MAX_TOKENS
+        max_tokens = DAILY_MAX_TOKENS
         kwargs = dict(
             model=MODEL_NAME,
             messages=[
@@ -635,7 +774,7 @@ async def send_report(data: ReportRequest):
         completion = client.chat.completions.create(**kwargs)
 
         content = read_completion(completion, "send-report")
-        report_data = coerce_report_data(content)
+        report_data = coerce_report_data(content, strict=True)
 
         # 추출 단계에서는 DB에 쓰지 않는다.
         # 사용자가 화면에서 확인·수정한 뒤 POST /reports 에서 저장한다.
@@ -755,8 +894,6 @@ def get_user_activities(
             )
 
             current += timedelta(days=1)
-
-        activities.reverse()
 
         result.append({"member_id": member_id, "name": name, "activities": activities})
     return result
@@ -1027,13 +1164,16 @@ def save_report(data: SaveReportData):
             (member_id, report_date, raw_text, json.dumps(parsed)),
         )
 
-        cursor.execute("DELETE FROM projects WHERE member_id = ?", (member_id,))
+        cursor.execute(
+            "DELETE FROM projects WHERE member_id = ? AND report_date = ?",
+            (member_id, report_date),
+        )
         conn.commit()
-        save_projects(parsed, member_id)
+        save_projects(parsed, member_id, report_date)
     return {"message": "Report saved successfully.", "report_date": report_date}
 
 
-def save_projects(report_data, member_id):
+def save_projects(report_data, member_id, report_date):
     with get_db() as conn:
         cursor = conn.cursor()
 
@@ -1049,9 +1189,10 @@ def save_projects(report_data, member_id):
                     in_progress_tasks,
                     issues,
                     requests,
-                    next_plans
+                    next_plans,
+                    report_date
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     member_id,
@@ -1061,6 +1202,7 @@ def save_projects(report_data, member_id):
                     json.dumps(project.get("issues", [])),
                     json.dumps(project.get("requests", [])),
                     json.dumps(project.get("nextPlans", [])),
+                    report_date,
                 ),
             )
 

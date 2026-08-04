@@ -187,7 +187,11 @@ onMounted(() => {
 
 <template>
     <div class="page weekly-report-page">
-        <userActivities :embedded="true"></userActivities>
+        <userActivities
+            :embedded="true"
+            :start-date="weekDays[0] || ''"
+            :end-date="weekDays[weekDays.length - 1] || ''"
+        ></userActivities>
         <div class="page-header">
             <div>
                 <h1>주간 보고서</h1>
@@ -345,6 +349,10 @@ onMounted(() => {
     align-items: center;
     padding-top: 16px;
     border-top: 1px solid var(--border);
+}
+
+.activity-name .log {
+    width: 500px;
 }
 
 .user-id-display {

@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS projects (
     requests TEXT,
     next_plans TEXT,
     important_summary TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    report_date DATE
 )
 """)
 
