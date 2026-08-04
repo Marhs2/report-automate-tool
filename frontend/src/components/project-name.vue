@@ -1,17 +1,24 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import useAPI from "../composables/useApi";
-import { Trash2 } from "lucide-vue-next";
+import { Trash2, Check, Pencil } from "lucide-vue-next";
 
 const {
     getRegisteredProjectNames,
     postProjectName,
     deleteProjectName,
+    updateProjectNameKeywords,
 } = useAPI();
 
 const projectNames = ref([]);
 const newName = ref("");
+const newKeywords = ref("");
 const isLoading = ref(false);
+
+// 편집 중인 행 (name) 과 입력 값
+const editingName = ref("");
+const editingKeywords = ref("");
+const savingName = ref("");
 
 const fetchProjectNames = async () => {
     isLoading.value = true;
@@ -31,8 +38,9 @@ const addProjectName = async () => {
         return;
     }
     try {
-        await postProjectName(name);
+        await postProjectName(name, newKeywords.value.trim());
         newName.value = "";
+        newKeywords.value = "";
         await fetchProjectNames();
     } catch (error) {
         const detail = error.response?.data?.detail;
@@ -51,6 +59,31 @@ const removeProjectName = async (name) => {
     }
 };
 
+const startEdit = (item) => {
+    editingName.value = item.name;
+    editingKeywords.value = item.keywords || "";
+};
+
+const saveKeywords = async (item) => {
+    savingName.value = item.name;
+    try {
+        await updateProjectNameKeywords(item.name, editingKeywords.value);
+        item.keywords = editingKeywords.value.trim();
+        editingName.value = "";
+        alert(`'${item.name}' 키워드가 저장되었습니다.`);
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        alert(detail || "키워드 저장에 실패했습니다.");
+    } finally {
+        savingName.value = "";
+    }
+};
+
+const cancelEdit = () => {
+    editingName.value = "";
+    editingKeywords.value = "";
+};
+
 onMounted(() => {
     fetchProjectNames();
 });
@@ -63,7 +96,8 @@ onMounted(() => {
                 <h1>프로젝트 명 관리</h1>
                 <p class="page-subtitle">
                     등록된 프로젝트 명은 보고서 작성 시 AI가 프로젝트를
-                    구분하는 데 사용됩니다
+                    구분하는 데 사용됩니다. 키워드는 원문에 화면·기능명만
+                    적혀 있을 때 프로젝트를 찾는 데 도움을 줍니다
                 </p>
             </div>
         </div>
@@ -78,7 +112,20 @@ onMounted(() => {
                         type="text"
                         v-model="newName"
                         class="input"
-                        placeholder="예: A사 MES 구축"
+                        placeholder="예: 일일보고 취합·주간보고 자동화 도구"
+                        @keyup.enter="addProjectName"
+                    />
+                </div>
+                <div class="field">
+                    <label for="keywords-input"
+                        >키워드 (쉼표로 구분, 선택)</label
+                    >
+                    <input
+                        id="keywords-input"
+                        type="text"
+                        v-model="newKeywords"
+                        class="input"
+                        placeholder="예: 보고서, 취합, 주간보고"
                         @keyup.enter="addProjectName"
                     />
                 </div>
@@ -98,12 +145,51 @@ onMounted(() => {
                 <thead>
                     <tr>
                         <th>프로젝트 명</th>
+                        <th>키워드</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="item in projectNames" :key="item.name">
                         <td class="name-cell">{{ item.name }}</td>
+                        <td class="keywords-cell">
+                            <template v-if="editingName === item.name">
+                                <input
+                                    type="text"
+                                    v-model="editingKeywords"
+                                    class="input keywords-input"
+                                    placeholder="쉼표로 구분 (예: 보고서, 취합)"
+                                    @keyup.enter="saveKeywords(item)"
+                                />
+                                <button
+                                    class="btn btn-icon"
+                                    @click="saveKeywords(item)"
+                                    :disabled="savingName === item.name"
+                                    title="저장"
+                                >
+                                    <Check :size="14" />
+                                </button>
+                                <button
+                                    class="btn btn-icon"
+                                    @click="cancelEdit"
+                                    title="취소"
+                                >
+                                    <span class="cancel-text">취소</span>
+                                </button>
+                            </template>
+                            <template v-else>
+                                <span class="keywords-text">{{
+                                    item.keywords || "—"
+                                }}</span>
+                                <button
+                                    class="btn btn-icon"
+                                    @click="startEdit(item)"
+                                    title="키워드 수정"
+                                >
+                                    <Pencil :size="14" />
+                                </button>
+                            </template>
+                        </td>
                         <td class="action-cell">
                             <button
                                 class="btn btn-icon"
@@ -166,6 +252,26 @@ onMounted(() => {
 .name-cell {
     font-weight: 600;
     color: var(--text-h);
+    white-space: nowrap;
+}
+
+.keywords-cell {
+    min-width: 260px;
+}
+
+.keywords-text {
+    color: var(--text);
+    margin-right: 8px;
+}
+
+.keywords-input {
+    max-width: 260px;
+    margin-right: 6px;
+}
+
+.cancel-text {
+    font-size: 12px;
+    color: var(--text);
 }
 
 .action-cell {

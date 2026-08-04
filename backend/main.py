@@ -81,20 +81,22 @@ def load_weekly_prompt():
 with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
     weekly_schema = json.load(f)
 
-MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "nuextract3")
+MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "qwen3.5-4b")
 LM_BASE_URL = os.environ.get("LM_BASE_URL", "http://127.0.0.1:1234/v1")
 LM_API_KEY = os.environ.get("LM_API_KEY", "lm-studio")
 LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
 
 DAILY_MAX_TOKENS = int(os.environ.get("DAILY_MAX_TOKENS", "16384"))
 WEEKLY_MAX_TOKENS = int(os.environ.get("WEEKLY_MAX_TOKENS", "2048"))
-_daily_reasoning = (os.environ.get("DAILY_REASONING") or "high").lower()
+_daily_reasoning = (os.environ.get("DAILY_REASONING") or "none").lower()
 DAILY_REASONING = (
-    _daily_reasoning if _daily_reasoning in {"low", "medium", "high"} else None
+    _daily_reasoning if _daily_reasoning in {"low", "medium", "high", "none"} else None
 )
 _weekly_reasoning = (os.environ.get("WEEKLY_REASONING") or "none").lower()
 WEEKLY_REASONING = (
-    _weekly_reasoning if _weekly_reasoning in {"low", "medium", "high"} else None
+    _weekly_reasoning
+    if _weekly_reasoning in {"low", "medium", "high", "none"}
+    else None
 )
 
 if urlparse(LM_BASE_URL).hostname not in {"localhost", "127.0.0.1", "::1"}:
@@ -132,6 +134,11 @@ class AliasRequest(BaseModel):
 
 class ProjectNameRequest(BaseModel):
     name: str
+    keywords: str = ""
+
+
+class ProjectNameKeywordsRequest(BaseModel):
+    keywords: str = ""
 
 
 class UpdateWeeklyData(BaseModel):
@@ -157,22 +164,18 @@ def ensure_runtime_schema():
             """
             CREATE TABLE IF NOT EXISTS known_projects (
                 name TEXT PRIMARY KEY,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                keywords TEXT NOT NULL DEFAULT ''
             )
             """
         )
-        # 이전 버전의 project_names 테이블이 남아 있으면 known_projects 로 옮기고 제거한다.
-        has_old = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_names'"
-        ).fetchone()
-        if has_old:
+        known_columns = conn.execute("PRAGMA table_info(known_projects)").fetchall()
+        if known_columns and not any(
+            column["name"] == "keywords" for column in known_columns
+        ):
             conn.execute(
-                """
-                INSERT OR IGNORE INTO known_projects (name, created_at)
-                SELECT name, created_at FROM project_names
-                """
+                "ALTER TABLE known_projects ADD COLUMN keywords TEXT NOT NULL DEFAULT ''"
             )
-            conn.execute("DROP TABLE project_names")
         project_columns = conn.execute("PRAGMA table_info(projects)").fetchall()
         if project_columns and not any(
             column["name"] == "report_date" for column in project_columns
@@ -221,6 +224,7 @@ def coerce_report_data(content, *, strict=False):
     parsed_json 이 있을 수 있어, 문자열이 나오면 dict 가 나올 때까지 한 번 더
     파싱한다.
     """
+
     def fail(message):
         if strict:
             raise ValueError(message)
@@ -588,10 +592,11 @@ def get_registered_project_names():
     """등록된 프로젝트 명 전체 조회."""
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT name, created_at FROM known_projects ORDER BY name"
+            "SELECT name, keywords, created_at FROM known_projects ORDER BY name"
         ).fetchall()
     return [
-        {"name": row[0], "created_at": row[1]} for row in rows
+        {"name": row[0], "keywords": row[1] or "", "created_at": row[2]}
+        for row in rows
     ]
 
 
@@ -604,12 +609,14 @@ def create_project_name(data: ProjectNameRequest):
     with get_db() as conn:
         try:
             conn.execute(
-                "INSERT INTO known_projects (name) VALUES (?)", (name,)
+                "INSERT INTO known_projects (name, keywords) VALUES (?, ?)",
+                (name, data.keywords.strip()),
             )
             conn.commit()
         except sqlite3.IntegrityError:
             raise HTTPException(
-                status_code=409, detail=f"'{name}' 프로젝트 명이 이미 등록되어 있습니다."
+                status_code=409,
+                detail=f"'{name}' 프로젝트 명이 이미 등록되어 있습니다.",
             )
     return {"message": f"'{name}' 프로젝트 명이 등록되었습니다."}
 
@@ -619,15 +626,31 @@ def delete_project_name(project_name: str):
     """프로젝트 명 삭제."""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM known_projects WHERE name = ?", (project_name,)
-        )
+        cursor.execute("DELETE FROM known_projects WHERE name = ?", (project_name,))
         if cursor.rowcount == 0:
             raise HTTPException(
                 status_code=404, detail="해당 프로젝트 명을 찾을 수 없습니다."
             )
         conn.commit()
     return {"message": "프로젝트 명이 삭제되었습니다."}
+
+
+@app.put("/project-names/{project_name}")
+def update_project_name_keywords(project_name: str, data: ProjectNameKeywordsRequest):
+    """등록된 프로젝트 명의 키워드 갱신. 없으면 404."""
+    keywords = data.keywords.strip()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE known_projects SET keywords = ? WHERE name = ?",
+            (keywords, project_name),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=404, detail="해당 프로젝트 명을 찾을 수 없습니다."
+            )
+        conn.commit()
+    return {"message": f"'{project_name}' 키워드가 저장되었습니다."}
 
 
 def normalize_selected_dates(selects):
@@ -708,6 +731,11 @@ def generate_weekly_report(member_id, selects):
                 status_code=502,
                 detail=f"로컬 AI 모델 호출 실패: {exc}",
             )
+        # 같은 사람이 같은 기간으로 다시 생성하면 이전 초안을 덮어쓴다. (일일보고와 동일한 덮어쓰기 원칙)
+        db.execute(
+            "DELETE FROM weekly_reports WHERE member_id = ? AND selected_date = ?",
+            (member_id, json.dumps(selects)),
+        )
         db.execute(
             "INSERT INTO weekly_reports (member_id, selected_date, report_json) VALUES (?, ?, ?)",
             (member_id, json.dumps(selects), json.dumps(report_data)),
@@ -769,6 +797,8 @@ async def send_report(data: ReportRequest):
                 },
             },
         )
+        # DAILY_REASONING: "none"이면 명시적으로 reasoning_effort=none 을 보내 추론을 끈다.
+        # (LM Studio/qwen3.5-4b 는 필드를 생략하면 기본으로 추론을 켠다)
         if DAILY_REASONING:
             kwargs["reasoning_effort"] = DAILY_REASONING
         completion = client.chat.completions.create(**kwargs)
@@ -958,13 +988,13 @@ def update_weekly(weekly_id: int, data: UpdateWeeklyData):
         report_data = json.loads(data.report_json)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="유효한 JSON이 아닙니다.")
+    if not isinstance(report_data, dict):
+        raise HTTPException(
+            status_code=400, detail="주간 보고서 데이터가 유효하지 않습니다."
+        )
 
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM report_drafts WHERE member_id = ? AND report_date = ?",
-            (member_id, report_date),
-        )
         cursor.execute(
             "UPDATE weekly_reports SET report_json = ? WHERE id = ?",
             (json.dumps(report_data), weekly_id),

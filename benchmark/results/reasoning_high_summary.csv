@@ -1,7 +1,0 @@
-﻿model,output_mode,json_valid_rate,schema_valid_rate,project_f1,micro_precision,micro_recall,micro_f1,macro_f1,issue_status_accuracy,empty_report_accuracy,latency_mean_s,latency_median_s,latency_max_s,tokens_per_s,api_errors,truncated
-qwen3.5-4b,json_schema+reasoning=high,1.0,1.0,0.955,0.8992,0.8788,0.8889,0.8858,1.0,0.0,69.05,64.0,131.08,73.7,0,0
-google/gemma-4-e2b,json_schema+reasoning=high,1.0,1.0,0.8829,0.7939,0.7879,0.7909,0.7692,1.0,1.0,10.66,10.79,15.83,93.2,0,0
-nuextract3,json_schema+reasoning=high,1.0,1.0,0.876,0.763,0.7803,0.7715,0.7546,1.0,0.0,10.16,9.93,14.52,68.3,0,0
-nvidia/nemotron-3-nano-4b,json_schema+reasoning=high,1.0,0.9688,0.9558,0.7059,0.7273,0.7164,0.7062,1.0,1.0,8.62,8.64,20.62,84.1,0,0
-kanana-2-3b-instruct-i1,json_schema+reasoning=high,1.0,1.0,0.7327,0.4496,0.4394,0.4444,0.4078,1.0,1.0,1.16,1.09,2.19,74.9,0,0
-lfm2.5-8b-a1b,json_schema+reasoning=high,1.0,1.0,0.4941,0.3333,0.2121,0.2593,0.2566,1.0,1.0,13.51,10.95,71.68,156.4,0,0

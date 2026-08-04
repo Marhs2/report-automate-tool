@@ -215,9 +215,9 @@ export default function useAPI() {
     }
   };
 
-  const postProjectName = async (name) => {
+  const postProjectName = async (name, keywords = "") => {
     try {
-      const response = await axios.post(`${baseURL}/project-names`, { name });
+      const response = await axios.post(`${baseURL}/project-names`, { name, keywords });
       return response.data;
     } catch (error) {
       console.error("Error creating project name:", error);
@@ -233,6 +233,19 @@ export default function useAPI() {
       return response.data;
     } catch (error) {
       console.error("Error deleting project name:", error);
+      throw error;
+    }
+  };
+
+  const updateProjectNameKeywords = async (projectName, keywords) => {
+    try {
+      const response = await axios.put(
+        `${baseURL}/project-names/${encodeURIComponent(projectName)}`,
+        { keywords },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error updating project name keywords:", error);
       throw error;
     }
   };
@@ -272,6 +285,7 @@ export default function useAPI() {
     getRegisteredProjectNames,
     postProjectName,
     deleteProjectName,
+    updateProjectNameKeywords,
     getProjectTimeline,
   };
 }
