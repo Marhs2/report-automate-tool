@@ -4,7 +4,7 @@ import useAPI from "../composables/useApi";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
-import { Download, Copy } from "lucide-vue-next";
+import { Download } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import userActivities from "./user-activities.vue";
 

@@ -82,13 +82,13 @@ def load_weekly_prompt():
 with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
     weekly_schema = json.load(f)
 
-MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "qwen3.5-4b-mtp")
+MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "qwen3.5-4b-mtp@q4_k_m")
 LM_BASE_URL = os.environ.get("LM_BASE_URL", "http://127.0.0.1:1234/v1")
 LM_API_KEY = os.environ.get("LM_API_KEY", "lm-studio")
 LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
 
 DAILY_MAX_TOKENS = int(os.environ.get("DAILY_MAX_TOKENS", "16384"))
-WEEKLY_MAX_TOKENS = int(os.environ.get("WEEKLY_MAX_TOKENS", "2048"))
+WEEKLY_MAX_TOKENS = int(os.environ.get("WEEKLY_MAX_TOKENS", "16384"))
 _daily_reasoning = (os.environ.get("DAILY_REASONING") or "none").lower()
 DAILY_REASONING = (
     _daily_reasoning if _daily_reasoning in {"low", "medium", "high", "none"} else None

@@ -9,7 +9,7 @@ const router = useRouter();
 const input = ref("");
 const today = new Date();
 const date = ref(
-    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
 );
 
 const aiLoading = ref(false);

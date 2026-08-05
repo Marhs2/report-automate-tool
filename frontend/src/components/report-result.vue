@@ -21,6 +21,8 @@
                         v-model="project.projectName"
                     />
 
+                    <button @click="removeProject(projectIndex)">삭제</button>
+
                     <div class="field-group completedTasks">
                         <h2>완료된 업무</h2>
                         <div
@@ -179,15 +181,25 @@
                     </div>
                 </div>
 
+                <button class="btn" @click="addProject">추가</button>
+
                 <div class="card save-bar">
                     <span class="member-id-display"
                         >사용자: {{ userName }}</span
                     >
                     <div class="save-actions">
-                        <button class="btn" @click="retryExtract">
-                            재추출
+                        <button
+                            class="btn"
+                            @click="retryExtract"
+                            :disabled="retryLoading"
+                        >
+                            {{ retryLoading ? "재추출 중..." : "재추출" }}
                         </button>
-                        <button class="btn btn-primary" @click="saveReport">
+                        <button
+                            class="btn btn-primary"
+                            @click="saveReport"
+                            :disabled="aiLoading"
+                        >
                             저장하기
                         </button>
                     </div>
@@ -217,6 +229,7 @@ const reportData = ref(null);
 const rawData = ref(null);
 const userName = ref("");
 const aiLoading = ref(false);
+const retryLoading = ref(false);
 const { PostSaveReport, PostReport, getUsers } = useAPI();
 
 watch(
@@ -258,6 +271,21 @@ onMounted(() => {
             });
     }
 });
+
+const addProject = () => {
+    reportData.value.projects.push({
+        projectName: "",
+        completedTasks: [],
+        inProgressTasks: [],
+        issues: [],
+        requests: [],
+        nextPlans: [],
+    });
+};
+
+const removeProject = (index) => {
+    reportData.value.projects.splice(index, 1);
+};
 
 const addCompletedTask = (project) => {
     project.completedTasks.push("");
@@ -343,6 +371,7 @@ const retryExtract = async () => {
     }
     try {
         aiLoading.value = true;
+        retryLoading.value = true;
         const reportDate =
             sessionStorage.getItem("reportDate") ||
             (() => {
@@ -361,6 +390,7 @@ const retryExtract = async () => {
         alert("재추출에 실패했습니다. 다시 시도해주세요.");
     } finally {
         aiLoading.value = false;
+        retryLoading.value = false;
     }
 };
 </script>
