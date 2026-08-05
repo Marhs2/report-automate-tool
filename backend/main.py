@@ -146,11 +146,6 @@ class UpdateWeeklyData(BaseModel):
     report_json: str
 
 
-INVALID_MEMBER_DETAIL = (
-    "유효하지 않은 사용자입니다. 사용자 선택 화면에서 다시 선택해주세요."
-)
-
-
 def validate_report_date(report_date):
     try:
         return date.fromisoformat(report_date).isoformat()
@@ -163,7 +158,10 @@ def validate_report_date(report_date):
 def validate_member(conn, member_id):
     if conn.execute("SELECT 1 FROM members WHERE id = ?", (member_id,)).fetchone():
         return
-    raise HTTPException(status_code=400, detail=INVALID_MEMBER_DETAIL)
+    raise HTTPException(
+        status_code=400,
+        detail="유효하지 않은 사용자입니다. 사용자 선택 화면에서 다시 선택해주세요.",
+    )
 
 
 def ensure_runtime_schema():
@@ -499,11 +497,7 @@ def _weekly_task_tokens(value):
         "착수",
         "시작",
     }
-    return {
-        token
-        for token in text.split()
-        if token and token not in ignored
-    }
+    return {token for token in text.split() if token and token not in ignored}
 
 
 def _weekly_tasks_match(left, right):
@@ -513,8 +507,10 @@ def _weekly_tasks_match(left, right):
     if len(common) >= 2:
         return True
     specific_common = common - _WEEKLY_GENERIC_ACTIONS
-    return bool(specific_common) and len(left_tokens) == 1 or (
-        bool(specific_common) and len(right_tokens) == 1
+    return (
+        bool(specific_common)
+        and len(left_tokens) == 1
+        or (bool(specific_common) and len(right_tokens) == 1)
     )
 
 
@@ -547,15 +543,9 @@ def promote_weekly_tasks(report_data, source_reports=None, alias_map=None):
             for task in project.get("inProgressTasks", [])
             if task and str(task).strip()
         ]
-        next_field = (
-            "nextPlans"
-            if "nextPlans" in project
-            else "nextWeekPlans"
-        )
+        next_field = "nextPlans" if "nextPlans" in project else "nextWeekPlans"
         next_plans = [
-            task
-            for task in project.get(next_field, [])
-            if task and str(task).strip()
+            task for task in project.get(next_field, []) if task and str(task).strip()
         ]
 
         completed_candidates = completed + completed_by_project.get(
@@ -749,8 +739,7 @@ def get_registered_project_names():
             "SELECT name, keywords, created_at FROM known_projects ORDER BY name"
         ).fetchall()
     return [
-        {"name": row[0], "keywords": row[1] or "", "created_at": row[2]}
-        for row in rows
+        {"name": row[0], "keywords": row[1] or "", "created_at": row[2]} for row in rows
     ]
 
 

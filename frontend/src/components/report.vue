@@ -55,8 +55,6 @@ const sendReport = async () => {
         console.log("보고서 전송 성공:", res);
 
         sessionStorage.setItem("reportData", JSON.stringify(res));
-        // 원문은 문자열 그대로 보관한다. JSON.stringify 후 정규식으로 되돌리면
-        // 개행이 섞인 텍스트에서 앞뒤 따옴표가 남는다.
         sessionStorage.setItem("reportRaw", input.value);
         sessionStorage.setItem("reportDate", date.value);
         await router.push({ name: "report-result" });
