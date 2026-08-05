@@ -94,6 +94,17 @@ KNOWN_PROJECTS_VALIDATION = """- 스마트팩토리
 - 전자상거래플랫폼
   · 표기 변형: 쇼핑몰, 이커머스"""
 
+# gold_dataset_report.json 의 프로젝트 (test-data/daily-reports.md 자체 작성 테스트 데이터).
+KNOWN_PROJECTS_REPORT = """- 일일보고취합
+  · 표기 변형: 일일보고 취합·주간보고 자동화 도구, 일일보고, 주간보고 자동화 도구, 취합
+  · 주요 구성 요소: 보고서 작성 화면, 보고서 미리보기, 임시 저장, 저장 목록, 활동 현황, 주간보고 초안, 제출 기능, 제출 현황, 이전 보고서 보존·이동, 통합 확인 화면, 대시보드
+- 명함주소록
+  · 표기 변형: 명함 관리 웹, 명함 관리, 명함
+  · 주요 구성 요소: 명함 사진 인식, 연락처 목록, 명함 상세 보기, 명함 공유 화면, 중복 명함 판단, 명함 분류, 모바일 화면
+- 회의록자동화
+  · 표기 변형: 회의록 자동화, 회의록
+  · 주요 구성 요소: 회의 녹음 파일 업로드, 녹음 요약, 참석자별 발화 정리, 회의 상세 보기, 음성 전처리, 회의록 양식"""
+
 KNOWN_PROJECTS_DATASET = """- A사 MES
   · 표기 변형: MES, A사 MES 구축, A사 MES 시스템
   · 주요 구성 요소: 설비 데이터 수집 배치, 실시간 알림 이력 화면, 알림 조건 설정,
@@ -125,6 +136,8 @@ def load_assets(prompt_path=None, known_projects="none", dataset_name="gold"):
         filler = KNOWN_PROJECTS_FRESH
     if known_projects == "validation":
         filler = KNOWN_PROJECTS_VALIDATION
+    if known_projects == "report":
+        filler = KNOWN_PROJECTS_REPORT
     prompt = prompt.replace("{{KNOWN_PROJECTS}}", filler)
     with open(ROOT / "backend" / "model_asset" / "json_Schema.json", encoding="utf-8") as f:
         schema = json.load(f)
@@ -361,12 +374,12 @@ def main():
     )
     ap.add_argument("--prompt", default=None, help="사용할 프롬프트 파일 (기본 backend/model_asset/prompt.txt)")
     ap.add_argument(
-        "--known-projects", default="none", choices=["none", "dataset", "names_only", "diverse", "fresh", "validation"],
+        "--known-projects", default="none", choices=["none", "dataset", "names_only", "diverse", "fresh", "validation", "report"],
         help="prompt의 {{KNOWN_PROJECTS}} 슬롯 채우기. dataset은 DB에 프로젝트가 등록된 상황을 재현",
     )
     ap.add_argument(
-        "--dataset", default="gold", choices=["gold", "diverse", "fresh", "validation"],
-        help="사용할 데이터셋 (gold=기존 32건, diverse=신규 32건, fresh=신규 32건, validation=검증 32건)",
+        "--dataset", default="gold", choices=["gold", "diverse", "fresh", "validation", "report"],
+        help="사용할 데이터셋 (gold=기존 32건, diverse=신규 32건, fresh=신규 32건, validation=검증 32건, report=자체 작성 테스트 보고 32건)",
     )
     args = ap.parse_args()
 

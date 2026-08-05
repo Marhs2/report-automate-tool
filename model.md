@@ -1,11 +1,14 @@
 # 모델 벤치마크 및 선정 근거
 
+> (`test-data/daily-reports.md`, 32건)의 항목별 추출 정확도·케이스별 오류 분석은
+> [docs/정확도-평가.md](docs/정확도-평가.md) 참고.
+
 ## 결론
 
 현재 기본 모델은 **qwen3.5-4b**로 유지한다.
 
 이번 동일 조건 일일보고 벤치마크에서 qwen3.5-4b가 세 모델 중
-가장 높은 micro F1을 기록했다.
+가장 높은 micro F1을 기록.
 
 ## 실행 조건
 
@@ -23,7 +26,7 @@
 실행 명령:
 
 ```bash
-python benchmark/run_benchmark.py qwen3.5-4b gemma-4-e2b-it-qat nuextract3 ^
+python benchmark/run_benchmark.py qwen3.5-4b google/gemma-4-e2b nuextract3 ^
   --force --reasoning none --max-tokens 6144 ^
   --dataset gold --known-projects dataset ^
   --out-dir benchmark/results/three_models_2026-08-05_daily
@@ -39,7 +42,7 @@ python benchmark/score_benchmark.py ^
 | ---: | ------------------ | --------: | ----------: | ----------: | -----: | -----: | --------: | ----------: |
 |    1 | **qwen3.5-4b**     |    100.0% |      100.0% |       93.7% |  84.9% |  81.1% | **83.0%** |     18.99초 |
 |    2 | nuextract3         |    100.0% |      100.0% |       95.7% |  82.6% |  82.6% |     82.6% |     22.10초 |
-|    3 | gemma-4-e2b-it-qat |    100.0% |      100.0% |       92.6% |  77.3% |  77.3% |     77.3% | **16.09초** |
+|    3 | google/gemma-4-e2b |    100.0% |      100.0% |       92.6% |  77.3% |  77.3% |     77.3% | **16.09초** |
 
 ## 항목별 F1
 
@@ -47,7 +50,7 @@ python benchmark/score_benchmark.py ^
 | ------------------ | --------: | -----------: | --------: | --------: | --------: |
 | qwen3.5-4b         |     90.7% |        84.6% |     71.4% |     66.7% |     83.7% |
 | nuextract3         |     87.8% |        80.0% | **72.3%** | **85.7%** |     83.7% |
-| gemma-4-e2b-it-qat |     89.1% |        73.7% |     68.3% |     63.6% |     69.8% |
+| google/gemma-4-e2b |     89.1% |        73.7% |     68.3% |     63.6% |     69.8% |
 
 ## 선정 판단
 
@@ -64,7 +67,7 @@ python benchmark/score_benchmark.py ^
 - 전체 micro F1은 qwen과 0.4%p 차이
 - qwen보다 평균 지연이 길어 기본 모델로는 제외
 
-### gemma-4-e2b-it-qat
+### google/gemma-4-e2b
 
 - 평균 지연은 가장 짧음
 - 그러나 전체 micro F1과 진행 중 업무·다음 계획 성능이 가장 낮음

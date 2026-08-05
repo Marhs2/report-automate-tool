@@ -58,6 +58,11 @@ PROJECT_ALIASES = {
     "전자상거래플랫폼": "전자상거래플랫폼",
     "쇼핑몰": "전자상거래플랫폼",
     "이커머스": "전자상거래플랫폼",
+    "일일보고": "일일보고취합",
+    "명함": "명함주소록",
+    "명함관리": "명함주소록",
+    "명함관리웹": "명함주소록",
+    "회의록": "회의록자동화",
 }
 
 
@@ -357,7 +362,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw-dir", default=None, help="채점할 원시 응답 디렉터리")
     ap.add_argument("--prefix", default="", help="출력 파일 접두어 (예: run1_)")
-    ap.add_argument("--dataset", default="gold", choices=["gold", "diverse", "fresh", "validation"], help="사용할 데이터셋")
+    ap.add_argument("--dataset", default="gold", choices=["gold", "diverse", "fresh", "validation", "report"], help="사용할 데이터셋")
     args = ap.parse_args()
     if args.raw_dir:
         RAW_DIR = pathlib.Path(args.raw_dir)
