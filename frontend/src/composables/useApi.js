@@ -18,6 +18,24 @@ export default function useAPI() {
     }
   };
 
+  const deleteReport = async (reportId) => {
+    try {
+      await axios.delete(`${baseURL}/reports/${reportId}`);
+    } catch (error) {
+      console.error("Error deleting report:", error);
+      throw error;
+    }
+  };
+
+  const deleteWeeklyReport = async (reportId) => {
+    try {
+      await axios.delete(`${baseURL}/weekly/${reportId}`);
+    } catch (error) {
+      console.error("Error deleting weekly report:", error);
+      throw error;
+    }
+  };
+
   const GetReportDraft = async (memberId, reportDate) => {
     const response = await axios.get(
       `${baseURL}/report-drafts/${memberId}/${reportDate}`,
@@ -287,5 +305,7 @@ export default function useAPI() {
     deleteProjectName,
     updateProjectNameKeywords,
     getProjectTimeline,
+    deleteWeeklyReport,
+    deleteReport
   };
 }

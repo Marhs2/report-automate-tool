@@ -1046,17 +1046,30 @@ def get_user_activities(
 
         cursor.execute(
             """
-            SELECT report_date, member_id, COUNT(DISTINCT report_date)
+            SELECT report_date, member_id, COUNT(report_date)
             FROM daily_reports
             WHERE report_date BETWEEN ? AND ?
             GROUP BY report_date, member_id
-        """,
+            """,
             (start_date, end_date),
         )
 
         counts = defaultdict(dict)
         for report_date, member_id, count in cursor.fetchall():
             counts[member_id][report_date] = count
+
+        cursor.execute(
+            """
+            SELECT member_id, COUNT(DISTINCT report_date)
+            FROM daily_reports
+            WHERE report_date BETWEEN ? AND ?
+            GROUP BY member_id
+            """,
+            (start_date, end_date),
+        )
+        total_counts = {
+            member_id: count for member_id, count in cursor.fetchall()
+        }
 
     result = []
 
@@ -1076,8 +1089,41 @@ def get_user_activities(
 
             current += timedelta(days=1)
 
-        result.append({"member_id": member_id, "name": name, "activities": activities})
+        result.append(
+            {
+                "member_id": member_id,
+                "name": name,
+                "total_count": total_counts.get(member_id, 0),
+                "activities": activities,
+            }
+        )
     return result
+
+
+@app.delete("/reports/{report_id}")
+def delete_report(report_id: int):
+    with get_db() as db:
+        db.execute(
+            """
+            DELETE FROM daily_reports
+            WHERE id = ?
+        """,
+            (report_id,),
+        )
+    return {"message": "Report deleted successfully"}
+
+
+@app.delete("/weekly/{report_id}")
+def delete_weekly_report(report_id: int):
+    with get_db() as db:
+        db.execute(
+            """
+            DELETE FROM weekly_reports
+            WHERE id = ?
+        """,
+            (report_id,),
+        )
+    return {"message": "Report deleted successfully"}
 
 
 @app.get("/weekly/{user_id}")

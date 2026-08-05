@@ -134,6 +134,10 @@ const displayDates = computed(
         ) || [],
 );
 
+const totalCountOf = (activity) =>
+    activity.total_count ??
+    activity.activities.reduce((total, item) => total + (item.count || 0), 0);
+
 const periodLabel = computed(() =>
     props.startDate && props.endDate
         ? `${props.startDate} ~ ${props.endDate} 제출 현황`
@@ -192,7 +196,12 @@ const periodLabel = computed(() =>
                     :key="activity.member_id"
                     class="activity-row"
                 >
-                    <h4 class="activity-name">{{ activity.name }}</h4>
+                    <h4 class="activity-name">
+                        {{ activity.name }}
+                        <span class="activity-total"
+                            >({{ totalCountOf(activity) }}건)</span
+                        >
+                    </h4>
                     <div
                         v-for="item in activity.activities"
                         :key="item.report_date"
@@ -333,6 +342,12 @@ const periodLabel = computed(() =>
     margin: 0;
     color: var(--text-h);
     white-space: nowrap;
+}
+
+.activity-total {
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 500;
 }
 
 .log {

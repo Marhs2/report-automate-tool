@@ -10,7 +10,7 @@ import userActivities from "./user-activities.vue";
 
 const router = useRouter();
 
-const { postWeekly, GetWeeklyReport } = useAPI();
+const { postWeekly, GetWeeklyReport, deleteWeeklyReport } = useAPI();
 
 const selects = ref([]);
 const weekDays = ref([]);
@@ -57,6 +57,36 @@ const prevWeek = () => loadWeek(weekOffset.value - 1);
 const nextWeek = () => loadWeek(weekOffset.value + 1);
 
 loadWeek(0);
+
+const deleteReport = async (reportId) => {
+    isLoading.value = true;
+    try {
+        await deleteReport(reportId);
+        await fetchWeeklyReport();
+        alert("삭제완료");
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        console.error("보고서 삭제 실패:", error);
+        alert(detail || "보고서 삭제에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+const deleteWeekly = async (reportId) => {
+    isLoading.value = true;
+    try {
+        await deleteWeeklyReport(reportId);
+        await fetchWeeklyReport();
+        alert("삭제완료");
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        console.error("주간 보고서 삭제 실패:", error);
+        alert(detail || "주간 보고서 삭제에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+        isLoading.value = false;
+    }
+};
 
 const sendDates = async () => {
     if (!userId.value) {
@@ -121,24 +151,41 @@ const downloadReport = async (report) => {
             report.createdAt || report.created_at || new Date().toISOString();
         const created_date = formatLocalDate(new Date(createdDateRaw));
 
-        const projectsList = (report.report?.projects || []).map((p) => ({
-            project_name: p.projectName || "",
-            completed: p.completedTasks || [],
-            inProgress: p.inProgressTasks || [],
-            issues: (p.issues || []).map((issue) => {
-                if (typeof issue === "string") {
+        const asReportItems = (items) => {
+            const values = Array.isArray(items)
+                ? items.filter((item) => {
+                      if (item === null || item === undefined) return false;
+                      return typeof item !== "string" || item.trim().length > 0;
+                  })
+                : [];
+            return values.length > 0 ? values : ["없음"];
+        };
+
+        const projectsList = (report.report?.projects || []).map((p) => {
+            const nextPlans =
+                Array.isArray(p.nextWeekPlans) && p.nextWeekPlans.length > 0
+                    ? p.nextWeekPlans
+                    : p.nextPlans;
+
+            return {
+                project_name: p.projectName || "",
+                completed: asReportItems(p.completedTasks),
+                inProgress: asReportItems(p.inProgressTasks),
+                issues: asReportItems(p.issues).map((issue) => {
+                    if (typeof issue === "string") {
+                        return {
+                            content: issue,
+                            resolved: false,
+                        };
+                    }
                     return {
-                        content: issue,
-                        resolved: false,
+                        content: issue.content || "없음",
+                        resolved: issue.status === "해결",
                     };
-                }
-                return {
-                    content: issue.content || "",
-                    resolved: issue.status === "해결",
-                };
-            }),
-            nextPlans: p.nextWeekPlans || p.nextPlans || [],
-        }));
+                }),
+                nextPlans: asReportItems(nextPlans),
+            };
+        });
 
         const project_count = projectsList.length;
 
@@ -273,6 +320,13 @@ onMounted(() => {
                                 {{ report.selectedDate?.join(", ") }}
                             </div>
                         </div>
+
+                        <button
+                            class="btn"
+                            @click="() => deleteWeeklyReport(report.id)"
+                        >
+                            삭제
+                        </button>
                         <button
                             class="btn"
                             :disabled="isLoading"

@@ -12,7 +12,7 @@ import { useRouter } from "vue-router";
 
 const route = useRouter();
 
-const { GetReports } = useAPI();
+const { GetReports, deleteReport } = useAPI();
 
 const reports = ref([]);
 const isLoading = ref(false);
@@ -169,6 +169,12 @@ onMounted(() => {
                             v-on:click="() => reportDetail(report.id)"
                         >
                             자세히 보기
+                        </button>
+                        <button
+                            class="btn"
+                            v-on:click="() => deleteReport(report.id)"
+                        >
+                            삭제
                         </button>
                     </div>
                 </div>
