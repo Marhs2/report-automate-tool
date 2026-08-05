@@ -132,5 +132,3 @@ bun run dev        # http://localhost:5173
 | **qwen3.5-4b + 추론 끄기 (채택)** | **88.3%** | **2.2초**     |
 | nuextract3 + 추론 끄기            | 88.3%     | 1.7초         |
 | nuextract3 + 추론 high            | 86.6%     | 8.1초         |
-
-(2026-07-30 1차 벤치마크: nuextract3 high 77.1% / qwen high 88.9%·69초 — [비교 결과](model.md))

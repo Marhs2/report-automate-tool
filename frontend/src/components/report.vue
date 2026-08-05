@@ -14,9 +14,16 @@ const date = ref(
 
 const aiLoading = ref(false);
 
+const getSelectedMemberId = () => {
+    const value = localStorage.getItem("report-selectedUser");
+    if (!value || value === "선택" || !/^\d+$/.test(value)) return null;
+    const memberId = Number(value);
+    return memberId > 0 ? memberId : null;
+};
+
 const loadDraft = async () => {
-    const memberId = localStorage.getItem("report-selectedUser");
-    if (!memberId || input.value.trim()) return;
+    const memberId = getSelectedMemberId();
+    if (memberId === null || input.value.trim()) return;
     try {
         const draft = await GetReportDraft(memberId, date.value);
         input.value = draft.raw_text;
@@ -31,13 +38,19 @@ onMounted(loadDraft);
 watch(date, loadDraft);
 
 const sendReport = async () => {
+    const memberId = getSelectedMemberId();
+    if (memberId === null) {
+        alert("사용자 선택 화면에서 사용자를 먼저 선택해주세요.");
+        return;
+    }
+
     aiLoading.value = true;
 
     try {
         const res = await PostReport(
             { content: input.value },
             date.value,
-            localStorage.getItem("report-selectedUser"),
+            memberId,
         );
         console.log("보고서 전송 성공:", res);
 

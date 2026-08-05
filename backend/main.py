@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sqlite3
 from collections import defaultdict
 from datetime import date, timedelta
@@ -81,7 +82,7 @@ def load_weekly_prompt():
 with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
     weekly_schema = json.load(f)
 
-MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "qwen3.5-4b")
+MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "qwen3.5-4b-mtp")
 LM_BASE_URL = os.environ.get("LM_BASE_URL", "http://127.0.0.1:1234/v1")
 LM_API_KEY = os.environ.get("LM_API_KEY", "lm-studio")
 LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
@@ -143,6 +144,26 @@ class ProjectNameKeywordsRequest(BaseModel):
 
 class UpdateWeeklyData(BaseModel):
     report_json: str
+
+
+INVALID_MEMBER_DETAIL = (
+    "유효하지 않은 사용자입니다. 사용자 선택 화면에서 다시 선택해주세요."
+)
+
+
+def validate_report_date(report_date):
+    try:
+        return date.fromisoformat(report_date).isoformat()
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400, detail="날짜는 YYYY-MM-DD 형식이어야 합니다."
+        )
+
+
+def validate_member(conn, member_id):
+    if conn.execute("SELECT 1 FROM members WHERE id = ?", (member_id,)).fetchone():
+        return
+    raise HTTPException(status_code=400, detail=INVALID_MEMBER_DETAIL)
 
 
 def ensure_runtime_schema():
@@ -429,6 +450,139 @@ def normalize_projects(report_data):
         )
 
     report_data["projects"] = result
+    return report_data
+
+
+_WEEKLY_TASK_MARKERS = (
+    "하였습니다",
+    "했습니다",
+    "진행중",
+    "진행 중",
+    "했음",
+    "완료",
+    "예정",
+    "착수",
+    "시작",
+    "중",
+)
+_WEEKLY_GENERIC_ACTIONS = {
+    "개발",
+    "구현",
+    "검토",
+    "설계",
+    "수정",
+    "처리",
+    "작업",
+    "업무",
+    "확인",
+    "테스트",
+    "반영",
+}
+
+
+def _weekly_task_tokens(value):
+    text = str(value).lower()
+    for marker in _WEEKLY_TASK_MARKERS:
+        text = text.replace(marker, f" {marker} ")
+    for action in _WEEKLY_GENERIC_ACTIONS:
+        text = re.sub(
+            rf"({re.escape(action)})(?=(완료|중|진행|예정|$|[\s,.!?]))",
+            r" \1 ",
+            text,
+        )
+    text = re.sub(r"[^0-9a-z가-힣]+", " ", text)
+    ignored = set(_WEEKLY_TASK_MARKERS) | {
+        "진행",
+        "중",
+        "완료",
+        "예정",
+        "착수",
+        "시작",
+    }
+    return {
+        token
+        for token in text.split()
+        if token and token not in ignored
+    }
+
+
+def _weekly_tasks_match(left, right):
+    left_tokens = _weekly_task_tokens(left)
+    right_tokens = _weekly_task_tokens(right)
+    common = left_tokens & right_tokens
+    if len(common) >= 2:
+        return True
+    specific_common = common - _WEEKLY_GENERIC_ACTIONS
+    return bool(specific_common) and len(left_tokens) == 1 or (
+        bool(specific_common) and len(right_tokens) == 1
+    )
+
+
+def _weekly_project_key(project, alias_map):
+    return str(guess_project(project, alias_map)).strip().casefold()
+
+
+def promote_weekly_tasks(report_data, source_reports=None, alias_map=None):
+    """Remove stale weekly statuses using the daily completed-task history."""
+    alias_map = alias_map or {}
+    completed_by_project = defaultdict(list)
+
+    for daily_report in source_reports or []:
+        for project in daily_report.get("projects", []):
+            if isinstance(project, dict):
+                completed_by_project[_weekly_project_key(project, alias_map)].extend(
+                    project.get("completedTasks", [])
+                )
+
+    for project in report_data.get("projects", []):
+        if not isinstance(project, dict):
+            continue
+        completed = [
+            task
+            for task in project.get("completedTasks", [])
+            if task and str(task).strip()
+        ]
+        in_progress = [
+            task
+            for task in project.get("inProgressTasks", [])
+            if task and str(task).strip()
+        ]
+        next_field = (
+            "nextPlans"
+            if "nextPlans" in project
+            else "nextWeekPlans"
+        )
+        next_plans = [
+            task
+            for task in project.get(next_field, [])
+            if task and str(task).strip()
+        ]
+
+        completed_candidates = completed + completed_by_project.get(
+            _weekly_project_key(project, alias_map), []
+        )
+        project["inProgressTasks"] = list(
+            dict.fromkeys(
+                task
+                for task in in_progress
+                if not any(
+                    _weekly_tasks_match(task, completed_task)
+                    for completed_task in completed_candidates
+                )
+            )
+        )
+        active_candidates = completed_candidates + project["inProgressTasks"]
+        project[next_field] = list(
+            dict.fromkeys(
+                task
+                for task in next_plans
+                if not any(
+                    _weekly_tasks_match(task, active_task)
+                    for active_task in active_candidates
+                )
+            )
+        )
+
     return report_data
 
 
@@ -723,6 +877,11 @@ def generate_weekly_report(member_id, selects):
                     strict=True,
                 )
             )
+            report_data = promote_weekly_tasks(
+                report_data,
+                reports,
+                get_alias_map(),
+            )
         except HTTPException:
             raise
         except Exception as exc:
@@ -759,8 +918,10 @@ def weekly_report(data: WeeklyReportRequest):
 async def send_report(data: ReportRequest):
     if not data.report.strip():
         raise HTTPException(status_code=400, detail="보고서 내용을 입력해주세요.")
+    report_date = validate_report_date(data.date)
 
     with get_db() as conn:
+        validate_member(conn, data.member_id)
         conn.execute(
             """
             INSERT INTO report_drafts (member_id, report_date, raw_text, updated_at)
@@ -769,7 +930,7 @@ async def send_report(data: ReportRequest):
             DO UPDATE SET raw_text = excluded.raw_text,
                           updated_at = CURRENT_TIMESTAMP
             """,
-            (data.member_id, data.date, data.report),
+            (data.member_id, report_date, data.report),
         )
         conn.commit()
 
@@ -832,6 +993,7 @@ async def send_report(data: ReportRequest):
 
 @app.get("/report-drafts/{member_id}/{report_date}")
 def get_report_draft(member_id: int, report_date: str):
+    report_date = validate_report_date(report_date)
     with get_db() as conn:
         row = conn.execute(
             """
@@ -1176,11 +1338,12 @@ def save_report(data: SaveReportData):
     )
     parsed = normalize_issues(parsed)
 
-    report_date = data.report_date or date.today().isoformat()
+    report_date = validate_report_date(data.report_date or date.today().isoformat())
     raw_text = data.report
     member_id = data.member_id
 
     with get_db() as conn:
+        validate_member(conn, member_id)
         cursor = conn.cursor()
         cursor.execute(
             "DELETE FROM daily_reports WHERE member_id = ? AND report_date = ?",
@@ -1198,42 +1361,39 @@ def save_report(data: SaveReportData):
             "DELETE FROM projects WHERE member_id = ? AND report_date = ?",
             (member_id, report_date),
         )
+        save_projects(conn, parsed, member_id, report_date)
         conn.commit()
-        save_projects(parsed, member_id, report_date)
     return {"message": "Report saved successfully.", "report_date": report_date}
 
 
-def save_projects(report_data, member_id, report_date):
-    with get_db() as conn:
-        cursor = conn.cursor()
+def save_projects(conn, report_data, member_id, report_date):
+    cursor = conn.cursor()
 
-        for project in report_data.get("projects", []):
-            if not isinstance(project, dict):
-                continue
-            cursor.execute(
-                """
-                INSERT INTO projects (
-                    member_id,
-                    name,
-                    completed_tasks,
-                    in_progress_tasks,
-                    issues,
-                    requests,
-                    next_plans,
-                    report_date
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    member_id,
-                    project.get("projectName") or "미분류 프로젝트",
-                    json.dumps(project.get("completedTasks", [])),
-                    json.dumps(project.get("inProgressTasks", [])),
-                    json.dumps(project.get("issues", [])),
-                    json.dumps(project.get("requests", [])),
-                    json.dumps(project.get("nextPlans", [])),
-                    report_date,
-                ),
+    for project in report_data.get("projects", []):
+        if not isinstance(project, dict):
+            continue
+        cursor.execute(
+            """
+            INSERT INTO projects (
+                member_id,
+                name,
+                completed_tasks,
+                in_progress_tasks,
+                issues,
+                requests,
+                next_plans,
+                report_date
             )
-
-        conn.commit()
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                member_id,
+                project.get("projectName") or "미분류 프로젝트",
+                json.dumps(project.get("completedTasks", [])),
+                json.dumps(project.get("inProgressTasks", [])),
+                json.dumps(project.get("issues", [])),
+                json.dumps(project.get("requests", [])),
+                json.dumps(project.get("nextPlans", [])),
+                report_date,
+            ),
+        )

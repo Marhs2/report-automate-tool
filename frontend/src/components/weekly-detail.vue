@@ -118,7 +118,7 @@
                     </div>
 
                     <div class="field-group nextPlans">
-                        <h2>다음 계획</h2>
+                        <h2>다음 주 계획</h2>
                         <div
                             v-if="project.nextPlans.length > 0"
                             v-for="(plan, planIndex) in project.nextPlans"
@@ -136,7 +136,7 @@
                                 -
                             </button>
                         </div>
-                        <div v-else class="empty-msg">다음 계획이 없습니다</div>
+                        <div v-else class="empty-msg">다음 주 계획이 없습니다</div>
                         <button class="btn add-btn" @click="addItem(project, 'nextPlans')">
                             +
                         </button>
