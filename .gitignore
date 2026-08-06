@@ -93,8 +93,5 @@ temp/
 *.bak
 *.orig
 
-# ── Benchmark run artifacts (regenerated on each run) ───
-benchmark/results/raw_*/
-benchmark/results/*_scores.json
-benchmark/results/*_summary.csv
-benchmark/results/*_tables.md
+# ── Benchmark (로컬 전용: 스크립트·데이터셋·실행 결과) ───
+benchmark/

@@ -191,9 +191,9 @@
                         <button
                             class="btn"
                             @click="retryExtract"
-                            :disabled="retryLoading"
+                            :disabled="aiLoading"
                         >
-                            {{ retryLoading ? "재추출 중..." : "재추출" }}
+                            {{ aiLoading ? "재추출 중..." : "재추출" }}
                         </button>
                         <button
                             class="btn btn-primary"
@@ -223,13 +223,12 @@ import { ref, onMounted, watch } from "vue";
 import useAPI from "../composables/useAPI";
 import { useRouter } from "vue-router";
 
-const route = useRouter();
+const router = useRouter();
 
 const reportData = ref(null);
 const rawData = ref(null);
 const userName = ref("");
 const aiLoading = ref(false);
-const retryLoading = ref(false);
 const { PostSaveReport, PostReport, getUsers } = useAPI();
 
 watch(
@@ -353,7 +352,7 @@ const saveReport = () => {
                 sessionStorage.removeItem("reportData");
                 sessionStorage.removeItem("reportRaw");
                 sessionStorage.removeItem("reportDate");
-                route.push("/");
+                router.push("/");
             })
             .catch((error) => {
                 console.error("보고서 저장 실패:", error);
@@ -363,15 +362,17 @@ const saveReport = () => {
 };
 
 const retryExtract = async () => {
-    if (!rawData.value) return;
-    const userId = localStorage.getItem("report-selectedUser") || "";
-    if (!userId) {
+    if (!rawData.value) {
+        alert("원문이 없어 재추출할 수 없습니다.");
+        return;
+    }
+    const userId = getSelectedMemberId();
+    if (userId === null) {
         alert("사용자 정보가 없습니다.");
         return;
     }
     try {
         aiLoading.value = true;
-        retryLoading.value = true;
         const reportDate =
             sessionStorage.getItem("reportDate") ||
             (() => {
@@ -390,8 +391,14 @@ const retryExtract = async () => {
         alert("재추출에 실패했습니다. 다시 시도해주세요.");
     } finally {
         aiLoading.value = false;
-        retryLoading.value = false;
     }
+};
+
+const getSelectedMemberId = () => {
+    const value = localStorage.getItem("report-selectedUser");
+    if (!value || value === "선택" || !/^\d+$/.test(value)) return null;
+    const memberId = Number(value);
+    return memberId > 0 ? memberId : null;
 };
 </script>
 
