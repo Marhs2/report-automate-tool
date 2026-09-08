@@ -91,10 +91,3 @@ python benchmark/score_benchmark.py ^
 
 - 재현율(84.1%)은 가장 높으나 정밀도(70.2%)가 낮아 micro F1이 최하(76.5%)
 - 진행 중 업무(66.7%)·이슈(65.4%) 오탐이 많고, 빈 보고 처리 50%(report)로 불안정
-
-## 결과 파일
-
-- 원시 응답: `benchmark/results/three_models_2026-08-05_daily/`, `benchmark/results/report_2026-08-05/`
-- 종합 점수: `benchmark/results/three_models_2026_08_05_scores.json`, `benchmark/results/report_2026_08_05_scores.json`
-- CSV 요약: `benchmark/results/three_models_2026_08_05_summary.csv`, `benchmark/results/report_2026_08_05_summary.csv`
-- 상세 표: `benchmark/results/three_models_2026_08_05_tables.md`, `benchmark/results/report_2026_08_05_tables.md`
