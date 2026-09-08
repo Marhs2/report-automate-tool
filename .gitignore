@@ -76,13 +76,6 @@ $RECYCLE.BIN/
 *.sln
 *.code-workspace
 
-# ── Agent / tooling local state ─────────────────────────
-.omg/
-omg_wiki/
-.cursor/
-.codegraph/
-.omo/
-.senpi/
 
 # ── Logs / temp ─────────────────────────────────────────
 logs/
@@ -93,5 +86,5 @@ temp/
 *.bak
 *.orig
 
-# ── Benchmark (로컬 전용: 스크립트·데이터셋·실행 결과) ───
+# ── Benchmark───
 benchmark/
