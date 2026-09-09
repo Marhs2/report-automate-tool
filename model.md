@@ -26,25 +26,7 @@
 
 실행 명령:
 
-```bash
-python benchmark/run_benchmark.py qwen3.5-4b google/gemma-4-e2b nuextract3 ^
-  --force --reasoning none --max-tokens 6144 ^
-  --dataset gold --known-projects dataset ^
-  --out-dir benchmark/results/three_models_2026-08-05_daily
 
-python benchmark/score_benchmark.py ^
-  --raw-dir benchmark/results/three_models_2026-08-05_daily ^
-  --prefix three_models_2026_08_05_
-
-python benchmark/run_benchmark.py qwen3.5-4b google/gemma-4-e2b nuextract3 ^
-  --force --reasoning none --max-tokens 6144 ^
-  --dataset report --known-projects report ^
-  --out-dir benchmark/results/report_2026-08-05
-
-python benchmark/score_benchmark.py ^
-  --raw-dir benchmark/results/report_2026-08-05 ^
-  --prefix report_2026_08_05_ --dataset report
-```
 
 ## gold 데이터셋 종합 결과 (2026-08-06 재측정)
 
