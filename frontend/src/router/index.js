@@ -7,7 +7,6 @@ import weekly from "../components/weekly-report.vue";
 import users from "../components/user-select.vue";
 import weeklyDetail from "../components/weekly-detail.vue";
 import reportDetail from "../components/report-detail.vue";
-import projectAliases from "../components/project-aliases.vue";
 import projectTimeline from "../components/project-timeline.vue";
 import projectName from "../components/project-name.vue";
 
@@ -52,11 +51,7 @@ const routes = [
     name: "report-detail",
     component: reportDetail,
   },
-  {
-    path: "/aliases",
-    name: "aliases",
-    component: projectAliases,
-  },
+
   {
     path: "/project-timeline",
     name: "project-timeline",

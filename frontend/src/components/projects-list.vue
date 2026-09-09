@@ -35,6 +35,17 @@ const getReports = async () => {
     }
 };
 
+const deleteProjectReport = async (reportId) => {
+    try {
+        await deleteReport(reportId);
+        getReports();
+        alert("삭제완료");
+    } catch (error) {
+        console.error("Error deleting report:", error);
+        alert("삭제실패");
+    }
+};
+
 const filteredReports = computed(() => {
     return reports.value.filter((report) => {
         const reportDate = report.report_date ?? "";
@@ -172,7 +183,7 @@ onMounted(() => {
                         </button>
                         <button
                             class="btn"
-                            v-on:click="() => deleteReport(report.id)"
+                            v-on:click="() => deleteProjectReport(report.id)"
                         >
                             삭제
                         </button>

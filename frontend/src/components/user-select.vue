@@ -15,6 +15,7 @@ const setUser = () => {
     if (selectedUser.value === "선택") return alert("유저를 선택해주세요");
     localStorage.setItem("report-selectedUser", selectedUser.value);
     router.push("/");
+    window.location.reload();
 };
 
 const saveUser = async () => {

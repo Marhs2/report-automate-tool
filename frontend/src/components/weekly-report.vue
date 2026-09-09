@@ -21,7 +21,6 @@ const isLoading = ref(false);
 const formatLocalDate = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-// weekOffset: 0 = 이번 주, -1 = 지난주, +1 = 다음주
 const weekOffset = ref(0);
 
 const getWeekDays = (offset) => {
@@ -62,8 +61,9 @@ const deleteReport = async (reportId) => {
     isLoading.value = true;
     try {
         await deleteReport(reportId);
-        await fetchWeeklyReport();
         alert("삭제완료");
+        await fetchWeeklyReport();
+        
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("보고서 삭제 실패:", error);
@@ -77,8 +77,10 @@ const deleteWeekly = async (reportId) => {
     isLoading.value = true;
     try {
         await deleteWeeklyReport(reportId);
-        await fetchWeeklyReport();
         alert("삭제완료");
+
+        await fetchWeeklyReport();
+        
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("주간 보고서 삭제 실패:", error);
@@ -126,25 +128,19 @@ const downloadReport = async (report) => {
     try {
         isLoading.value = true;
 
-        // 1. Fetch the docx template as an array buffer.
         const response = await fetch("/asset/주간_보고서_템플릿.docx");
         if (!response.ok) {
             throw new Error("템플릿 파일을 찾을 수 없습니다.");
         }
         const arrayBuffer = await response.arrayBuffer();
 
-        // 2. Load the binary content into PizZip
         const zip = new PizZip(arrayBuffer);
-
-        // 3. Initialize Docxtemplater
         const doc = new Docxtemplater(zip, {
             paragraphLoop: true,
             linebreaks: true,
         });
 
-        // 4. Formulate the data object for Docxtemplater
         const sortedDates = [...(report.selectedDate || [])].sort();
-        const period_start = sortedDates[0] || "";
         const period_end = sortedDates[sortedDates.length - 1] || "";
 
         const createdDateRaw =
@@ -188,8 +184,6 @@ const downloadReport = async (report) => {
         });
 
         const project_count = projectsList.length;
-
-        // Default missing members list to empty
         const missing = [];
         const missing_count = missing.length;
 
@@ -202,21 +196,17 @@ const downloadReport = async (report) => {
             missing,
         };
 
-        // Render the document with the data
         doc.render(data);
 
-        // Get the generated zip content as blob
         const out = doc.getZip().generate({
             type: "blob",
             mimeType:
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         });
 
-        // Generate filename based on member name and date range
         const memberName = report.memberName || `사용자_${report.memberId}`;
         const filename = `주간_보고서_${memberName}_${period_end}.docx`;
 
-        // Save the file using file-saver
         saveAs(out, filename);
     } catch (error) {
         console.error("보고서 다운로드 실패:", error);
@@ -323,7 +313,7 @@ onMounted(() => {
 
                         <button
                             class="btn"
-                            @click="() => deleteWeeklyReport(report.id)"
+                            @click="() => deleteWeekly(report.id)"
                         >
                             삭제
                         </button>

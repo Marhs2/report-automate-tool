@@ -61,15 +61,6 @@ CREATE TABLE IF NOT EXISTS weekly_reports (
 """)
 
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS project_aliases (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    alias_name TEXT NOT NULL UNIQUE,
-    canonical_name TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-)
-""")
-
-cursor.execute("""
 CREATE TABLE IF NOT EXISTS report_drafts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     member_id INTEGER NOT NULL,

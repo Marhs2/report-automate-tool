@@ -4,7 +4,6 @@ import {
     PenSquare,
     CalendarDays,
     FileBarChart,
-    GitMerge,
     GitGraph,
 } from "lucide-vue-next";
 import { onMounted, ref } from "vue";
@@ -21,7 +20,6 @@ const navItems = [
     { to: "/report", label: "보고서 작성", icon: PenSquare },
     { to: "/activities", label: "사용자 활동", icon: CalendarDays },
     { to: "/weekly", label: "주간 보고서", icon: FileBarChart },
-    { to: "/aliases", label: "별칭 관리", icon: GitMerge },
     { to: "/project-name", label: "프로젝트 명 관리", icon: FolderKanban },
 ];
 

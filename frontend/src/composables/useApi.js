@@ -178,41 +178,6 @@ export default function useAPI() {
     }
   };
 
-  const getProjectAliases = async () => {
-    try {
-      const response = await axios.get(`${baseURL}/project-aliases`);
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching project aliases:", error);
-      throw error;
-    }
-  };
-
-  const postProjectAlias = async (alias_name, canonical_name) => {
-    try {
-      const response = await axios.post(`${baseURL}/project-aliases`, {
-        alias_name,
-        canonical_name,
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error creating project alias:", error);
-      throw error;
-    }
-  };
-
-  const deleteProjectAlias = async (aliasId) => {
-    try {
-      const response = await axios.delete(
-        `${baseURL}/project-aliases/${aliasId}`,
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error deleting project alias:", error);
-      throw error;
-    }
-  };
-
   const getProjectNames = async () => {
     try {
       const response = await axios.get(`${baseURL}/project-names`);
@@ -296,9 +261,6 @@ export default function useAPI() {
     updateWeeklyReport,
     postUsers,
     getUsers,
-    getProjectAliases,
-    postProjectAlias,
-    deleteProjectAlias,
     getProjectNames,
     getRegisteredProjectNames,
     postProjectName,
