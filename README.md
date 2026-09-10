@@ -14,7 +14,7 @@
 | CPU      | 4코어                              | 6코어 이상           |
 | GPU      | NVIDIA 6GB VRAM                    | NVIDIA 8GB VRAM 이상 |
 | RAM      | 16GB                               | 32GB                 |
-| OS       | Windows 10/11 (macOS/Linux도 동작) |                      |
+| OS       | Windows 10/11  |                      |
 | 저장공간 | 5GB 여유                           | 10GB 여유            |
 
 GPU가 없으면 CPU로도 동작하나 속도가 크게 느려짐. (권장 사양 근거: qwen3.5-4b Q4 파일 크기 3.7GB — [비교 결과](model.md); Qwen3.5-4B Q4 추론 VRAM 3.3~5+GB — [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-5-4b)
@@ -56,7 +56,7 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-python init_db.py               # SQLite DB 생성 (최초 1회)
+python init_db.py               
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
@@ -94,17 +94,8 @@ bun run dev        # http://localhost:5173
 
 ## 테스트 데이터
 
-`test-data/daily-reports.md` + `benchmark/dataset/gold_dataset.json` — 자체 작성 정답 데이터셋 **32건** (요구사항 30건 이상 충족):
-
-- `benchmark/dataset/gold_dataset_report.json`: `test-data/daily-reports.md`(2주치, 인물 4명, 프로젝트 3개)를 prompt.txt 규칙으로 라벨링
+- `test-data/daily-reports.md`(2주치, 인물 4명, 프로젝트 3개)
 - 작성 스타일 혼합: 줄글 11, 개조식 9, 메신저체 4, 표 2, 한 줄 2, 영문 혼합 2, 혼합 1, 업무 없음 1
-- 엣지 케이스 포함: 한 줄 보고, 인사말만 있는 보고, 복수 프로젝트 보고(32건 중 20건), 영문·한글 혼용, 표 구분선 누락(D06), '개발 개발' 오타(D04)
-
-```bash
-python backend/seed_demo_data.py
-```
-
-다른 DB에서 먼저 확인할 때는 `--db`로 임시 SQLite 경로를 지정.
 
 ---
 

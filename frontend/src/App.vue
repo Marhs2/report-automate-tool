@@ -5,11 +5,13 @@ import {
     CalendarDays,
     FileBarChart,
     GitGraph,
+    LogOut,
+    UserRound,
 } from "lucide-vue-next";
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { LogOut, UserRound } from "lucide-vue-next";
 import useAPI from "./composables/useApi";
+import { selectedUserId } from "./composables/useSelectedUser";
 
 const router = useRouter();
 const { getUsers } = useAPI();
@@ -25,8 +27,7 @@ const navItems = [
 
 const currentUser = ref("");
 
-const loadCurrentUser = async () => {
-    const storedId = localStorage.getItem("report-selectedUser");
+const loadCurrentUser = async (storedId) => {
     if (!storedId) {
         currentUser.value = "";
         return;
@@ -40,23 +41,27 @@ const loadCurrentUser = async () => {
     }
 };
 
+watch(
+    selectedUserId,
+    (id) => {
+        loadCurrentUser(id);
+    },
+    { immediate: true }
+);
+
 const logout = () => {
     if (window.confirm("사용자를 변경하시겠습니까?")) {
-        localStorage.removeItem("report-selectedUser");
+        selectedUserId.value = null;
         sessionStorage.removeItem("selectedUser");
         sessionStorage.removeItem("reportData");
         sessionStorage.removeItem("reportRaw");
         sessionStorage.removeItem("reportDate");
-        currentUser.value = "";
         router.push("/users");
     }
 };
 
-// DOMContentLoaded 는 Vue 마운트 이전에 이미 발생하므로 리스너가 실행되지 않는다.
-// onMounted 에서 확인한다.
 onMounted(() => {
-    loadCurrentUser();
-    if (localStorage.getItem("report-selectedUser") == null) {
+    if (selectedUserId.value == null) {
         alert("사용자를 선택해주세요");
         router.push("/users");
     }
@@ -66,8 +71,6 @@ onMounted(() => {
 <template>
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <span class="brand-mark">R</span>
-            <span class="brand-text">보고서<br />자동화 도구</span>
         </div>
         <nav class="nav-links">
             <router-link

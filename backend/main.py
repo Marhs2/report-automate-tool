@@ -1,5 +1,5 @@
+import io
 import json
-import os
 import re
 import sqlite3
 from collections import defaultdict
@@ -7,9 +7,10 @@ from datetime import date, timedelta
 from urllib.parse import urlparse
 
 from db import get_db
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
+from pptx_to_text import extract_all_text_from_pptx
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -31,14 +32,12 @@ with open("./model_asset/json_Schema.json", "r", encoding="utf-8") as f:
 
 
 def split_project_keywords(raw):
-    """known_projects.keywords 문자열을 표기 변형 목록으로 나눈다."""
     if not raw:
         return []
     return [part.strip() for part in re.split(r"[,，|/]", str(raw)) if part.strip()]
 
 
 def get_known_project_rows():
-    """등록된 프로젝트 (name, keywords) 목록."""
     with get_db() as conn:
         return conn.execute(
             "SELECT name, keywords FROM known_projects WHERE TRIM(name) != ''"
@@ -46,7 +45,6 @@ def get_known_project_rows():
 
 
 def get_project_name_map():
-    """known_projects의 이름·키워드 → 대표 프로젝트명 매핑."""
     mapping = {}
     for name, keywords in get_known_project_rows():
         mapping[name] = name
@@ -56,11 +54,7 @@ def get_project_name_map():
 
 
 def get_known_projects_block():
-    """DB의 known_projects로 {{KNOWN_PROJECTS}} 슬롯을 채운다.
-
-    prompt.txt 의 [C0] 등록된 프로젝트 목록 형식과 맞춘다.
-    등록된 프로젝트가 없으면 빈 문장을 돌려주고, 사용자는 원문에서 직접 판단한다.
-    """
+    """prompt.txt 의 {{KNOWN_PROJECTS}} 슬롯용 텍스트."""
     registered = get_known_project_rows()
     keywords_by_name = {
         name: split_project_keywords(keywords) for name, keywords in registered
@@ -82,22 +76,21 @@ def get_known_projects_block():
 
 
 def load_daily_prompt():
-    """daily_prompt 을 읽되 {{KNOWN_PROJECTS}} 슬롯을 DB에서 채워 반환한다."""
     with open("./model_asset/prompt.txt", "r", encoding="utf-8") as f:
         prompt = f.read()
     return prompt.replace("{{KNOWN_PROJECTS}}", get_known_projects_block())
 
 
 def load_weekly_prompt():
-    """weekly_prompt 를 읽는다. known_projects 목록은 주입하지 않는다."""
     with open("./model_asset/weekly_prompt.txt", "r", encoding="utf-8") as f:
-        return f.read()
+        prompt = f.read()
+    return prompt.replace("{{KNOWN_PROJECTS}}", get_known_projects_block())
 
 
 with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
     weekly_schema = json.load(f)
 
-# LM Studio MLX structured output은 uniqueItems·길이 제한 키를 지원하지 않는다.
+# LM Studio structured output 미지원 키 제거
 _LLM_SCHEMA_DROP_KEYS = frozenset(
     {
         "$schema",
@@ -113,7 +106,6 @@ _LLM_SCHEMA_DROP_KEYS = frozenset(
 
 
 def sanitize_llm_schema(node):
-    """로컬 모델 structured output용으로 스키마를 단순화한다."""
     if isinstance(node, dict):
         return {
             key: sanitize_llm_schema(value)
@@ -128,19 +120,40 @@ def sanitize_llm_schema(node):
 daily_llm_schema = sanitize_llm_schema(daily_schema)
 weekly_llm_schema = sanitize_llm_schema(weekly_schema)
 
-MODEL_NAME = "qwen/qwen3.5-9b"
-LM_BASE_URL = "http://127.0.0.1:1234/v1"
+MODEL_NAME = "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M"
+LM_BASE_URL = "http://192.168.210.10:8888/v1"
 LM_API_KEY = "lm-studio"
 LLM_TIMEOUT_SECONDS = 600.0
 
-DAILY_MAX_TOKENS = 16384
-WEEKLY_MAX_TOKENS = 16384
+DAILY_MAX_TOKENS = 262144
+WEEKLY_MAX_TOKENS = 262144
 DAILY_REASONING = "none"
 WEEKLY_REASONING = "none"
 
-if urlparse(LM_BASE_URL).hostname not in {"localhost", "127.0.0.1", "::1"}:
+def _is_allowed_lm_host(hostname: str | None) -> bool:
+    if not hostname:
+        return False
+    if hostname in {"localhost", "127.0.0.1", "::1"}:
+        return True
+    try:
+        parts = [int(p) for p in hostname.split(".")]
+    except ValueError:
+        return False
+    if len(parts) != 4 or any(p < 0 or p > 255 for p in parts):
+        return False
+    a, b = parts[0], parts[1]
+    if a == 10:
+        return True
+    if a == 172 and 16 <= b <= 31:
+        return True
+    if a == 192 and b == 168:
+        return True
+    return False
+
+
+if not _is_allowed_lm_host(urlparse(LM_BASE_URL).hostname):
     raise RuntimeError(
-        "LM_BASE_URL은 인터넷 차단 환경을 위해 로컬 주소만 사용할 수 있습니다."
+        "LM_BASE_URL은 localhost 또는 사설망(10/172.16-31/192.168) 주소만 사용할 수 있습니다."
     )
 
 
@@ -233,7 +246,6 @@ def ensure_runtime_schema():
             column["name"] == "report_date" for column in project_columns
         ):
             conn.execute("ALTER TABLE projects ADD COLUMN report_date DATE")
-        # 별칭은 known_projects.keywords 로 통합됨
         conn.execute("DROP TABLE IF EXISTS project_aliases")
         conn.commit()
 
@@ -241,43 +253,8 @@ def ensure_runtime_schema():
 ensure_runtime_schema()
 
 
-PROJECT_FIX = {
-    "기술보증기금": "이노비즈 인증",
-    "대한전선": "경영지원",
-    "우리은행": "경영지원",
-    "세방전지": "경영지원",
-    "홈페이지": "경영지원",
-    "BC": "경영지원",
-    "DC": "경영지원",
-    "TC": "경영지원",
-}
-
-KEYWORD_FIX = {
-    "기술보증기금": "이노비즈 인증",
-    "이노비즈": "이노비즈 인증",
-    "대한전선": "경영지원",
-    "우리은행": "경영지원",
-    "세방전지": "경영지원",
-    "서울디지텍고": "서울디지텍고 3자협약",
-    "산업체 방문조사카드": "서울디지텍고 3자협약",
-    "선도기업신청서": "서울디지텍고 3자협약",
-    "직무분석": "서울디지텍고 3자협약",
-    "AI자율제조": "AI자율제조",
-    "RCMS": "AI자율제조",
-    "OCR": "Yak-Map",
-    "약품": "Yak-Map",
-    "복약": "Yak-Map",
-    "여우비": "여우비",
-}
-
-
 def coerce_report_data(content, *, strict=False):
-    """LLM/DB 응답을 안전하게 파싱한다.
-
-    DB에 이중 인코딩(JSON 문자열이 다시 JSON 문자열로 감싸진)으로 저장된
-    parsed_json 이 있을 수 있어, 문자열이 나오면 dict 가 나올 때까지 한 번 더
-    파싱한다.
-    """
+    """LLM/DB JSON을 dict로 파싱한다. 이중 인코딩도 풀어본다."""
 
     def fail(message):
         if strict:
@@ -311,7 +288,6 @@ def coerce_report_data(content, *, strict=False):
 
 
 def project_has_content(project):
-    """완료/진행/이슈/요청/계획 중 하나라도 있으면 True."""
     if not isinstance(project, dict):
         return False
     for key in (
@@ -337,7 +313,6 @@ def project_has_content(project):
 
 
 def drop_empty_projects(report_data):
-    """업무 배열이 모두 비어 있는 프로젝트는 화면/저장에서 제외한다."""
     if not isinstance(report_data, dict):
         return {"projects": []}
     projects = report_data.get("projects") or []
@@ -348,7 +323,6 @@ def drop_empty_projects(report_data):
 
 
 def read_completion(completion, label):
-    """LLM 응답 본문을 꺼내면서 상한 초과로 잘렸는지 확인한다."""
     choice = completion.choices[0]
     finish_reason = getattr(choice, "finish_reason", None)
     usage = getattr(completion, "usage", None)
@@ -373,7 +347,6 @@ def read_completion(completion, label):
 
 
 def guess_project(project, name_map=None):
-    """프로젝트명을 정규화한다. name_map이 없으면 known_projects에서 가져온다."""
     if name_map is None:
         name_map = get_project_name_map()
 
@@ -390,137 +363,12 @@ def guess_project(project, name_map=None):
         + [str(t) for t in project.get("nextPlans", project.get("nextWeekPlans", []))]
     )
 
-    # 1. KEYWORD_FIX (코드 내 키워드 매핑)
-    for keyword, target in KEYWORD_FIX.items():
-        if keyword in text:
-            return target
-
-    # 2. known_projects 키워드가 본문에 있으면 대표명으로 매핑
     for keyword, target in name_map.items():
         if keyword != target and keyword in text:
             return target
 
-    # 3. 원래 프로젝트명
     project_name = project.get("projectName") or "미분류 프로젝트"
-
-    # 4. PROJECT_FIX (코드 내 이름 매핑)
-    project_name = PROJECT_FIX.get(project_name, project_name)
-
-    # 5. known_projects 이름·키워드 매핑 (사용자 등록)
-    project_name = name_map.get(project_name, project_name)
-
-    return project_name
-
-
-def normalize_projects(report_data):
-    name_map = get_project_name_map()
-
-    merged = defaultdict(
-        lambda: {
-            "completedTasks": [],
-            "inProgressTasks": [],
-            "issues": [],
-            "requests": [],
-            "nextPlans": [],
-        }
-    )
-
-    for project in report_data.get("projects", []):
-        if not isinstance(project, dict):
-            continue
-        completed_tasks = [
-            task
-            for task in project.get("completedTasks", [])
-            if task and str(task).strip()
-        ]
-        in_progress_tasks = [
-            task
-            for task in project.get("inProgressTasks", [])
-            if task and str(task).strip()
-        ]
-        issues_list = [
-            issue
-            for issue in project.get("issues", [])
-            if issue
-            and (
-                str(issue).strip()
-                if not isinstance(issue, dict)
-                else any(issue.values())
-            )
-        ]
-        requests_list = [
-            req for req in project.get("requests", []) if req and str(req).strip()
-        ]
-        next_plans_list = [
-            plan
-            for plan in project.get("nextPlans", project.get("nextWeekPlans", []))
-            if plan and str(plan).strip()
-        ]
-
-        if not (
-            completed_tasks
-            or in_progress_tasks
-            or issues_list
-            or requests_list
-            or next_plans_list
-        ):
-            continue
-
-        project_name = guess_project(project, name_map)
-        project_name = PROJECT_FIX.get(project_name, project_name)
-        project_name = name_map.get(project_name, project_name)
-
-        merged[project_name]["completedTasks"].extend(completed_tasks)
-        merged[project_name]["inProgressTasks"].extend(in_progress_tasks)
-        merged[project_name]["issues"].extend(issues_list)
-        merged[project_name]["requests"].extend(requests_list)
-        merged[project_name]["nextPlans"].extend(next_plans_list)
-
-    result = []
-
-    for name, data in merged.items():
-        unique_issues = []
-        for issue in data["issues"]:
-            if issue not in unique_issues:
-                if isinstance(issue, dict):
-                    content = issue.get("content", "")
-                    status = issue.get("status", "미해결")
-                    if content and str(content).strip():
-                        unique_issues.append(
-                            {"content": str(content).strip(), "status": status}
-                        )
-                elif str(issue).strip():
-                    unique_issues.append(
-                        {"content": str(issue).strip(), "status": "미해결"}
-                    )
-
-        completed = [
-            x for x in list(dict.fromkeys(data["completedTasks"])) if str(x).strip()
-        ]
-        in_progress = [
-            x for x in list(dict.fromkeys(data["inProgressTasks"])) if str(x).strip()
-        ]
-        requests = [x for x in list(dict.fromkeys(data["requests"])) if str(x).strip()]
-        next_plans = [
-            x for x in list(dict.fromkeys(data["nextPlans"])) if str(x).strip()
-        ]
-
-        if not (completed or in_progress or unique_issues or requests or next_plans):
-            continue
-
-        result.append(
-            {
-                "projectName": name,
-                "completedTasks": completed,
-                "inProgressTasks": in_progress,
-                "issues": unique_issues,
-                "requests": requests,
-                "nextPlans": next_plans,
-            }
-        )
-
-    report_data["projects"] = result
-    return report_data
+    return name_map.get(project_name, project_name)
 
 
 _WEEKLY_TASK_MARKERS = (
@@ -587,122 +435,23 @@ def _weekly_tasks_match(left, right):
 
 
 def reported_project_name(project):
-    """입력 JSON의 projectName만 쓴다. known_projects 키워드로 본문을 훑지 않는다."""
     if not isinstance(project, dict):
         return "미분류 프로젝트"
     name = str(project.get("projectName") or "").strip()
     return name or "미분류 프로젝트"
 
 
-def _unique_keep_order(items):
-    result = []
-    seen = set()
-    for item in items:
-        if item is None:
-            continue
-        text = str(item).strip()
-        if not text or text in seen:
-            continue
-        seen.add(text)
-        result.append(text)
-    return result
-
-
-def merge_daily_reports_to_weekly(reports, name_map=None):
-    """여러 일일보고 JSON을 프로젝트별로 합친다.
-
-    문장은 입력에 있는 그대로 복사한다. known_projects 이름·키워드를
-    업무 문구로 넣거나, 목록에 없는 프로젝트를 버리지 않는다.
-    """
-    merged = defaultdict(
-        lambda: {
-            "completedTasks": [],
-            "inProgressTasks": [],
-            "issues": [],
-            "nextPlans": [],
-        }
-    )
-    order = []
-    latest_issue = {}
-
-    for report in reports or []:
-        if not isinstance(report, dict):
-            continue
-        for project in report.get("projects", []):
-            if not isinstance(project, dict):
-                continue
-            name = reported_project_name(project)
-            if name not in merged:
-                order.append(name)
-            bucket = merged[name]
-            bucket["completedTasks"].extend(project.get("completedTasks") or [])
-            bucket["inProgressTasks"].extend(project.get("inProgressTasks") or [])
-            bucket["nextPlans"].extend(project.get("requests") or [])
-            bucket["nextPlans"].extend(
-                project.get("nextPlans") or project.get("nextWeekPlans") or []
-            )
-            for issue in project.get("issues") or []:
-                if isinstance(issue, dict):
-                    content = str(issue.get("content") or "").strip()
-                    status = issue.get("status") or "미해결"
-                else:
-                    content = str(issue).strip()
-                    status = "미해결"
-                if not content:
-                    continue
-                latest_issue[(name, content.casefold())] = {
-                    "content": content,
-                    "status": status,
-                }
-
-    projects = []
-    for name in order:
-        data = merged[name]
-        issues = [
-            latest_issue[key]
-            for key in latest_issue
-            if key[0] == name and latest_issue[key]["status"] != "해결"
-        ]
-        projects.append(
-            {
-                "projectName": name,
-                "completedTasks": _unique_keep_order(data["completedTasks"]),
-                "inProgressTasks": _unique_keep_order(data["inProgressTasks"]),
-                "issues": issues,
-                "requests": [],
-                "nextPlans": _unique_keep_order(data["nextPlans"]),
-            }
-        )
-
-    report_data = {"projects": projects}
-    report_data = promote_weekly_tasks(report_data, reports, name_map)
-    for project in report_data.get("projects", []):
-        completed = project.get("completedTasks") or []
-        project["issues"] = [
-            issue
-            for issue in project.get("issues") or []
-            if isinstance(issue, dict)
-            and str(issue.get("content") or "").strip()
-            and not any(
-                _weekly_tasks_match(issue.get("content"), task) for task in completed
-            )
-        ]
-    return drop_empty_projects(report_data)
-
-
-def _weekly_project_key(project, name_map=None):
+def _weekly_project_key(project):
     return reported_project_name(project).casefold()
 
 
-def promote_weekly_tasks(report_data, source_reports=None, name_map=None):
-    """Remove stale weekly statuses using the daily completed-task history."""
-    name_map = name_map or {}
+def promote_weekly_tasks(report_data, source_reports=None):
     completed_by_project = defaultdict(list)
 
     for daily_report in source_reports or []:
         for project in daily_report.get("projects", []):
             if isinstance(project, dict):
-                completed_by_project[_weekly_project_key(project, name_map)].extend(
+                completed_by_project[_weekly_project_key(project)].extend(
                     project.get("completedTasks", [])
                 )
 
@@ -725,7 +474,7 @@ def promote_weekly_tasks(report_data, source_reports=None, name_map=None):
         ]
 
         completed_candidates = completed + completed_by_project.get(
-            _weekly_project_key(project, name_map), []
+            _weekly_project_key(project), []
         )
         project["inProgressTasks"] = list(
             dict.fromkeys(
@@ -757,12 +506,8 @@ def read_root():
     return {"Hello": "World"}
 
 
-# ─── 프로젝트별 타임라인 조회 ────────────────────────────────────────
-
-
 @app.get("/project-timeline")
 def get_project_timeline(name: str, member_id: int = None):
-    """프로젝트명으로 시간순 보고 이력 조회."""
     name_map = get_project_name_map()
     canonical = name.strip()
 
@@ -821,15 +566,8 @@ def get_project_timeline(name: str, member_id: int = None):
     return results
 
 
-# ─── 프로젝트 명 관리 ──────────────────────────────────────────────
-
-
 @app.get("/project-names")
 def get_project_names():
-    """모든 보고서에서 등장한 고유 프로젝트명 목록 (정규화 적용).
-
-    등록된 프로젝트 명(known_projects)도 함께 포함한다.
-    """
     name_map = get_project_name_map()
     with get_db() as conn:
         rows = conn.execute("SELECT parsed_json FROM daily_reports").fetchall()
@@ -851,7 +589,6 @@ def get_project_names():
 
 @app.get("/project-names/registered")
 def get_registered_project_names():
-    """등록된 프로젝트 명 전체 조회."""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT name, keywords, created_at FROM known_projects ORDER BY name"
@@ -863,7 +600,6 @@ def get_registered_project_names():
 
 @app.post("/project-names")
 def create_project_name(data: ProjectNameRequest):
-    """새 프로젝트 명 등록. 같은 이름이 이미 있으면 409."""
     name = data.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="프로젝트 명을 입력해주세요.")
@@ -884,7 +620,6 @@ def create_project_name(data: ProjectNameRequest):
 
 @app.delete("/project-names/{project_name}")
 def delete_project_name(project_name: str):
-    """프로젝트 명 삭제."""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM known_projects WHERE name = ?", (project_name,))
@@ -898,7 +633,6 @@ def delete_project_name(project_name: str):
 
 @app.put("/project-names/{project_name}")
 def update_project_name_keywords(project_name: str, data: ProjectNameKeywordsRequest):
-    """등록된 프로젝트 명의 키워드 갱신. 없으면 404."""
     keywords = data.keywords.strip()
     with get_db() as conn:
         cursor = conn.cursor()
@@ -951,15 +685,75 @@ def generate_weekly_report(member_id, selects):
             return None
 
         reports = [coerce_report_data(row[0]) for row in res]
-        report_data = merge_daily_reports_to_weekly(reports)
-        # 같은 사람이 같은 기간으로 다시 생성하면 이전 초안을 덮어쓴다. (일일보고와 동일한 덮어쓰기 원칙)
+        try:
+            client = OpenAI(
+                base_url=LM_BASE_URL,
+                api_key=LM_API_KEY,
+                timeout=LLM_TIMEOUT_SECONDS,
+            )
+            kwargs = dict(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": load_weekly_prompt()},
+                    {"role": "user", "content": json.dumps(reports, ensure_ascii=False)},
+                ],
+                temperature=0.1,
+                max_tokens=WEEKLY_MAX_TOKENS,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "weekly_report",
+                        "strict": True,
+                        "schema": weekly_llm_schema,
+                    },
+                },
+            )
+            if WEEKLY_REASONING:
+                kwargs["reasoning_effort"] = WEEKLY_REASONING
+            completion = client.chat.completions.create(**kwargs)
+
+            report_data = drop_empty_projects(
+                coerce_report_data(
+                    read_completion(completion, "weekly-report"),
+                    strict=True,
+                )
+            )
+            for project in report_data.get("projects", []):
+                if not isinstance(project, dict):
+                    continue
+                if "nextWeekPlans" in project and "nextPlans" not in project:
+                    project["nextPlans"] = list(project.get("nextWeekPlans") or [])
+            report_data = promote_weekly_tasks(report_data, reports)
+            report_data = drop_empty_projects(report_data)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            resp = getattr(exc, "response", None)
+            if resp is not None:
+                try:
+                    detail = resp.json()
+                except Exception:
+                    detail = resp.text
+                print(
+                    f"[weekly-report] upstream status={resp.status_code} body={detail}"
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"주간 보고서 AI 호출 실패 (status={resp.status_code}).",
+                )
+            print(f"[weekly-report] error: {exc}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"주간 보고서 AI 호출 실패: {exc}",
+            )
+
         db.execute(
             "DELETE FROM weekly_reports WHERE member_id = ? AND selected_date = ?",
             (member_id, json.dumps(selects)),
         )
         db.execute(
             "INSERT INTO weekly_reports (member_id, selected_date, report_json) VALUES (?, ?, ?)",
-            (member_id, json.dumps(selects), json.dumps(report_data)),
+            (member_id, json.dumps(selects), json.dumps(report_data, ensure_ascii=False)),
         )
         db.commit()
         return report_data
@@ -976,14 +770,13 @@ def weekly_report(data: WeeklyReportRequest):
     return report_data
 
 
-@app.post("/send-report")
-async def send_report(data: ReportRequest):
-    if not data.report.strip():
+def process_daily_report(report: str, report_date: str, member_id: int):
+    if not report.strip():
         raise HTTPException(status_code=400, detail="보고서 내용을 입력해주세요.")
-    report_date = validate_report_date(data.date)
+    report_date = validate_report_date(report_date)
 
     with get_db() as conn:
-        validate_member(conn, data.member_id)
+        validate_member(conn, member_id)
         conn.execute(
             """
             INSERT INTO report_drafts (member_id, report_date, raw_text, updated_at)
@@ -992,7 +785,7 @@ async def send_report(data: ReportRequest):
             DO UPDATE SET raw_text = excluded.raw_text,
                           updated_at = CURRENT_TIMESTAMP
             """,
-            (data.member_id, report_date, data.report),
+            (member_id, report_date, report),
         )
         conn.commit()
 
@@ -1007,7 +800,7 @@ async def send_report(data: ReportRequest):
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": load_daily_prompt()},
-                {"role": "user", "content": data.report},
+                {"role": "user", "content": report},
             ],
             temperature=0.1,
             max_tokens=max_tokens,
@@ -1016,7 +809,7 @@ async def send_report(data: ReportRequest):
                 "json_schema": {
                     "name": "daily_report",
                     "strict": True,
-                    "schema": daily_schema,
+                    "schema": daily_llm_schema,
                 },
             },
         )
@@ -1025,13 +818,7 @@ async def send_report(data: ReportRequest):
         completion = client.chat.completions.create(**kwargs)
 
         content = read_completion(completion, "send-report")
-        report_data = drop_empty_projects(
-            coerce_report_data(content, strict=True)
-        )
-
-        # 추출 단계에서는 DB에 쓰지 않는다.
-        # 사용자가 화면에서 확인·수정한 뒤 POST /reports 에서 저장한다.
-        return report_data
+        return drop_empty_projects(coerce_report_data(content, strict=True))
     except HTTPException:
         raise
     except Exception as e:
@@ -1051,6 +838,47 @@ async def send_report(data: ReportRequest):
             status_code=502,
             detail=f"AI 모델 호출 실패: {e}. 원문은 보존되어 있으니 재시도해주세요.",
         )
+
+
+@app.post("/send-report")
+async def send_report(data: ReportRequest):
+    return process_daily_report(data.report, data.date, data.member_id)
+
+
+@app.post("/send-report-pptx")
+async def send_report_pptx(
+    file: UploadFile = File(...),
+    date: str = Form(...),
+    member_id: int = Form(...),
+):
+    filename = (file.filename or "").lower()
+    if not filename.endswith(".pptx"):
+        raise HTTPException(
+            status_code=400,
+            detail="PPTX 파일만 업로드할 수 있습니다.",
+        )
+    try:
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="빈 파일입니다.")
+        raw_text = extract_all_text_from_pptx(io.BytesIO(content))
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[send-report-pptx] extract error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"PPTX 텍스트 추출에 실패했습니다: {e}",
+        )
+
+    if not raw_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="PPTX에서 추출된 텍스트가 없습니다.",
+        )
+
+    parsed = process_daily_report(raw_text, date, member_id)
+    return {"parsed": parsed, "raw_text": raw_text}
 
 
 @app.get("/report-drafts/{member_id}/{report_date}")
@@ -1253,7 +1081,6 @@ def get_weekly_by_id(weekly_id: int):
 
 @app.put("/weekly/{weekly_id}")
 def update_weekly(weekly_id: int, data: UpdateWeeklyData):
-    """주간보고 초안을 사용자가 수정한 내용으로 갱신한다."""
     try:
         report_data = json.loads(data.report_json)
     except json.JSONDecodeError:
@@ -1343,49 +1170,6 @@ def get_report_by_id(report_id: int):
         "parsed_json": parsed,
         "created_at": row[5],
     }
-
-
-@app.get("/projects")
-def get_projects():
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM projects")
-        rows = cursor.fetchall()
-        projects = []
-        for row in rows:
-            projects.append(
-                {
-                    "id": row[0],
-                    "member_id": row[1],
-                    "name": row[2],
-                    "completed_tasks": json.loads(row[3]),
-                    "in_progress_tasks": json.loads(row[4]),
-                    "issues": json.loads(row[5]),
-                    "requests": json.loads(row[6]),
-                    "next_plans": json.loads(row[7]),
-                }
-            )
-    return projects
-
-
-@app.get("/projects/{project_id}")
-def get_project_by_name(project_id: int):
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM projects WHERE id = ?", (project_id,))
-        row = cursor.fetchone()
-        if row:
-            return {
-                "id": row[0],
-                "member_id": row[1],
-                "name": row[2],
-                "completed_tasks": json.loads(row[3]),
-                "in_progress_tasks": json.loads(row[4]),
-                "issues": json.loads(row[5]),
-                "requests": json.loads(row[6]),
-                "next_plans": json.loads(row[7]),
-            }
-        return None
 
 
 @app.post("/users")

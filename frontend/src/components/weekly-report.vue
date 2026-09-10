@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import useAPI from "../composables/useApi";
+import { selectedUserId } from "../composables/useSelectedUser";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
@@ -14,7 +15,7 @@ const { postWeekly, GetWeeklyReport, deleteWeeklyReport } = useAPI();
 
 const selects = ref([]);
 const weekDays = ref([]);
-const userId = ref(sessionStorage.getItem("selectedUser") || "");
+const userId = ref(selectedUserId.value || "");
 const weeklyReport = ref(null);
 const isLoading = ref(false);
 
@@ -56,22 +57,6 @@ const prevWeek = () => loadWeek(weekOffset.value - 1);
 const nextWeek = () => loadWeek(weekOffset.value + 1);
 
 loadWeek(0);
-
-const deleteReport = async (reportId) => {
-    isLoading.value = true;
-    try {
-        await deleteReport(reportId);
-        alert("삭제완료");
-        await fetchWeeklyReport();
-        
-    } catch (error) {
-        const detail = error.response?.data?.detail;
-        console.error("보고서 삭제 실패:", error);
-        alert(detail || "보고서 삭제에 실패했습니다. 다시 시도해주세요.");
-    } finally {
-        isLoading.value = false;
-    }
-};
 
 const deleteWeekly = async (reportId) => {
     isLoading.value = true;
@@ -216,8 +201,67 @@ const downloadReport = async (report) => {
     }
 };
 
+
+const formatReport = (report) => {
+    if (!report?.projects) return "";
+    const lines = [];
+    for (const project of report.projects) {
+        lines.push(`[${project.projectName}]`);
+
+        if (project.completedTasks?.length) {
+            lines.push("완료된 업무:");
+            for (const task of project.completedTasks) {
+                lines.push(`- ${task}`);
+            }
+        }
+
+        if (project.inProgressTasks?.length) {
+            lines.push("진행 중인 업무:");
+            for (const task of project.inProgressTasks) {
+                lines.push(`- ${task}`);
+            }
+        }
+
+        if (project.issues?.length) {
+            lines.push("이슈:");
+            for (const issue of project.issues) {
+                const content =
+                    typeof issue === "string" ? issue : issue.content || "";
+                const status =
+                    typeof issue === "string"
+                        ? "미해결"
+                        : issue.status || "미해결";
+                lines.push(`- ${content} (${status})`);
+            }
+        }
+
+        if (project.nextPlans?.length) {
+            lines.push("다음 계획:");
+            for (const plan of project.nextPlans) {
+                lines.push(`- ${plan}`);
+            }
+        }
+
+        lines.push("");
+    }
+    return lines.join("\n").trim();
+};
+
+const copyReport = async (report) => {
+    if (!report?.report) return;
+    try {
+        const text = formatReport(report.report);
+        await navigator.clipboard.writeText(text);
+        alert("보고서가 클립보드에 복사되었습니다.");
+    } catch (error) {
+        console.error("복사 실패:", error);
+        alert("복사에 실패했습니다.");
+    }
+};
+
+
 onMounted(() => {
-    userId.value = localStorage.getItem("report-selectedUser") || "";
+    userId.value = selectedUserId.value || "";
     fetchWeeklyReport();
 });
 </script>
@@ -311,7 +355,8 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <button
+                        <div class="report-list-actions">
+                            <button
                             class="btn"
                             @click="() => deleteWeekly(report.id)"
                         >
@@ -325,6 +370,10 @@ onMounted(() => {
                             보기
                         </button>
 
+                        <button class="btn" @click="() => copyReport(report)">
+                            복사
+                        </button>
+
                         <button
                             class="btn"
                             v-on:click="() => downloadReport(report)"
@@ -332,6 +381,10 @@ onMounted(() => {
                         >
                             <Download :size="14" /> 다운로드
                         </button>
+                        </div>
+
+             
+
                     </div>
                     <ul class="report-projects">
                         <li
@@ -393,15 +446,6 @@ onMounted(() => {
     align-items: center;
     padding-top: 16px;
     border-top: 1px solid var(--border);
-}
-
-.activity-name .log {
-    width: 500px;
-}
-
-.user-id-display {
-    font-size: 14px;
-    color: var(--text-h);
 }
 
 .report-list {

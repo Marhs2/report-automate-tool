@@ -20,7 +20,6 @@
 - 작성 스타일: 개조식, 줄글, 메신저체, 표, 혼합, 영어 혼합, 한 줄, 업무 없음
 - 프롬프트: `backend/model_asset/prompt.txt`
 - 스키마: `backend/model_asset/json_Schema.json`
-- 등록 프로젝트 주입: gold=`--known-projects dataset`, report=`--known-projects report`
 - 추론: `none`
 - 최대 출력 토큰: 6144
 

@@ -254,8 +254,6 @@ onMounted(() => {
         rawData.value = storedRaw;
     }
 
-    console.log("Loaded report data:", reportData.value);
-
     const userId = localStorage.getItem("report-selectedUser") || "";
     if (userId) {
         getUsers()
@@ -346,8 +344,7 @@ const saveReport = () => {
             parseInt(localStorage.getItem("report-selectedUser") || "0"),
             reportDate,
         )
-            .then((response) => {
-                console.log("보고서 저장 성공:", response);
+            .then(() => {
                 alert("보고서가 성공적으로 저장되었습니다.");
                 sessionStorage.removeItem("reportData");
                 sessionStorage.removeItem("reportRaw");

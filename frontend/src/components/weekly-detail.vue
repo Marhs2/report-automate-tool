@@ -171,7 +171,6 @@ import { useRoute } from "vue-router";
 const route = useRoute();
 
 const reportData = ref(null);
-const rawData = ref(null);
 const userName = ref("");
 const isSaving = ref(false);
 const { getUsers, GetWeeklyReportById, updateWeeklyReport } = useAPI();
@@ -193,7 +192,6 @@ onMounted(async () => {
         try {
             const data = await GetWeeklyReportById(reportId);
             reportData.value = data.report;
-            rawData.value = null;
             userName.value = data.memberName || `사용자 ${data.memberId}`;
 
             sessionStorage.setItem("reportData", JSON.stringify(data.report));
@@ -216,14 +214,6 @@ onMounted(async () => {
     if (stored) {
         reportData.value = JSON.parse(stored);
     }
-
-    const storedRaw = sessionStorage.getItem("reportRaw");
-
-    if (storedRaw) {
-        rawData.value = storedRaw;
-    }
-
-    console.log("Loaded report data:", reportData.value);
 
     const userId = localStorage.getItem("report-selectedUser") || "";
     if (userId) {

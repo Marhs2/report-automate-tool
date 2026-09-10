@@ -1,7 +1,6 @@
 <script setup>
 import { onMounted, ref, reactive, computed, watch } from "vue";
 import useApi from "../composables/useApi";
-import { Check, Minus } from "lucide-vue-next";
 
 const { GetUserActivities } = useApi();
 
@@ -10,6 +9,8 @@ const props = defineProps({
     endDate: { type: String, default: "" },
     embedded: { type: Boolean, default: false },
 });
+
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 const userActivities = ref([]);
 
@@ -26,6 +27,14 @@ const tooltip = reactive({
 });
 
 let hideTimer = null;
+
+const parseDate = (dateStr) => new Date(`${dateStr}T00:00:00`);
+
+const startOfToday = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+};
 
 const getWeekDays = () => {
     const now = new Date();
@@ -47,12 +56,27 @@ const getWeekDays = () => {
     return days;
 };
 
+function metaFor(dateStr) {
+    const date = parseDate(dateStr);
+    const weekDay = date.getDay();
+    const today = startOfToday();
+    return {
+        date: dateStr,
+        day: date.getDate(),
+        weekLabel: WEEKDAY_LABELS[weekDay],
+        isWeekend: weekDay === 0 || weekDay === 6,
+        isToday: date.getTime() === today.getTime(),
+        isFuture: date.getTime() > today.getTime(),
+    };
+}
+
 function showTooltip(e, dateStr, count) {
     clearTimeout(hideTimer);
+    const meta = metaFor(dateStr);
     tooltip.content =
         count > 0
-            ? `${dateStr} - 제출함 (${count}건)`
-            : `${dateStr} - 제출 안 함`;
+            ? `${meta.weekLabel} ${dateStr} · 제출 ${count}건`
+            : `${meta.weekLabel} ${dateStr} · 미제출`;
     tooltip.x = e.clientX + 16;
     tooltip.y = e.clientY - 16;
     tooltip.visible = true;
@@ -118,13 +142,19 @@ watch(
     },
 );
 
+const totalCountOf = (activity) =>
+    activity.total_count ??
+    activity.activities.reduce((total, item) => total + (item.count || 0), 0);
+
 const orderedActivities = computed(() =>
-    userActivities.value.map((activity) => ({
-        ...activity,
-        activities: [...(activity.activities || [])].sort((left, right) =>
-            left.report_date.localeCompare(right.report_date),
-        ),
-    })),
+    userActivities.value
+        .map((activity) => ({
+            ...activity,
+            activities: [...(activity.activities || [])].sort((left, right) =>
+                left.report_date.localeCompare(right.report_date),
+            ),
+        }))
+        .sort((left, right) => totalCountOf(right) - totalCountOf(left)),
 );
 
 const displayDates = computed(
@@ -134,9 +164,23 @@ const displayDates = computed(
         ) || [],
 );
 
-const totalCountOf = (activity) =>
-    activity.total_count ??
-    activity.activities.reduce((total, item) => total + (item.count || 0), 0);
+const dateMeta = computed(() => displayDates.value.map(metaFor));
+
+const weekdayCount = computed(
+    () => dateMeta.value.filter((item) => !item.isWeekend).length,
+);
+
+const progressOf = (activity) => {
+    const submitted = (activity.activities || []).filter(
+        (item) => item.count > 0,
+    ).length;
+    const total = weekdayCount.value || (activity.activities || []).length;
+    return {
+        submitted,
+        total,
+        pct: total ? Math.round((submitted / total) * 100) : 0,
+    };
+};
 
 const periodLabel = computed(() =>
     props.startDate && props.endDate
@@ -158,67 +202,97 @@ const periodLabel = computed(() =>
             </div>
         </div>
 
-        <div v-if="!embedded" class="view-controls">
-            <div class="month-nav">
+        <div class="view-controls">
+            <div v-if="!embedded" class="month-nav">
                 <button class="btn btn-small" @click="prevMonth">&lt;</button>
                 <span class="current-period"
                     >{{ selectedYear }}년 {{ selectedMonth }}월</span
                 >
                 <button class="btn btn-small" @click="nextMonth">&gt;</button>
             </div>
+            <div v-if="orderedActivities.length" class="legend">
+                <span class="legend-item">
+                    <span class="swatch submitted"></span> 제출
+                </span>
+                <span class="legend-item">
+                    <span class="swatch missed"></span> 미제출
+                </span>
+                <span class="legend-item">
+                    <span class="swatch weekend"></span> 주말
+                </span>
+                <span class="legend-item">
+                    <span class="swatch today"></span> 오늘
+                </span>
+            </div>
         </div>
 
         <div v-if="orderedActivities.length === 0" class="empty-state">
             표시할 활동 기록이 없습니다
         </div>
-        <template v-else>
-            <div class="legend">
-                <span class="legend-item"
-                    ><Check :size="12" class="legend-icon done" /> 제출함</span
+        <div
+            v-else
+            class="card activity-card"
+            :style="{ '--day-count': Math.max(displayDates.length, 1) }"
+        >
+            <div class="activity-date-header">
+                <span class="activity-name-cell activity-date-spacer"
+                    >팀원</span
                 >
-                <span class="legend-item"
-                    ><Minus :size="12" class="legend-icon none" /> 제출 안
-                    함</span
+                <span
+                    v-for="meta in dateMeta"
+                    :key="meta.date"
+                    class="date-head"
+                    :class="{
+                        weekend: meta.isWeekend,
+                        today: meta.isToday,
+                    }"
                 >
+                    <span class="date-weekday">{{ meta.weekLabel }}</span>
+                    <span class="date-day">{{ meta.day }}</span>
+                </span>
             </div>
             <div
-                class="card activity-card"
-                :style="{ '--day-count': Math.max(displayDates.length, 1) }"
+                v-for="activity in orderedActivities"
+                :key="activity.member_id"
+                class="activity-row"
             >
-                <div class="activity-date-header">
-                    <span class="activity-date-spacer"></span>
-                    <span v-for="date in displayDates" :key="date">
-                        {{ date.slice(5).replace("-", "/") }}
-                    </span>
-                </div>
-                <div
-                    v-for="activity in orderedActivities"
-                    :key="activity.member_id"
-                    class="activity-row"
-                >
-                    <h4 class="activity-name">
-                        {{ activity.name }}
+                <div class="activity-name-cell">
+                    <h4 class="activity-name">{{ activity.name }}</h4>
+                    <div class="activity-meta">
                         <span class="activity-total"
-                            >({{ totalCountOf(activity) }}건)</span
+                            >{{ progressOf(activity).submitted }}일 제출</span
                         >
-                    </h4>
-                    <div
-                        v-for="item in activity.activities"
-                        :key="item.report_date"
-                        class="log"
-                        :class="item.count > 0 ? 'committed' : ''"
-                        @mouseenter="
-                            showTooltip($event, item.report_date, item.count)
-                        "
-                        @mousemove="moveTooltip"
-                        @mouseleave="hideTooltip"
-                    >
-                        <Check v-if="item.count > 0" :size="12" />
-                        <Minus v-else :size="12" />
+                        <div
+                            class="progress-track"
+                            :title="`${progressOf(activity).submitted}/${progressOf(activity).total} 평일`"
+                        >
+                            <span
+                                class="progress-fill"
+                                :style="{
+                                    width: progressOf(activity).pct + '%',
+                                }"
+                            ></span>
+                        </div>
                     </div>
                 </div>
+                <div
+                    v-for="item in activity.activities"
+                    :key="item.report_date"
+                    class="log"
+                    :class="{
+                        committed: item.count > 0,
+                        weekend: metaFor(item.report_date).isWeekend,
+                        today: metaFor(item.report_date).isToday,
+                        future: metaFor(item.report_date).isFuture,
+                    }"
+                    @mouseenter="
+                        showTooltip($event, item.report_date, item.count)
+                    "
+                    @mousemove="moveTooltip"
+                    @mouseleave="hideTooltip"
+                ></div>
             </div>
-        </template>
+        </div>
 
         <transition name="tooltip-fade">
             <div
@@ -237,33 +311,12 @@ const periodLabel = computed(() =>
     margin-bottom: 32px;
 }
 
-.legend {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 12px;
-    font-size: 12px;
-    color: var(--text);
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.legend-icon.done {
-    color: var(--success);
-}
-
-.legend-icon.none {
-    color: var(--text);
-    opacity: 0.5;
-}
-
 .view-controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
     margin-bottom: 12px;
 }
 
@@ -278,54 +331,97 @@ const periodLabel = computed(() =>
     color: var(--text-h);
 }
 
-.view-toggle {
+.legend {
     display: flex;
-    gap: 4px;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--text);
 }
 
-.view-toggle .btn.active {
-    background: var(--accent-bg);
-    border-color: var(--accent-border);
-    color: var(--text-h);
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.swatch.submitted {
+    background: var(--success);
+}
+
+.swatch.missed {
+    background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.swatch.weekend {
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.swatch.today {
+    box-shadow: 0 0 0 2px var(--accent);
+    background: color-mix(in srgb, var(--text) 18%, transparent);
 }
 
 .activity-card {
     overflow-x: auto;
+    padding: 16px;
 }
 
 .activity-date-header,
 .activity-row {
     display: grid;
-    grid-template-columns:
-        84px
-        repeat(var(--day-count), 32px);
-    column-gap: 8px;
-    justify-content: space-evenly;
-    min-width: max-content;
-}
-
-.activity-row {
+    grid-template-columns: 148px repeat(var(--day-count), minmax(18px, 1fr));
+    column-gap: 4px;
     align-items: center;
-    padding: 16px 0;
-    border-bottom: 1px solid var(--border);
-    gap: 15px;
 }
 
 .activity-date-header {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.date-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
     color: var(--text);
+    min-width: 0;
+}
+
+.date-weekday {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0;
+    opacity: 0.7;
+}
+
+.date-day {
     font-size: 11px;
-    gap: 15px;
-    font-weight: bold;
+    font-weight: 700;
+    line-height: 1.1;
 }
 
-.activity-date-header span:not(.activity-date-spacer) {
-    text-align: center;
-    white-space: nowrap;
+.date-head.weekend {
+    color: color-mix(in srgb, var(--text) 70%, transparent);
 }
 
-.activity-date-spacer {
-    display: block;
+.date-head.today {
+    color: var(--accent);
+}
+
+.activity-row {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
 }
 
 .activity-row:last-child {
@@ -333,8 +429,22 @@ const periodLabel = computed(() =>
     padding-bottom: 0;
 }
 
-.activity-row:first-child {
-    padding-top: 0;
+.activity-name-cell {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding-right: 10px;
+    background: var(--bg);
+}
+
+.activity-date-spacer {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
 }
 
 .activity-name {
@@ -342,39 +452,72 @@ const periodLabel = computed(() =>
     margin: 0;
     color: var(--text-h);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.activity-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .activity-total {
     color: var(--text);
     font-size: 11px;
     font-weight: 500;
+    white-space: nowrap;
+}
+
+.progress-track {
+    flex: 1;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--border);
+    overflow: hidden;
+    min-width: 36px;
+}
+
+.progress-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--success);
 }
 
 .log {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: min(100%, 32px);
-    height: 28px;
+    width: 100%;
+    aspect-ratio: 1;
+    max-height: 22px;
     justify-self: center;
-    border-radius: 6px;
-    border: 1.5px solid var(--border);
-    background: var(--bg-soft);
-    color: var(--text);
-    opacity: 0.5;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--text) 16%, transparent);
     cursor: pointer;
-    transition: opacity 0.15s ease;
+    transition:
+        transform 0.12s ease,
+        background 0.12s ease,
+        opacity 0.12s ease;
+}
+
+.log.weekend {
+    background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.log.committed {
+    background: var(--success);
+}
+
+.log.future:not(.committed) {
+    opacity: 0.28;
+    cursor: default;
+}
+
+.log.today {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
 .log:hover {
-    opacity: 1;
-}
-
-.committed {
-    background-color: color-mix(in srgb, var(--success) 15%, transparent);
-    border-color: var(--success);
-    color: var(--success);
-    opacity: 1;
+    transform: scale(1.18);
 }
 
 /* Tooltip */

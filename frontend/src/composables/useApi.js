@@ -18,6 +18,26 @@ export default function useAPI() {
     }
   };
 
+  const PostReportPptx = async (file, dateData, memberId) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("date", dateData);
+    formData.append("member_id", String(memberId));
+    try {
+      const response = await axios.post(
+        `${baseURL}/send-report-pptx`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error sending PPTX report:", error);
+      throw error;
+    }
+  };
+
   const deleteReport = async (reportId) => {
     try {
       await axios.delete(`${baseURL}/reports/${reportId}`);
@@ -65,7 +85,6 @@ export default function useAPI() {
   const GetWeeklyReportById = async (weeklyId) => {
     try {
       const response = await axios.get(`${baseURL}/weeklyById/${weeklyId}`);
-      console.log(response.data);
       return response.data;
     } catch (error) {
       console.error("Error fetching weekly report by id:", error);
@@ -142,16 +161,6 @@ export default function useAPI() {
       return response.data;
     } catch (error) {
       console.error("Error fetching report by id:", error);
-      throw error;
-    }
-  };
-
-  const GetProjects = async () => {
-    try {
-      const response = await axios.get(`${baseURL}/projects`);
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching projects:", error);
       throw error;
     }
   };
@@ -249,11 +258,11 @@ export default function useAPI() {
 
   return {
     PostReport,
+    PostReportPptx,
     GetReportDraft,
     PostSaveReport,
     GetReports,
     GetReportById,
-    GetProjects,
     GetUserActivities,
     postWeekly,
     GetWeeklyReport,

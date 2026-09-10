@@ -26,12 +26,10 @@ const getReports = async () => {
     try {
         const response = await GetReports();
         reports.value = response;
-        console.log("Reports:", response);
     } catch (error) {
         console.error("Error fetching reports:", error);
     } finally {
         isLoading.value = false;
-        console.log(isLoading.value);
     }
 };
 
