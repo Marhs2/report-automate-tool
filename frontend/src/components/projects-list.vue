@@ -7,6 +7,7 @@ import {
     AlertTriangle,
     MessageSquare,
     ArrowRightCircle,
+    Search,
 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 
@@ -34,6 +35,7 @@ const getReports = async () => {
 };
 
 const deleteProjectReport = async (reportId) => {
+    if (!window.confirm("이 보고서를 삭제할까요?")) return;
     try {
         await deleteReport(reportId);
         getReports();
@@ -100,6 +102,56 @@ const isUnresolved = (value) =>
 
 const projectsOf = (report) => toParsed(report.parsed_json)?.projects ?? [];
 
+const formatDate = (value) => {
+    if (!value) return "-";
+    const [y, m, d] = String(value).split("-");
+    if (!y || !m || !d) return value;
+    return `${y}.${m}.${d}`;
+};
+
+const hasItems = (list) => Array.isArray(list) && list.length > 0;
+
+const visibleSections = (item) => {
+    const sections = [
+        {
+            key: "completed",
+            label: "완료된 업무",
+            tone: "tone-completed",
+            icon: CheckCircle2,
+            items: item.completedTasks,
+        },
+        {
+            key: "progress",
+            label: "진행 중인 업무",
+            tone: "tone-in-progress",
+            icon: CircleDot,
+            items: item.inProgressTasks,
+        },
+        {
+            key: "issues",
+            label: "이슈",
+            tone: "tone-issues",
+            icon: AlertTriangle,
+            items: item.issues,
+        },
+        {
+            key: "requests",
+            label: "요청사항",
+            tone: "tone-request",
+            icon: MessageSquare,
+            items: item.requests,
+        },
+        {
+            key: "plans",
+            label: "다음 계획",
+            tone: "tone-next-plans",
+            icon: ArrowRightCircle,
+            items: item.nextPlans,
+        },
+    ];
+    return sections.filter((section) => hasItems(section.items));
+};
+
 onMounted(() => {
     getReports();
 });
@@ -114,247 +166,171 @@ onMounted(() => {
                     제출된 보고서를 날짜, 작성자, 프로젝트로 조회합니다
                 </p>
             </div>
+            <span class="count-chip">
+                {{ filteredReportsByProject.length }}건
+            </span>
         </div>
 
-        <div class="toolbar">
-            <label for="filterDateFrom">시작 날짜:</label>
-            <input
-                type="date"
-                v-model="filterDateFrom"
-                id="filterDateFrom"
-                class="input filter-input"
-                placeholder="시작 날짜"
-            />
-
-            <label for="filterDateEnd">종료 날짜:</label>
-            <input
-                type="date"
-                v-model="filterDateEnd"
-                id="filterDateEnd"
-                class="input filter-input"
-                placeholder="종료 날짜"
-            />
-
-            <input
-                type="text"
-                placeholder="사람별로"
-                v-model="filterMember"
-                class="input filter-input"
-            />
-            <input
-                type="text"
-                placeholder="프로젝트"
-                v-model="filterProject"
-                class="input filter-input"
-            />
+        <div class="filter-card">
+            <div class="field">
+                <label for="filterDateFrom">시작일</label>
+                <input
+                    type="date"
+                    v-model="filterDateFrom"
+                    id="filterDateFrom"
+                    class="input"
+                />
+            </div>
+            <div class="field">
+                <label for="filterDateEnd">종료일</label>
+                <input
+                    type="date"
+                    v-model="filterDateEnd"
+                    id="filterDateEnd"
+                    class="input"
+                />
+            </div>
+            <div class="field">
+                <label for="filterMember">작성자</label>
+                <input
+                    id="filterMember"
+                    type="text"
+                    placeholder="이름 검색"
+                    v-model="filterMember"
+                    class="input"
+                />
+            </div>
+            <div class="field">
+                <label for="filterProject">프로젝트</label>
+                <input
+                    id="filterProject"
+                    type="text"
+                    placeholder="프로젝트명 검색"
+                    v-model="filterProject"
+                    class="input"
+                />
+            </div>
         </div>
 
-        <div v-if="isLoading" class="empty-state">Loading reports...</div>
+        <div v-if="isLoading" class="empty-state">보고서를 불러오는 중...</div>
         <div
             v-else-if="filteredReportsByProject.length === 0"
             class="empty-state"
         >
-            조건에 맞는 보고서가 없습니다
+            <Search :size="20" />
+            <p>조건에 맞는 보고서가 없습니다</p>
         </div>
         <div v-else class="reports-container">
-            <div
+            <article
                 v-for="report in filteredReportsByProject"
                 :key="report.id"
                 class="card report-item"
             >
-                <div class="report-header">
-                    <h3 class="report-id">Report ID: {{ report.id }}</h3>
-                    <div class="report-meta">
-                        <span class="meta-item"
-                            ><strong>Member Name:</strong>
-                            {{ report.member_name }}</span
-                        >
-                        <span class="meta-item"
-                            ><strong>Report Date:</strong>
-                            {{ report.report_date }}</span
-                        >
+                <header class="report-header">
+                    <div class="report-identity">
+                        <span class="avatar">{{
+                            String(report.member_name || "?").slice(0, 1)
+                        }}</span>
+                        <div>
+                            <h3 class="report-name">{{ report.member_name }}</h3>
+                            <p class="report-sub">
+                                {{ formatDate(report.report_date) }}
+                                · 프로젝트 {{ projectsOf(report).length }}개
+                            </p>
+                        </div>
+                    </div>
+                    <div class="report-actions">
                         <button
-                            class="btn"
+                            class="btn btn-primary"
                             v-on:click="() => reportDetail(report.id)"
                         >
                             자세히 보기
                         </button>
                         <button
-                            class="btn"
+                            class="btn btn-danger"
                             v-on:click="() => deleteProjectReport(report.id)"
                         >
                             삭제
                         </button>
                     </div>
-                </div>
+                </header>
+
                 <div class="projects-list">
-                    <div
+                    <section
                         v-for="(item, index) in projectsOf(report)"
                         :key="index"
                         class="project-block"
                     >
                         <div class="project-name">
-                            <span class="project-name-label">Project</span>
                             <span class="project-name-value">{{
                                 item.projectName
                             }}</span>
+                            <span
+                                v-if="visibleSections(item).length === 0"
+                                class="empty-chip"
+                                >내용 없음</span
+                            >
                         </div>
 
                         <div class="detail-list">
-                            <!-- 완료된 업무 -->
-                            <div class="detail-row">
+                            <div
+                                v-for="section in visibleSections(item)"
+                                :key="section.key"
+                                class="detail-row"
+                                :class="section.tone"
+                            >
                                 <div class="detail-label">
-                                    <CheckCircle2 :size="15" />
-                                    <span>완료된 업무</span>
+                                    <component :is="section.icon" :size="15" />
+                                    <span>{{ section.label }}</span>
                                 </div>
-
                                 <div class="detail-content">
-                                    <ul
-                                        v-if="
-                                            item.completedTasks &&
-                                            item.completedTasks.length
-                                        "
-                                    >
+                                    <ul>
                                         <li
-                                            v-for="(
-                                                task, index
-                                            ) in item.completedTasks"
-                                            :key="index"
+                                            v-for="(entry, entryIndex) in section.items"
+                                            :key="entryIndex"
                                         >
-                                            {{ task }}
+                                            {{ itemText(entry) }}
                                         </li>
                                     </ul>
-
-                                    <p v-else class="empty-msg">해당 없음</p>
-                                </div>
-                            </div>
-
-                            <!-- 진행 중인 업무 -->
-                            <div class="detail-row">
-                                <div class="detail-label">
-                                    <CircleDot :size="15" />
-                                    <span>진행 중인 업무</span>
-                                </div>
-
-                                <div class="detail-content">
-                                    <ul
-                                        v-if="
-                                            item.inProgressTasks &&
-                                            item.inProgressTasks.length
-                                        "
-                                    >
-                                        <li
-                                            v-for="(
-                                                task, index
-                                            ) in item.inProgressTasks"
-                                            :key="index"
-                                        >
-                                            {{ task }}
-                                        </li>
-                                    </ul>
-
-                                    <p v-else class="empty-msg">해당 없음</p>
-                                </div>
-                            </div>
-
-                            <!-- 이슈 -->
-                            <div class="detail-row">
-                                <div class="detail-label">
-                                    <AlertTriangle :size="15" />
-                                    <span>이슈</span>
-                                </div>
-
-                                <div class="detail-content">
-                                    <ul
-                                        v-if="item.issues && item.issues.length"
-                                    >
-                                        <li
-                                            v-for="(
-                                                issue, index
-                                            ) in item.issues"
-                                            :key="index"
-                                        >
-                                            {{ issue.content || issue }}
-                                        </li>
-                                    </ul>
-
-                                    <p v-else class="empty-msg">해당 없음</p>
-                                </div>
-                            </div>
-
-                            <!-- 요청사항 -->
-                            <div class="detail-row">
-                                <div class="detail-label">
-                                    <MessageSquare :size="15" />
-                                    <span>요청사항</span>
-                                </div>
-
-                                <div class="detail-content">
-                                    <ul
-                                        v-if="
-                                            item.requests &&
-                                            item.requests.length
-                                        "
-                                    >
-                                        <li
-                                            v-for="(
-                                                task, index
-                                            ) in item.requests"
-                                            :key="index"
-                                        >
-                                            {{ task }}
-                                        </li>
-                                    </ul>
-
-                                    <p v-else class="empty-msg">해당 없음</p>
-                                </div>
-                            </div>
-
-                            <!-- 다음 계획 -->
-                            <div class="detail-row">
-                                <div class="detail-label">
-                                    <ArrowRightCircle :size="15" />
-                                    <span>다음 계획</span>
-                                </div>
-
-                                <div class="detail-content">
-                                    <ul
-                                        v-if="
-                                            item.nextPlans &&
-                                            item.nextPlans.length
-                                        "
-                                    >
-                                        <li
-                                            v-for="(
-                                                task, index
-                                            ) in item.nextPlans"
-                                            :key="index"
-                                        >
-                                            {{ task }}
-                                        </li>
-                                    </ul>
-
-                                    <p v-else class="empty-msg">해당 없음</p>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </section>
                 </div>
-            </div>
+            </article>
         </div>
     </div>
 </template>
 
 <style scoped>
-.filter-input {
-    width: auto;
-    min-width: 160px;
+.count-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.filter-card {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+    padding: 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
 }
 
 .reports-container {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
 .report-item {
@@ -362,65 +338,88 @@ onMounted(() => {
     overflow: hidden;
 }
 
+.report-header .btn {
+    white-space: nowrap;
+}
+
 .report-header {
-    background: var(--bg-soft);
-    padding: 14px 20px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 12px;
 }
 
-.report-id {
-    margin: 0;
-    font-size: 15px;
-    color: var(--accent);
-}
-
-.report-meta {
+.report-identity {
     display: flex;
     align-items: center;
-    gap: 20px;
-    font-size: 13px;
+    gap: 12px;
+    min-width: 0;
+}
+
+.avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: var(--bg-soft);
+    color: var(--text-h);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.report-name {
+    margin: 0;
+    font-size: 16px;
+}
+
+.report-sub {
+    margin-top: 2px;
+    font-size: 12px;
     color: var(--text);
 }
 
+.report-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
 .projects-list {
-    padding: 4px 20px 20px;
+    padding: 8px 20px 16px;
+    display: grid;
+    gap: 10px;
 }
 
 .project-block {
-    padding: 20px 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.project-block:last-child {
-    border-bottom: none;
-    padding-bottom: 4px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
 }
 
 .project-name {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
-    margin-bottom: 14px;
-}
-
-.project-name-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text);
-    opacity: 0.7;
+    margin-bottom: 4px;
 }
 
 .project-name-value {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
     color: var(--text-h);
+}
+
+.empty-chip {
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0.7;
 }
 
 .detail-list {
@@ -431,26 +430,23 @@ onMounted(() => {
 .detail-row {
     display: flex;
     gap: 16px;
-    padding: 10px 0;
-    border-top: 1px solid var(--border);
-}
-
-.detail-row:first-child {
-    border-top: none;
+    padding: 10px 0 2px;
 }
 
 .detail-label {
-    flex: 0 0 150px;
+    flex: 0 0 132px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 7px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 650;
     color: var(--text-h);
+    padding-top: 1px;
 }
 
 .detail-label svg {
     flex-shrink: 0;
+    margin-top: 2px;
 }
 
 .tone-completed .detail-label svg {
@@ -476,9 +472,9 @@ onMounted(() => {
 
 .detail-content ul {
     margin: 0;
-    padding-left: 18px;
+    padding-left: 16px;
     font-size: 13px;
-    line-height: 1.6;
+    line-height: 1.65;
     color: var(--text);
 }
 
@@ -498,11 +494,23 @@ onMounted(() => {
     vertical-align: middle;
 }
 
-.empty-msg {
-    margin: 0;
-    font-size: 13px;
-    color: var(--text);
-    font-style: italic;
-    opacity: 0.6;
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+@media (max-width: 860px) {
+    .filter-card {
+        grid-template-columns: 1fr 1fr;
+    }
+    .detail-row {
+        flex-direction: column;
+        gap: 6px;
+    }
+    .detail-label {
+        flex: none;
+    }
 }
 </style>

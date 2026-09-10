@@ -6,7 +6,7 @@ import {
     FileBarChart,
     GitGraph,
     LogOut,
-    UserRound,
+    Settings2,
 } from "lucide-vue-next";
 import { onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
@@ -16,13 +16,28 @@ import { selectedUserId } from "./composables/useSelectedUser";
 const router = useRouter();
 const { getUsers } = useAPI();
 
-const navItems = [
-    { to: "/", label: "프로젝트 목록", icon: FolderKanban },
-    { to: "/project-timeline", label: "프로젝트 흐름", icon: GitGraph },
-    { to: "/report", label: "보고서 작성", icon: PenSquare },
-    { to: "/activities", label: "사용자 활동", icon: CalendarDays },
-    { to: "/weekly", label: "주간 보고서", icon: FileBarChart },
-    { to: "/project-name", label: "프로젝트 명 관리", icon: FolderKanban },
+const navGroups = [
+    {
+        label: "조회",
+        items: [
+            { to: "/", label: "프로젝트 목록", icon: FolderKanban },
+            { to: "/project-timeline", label: "프로젝트 흐름", icon: GitGraph },
+            { to: "/activities", label: "사용자 활동", icon: CalendarDays },
+        ],
+    },
+    {
+        label: "작성",
+        items: [
+            { to: "/report", label: "보고서 작성", icon: PenSquare },
+            { to: "/weekly", label: "주간 보고서", icon: FileBarChart },
+        ],
+    },
+    {
+        label: "관리",
+        items: [
+            { to: "/project-name", label: "프로젝트 명 관리", icon: Settings2 },
+        ],
+    },
 ];
 
 const currentUser = ref("");
@@ -49,6 +64,11 @@ watch(
     { immediate: true }
 );
 
+const userInitial = () => {
+    const name = currentUser.value || "";
+    return name.slice(0, 1) || "?";
+};
+
 const logout = () => {
     if (window.confirm("사용자를 변경하시겠습니까?")) {
         selectedUserId.value = null;
@@ -70,23 +90,25 @@ onMounted(() => {
 
 <template>
     <aside class="sidebar">
-        <div class="sidebar-brand">
-        </div>
+
         <nav class="nav-links">
-            <router-link
-                v-for="item in navItems"
-                :key="item.to"
-                :to="item.to"
-                class="nav-link"
-            >
-                <component :is="item.icon" :size="16" />
-                {{ item.label }}
-            </router-link>
+            <div v-for="group in navGroups" :key="group.label" class="nav-group">
+                <p class="nav-group-label">{{ group.label }}</p>
+                <router-link
+                    v-for="item in group.items"
+                    :key="item.to"
+                    :to="item.to"
+                    class="nav-link"
+                >
+                    <component :is="item.icon" :size="16" />
+                    {{ item.label }}
+                </router-link>
+            </div>
         </nav>
 
         <div class="sidebar-footer">
             <div class="sidebar-user">
-                <UserRound :size="16" />
+                <span class="sidebar-avatar">{{ userInitial() }}</span>
                 <span class="sidebar-user-name">{{ currentUser || "사용자 미선택" }}</span>
             </div>
             <button class="sidebar-logout" @click="logout">

@@ -90,36 +90,6 @@ def load_weekly_prompt():
 with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
     weekly_schema = json.load(f)
 
-# LM Studio structured output 미지원 키 제거
-_LLM_SCHEMA_DROP_KEYS = frozenset(
-    {
-        "$schema",
-        "title",
-        "description",
-        "uniqueItems",
-        "minItems",
-        "maxItems",
-        "minLength",
-        "maxLength",
-    }
-)
-
-
-def sanitize_llm_schema(node):
-    if isinstance(node, dict):
-        return {
-            key: sanitize_llm_schema(value)
-            for key, value in node.items()
-            if key not in _LLM_SCHEMA_DROP_KEYS
-        }
-    if isinstance(node, list):
-        return [sanitize_llm_schema(item) for item in node]
-    return node
-
-
-daily_llm_schema = sanitize_llm_schema(daily_schema)
-weekly_llm_schema = sanitize_llm_schema(weekly_schema)
-
 MODEL_NAME = "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M"
 LM_BASE_URL = "http://192.168.210.10:8888/v1"
 LM_API_KEY = "lm-studio"
@@ -704,7 +674,7 @@ def generate_weekly_report(member_id, selects):
                     "json_schema": {
                         "name": "weekly_report",
                         "strict": True,
-                        "schema": weekly_llm_schema,
+                        "schema": weekly_schema,
                     },
                 },
             )
@@ -809,7 +779,7 @@ def process_daily_report(report: str, report_date: str, member_id: int):
                 "json_schema": {
                     "name": "daily_report",
                     "strict": True,
-                    "schema": daily_llm_schema,
+                    "schema": daily_schema,
                 },
             },
         )
