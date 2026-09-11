@@ -1206,7 +1206,7 @@ def get_user_activities(
 
         cursor.execute(
             """
-            SELECT report_date, member_id, COUNT(report_date)
+            SELECT report_date, member_id, COUNT(report_date), MAX(id)
             FROM daily_reports
             WHERE report_date BETWEEN ? AND ?
             GROUP BY report_date, member_id
@@ -1215,8 +1215,10 @@ def get_user_activities(
         )
 
         counts = defaultdict(dict)
-        for report_date, member_id, count in cursor.fetchall():
+        report_ids = defaultdict(dict)
+        for report_date, member_id, count, report_id in cursor.fetchall():
             counts[member_id][report_date] = count
+            report_ids[member_id][report_date] = report_id
 
         cursor.execute(
             """
@@ -1244,6 +1246,7 @@ def get_user_activities(
                 {
                     "report_date": report_date,
                     "count": counts[member_id].get(report_date, 0),
+                    "report_id": report_ids[member_id].get(report_date),
                 }
             )
 

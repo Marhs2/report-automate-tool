@@ -1,8 +1,10 @@
 <script setup>
 import { onMounted, ref, reactive, computed, watch } from "vue";
+import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 
-const { GetUserActivities } = useApi();
+const router = useRouter();
+const { GetUserActivities, GetReports } = useApi();
 
 const props = defineProps({
     startDate: { type: String, default: "" },
@@ -70,13 +72,52 @@ function metaFor(dateStr) {
     };
 }
 
-function showTooltip(e, dateStr, count) {
-    clearTimeout(hideTimer);
+const formatDotDate = (dateStr) => {
+    const [year, month, day] = String(dateStr).split("-");
+    if (!year || !month || !day) return dateStr;
+    return `${year}.${month}.${day}`;
+};
+
+const cellStatus = (dateStr, count) => {
     const meta = metaFor(dateStr);
-    tooltip.content =
-        count > 0
-            ? `${meta.weekLabel} ${dateStr} · 제출 ${count}건`
-            : `${meta.weekLabel} ${dateStr} · 미제출`;
+    if (count > 0) return "제출";
+    if (meta.isFuture) return "예정";
+    if (meta.isWeekend) return "주말";
+    return "미제출";
+};
+
+const canOpenCell = (item) => Boolean(item?.count > 0);
+
+const openCell = async (activity, item) => {
+    if (!canOpenCell(item)) return;
+    hideTooltip();
+    let reportId = item.report_id;
+    if (!reportId) {
+        try {
+            const reports = await GetReports();
+            const found = (reports || []).find(
+                (report) =>
+                    String(report.member_id) === String(activity.member_id) &&
+                    report.report_date === item.report_date,
+            );
+            reportId = found?.id;
+        } catch (error) {
+            console.error("보고서 찾기 실패:", error);
+        }
+    }
+    if (!reportId) return;
+    router.push(`/report/${reportId}`);
+};
+
+const cellLabel = (name, item) => {
+    const meta = metaFor(item.report_date);
+    return `${name} ${formatDotDate(item.report_date)} (${meta.weekLabel}) ${cellStatus(item.report_date, item.count)}`;
+};
+
+function showTooltip(e, name, item) {
+    clearTimeout(hideTimer);
+    const meta = metaFor(item.report_date);
+    tooltip.content = `${name} · ${meta.weekLabel} ${formatDotDate(item.report_date)} · ${cellStatus(item.report_date, item.count)}`;
     tooltip.x = e.clientX + 16;
     tooltip.y = e.clientY - 16;
     tooltip.visible = true;
@@ -147,15 +188,16 @@ const totalCountOf = (activity) =>
     activity.activities.reduce((total, item) => total + (item.count || 0), 0);
 
 const orderedActivities = computed(() =>
-    userActivities.value
-        .map((activity) => ({
-            ...activity,
-            activities: [...(activity.activities || [])].sort((left, right) =>
-                left.report_date.localeCompare(right.report_date),
-            ),
-        }))
-        .sort((left, right) => totalCountOf(right) - totalCountOf(left)),
+    userActivities.value.map((activity) => ({
+        ...activity,
+        activities: [...(activity.activities || [])].sort((left, right) =>
+            left.report_date.localeCompare(right.report_date),
+        ),
+    })),
 );
+
+const hasFutureDates = computed(() => dateMeta.value.some((item) => item.isFuture));
+const hasToday = computed(() => dateMeta.value.some((item) => item.isToday));
 
 const displayDates = computed(
     () =>
@@ -204,11 +246,23 @@ const periodLabel = computed(() =>
 
         <div class="view-controls">
             <div v-if="!embedded" class="month-nav">
-                <button class="btn btn-small" @click="prevMonth">&lt;</button>
+                <button
+                    class="btn btn-small"
+                    aria-label="이전 달"
+                    @click="prevMonth"
+                >
+                    &lt;
+                </button>
                 <span class="current-period"
                     >{{ selectedYear }}년 {{ selectedMonth }}월</span
                 >
-                <button class="btn btn-small" @click="nextMonth">&gt;</button>
+                <button
+                    class="btn btn-small"
+                    aria-label="다음 달"
+                    @click="nextMonth"
+                >
+                    &gt;
+                </button>
             </div>
             <div v-if="orderedActivities.length" class="legend">
                 <span class="legend-item">
@@ -220,8 +274,11 @@ const periodLabel = computed(() =>
                 <span class="legend-item">
                     <span class="swatch weekend"></span> 주말
                 </span>
-                <span class="legend-item">
+                <span v-if="hasToday" class="legend-item">
                     <span class="swatch today"></span> 오늘
+                </span>
+                <span v-if="hasFutureDates" class="legend-item">
+                    <span class="swatch future"></span> 예정
                 </span>
             </div>
         </div>
@@ -260,7 +317,7 @@ const periodLabel = computed(() =>
                     <h4 class="activity-name">{{ activity.name }}</h4>
                     <div class="activity-meta">
                         <span class="activity-total"
-                            >{{ progressOf(activity).submitted }}일 제출</span
+                            >{{ progressOf(activity).submitted }}/{{ progressOf(activity).total }} 평일</span
                         >
                         <div
                             class="progress-track"
@@ -284,10 +341,15 @@ const periodLabel = computed(() =>
                         weekend: metaFor(item.report_date).isWeekend,
                         today: metaFor(item.report_date).isToday,
                         future: metaFor(item.report_date).isFuture,
+                        clickable: canOpenCell(item),
                     }"
-                    @mouseenter="
-                        showTooltip($event, item.report_date, item.count)
-                    "
+                    role="button"
+                    :tabindex="canOpenCell(item) ? 0 : -1"
+                    :aria-label="cellLabel(activity.name, item)"
+                    @click="openCell(activity, item)"
+                    @keydown.enter.prevent="openCell(activity, item)"
+                    @keydown.space.prevent="openCell(activity, item)"
+                    @mouseenter="showTooltip($event, activity.name, item)"
                     @mousemove="moveTooltip"
                     @mouseleave="hideTooltip"
                 ></div>

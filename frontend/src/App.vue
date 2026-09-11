@@ -5,16 +5,17 @@ import {
     CalendarDays,
     FileBarChart,
     GitGraph,
-    LogOut,
+    ArrowLeftRight,
     Settings2,
 } from "lucide-vue-next";
 import { onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import useAPI from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
 import { useToast } from "./composables/useToast";
 
 const router = useRouter();
+const route = useRoute();
 const { getUsers } = useAPI();
 const { toasts } = useToast();
 
@@ -22,7 +23,7 @@ const navGroups = [
     {
         label: "조회",
         items: [
-            { to: "/", label: "프로젝트 목록", icon: FolderKanban },
+            { to: "/", label: "일일보고", icon: FolderKanban },
             { to: "/project-timeline", label: "프로젝트 흐름", icon: GitGraph },
             { to: "/activities", label: "사용자 활동", icon: CalendarDays },
         ],
@@ -37,10 +38,17 @@ const navGroups = [
     {
         label: "관리",
         items: [
-            { to: "/project-name", label: "프로젝트 명 관리", icon: Settings2 },
+            { to: "/project-name", label: "프로젝트명 관리", icon: Settings2 },
         ],
     },
 ];
+
+const isNavActive = (to) => {
+    const path = route.path;
+    if (to === "/") return path === "/" || /^\/report\/\d+/.test(path);
+    if (to === "/report") return path === "/report" || path === "/report-result";
+    return path === to || path.startsWith(`${to}/`);
+};
 
 const currentUser = ref("");
 
@@ -100,6 +108,7 @@ onMounted(() => {
                     :key="item.to"
                     :to="item.to"
                     class="nav-link"
+                    :class="{ 'router-link-exact-active': isNavActive(item.to) }"
                 >
                     <component :is="item.icon" :size="16" />
                     {{ item.label }}
@@ -113,7 +122,7 @@ onMounted(() => {
                 <span class="sidebar-user-name">{{ currentUser || "사용자 미선택" }}</span>
             </div>
             <button class="sidebar-logout" @click="logout">
-                <LogOut :size="14" />
+                <ArrowLeftRight :size="14" />
                 사용자 변경
             </button>
         </div>

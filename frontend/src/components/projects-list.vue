@@ -1,18 +1,12 @@
 <script setup>
 import { onMounted, ref, computed } from "vue";
 import useAPI from "../composables/useApi";
-import {
-    CheckCircle2,
-    CircleDot,
-    AlertTriangle,
-    MessageSquare,
-    ArrowRightCircle,
-    Search,
-} from "lucide-vue-next";
+import { Search, Trash2 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
+import { useToast } from "../composables/useToast";
 
-const route = useRouter();
-
+const router = useRouter();
+const { success: toastSuccess, error: toastError } = useToast();
 const { GetReports, deleteReport } = useAPI();
 
 const reports = ref([]);
@@ -22,6 +16,13 @@ const filterProject = ref("");
 const filterDateFrom = ref("");
 const filterDateEnd = ref("");
 
+const formatLocalDate = (value) => {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+};
+
 const getReports = async () => {
     isLoading.value = true;
     try {
@@ -29,37 +30,25 @@ const getReports = async () => {
         reports.value = response;
     } catch (error) {
         console.error("Error fetching reports:", error);
+        toastError("보고서를 불러오지 못했습니다.");
     } finally {
         isLoading.value = false;
     }
 };
 
-const deleteProjectReport = async (reportId) => {
+const deleteProjectReport = async (reportId, event) => {
+    event?.stopPropagation();
+    event?.preventDefault();
     if (!window.confirm("이 보고서를 삭제할까요?")) return;
     try {
         await deleteReport(reportId);
-        getReports();
-        alert("삭제완료");
+        await getReports();
+        toastSuccess("보고서를 삭제했습니다.");
     } catch (error) {
         console.error("Error deleting report:", error);
-        alert("삭제실패");
+        toastError("삭제에 실패했습니다.");
     }
 };
-
-const filteredReports = computed(() => {
-    return reports.value.filter((report) => {
-        const reportDate = report.report_date ?? "";
-        const matchFrom =
-            !filterDateFrom.value || reportDate >= filterDateFrom.value;
-        const matchEnd =
-            !filterDateEnd.value || reportDate <= filterDateEnd.value;
-
-        const matchMember =
-            filterMember.value === "" ||
-            String(report.member_name).includes(filterMember.value);
-        return matchFrom && matchEnd && matchMember;
-    });
-});
 
 const toParsed = (parsedJson) => {
     if (!parsedJson) return null;
@@ -73,6 +62,8 @@ const toParsed = (parsedJson) => {
     return parsedJson;
 };
 
+const projectsOf = (report) => toParsed(report.parsed_json)?.projects ?? [];
+
 const matchesProjectFilter = (parsedJson) => {
     if (filterProject.value === "") return true;
     const parsed = toParsed(parsedJson);
@@ -83,24 +74,70 @@ const matchesProjectFilter = (parsedJson) => {
 };
 
 const filteredReportsByProject = computed(() => {
-    return filteredReports.value.filter((report) =>
-        matchesProjectFilter(report.parsed_json),
-    );
+    return reports.value.filter((report) => {
+        const reportDate = report.report_date ?? "";
+        const matchFrom =
+            !filterDateFrom.value || reportDate >= filterDateFrom.value;
+        const matchEnd =
+            !filterDateEnd.value || reportDate <= filterDateEnd.value;
+        const matchMember =
+            filterMember.value === "" ||
+            String(report.member_name).includes(filterMember.value);
+        return (
+            matchFrom &&
+            matchEnd &&
+            matchMember &&
+            matchesProjectFilter(report.parsed_json)
+        );
+    });
 });
 
-const reportDetail = (report) => {
-    route.push(`/report/${report}`);
-};
+const memberOptions = computed(() =>
+    [...new Set(reports.value.map((report) => report.member_name).filter(Boolean))].sort(),
+);
 
-const itemText = (value) =>
-    value && typeof value === "object"
-        ? (value.content ?? "")
-        : String(value ?? "");
+const projectOptions = computed(() => {
+    const names = new Set();
+    for (const report of reports.value) {
+        for (const project of projectsOf(report)) {
+            if (project.projectName) names.add(project.projectName);
+        }
+    }
+    return [...names].sort();
+});
+
+const hasActiveFilter = computed(
+    () =>
+        Boolean(filterMember.value) ||
+        Boolean(filterProject.value) ||
+        Boolean(filterDateFrom.value) ||
+        Boolean(filterDateEnd.value),
+);
 
 const isUnresolved = (value) =>
     value && typeof value === "object" ? value.status !== "해결" : false;
 
-const projectsOf = (report) => toParsed(report.parsed_json)?.projects ?? [];
+const projectNamesOf = (report) =>
+    projectsOf(report)
+        .map((project) => project.projectName)
+        .filter(Boolean);
+
+const unresolvedIssueCount = (report) =>
+    projectsOf(report).reduce((count, project) => {
+        const issues = Array.isArray(project.issues) ? project.issues : [];
+        return count + issues.filter(isUnresolved).length;
+    }, 0);
+
+const openDetail = (reportId) => {
+    router.push(`/report/${reportId}`);
+};
+
+const onCardKeydown = (event, reportId) => {
+    if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openDetail(reportId);
+    }
+};
 
 const formatDate = (value) => {
     if (!value) return "-";
@@ -109,50 +146,32 @@ const formatDate = (value) => {
     return `${y}.${m}.${d}`;
 };
 
-const hasItems = (list) => Array.isArray(list) && list.length > 0;
+const setPresetToday = () => {
+    const today = formatLocalDate(new Date());
+    filterDateFrom.value = today;
+    filterDateEnd.value = today;
+};
 
-const visibleSections = (item) => {
-    const sections = [
-        {
-            key: "completed",
-            label: "완료된 업무",
-            tone: "tone-completed",
-            icon: CheckCircle2,
-            items: item.completedTasks,
-        },
-        {
-            key: "progress",
-            label: "진행 중인 업무",
-            tone: "tone-in-progress",
-            icon: CircleDot,
-            items: item.inProgressTasks,
-        },
-        {
-            key: "issues",
-            label: "이슈",
-            tone: "tone-issues",
-            icon: AlertTriangle,
-            items: item.issues,
-        },
-        {
-            key: "requests",
-            label: "요청사항",
-            tone: "tone-request",
-            icon: MessageSquare,
-            items: item.requests,
-        },
-        {
-            key: "plans",
-            label: "다음 계획",
-            tone: "tone-next-plans",
-            icon: ArrowRightCircle,
-            items: item.nextPlans,
-        },
-    ];
-    return sections.filter((section) => hasItems(section.items));
+const setPresetThisWeek = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    filterDateFrom.value = formatLocalDate(monday);
+    filterDateEnd.value = formatLocalDate(sunday);
+};
+
+const clearFilters = () => {
+    filterMember.value = "";
+    filterProject.value = "";
+    filterDateFrom.value = "";
+    filterDateEnd.value = "";
 };
 
 onMounted(() => {
+    document.title = "일일보고";
     getReports();
 });
 </script>
@@ -161,7 +180,7 @@ onMounted(() => {
     <div class="page">
         <div class="page-header">
             <div>
-                <h1>프로젝트 목록</h1>
+                <h1>일일보고</h1>
                 <p class="page-subtitle">
                     제출된 보고서를 날짜, 작성자, 프로젝트로 조회합니다
                 </p>
@@ -169,6 +188,27 @@ onMounted(() => {
             <span class="count-chip">
                 {{ filteredReportsByProject.length }}건
             </span>
+        </div>
+
+        <div class="filter-presets">
+            <button type="button" class="btn btn-small" @click="setPresetToday">
+                오늘
+            </button>
+            <button
+                type="button"
+                class="btn btn-small"
+                @click="setPresetThisWeek"
+            >
+                이번 주
+            </button>
+            <button
+                type="button"
+                class="btn btn-small"
+                :disabled="!hasActiveFilter"
+                @click="clearFilters"
+            >
+                초기화
+            </button>
         </div>
 
         <div class="filter-card">
@@ -195,20 +235,38 @@ onMounted(() => {
                 <input
                     id="filterMember"
                     type="text"
+                    list="member-options"
                     placeholder="이름 검색"
                     v-model="filterMember"
                     class="input"
+                    autocomplete="off"
                 />
+                <datalist id="member-options">
+                    <option
+                        v-for="name in memberOptions"
+                        :key="name"
+                        :value="name"
+                    />
+                </datalist>
             </div>
             <div class="field">
                 <label for="filterProject">프로젝트</label>
                 <input
                     id="filterProject"
                     type="text"
+                    list="project-options"
                     placeholder="프로젝트명 검색"
                     v-model="filterProject"
                     class="input"
+                    autocomplete="off"
                 />
+                <datalist id="project-options">
+                    <option
+                        v-for="name in projectOptions"
+                        :key="name"
+                        :value="name"
+                    />
+                </datalist>
             </div>
         </div>
 
@@ -219,84 +277,68 @@ onMounted(() => {
         >
             <Search :size="20" />
             <p>조건에 맞는 보고서가 없습니다</p>
+            <button
+                v-if="hasActiveFilter"
+                type="button"
+                class="btn"
+                @click="clearFilters"
+            >
+                필터 초기화
+            </button>
         </div>
         <div v-else class="reports-container">
             <article
                 v-for="report in filteredReportsByProject"
                 :key="report.id"
                 class="card report-item"
+                tabindex="0"
+                @click="openDetail(report.id)"
+                @keydown="onCardKeydown($event, report.id)"
             >
                 <header class="report-header">
                     <div class="report-identity">
                         <span class="avatar">{{
                             String(report.member_name || "?").slice(0, 1)
                         }}</span>
-                        <div>
+                        <div class="report-copy">
                             <h3 class="report-name">{{ report.member_name }}</h3>
                             <p class="report-sub">
                                 {{ formatDate(report.report_date) }}
-                                · 프로젝트 {{ projectsOf(report).length }}개
                             </p>
+                            <div class="report-meta">
+                                <span
+                                    v-for="name in projectNamesOf(report)"
+                                    :key="name"
+                                    class="meta-chip"
+                                >
+                                    {{ name }}
+                                </span>
+                                <span
+                                    v-if="unresolvedIssueCount(report) > 0"
+                                    class="meta-chip issue-chip"
+                                >
+                                    이슈 {{ unresolvedIssueCount(report) }}
+                                </span>
+                                <span
+                                    v-else-if="projectNamesOf(report).length === 0"
+                                    class="meta-chip"
+                                >
+                                    내용 없음
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <div class="report-actions">
                         <button
-                            class="btn btn-primary"
-                            v-on:click="() => reportDetail(report.id)"
+                            type="button"
+                            class="btn btn-danger btn-icon"
+                            aria-label="보고서 삭제"
+                            @click="deleteProjectReport(report.id, $event)"
                         >
-                            자세히 보기
-                        </button>
-                        <button
-                            class="btn btn-danger"
-                            v-on:click="() => deleteProjectReport(report.id)"
-                        >
-                            삭제
+                            <Trash2 :size="15" />
                         </button>
                     </div>
                 </header>
-
-                <div class="projects-list">
-                    <section
-                        v-for="(item, index) in projectsOf(report)"
-                        :key="index"
-                        class="project-block"
-                    >
-                        <div class="project-name">
-                            <span class="project-name-value">{{
-                                item.projectName
-                            }}</span>
-                            <span
-                                v-if="visibleSections(item).length === 0"
-                                class="empty-chip"
-                                >내용 없음</span
-                            >
-                        </div>
-
-                        <div class="detail-list">
-                            <div
-                                v-for="section in visibleSections(item)"
-                                :key="section.key"
-                                class="detail-row"
-                                :class="section.tone"
-                            >
-                                <div class="detail-label">
-                                    <component :is="section.icon" :size="15" />
-                                    <span>{{ section.label }}</span>
-                                </div>
-                                <div class="detail-content">
-                                    <ul>
-                                        <li
-                                            v-for="(entry, entryIndex) in section.items"
-                                            :key="entryIndex"
-                                        >
-                                            {{ itemText(entry) }}
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                </div>
             </article>
         </div>
     </div>
@@ -315,6 +357,13 @@ onMounted(() => {
     font-weight: 700;
 }
 
+.filter-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
 .filter-card {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -330,12 +379,13 @@ onMounted(() => {
 .reports-container {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 10px;
 }
 
 .report-item {
     padding: 0;
     overflow: hidden;
+    cursor: pointer;
 }
 
 .report-item:hover {
@@ -343,24 +393,28 @@ onMounted(() => {
     box-shadow: var(--shadow-raised);
 }
 
-.report-header .btn {
-    white-space: nowrap;
+.report-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 .report-header {
     padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     flex-wrap: wrap;
     gap: 12px;
 }
 
 .report-identity {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
+    min-width: 0;
+}
+
+.report-copy {
     min-width: 0;
 }
 
@@ -388,6 +442,33 @@ onMounted(() => {
     color: var(--text);
 }
 
+.report-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.meta-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 220px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--bg-soft);
+    color: var(--text-h);
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.issue-chip {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
 .report-actions {
     display: flex;
     align-items: center;
@@ -395,108 +476,8 @@ onMounted(() => {
     flex-shrink: 0;
 }
 
-.projects-list {
-    padding: 8px 20px 16px;
-    display: grid;
-    gap: 10px;
-}
-
-.project-block {
-    padding: 14px 16px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--bg);
-}
-
-.project-name {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-
-.project-name-value {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-h);
-}
-
-.empty-chip {
-    font-size: 11px;
-    color: var(--text);
-    opacity: 0.7;
-}
-
-.detail-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.detail-row {
-    display: flex;
-    gap: 16px;
-    padding: 10px 0 2px;
-}
-
-.detail-label {
-    flex: 0 0 132px;
-    display: flex;
-    align-items: flex-start;
-    gap: 7px;
-    font-size: 13px;
-    font-weight: 650;
-    color: var(--text-h);
-    padding-top: 1px;
-}
-
-.detail-label svg {
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-.tone-completed .detail-label svg {
-    color: var(--success);
-}
-.tone-in-progress .detail-label svg {
-    color: var(--accent);
-}
-.tone-issues .detail-label svg {
-    color: var(--danger);
-}
-.tone-request .detail-label svg {
-    color: var(--warning);
-}
-.tone-next-plans .detail-label svg {
-    color: #14b8a6;
-}
-
-.detail-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.detail-content ul {
-    margin: 0;
-    padding-left: 16px;
-    font-size: 13px;
-    line-height: 1.65;
-    color: var(--text);
-}
-
-.detail-content li {
-    list-style: disc;
-}
-
-.badge-unresolved {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 6px;
-    border-radius: 999px;
-    border: 1px solid var(--danger);
-    color: var(--danger);
-    font-size: 11px;
-    font-weight: 600;
-    vertical-align: middle;
+.btn-icon {
+    padding: 8px;
 }
 
 .empty-state {
@@ -509,13 +490,6 @@ onMounted(() => {
 @media (max-width: 860px) {
     .filter-card {
         grid-template-columns: 1fr 1fr;
-    }
-    .detail-row {
-        flex-direction: column;
-        gap: 6px;
-    }
-    .detail-label {
-        flex: none;
     }
 }
 </style>

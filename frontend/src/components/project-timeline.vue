@@ -1,17 +1,9 @@
 <script setup>
 import { onMounted, ref, computed } from "vue";
+import { useRouter } from "vue-router";
 import useAPI from "../composables/useApi";
-import {
-  CheckCircle2,
-  CircleDot,
-  AlertTriangle,
-  MessageSquare,
-  ArrowRightCircle,
-  Calendar,
-  User,
-  FolderOpen,
-} from "lucide-vue-next";
 
+const router = useRouter();
 const { getProjectNames, getProjectTimeline, getUsers } = useAPI();
 
 const projectNames = ref([]);
@@ -72,6 +64,71 @@ const groupedByDate = computed(() => {
 const totalDays = computed(() => groupedByDate.value.length);
 const totalEntries = computed(() => timeline.value.length);
 
+const selectedMemberName = computed(() => {
+  const found = users.value.find(
+    (user) => String(user.id) === String(selectedMember.value),
+  );
+  return found?.name || "";
+});
+
+const formatDate = (value) => {
+  const [year, month, day] = String(value).split("-");
+  if (!year || !month || !day) return value;
+  return `${year}.${month}.${day}`;
+};
+
+const itemText = (value) =>
+  value && typeof value === "object"
+    ? (value.content ?? "")
+    : String(value ?? "");
+
+const statusOf = (value) =>
+  value && typeof value === "object" ? value.status || "" : "";
+
+const visibleSections = (entry) =>
+  [
+    {
+      key: "completed",
+      label: "완료된 업무",
+      items: entry.completedTasks || [],
+    },
+    {
+      key: "progress",
+      label: "진행 중인 업무",
+      items: entry.inProgressTasks || [],
+    },
+    {
+      key: "issues",
+      label: "이슈",
+      items: entry.issues || [],
+    },
+    {
+      key: "requests",
+      label: "요청사항",
+      items: entry.requests || [],
+    },
+    {
+      key: "plans",
+      label: "다음 계획",
+      items: entry.nextPlans || [],
+    },
+  ].filter((section) => Array.isArray(section.items) && section.items.length);
+
+const onProjectChange = () => {
+  selectedMember.value = "";
+  fetchTimeline();
+};
+
+const openEntry = (entry) => {
+  if (!entry?.report_id) return;
+  router.push(`/report/${entry.report_id}`);
+};
+
+const clearMemberFilter = () => {
+  selectedMember.value = "";
+  fetchTimeline();
+};
+
 onMounted(() => {
   fetchInitialData();
 });
@@ -81,7 +138,7 @@ onMounted(() => {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1>프로젝트별 타임라인</h1>
+        <h1>프로젝트 흐름</h1>
         <p class="page-subtitle">
           프로젝트를 선택하면 시간순으로 보고 이력을 조회합니다
         </p>
@@ -90,27 +147,35 @@ onMounted(() => {
 
     <!-- 필터 영역 -->
     <div class="toolbar">
-      <select
-        v-model="selectedProject"
-        class="input filter-select"
-        @change="fetchTimeline"
-      >
-        <option value="">프로젝트 선택</option>
-        <option v-for="name in projectNames" :key="name" :value="name">
-          {{ name }}
-        </option>
-      </select>
+      <div class="field">
+        <label for="timeline-project">프로젝트</label>
+        <select
+          id="timeline-project"
+          v-model="selectedProject"
+          class="input filter-select"
+          @change="onProjectChange"
+        >
+          <option value="">프로젝트 선택</option>
+          <option v-for="name in projectNames" :key="name" :value="name">
+            {{ name }}
+          </option>
+        </select>
+      </div>
 
-      <select
-        v-model="selectedMember"
-        class="input filter-select"
-        @change="fetchTimeline"
-      >
-        <option value="">전체 멤버</option>
-        <option v-for="user in users" :key="user.id" :value="user.id">
-          {{ user.name }}
-        </option>
-      </select>
+      <div class="field">
+        <label for="timeline-member">멤버</label>
+        <select
+          id="timeline-member"
+          v-model="selectedMember"
+          class="input filter-select"
+          @change="fetchTimeline"
+        >
+          <option value="">전체 멤버</option>
+          <option v-for="user in users" :key="user.id" :value="user.id">
+            {{ user.name }}
+          </option>
+        </select>
+      </div>
     </div>
 
     <!-- 로딩 -->
@@ -118,7 +183,6 @@ onMounted(() => {
 
     <!-- 프로젝트 미선택 -->
     <div v-else-if="!selectedProject" class="empty-state">
-      <FolderOpen :size="32" style="margin-bottom: 8px; opacity: 0.5" />
       <p>프로젝트를 선택해주세요</p>
     </div>
 
@@ -129,20 +193,25 @@ onMounted(() => {
 
     <!-- 결과 없음 -->
     <div v-else-if="timeline.length === 0" class="empty-state">
-      해당 프로젝트의 보고 이력이 없습니다
+      <p v-if="selectedMember">
+        {{ selectedMemberName || "선택한 멤버" }}의 보고가 없습니다
+      </p>
+      <p v-else>해당 프로젝트의 보고 이력이 없습니다</p>
+      <button
+        v-if="selectedMember"
+        type="button"
+        class="btn"
+        @click="clearMemberFilter"
+      >
+        전체 멤버 보기
+      </button>
     </div>
 
     <!-- 타임라인 표시 -->
     <div v-else class="timeline-container">
       <div class="timeline-summary">
-        <span class="summary-badge">
-          <Calendar :size="14" />
-          {{ totalDays }}일
-        </span>
-        <span class="summary-badge">
-          <User :size="14" />
-          {{ totalEntries }}건 보고
-        </span>
+        <span class="summary-badge">{{ totalDays }}일</span>
+        <span class="summary-badge">{{ totalEntries }}건 보고</span>
       </div>
 
       <div class="timeline">
@@ -154,7 +223,7 @@ onMounted(() => {
 
           <div class="timeline-content">
             <div class="date-header">
-              <span class="date-text">{{ date }}</span>
+              <span class="date-text">{{ formatDate(date) }}</span>
               <span class="date-count">{{ entries.length }}건</span>
             </div>
 
@@ -162,113 +231,41 @@ onMounted(() => {
               v-for="(entry, eIdx) in entries"
               :key="eIdx"
               class="card timeline-card"
+              tabindex="0"
+              @click="openEntry(entry)"
+              @keydown.enter.prevent="openEntry(entry)"
+              @keydown.space.prevent="openEntry(entry)"
             >
-              <div class="entry-meta">
-                <User :size="13" />
-                <span>{{ entry.member_name }}</span>
-              </div>
+              <header class="entry-header">
+                <span class="avatar">{{
+                  String(entry.member_name || "?").slice(0, 1)
+                }}</span>
+                <h3 class="entry-name">{{ entry.member_name }}</h3>
+              </header>
 
-              <div class="detail-list">
-                <!-- 완료된 업무 -->
-                <div
-                  v-if="entry.completedTasks && entry.completedTasks.length"
-                  class="detail-row"
-                >
-                  <div class="detail-label tone-completed">
-                    <CheckCircle2 :size="14" />
-                    <span>완료</span>
-                  </div>
-                  <div class="detail-content">
-                    <ul>
-                      <li v-for="(task, i) in entry.completedTasks" :key="i">
-                        {{ task }}
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                <!-- 진행 중 -->
-                <div
-                  v-if="entry.inProgressTasks && entry.inProgressTasks.length"
-                  class="detail-row"
-                >
-                  <div class="detail-label tone-in-progress">
-                    <CircleDot :size="14" />
-                    <span>진행중</span>
-                  </div>
-                  <div class="detail-content">
-                    <ul>
-                      <li v-for="(task, i) in entry.inProgressTasks" :key="i">
-                        {{ task }}
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                <!-- 이슈 -->
-                <div
-                  v-if="entry.issues && entry.issues.length"
-                  class="detail-row"
-                >
-                  <div class="detail-label tone-issues">
-                    <AlertTriangle :size="14" />
-                    <span>이슈</span>
-                  </div>
-                  <div class="detail-content">
-                    <ul>
-                      <li v-for="(issue, i) in entry.issues" :key="i">
-                        <span>{{ issue.content || issue }}</span>
-                        <span
-                          v-if="issue.status"
-                          :class="[
-                            'status-badge',
-                            issue.status === '해결'
-                              ? 'status-resolved'
-                              : 'status-unresolved',
-                          ]"
-                        >
-                          {{ issue.status }}
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                <!-- 요청사항 -->
-                <div
-                  v-if="entry.requests && entry.requests.length"
-                  class="detail-row"
-                >
-                  <div class="detail-label tone-request">
-                    <MessageSquare :size="14" />
-                    <span>요청</span>
-                  </div>
-                  <div class="detail-content">
-                    <ul>
-                      <li v-for="(req, i) in entry.requests" :key="i">
-                        {{ req }}
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                <!-- 다음 계획 -->
-                <div
-                  v-if="entry.nextPlans && entry.nextPlans.length"
-                  class="detail-row"
-                >
-                  <div class="detail-label tone-next-plans">
-                    <ArrowRightCircle :size="14" />
-                    <span>계획</span>
-                  </div>
-                  <div class="detail-content">
-                    <ul>
-                      <li v-for="(plan, i) in entry.nextPlans" :key="i">
-                        {{ plan }}
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+              <div
+                v-for="section in visibleSections(entry)"
+                :key="section.key"
+                class="field-group"
+              >
+                <h3>{{ section.label }}</h3>
+                <ul class="item-list">
+                  <li
+                    v-for="(item, itemIndex) in section.items"
+                    :key="itemIndex"
+                  >
+                    <span>{{ itemText(item) }}</span>
+                    <span
+                      v-if="section.key === 'issues' && statusOf(item)"
+                      class="status-badge"
+                      :class="
+                        statusOf(item) === '해결' ? 'is-resolved' : 'is-open'
+                      "
+                    >
+                      {{ statusOf(item) }}
+                    </span>
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
@@ -371,98 +368,99 @@ onMounted(() => {
 .timeline-card {
   padding: 14px 18px;
   margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.timeline-card:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-raised);
+}
+
+.timeline-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .timeline-card:last-child {
   margin-bottom: 0;
 }
 
-.entry-meta {
+.entry-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
-.detail-list {
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--bg-soft);
+  color: var(--text-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.entry-name {
+  margin: 0;
+  font-size: 15px;
+}
+
+.field-group {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
 }
 
-.detail-row {
-  display: flex;
-  gap: 12px;
-  padding: 6px 0;
+.field-group:last-of-type {
+  margin-bottom: 0;
 }
 
-.detail-row + .detail-row {
-  border-top: 1px solid var(--border);
+.field-group h3 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
 }
 
-.detail-label {
-  flex: 0 0 80px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 600;
+.item-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.65;
   color: var(--text-h);
 }
 
-.tone-completed {
-  color: var(--success);
-}
-.tone-in-progress {
-  color: var(--accent);
-}
-.tone-issues {
-  color: var(--danger);
-}
-.tone-request {
-  color: var(--warning);
-}
-.tone-next-plans {
-  color: #14b8a6;
-}
-
-.detail-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.detail-content ul {
-  margin: 0;
-  padding-left: 16px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text);
-}
-
-.detail-content li {
-  list-style: disc;
+.item-list li + li {
+  margin-top: 4px;
 }
 
 .status-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 1px 7px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 650;
+  vertical-align: middle;
 }
 
-.status-resolved {
-  border: 1px solid var(--success);
-  color: var(--success);
-}
-
-.status-unresolved {
-  border: 1px solid var(--danger);
+.status-badge.is-open {
+  background: var(--danger-bg);
   color: var(--danger);
+}
+
+.status-badge.is-resolved {
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
 }
 </style>

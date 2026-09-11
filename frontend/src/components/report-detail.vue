@@ -2,9 +2,14 @@
     <div class="page">
         <div class="page-header">
             <div>
-                <h1>분석 결과</h1>
+                <button type="button" class="btn back-btn" @click="goBack">
+                    <ArrowLeft :size="16" />
+                    목록으로
+                </button>
+                <h1>일일보고</h1>
                 <p class="page-subtitle">
-                    AI가 정리한 내용을 확인하고 필요한 부분을 수정하세요
+                    {{ userName || "작성자 미상" }}
+                    <span v-if="reportDate"> · {{ formatDate(reportDate) }}</span>
                 </p>
             </div>
         </div>
@@ -13,171 +18,193 @@
 
         <div v-else-if="reportData" class="content-container">
             <div class="json-container">
-                <div
+                <section
                     v-for="(project, projectIndex) in reportData.projects"
                     :key="project._uid || projectIndex"
                     class="card projects-container"
                 >
-                    <input
-                        readonly
-                        class="input project-name-input"
-                        v-model="project.projectName"
-                    />
+                    <h2 class="project-title">
+                        {{ project.projectName || "이름 없는 프로젝트" }}
+                    </h2>
 
-                    <div class="field-group completedTasks">
-                        <h2>완료된 업무</h2>
-                        <input
-                            readonly
-                            v-if="project.completedTasks.length > 0"
-                            v-for="(task, taskIndex) in project.completedTasks"
-                            :key="`completed-${taskIndex}`"
-                            class="input"
-                            :value="task"
-                            v-model="project.completedTasks[taskIndex]"
-                        />
-                        <div v-else class="empty-msg">
-                            완료된 업무가 없습니다
-                        </div>
-                    </div>
-
-                    <div class="field-group inProgressTasks">
-                        <h2>진행 중인 업무</h2>
-                        <input
-                            readonly
-                            v-if="project.inProgressTasks.length > 0"
-                            v-for="(task, taskIndex) in project.inProgressTasks"
-                            :key="`progress-${taskIndex}`"
-                            class="input"
-                            :value="task"
-                            v-model="project.inProgressTasks[taskIndex]"
-                        />
-
-                        <div v-else class="empty-msg">
-                            진행 중인 업무가 없습니다
-                        </div>
-                    </div>
-
-                    <div class="field-group issues">
-                        <h2>이슈</h2>
-                        <input
-                            readonly
-                            v-if="project.issues.length > 0"
-                            v-for="(issue, issueIndex) in project.issues"
-                            :key="`issue-${issueIndex}`"
-                            class="input"
-                            :value="issue.content"
-                            v-model="project.issues[issueIndex].content"
-                        />
-                        <div v-else class="empty-msg">이슈가 없습니다</div>
-                    </div>
-
-                    <div class="field-group requests">
-                        <h2>요청사항</h2>
-                        <input
-                            readonly
-                            v-if="project.requests.length > 0"
-                            v-for="(request, requestIndex) in project.requests"
-                            :key="`request-${requestIndex}`"
-                            class="input"
-                            :value="request"
-                            v-model="project.requests[requestIndex]"
-                        />
-                        <div v-else class="empty-msg">요청사항이 없습니다</div>
-                    </div>
-
-                    <div class="field-group nextPlans">
-                        <h2>다음 계획</h2>
-                        <input
-                            readonly
-                            v-if="project.nextPlans.length > 0"
-                            v-for="(plan, planIndex) in project.nextPlans"
-                            :key="`plan-${planIndex}`"
-                            class="input"
-                            :value="plan"
-                            v-model="project.nextPlans[planIndex]"
-                        />
-
-                        <div v-else class="empty-msg">다음 계획이 없습니다</div>
-                    </div>
-                </div>
-
-                <div class="card save-bar">
-                    <span class="member-id-display"
-                        >사용자: {{ userName }}</span
+                    <div
+                        v-for="section in visibleSections(project)"
+                        :key="section.key"
+                        class="field-group"
                     >
-                    <div class="save-actions"></div>
-                </div>
+                        <h3>{{ section.label }}</h3>
+                        <ul v-if="section.items.length" class="item-list">
+                            <li
+                                v-for="(entry, entryIndex) in section.items"
+                                :key="entryIndex"
+                            >
+                                <span>{{ itemText(entry) }}</span>
+                                <span
+                                    v-if="section.key === 'issues' && statusOf(entry)"
+                                    class="status-badge"
+                                    :class="
+                                        statusOf(entry) === '해결'
+                                            ? 'is-resolved'
+                                            : 'is-open'
+                                    "
+                                >
+                                    {{ statusOf(entry) }}
+                                </span>
+                            </li>
+                        </ul>
+                        <p v-else class="empty-msg">{{ section.empty }}</p>
+                    </div>
+                </section>
             </div>
 
-            <div class="card raw-container">
+            <aside class="card raw-container">
                 <h2>원본 보고서</h2>
-                <pre class="raw-content">{{ rawData }}</pre>
-            </div>
+                <pre class="raw-content">{{ rawData || "원문이 없습니다." }}</pre>
+            </aside>
         </div>
 
         <div v-else class="empty-state">
-            보고서 데이터가 없습니다. 보고서를 먼저 제출해주세요.
+            <p>보고서 데이터가 없습니다.</p>
+            <button type="button" class="btn" @click="goBack">목록으로</button>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, watch } from "vue";
+import { ArrowLeft } from "lucide-vue-next";
 import useAPI from "../composables/useApi";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
+const router = useRouter();
 
 const reportData = ref(null);
 const rawData = ref(null);
 const userName = ref("");
+const reportDate = ref("");
 const isLoading = ref(false);
 
 const { getUsers, GetReportById } = useAPI();
 
-onMounted(async () => {
-    const id = route.params.id;
-    if (!id) return;
+const toParsed = (parsedJson) => {
+    if (!parsedJson) return null;
+    if (typeof parsedJson === "string") {
+        try {
+            return JSON.parse(parsedJson);
+        } catch {
+            return null;
+        }
+    }
+    return parsedJson;
+};
 
+const itemText = (value) =>
+    value && typeof value === "object"
+        ? (value.content ?? "")
+        : String(value ?? "");
+
+const statusOf = (value) =>
+    value && typeof value === "object" ? value.status || "" : "";
+
+const hasItems = (list) => Array.isArray(list) && list.length > 0;
+
+const visibleSections = (project) => [
+    {
+        key: "completed",
+        label: "완료된 업무",
+        items: project.completedTasks || [],
+        empty: "완료된 업무가 없습니다",
+    },
+    {
+        key: "progress",
+        label: "진행 중인 업무",
+        items: project.inProgressTasks || [],
+        empty: "진행 중인 업무가 없습니다",
+    },
+    {
+        key: "issues",
+        label: "이슈",
+        items: project.issues || [],
+        empty: "이슈가 없습니다",
+    },
+    {
+        key: "requests",
+        label: "요청사항",
+        items: project.requests || [],
+        empty: "요청사항이 없습니다",
+    },
+    {
+        key: "plans",
+        label: "다음 계획",
+        items: project.nextPlans || [],
+        empty: "다음 계획이 없습니다",
+    },
+].filter((section) => hasItems(section.items));
+
+const formatDate = (value) => {
+    if (!value) return "-";
+    const [y, m, d] = String(value).split("-");
+    if (!y || !m || !d) return value;
+    return `${y}.${m}.${d}`;
+};
+
+const goBack = () => {
+    router.push("/");
+};
+
+const loadReport = async (id) => {
+    if (!id) return;
     isLoading.value = true;
+    reportData.value = null;
     try {
         const data = await GetReportById(id);
-        reportData.value = data.parsed_json;
+        reportData.value = toParsed(data.parsed_json);
         rawData.value = data.raw_text;
+        reportDate.value = data.report_date || "";
 
-        // 사용자 이름 조회
         const users = await getUsers();
         const found = users.find(
-            (u) => String(u.id) === String(data.member_id),
+            (user) => String(user.id) === String(data.member_id),
         );
         userName.value = found ? found.name : `사용자 ${data.member_id}`;
+        document.title = `${userName.value} · 일일보고`;
     } catch (error) {
         console.error("보고서 불러오기 실패:", error);
-        alert("보고서를 불러오는데 실패했습니다.");
+        reportData.value = null;
     } finally {
         isLoading.value = false;
     }
-});
+};
+
+watch(
+    () => route.params.id,
+    (id) => {
+        loadReport(id);
+    },
+    { immediate: true },
+);
 </script>
 
 <style scoped>
-/* 전체 레이아웃 (편집기와 원본 보고서 좌우 정렬) */
+.back-btn {
+    margin-bottom: 14px;
+}
+
 .content-container {
     display: flex;
     gap: 24px;
     align-items: flex-start;
 }
 
-/* 왼쪽 편집 폼 영역 */
 .json-container {
     flex: 2;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
-/* 오른쪽 원본 보고서 영역 (스크롤 고정) */
 .raw-container {
     flex: 1;
     min-width: 0;
@@ -194,7 +221,7 @@ onMounted(async () => {
 .raw-container pre {
     margin: 0;
     white-space: pre-wrap;
-    word-break: break-all;
+    word-break: break-word;
     font-size: 13px;
     line-height: 1.5;
     max-height: 80vh;
@@ -202,28 +229,23 @@ onMounted(async () => {
     color: var(--text);
 }
 
-/* 개별 프로젝트 카드 */
 .projects-container {
     display: flex;
     flex-direction: column;
 }
 
-/* 프로젝트명 입력창 */
-.project-name-input {
+.project-title {
+    margin: 0 0 12px;
     font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 16px;
-    color: var(--text-h);
 }
 
-/* 각 업무/이슈/요청/계획 박스 레이아웃 */
 .field-group {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     border: 1px solid var(--border);
-    background: var(--bg-soft);
+    background: var(--bg);
     padding: 14px 16px;
     border-radius: var(--radius-sm);
 }
@@ -232,43 +254,59 @@ onMounted(async () => {
     margin-bottom: 0;
 }
 
-.field-group h2 {
-    margin: 0 0 4px;
+.field-group h3 {
+    margin: 0;
     font-size: 13px;
     color: var(--text);
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
 }
 
-.field-group .empty-msg {
+.item-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text-h);
+}
+
+.item-list li + li {
+    margin-top: 4px;
+}
+
+.empty-msg {
+    margin: 0;
     font-size: 13px;
     color: var(--text);
     font-style: italic;
     opacity: 0.7;
 }
 
-/* 추가 (+) 버튼 */
-.add-btn {
-    align-self: flex-start;
-    padding: 5px 14px;
-    font-size: 13px;
+.status-badge {
+    display: inline-flex;
+    margin-left: 8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 650;
+    vertical-align: middle;
 }
 
-/* 하단 저장 영역 */
-.save-bar {
-    display: flex;
-    gap: 12px;
-    align-items: center;
+.status-badge.is-open {
+    background: var(--danger-bg);
+    color: var(--danger);
 }
 
-.save-bar .member-id-display {
-    font-size: 14px;
-    color: var(--text-h);
+.status-badge.is-resolved {
+    background: color-mix(in srgb, var(--success) 16%, transparent);
+    color: var(--success);
 }
 
-.save-actions {
-    display: flex;
-    gap: 8px;
-    margin-left: auto;
+@media (max-width: 860px) {
+    .content-container {
+        flex-direction: column;
+    }
+
+    .raw-container {
+        position: static;
+    }
 }
 </style>

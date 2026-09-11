@@ -65,16 +65,12 @@ weekDays.value = getWeekDays(0);
 selects.value = [...weekDays.value];
 
 const deleteWeekly = async (reportId) => {
+    if (!window.confirm("이 주간 보고서를 삭제할까요?")) return;
     isLoading.value = true;
     try {
         await deleteWeeklyReport(reportId);
-
-        confirm("주간 보고서를 삭제하시겠습니까?")
-        if (confirmed) {
-            toastSuccess("주간 보고서를 삭제했습니다.");
-            await fetchWeeklyReport();
-        }
-
+        toastSuccess("주간 보고서를 삭제했습니다.");
+        await fetchWeeklyReport();
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("주간 보고서 삭제 실패:", error);
@@ -125,6 +121,10 @@ const loadDayCounts = async () => {
             next[item.report_date] = item.count || 0;
         }
         dayCounts.value = next;
+        const withReports = weekDays.value.filter(
+            (day) => (next[day] || 0) > 0,
+        );
+        selects.value = withReports;
     } catch (error) {
         console.error("날짜별 보고 수 조회 실패:", error);
     }
