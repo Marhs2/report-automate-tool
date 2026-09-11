@@ -1,10 +1,14 @@
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import useAPI from "../composables/useAPI";
+import { selectedUserId } from "../composables/useSelectedUser";
+import { useToast } from "../composables/useToast";
 
-const { PostReport, PostReportPptx, GetReportDraft } = useAPI();
+const { PostReport, PostReportPptx, GetReportDraft, GetUserActivities, getUsers } =
+    useAPI();
 const router = useRouter();
+const { error: toastError } = useToast();
 
 const input = ref("");
 const file = ref(null);
@@ -15,12 +19,52 @@ const date = ref(
 );
 
 const aiLoading = ref(false);
+const formError = ref("");
+const userName = ref("");
+const alreadySaved = ref(false);
 
 const getSelectedMemberId = () => {
-    const value = localStorage.getItem("report-selectedUser");
-    if (!value || value === "선택" || !/^\d+$/.test(value)) return null;
+    const value = selectedUserId.value;
+    if (value === null || value === undefined || value === "선택") return null;
     const memberId = Number(value);
-    return memberId > 0 ? memberId : null;
+    return Number.isInteger(memberId) && memberId > 0 ? memberId : null;
+};
+
+const hasUser = computed(() => getSelectedMemberId() !== null);
+
+const loadUserName = async () => {
+    const memberId = getSelectedMemberId();
+    if (memberId === null) {
+        userName.value = "";
+        return;
+    }
+    try {
+        const users = await getUsers();
+        const found = users.find((u) => String(u.id) === String(memberId));
+        userName.value = found ? found.name : `사용자 ${memberId}`;
+    } catch {
+        userName.value = `사용자 ${memberId}`;
+    }
+};
+
+const loadSavedState = async () => {
+    const memberId = getSelectedMemberId();
+    alreadySaved.value = false;
+    if (memberId === null || !date.value) return;
+    try {
+        const rows = await GetUserActivities(
+            Number(date.value.slice(0, 4)),
+            Number(date.value.slice(5, 7)),
+            date.value,
+            date.value,
+        );
+        const mine = (rows || []).find(
+            (row) => String(row.member_id) === String(memberId),
+        );
+        alreadySaved.value = Boolean(mine && (mine.activities || []).some((a) => a.count > 0));
+    } catch {
+        alreadySaved.value = false;
+    }
 };
 
 const loadDraft = async () => {
@@ -36,8 +80,20 @@ const loadDraft = async () => {
     }
 };
 
-onMounted(loadDraft);
-watch(date, loadDraft);
+const refreshMeta = async () => {
+    await loadUserName();
+    await loadSavedState();
+};
+
+onMounted(async () => {
+    await refreshMeta();
+    await loadDraft();
+});
+watch(date, async () => {
+    await loadSavedState();
+    await loadDraft();
+});
+watch(selectedUserId, refreshMeta);
 
 const selectType = (nextType) => {
     buttonType.value = nextType;
@@ -46,31 +102,34 @@ const selectType = (nextType) => {
 const uploadFile = (event) => {
     const selected = event.target.files?.[0] || null;
     if (selected && !selected.name.toLowerCase().endsWith(".pptx")) {
-        alert("PPTX 파일만 업로드할 수 있습니다.");
+        formError.value = "PPTX 파일만 업로드할 수 있습니다.";
         event.target.value = "";
         file.value = null;
         return;
     }
+    formError.value = "";
     file.value = selected;
 };
 
 const sendReport = async () => {
     const memberId = getSelectedMemberId();
     if (memberId === null) {
-        alert("사용자 선택 화면에서 사용자를 먼저 선택해주세요.");
+        formError.value = "왼쪽 아래에서 사용자를 먼저 선택해주세요.";
+        router.push("/users");
         return;
     }
 
     if (buttonType.value === "text") {
         if (!input.value.trim()) {
-            alert("보고서 내용을 입력해주세요.");
+            formError.value = "보고서 내용을 입력해주세요.";
             return;
         }
     } else if (!file.value) {
-        alert("PPTX 파일을 선택해주세요.");
+        formError.value = "PPTX 파일을 선택해주세요.";
         return;
     }
 
+    formError.value = "";
     aiLoading.value = true;
 
     try {
@@ -97,10 +156,11 @@ const sendReport = async () => {
     } catch (error) {
         console.error("보고서 전송 실패:", error);
         const detail = error.response?.data?.detail;
-        alert(
+        const message =
             detail ||
-                "보고서 전송에 실패했습니다. 입력한 내용은 유지되니 다시 시도해주세요.",
-        );
+            "보고서 전송에 실패했습니다. 입력한 내용은 유지되니 다시 시도해주세요.";
+        formError.value = message;
+        toastError(message);
     } finally {
         aiLoading.value = false;
     }
@@ -119,7 +179,33 @@ const sendReport = async () => {
             </div>
         </div>
 
-        <div class="card">
+        <div class="status-banner">
+            <span
+                >작성자 <strong>{{ userName || "미선택" }}</strong></span
+            >
+            <span
+                >날짜 <strong>{{ date }}</strong></span
+            >
+            <span
+                v-if="alreadySaved"
+                class="status-chip is-saved"
+                >이 날짜 저장됨</span
+            >
+            <span v-else class="status-chip is-draft">아직 저장 전</span>
+        </div>
+
+        <div v-if="!hasUser" class="card">
+            <p class="page-subtitle">
+                사용자를 선택해야 보고서를 넣을 수 있습니다.
+            </p>
+            <div class="form-actions">
+                <router-link class="btn btn-primary" to="/users"
+                    >사용자 선택</router-link
+                >
+            </div>
+        </div>
+
+        <div v-else class="card">
             <div class="field">
                 <label for="date">날짜</label>
                 <input type="date" id="date" v-model="date" required />
@@ -179,7 +265,7 @@ const sendReport = async () => {
                     @click="sendReport"
                     :disabled="aiLoading"
                 >
-                    {{ aiLoading ? "전송 중..." : "보내기" }}
+                    {{ aiLoading ? "정리 중..." : "AI로 정리하기" }}
                 </button>
             </div>
         </div>
@@ -193,6 +279,18 @@ const sendReport = async () => {
     margin-top: 16px;
 }
 
+.form-error {
+    margin-top: 12px;
+    color: var(--danger);
+    font-size: 13px;
+}
+
+.form-hint {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text);
+}
+
 .select-type-buttons {
     display: flex;
     gap: 8px;
@@ -200,22 +298,43 @@ const sendReport = async () => {
 
 .file-drop-area {
     border: 1px dashed var(--border);
-    padding: 16px;
+    padding: 20px;
     border-radius: var(--radius-sm);
+    background: var(--bg);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    transition:
+        border-color 0.15s,
+        background 0.15s;
+}
+
+.file-drop-area:hover,
+.file-drop-area:focus-within {
+    border-color: var(--accent-border);
+}
+
+.file-drop-area > input[type="file"] {
+    padding: 0;
+    border: none;
+    background: transparent;
 }
 
 .file-name {
     margin: 0;
     font-size: 13px;
+    font-weight: 600;
     color: var(--text-h);
 }
 
 .select-type-btn.active {
-    background: var(--accent-bg, #e8f0fe);
-    border-color: var(--accent-border, #007bff);
-    color: var(--text-h, #111);
+    background: var(--accent-bg);
+    border-color: var(--accent-border);
+    color: var(--accent);
+}
+
+.select-type-btn.active:hover {
+    background: var(--accent-bg);
+    border-color: var(--accent-border);
 }
 </style>

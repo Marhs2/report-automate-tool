@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import useAPI from "../composables/useApi";
 import { Trash2, Check, Pencil } from "lucide-vue-next";
 
@@ -8,6 +8,7 @@ const {
     postProjectName,
     deleteProjectName,
     updateProjectNameKeywords,
+    recommendKeywords,
 } = useAPI();
 
 const projectNames = ref([]);
@@ -15,10 +16,53 @@ const newName = ref("");
 const newKeywords = ref("");
 const isLoading = ref(false);
 
-// 편집 중인 행 (name) 과 입력 값
 const editingName = ref("");
 const editingKeywords = ref("");
 const savingName = ref("");
+
+const sourceText = ref("");
+const isRecommending = ref(false);
+const recommendError = ref("");
+const recommendation = ref(null);
+const applyingName = ref("");
+const appliedNames = ref(new Set());
+
+const hasRecommendation = computed(() => {
+    const data = recommendation.value;
+    if (!data) return false;
+    return (
+        (data.keywordAdditions && data.keywordAdditions.length > 0) ||
+        (data.newProjects && data.newProjects.length > 0)
+    );
+});
+
+const unwrapKeywords = (payload) => {
+    let data = payload?.keywords ?? payload;
+    if (typeof data === "string") {
+        try {
+            data = JSON.parse(data);
+        } catch {
+            data = null;
+        }
+    }
+    return {
+        keywordAdditions: data?.keywordAdditions || [],
+        newProjects: data?.newProjects || [],
+    };
+};
+
+const mergeKeywords = (current, extra) => {
+    const merged = [];
+    const seen = new Set();
+    for (const value of [...String(current || "").split(/[,，|/]/), ...(extra || [])]) {
+        const text = String(value || "").trim();
+        const key = text.toLowerCase();
+        if (!text || seen.has(key)) continue;
+        seen.add(key);
+        merged.push(text);
+    }
+    return merged.join(", ");
+};
 
 const fetchProjectNames = async () => {
     isLoading.value = true;
@@ -84,6 +128,71 @@ const cancelEdit = () => {
     editingKeywords.value = "";
 };
 
+const requestRecommendation = async () => {
+    const report = sourceText.value.trim();
+    if (!report) {
+        recommendError.value = "원문을 입력해주세요.";
+        return;
+    }
+    recommendError.value = "";
+    isRecommending.value = true;
+    recommendation.value = null;
+    appliedNames.value = new Set();
+    try {
+        recommendation.value = unwrapKeywords(await recommendKeywords(report));
+    } catch (error) {
+        recommendError.value =
+            error.response?.data?.detail || "키워드 추천에 실패했습니다.";
+    } finally {
+        isRecommending.value = false;
+    }
+};
+
+const markApplied = (name) => {
+    const next = new Set(appliedNames.value);
+    next.add(name);
+    appliedNames.value = next;
+};
+
+const applyKeywordAddition = async (item) => {
+    const target = projectNames.value.find((row) => row.name === item.projectName);
+    if (!target) {
+        alert(`'${item.projectName}'은 등록된 프로젝트가 아닙니다.`);
+        return;
+    }
+    applyingName.value = item.projectName;
+    try {
+        const keywords = mergeKeywords(target.keywords, item.suggestedKeywords);
+        await updateProjectNameKeywords(item.projectName, keywords);
+        target.keywords = keywords;
+        markApplied(item.projectName);
+        alert(`'${item.projectName}' 키워드를 반영했습니다.`);
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        alert(detail || "키워드 반영에 실패했습니다.");
+    } finally {
+        applyingName.value = "";
+    }
+};
+
+const applyNewProject = async (item) => {
+    applyingName.value = item.projectName;
+    try {
+        await postProjectName(
+            item.projectName,
+            (item.suggestedKeywords || []).join(", "),
+        );
+        markApplied(item.projectName);
+        await fetchProjectNames();
+        alert(`'${item.projectName}' 프로젝트를 등록했습니다.`);
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        alert(detail || "프로젝트 등록에 실패했습니다.");
+    } finally {
+        applyingName.value = "";
+    }
+};
+
 onMounted(() => {
     fetchProjectNames();
 });
@@ -100,6 +209,133 @@ onMounted(() => {
                     적혀 있을 때 프로젝트를 찾는 데 도움을 줍니다
                 </p>
             </div>
+        </div>
+
+        <div class="card">
+            <h2>원문으로 키워드 추천받기</h2>
+            <p class="card-hint">
+                보고서를 넣으면 기존 프로젝트 키워드와 새 프로젝트 후보를
+                골라 줍니다. 반영·등록을 눌러야 저장됩니다.
+            </p>
+            <div class="field">
+                <label for="source-text">원문</label>
+                <textarea
+                    id="source-text"
+                    v-model="sourceText"
+                    class="textarea"
+                    rows="10"
+                    placeholder="보고서 원문을 붙여넣으세요"
+                ></textarea>
+            </div>
+            <p v-if="recommendError" class="error-text">{{ recommendError }}</p>
+            <div class="recommend-actions">
+                <button
+                    class="btn btn-primary"
+                    :disabled="isRecommending"
+                    @click="requestRecommendation"
+                >
+                    {{ isRecommending ? "분석 중..." : "추천 받기" }}
+                </button>
+            </div>
+        </div>
+
+        <div v-if="recommendation && !hasRecommendation" class="card">
+            <h2>추천 결과</h2>
+            <p class="card-hint">
+                원문에서 근거를 찾지 못했습니다. 프로젝트명이 드러나는 문장을
+                포함해보세요.
+            </p>
+        </div>
+
+        <div
+            v-if="recommendation?.keywordAdditions?.length"
+            class="card"
+        >
+            <h2>기존 프로젝트에 키워드 추가</h2>
+            <ul class="suggest-list">
+                <li
+                    v-for="item in recommendation.keywordAdditions"
+                    :key="item.projectName"
+                    class="suggest-item"
+                >
+                    <div class="suggest-body">
+                        <h3>{{ item.projectName }}</h3>
+                        <div class="keyword-chips">
+                            <span
+                                v-for="keyword in item.suggestedKeywords"
+                                :key="keyword"
+                                class="chip"
+                            >
+                                {{ keyword }}
+                            </span>
+                        </div>
+                        <p class="suggest-reason">{{ item.reason }}</p>
+                    </div>
+                    <button
+                        class="btn btn-primary btn-small"
+                        :disabled="
+                            applyingName === item.projectName ||
+                            appliedNames.has(item.projectName)
+                        "
+                        @click="applyKeywordAddition(item)"
+                    >
+                        {{
+                            appliedNames.has(item.projectName)
+                                ? "반영됨"
+                                : applyingName === item.projectName
+                                  ? "반영 중..."
+                                  : "반영"
+                        }}
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <div v-if="recommendation?.newProjects?.length" class="card">
+            <h2>신규 프로젝트 후보</h2>
+            <ul class="suggest-list">
+                <li
+                    v-for="item in recommendation.newProjects"
+                    :key="item.projectName"
+                    class="suggest-item"
+                >
+                    <div class="suggest-body">
+                        <h3>{{ item.projectName }}</h3>
+                        <div class="keyword-chips">
+                            <span
+                                v-for="keyword in item.suggestedKeywords"
+                                :key="keyword"
+                                class="chip chip-new"
+                            >
+                                {{ keyword }}
+                            </span>
+                            <span
+                                v-if="!(item.suggestedKeywords || []).length"
+                                class="chip-empty"
+                            >
+                                키워드 없음
+                            </span>
+                        </div>
+                        <p class="suggest-reason">{{ item.reason }}</p>
+                    </div>
+                    <button
+                        class="btn btn-primary btn-small"
+                        :disabled="
+                            applyingName === item.projectName ||
+                            appliedNames.has(item.projectName)
+                        "
+                        @click="applyNewProject(item)"
+                    >
+                        {{
+                            appliedNames.has(item.projectName)
+                                ? "등록됨"
+                                : applyingName === item.projectName
+                                  ? "등록 중..."
+                                  : "등록"
+                        }}
+                    </button>
+                </li>
+            </ul>
         </div>
 
         <div class="card">
@@ -207,6 +443,100 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.card + .card {
+    margin-top: 16px;
+}
+
+.card h2 {
+    display: block;
+    margin: 0 0 8px;
+}
+
+.card-hint {
+    display: block;
+    font-size: 13px;
+    color: var(--text);
+    margin: 0 0 14px;
+    line-height: 1.5;
+}
+
+.recommend-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+.error-text {
+    margin-top: 8px;
+    color: var(--danger);
+    font-size: 13px;
+}
+
+.suggest-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.suggest-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.suggest-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.suggest-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.suggest-body h3 {
+    margin-bottom: 8px;
+}
+
+.keyword-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.chip-new {
+    background: color-mix(in srgb, var(--warning) 16%, transparent);
+    color: var(--warning);
+}
+
+.chip-empty {
+    font-size: 12px;
+    color: var(--text);
+}
+
+.suggest-reason {
+    font-size: 13px;
+    color: var(--text);
+}
+
 .add-form {
     display: flex;
     align-items: flex-end;
@@ -238,6 +568,14 @@ onMounted(() => {
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.4px;
+}
+
+.name-table tbody tr {
+    transition: background 0.15s;
+}
+
+.name-table tbody tr:hover {
+    background: var(--bg-soft);
 }
 
 .name-table td {
@@ -294,7 +632,13 @@ onMounted(() => {
 
 .btn-icon:hover {
     opacity: 1;
-    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    background: var(--accent-bg);
+    color: var(--accent);
+    border-color: transparent;
+}
+
+.action-cell .btn-icon:hover {
+    background: var(--danger-bg);
     color: var(--danger);
 }
 </style>

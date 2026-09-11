@@ -242,6 +242,20 @@ export default function useAPI() {
     }
   };
 
+  const recommendKeywords = async (report) => {
+    try {
+      const response = await axios.post(
+        `${baseURL}/project-names/recommend`,
+        { report },
+        { timeout: 180000 },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error recommending keywords:", error);
+      throw error;
+    }
+  };
+
   const getProjectTimeline = async (name, memberId) => {
     try {
       const params = { name };
@@ -275,6 +289,7 @@ export default function useAPI() {
     postProjectName,
     deleteProjectName,
     updateProjectNameKeywords,
+    recommendKeywords,
     getProjectTimeline,
     deleteWeeklyReport,
     deleteReport

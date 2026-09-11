@@ -1,7 +1,8 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import useAPI from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
+import { useToast } from "../composables/useToast";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
@@ -11,13 +12,16 @@ import userActivities from "./user-activities.vue";
 
 const router = useRouter();
 
-const { postWeekly, GetWeeklyReport, deleteWeeklyReport } = useAPI();
+const { postWeekly, GetWeeklyReport, deleteWeeklyReport, GetUserActivities } = useAPI();
+const { success: toastSuccess, error: toastError } = useToast();
 
 const selects = ref([]);
 const weekDays = ref([]);
 const userId = ref(selectedUserId.value || "");
 const weeklyReport = ref(null);
 const isLoading = ref(false);
+const dayCounts = ref({});
+const weekdayLabels = ["월", "화", "수", "목", "금"];
 
 const formatLocalDate = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -39,10 +43,11 @@ const getWeekDays = (offset) => {
     return days;
 };
 
-const loadWeek = (offset) => {
+const loadWeek = async (offset) => {
     weekOffset.value = offset;
     weekDays.value = getWeekDays(offset);
     selects.value = [...weekDays.value];
+    await loadDayCounts();
 };
 
 const weekLabel = computed(() => {
@@ -56,20 +61,24 @@ const weekLabel = computed(() => {
 const prevWeek = () => loadWeek(weekOffset.value - 1);
 const nextWeek = () => loadWeek(weekOffset.value + 1);
 
-loadWeek(0);
+weekDays.value = getWeekDays(0);
+selects.value = [...weekDays.value];
 
 const deleteWeekly = async (reportId) => {
     isLoading.value = true;
     try {
         await deleteWeeklyReport(reportId);
-        alert("삭제완료");
 
-        await fetchWeeklyReport();
-        
+        confirm("주간 보고서를 삭제하시겠습니까?")
+        if (confirmed) {
+            toastSuccess("주간 보고서를 삭제했습니다.");
+            await fetchWeeklyReport();
+        }
+
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("주간 보고서 삭제 실패:", error);
-        alert(detail || "주간 보고서 삭제에 실패했습니다. 다시 시도해주세요.");
+        toastError(detail || "주간 보고서 삭제에 실패했습니다. 다시 시도해주세요.");
     } finally {
         isLoading.value = false;
     }
@@ -77,32 +86,64 @@ const deleteWeekly = async (reportId) => {
 
 const sendDates = async () => {
     if (!userId.value) {
-        alert("사용자를 먼저 선택해주세요.");
+        toastError("사용자를 먼저 선택해주세요.");
         return;
     }
     if (selects.value.length === 0) {
-        alert("기간(날짜)을 최소 1개 선택해주세요.");
+        toastError("기간(날짜)을 최소 1개 선택해주세요.");
         return;
     }
     isLoading.value = true;
     try {
         await postWeekly(userId.value, selects.value);
         await fetchWeeklyReport();
-        alert("생성완료");
+        toastSuccess("주간 보고서를 만들었습니다.");
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("주간 보고서 생성 실패:", error);
-        alert(detail || "주간 보고서 생성에 실패했습니다. 다시 시도해주세요.");
+        toastError(detail || "주간 보고서 생성에 실패했습니다. 다시 시도해주세요.");
     } finally {
         isLoading.value = false;
     }
 };
 
+const loadDayCounts = async () => {
+    dayCounts.value = {};
+    if (!userId.value || weekDays.value.length < 5) return;
+    try {
+        const rows = await GetUserActivities(
+            Number(weekDays.value[0].slice(0, 4)),
+            Number(weekDays.value[0].slice(5, 7)),
+            weekDays.value[0],
+            weekDays.value[4],
+        );
+        const mine = (rows || []).find(
+            (row) => String(row.member_id) === String(userId.value),
+        );
+        const next = {};
+        for (const item of mine?.activities || []) {
+            next[item.report_date] = item.count || 0;
+        }
+        dayCounts.value = next;
+    } catch (error) {
+        console.error("날짜별 보고 수 조회 실패:", error);
+    }
+};
+
 const fetchWeeklyReport = async () => {
+    if (!userId.value) {
+        weeklyReport.value = [];
+        return;
+    }
     isLoading.value = true;
-    const response = await GetWeeklyReport(userId.value);
-    weeklyReport.value = response;
-    isLoading.value = false;
+    try {
+        weeklyReport.value = await GetWeeklyReport(userId.value);
+    } catch (error) {
+        console.error("주간 보고서 조회 실패:", error);
+        weeklyReport.value = [];
+    } finally {
+        isLoading.value = false;
+    }
 };
 
 const viewReport = (report) => {
@@ -195,7 +236,7 @@ const downloadReport = async (report) => {
         saveAs(out, filename);
     } catch (error) {
         console.error("보고서 다운로드 실패:", error);
-        alert("보고서 다운로드 중 오류가 발생했습니다: " + error.message);
+        toastError("보고서 다운로드 중 오류가 발생했습니다: " + error.message);
     } finally {
         isLoading.value = false;
     }
@@ -252,17 +293,27 @@ const copyReport = async (report) => {
     try {
         const text = formatReport(report.report);
         await navigator.clipboard.writeText(text);
-        alert("보고서가 클립보드에 복사되었습니다.");
+        toastSuccess("보고서를 복사했습니다.");
     } catch (error) {
         console.error("복사 실패:", error);
-        alert("복사에 실패했습니다.");
+        toastError("복사에 실패했습니다.");
     }
 };
 
 
-onMounted(() => {
+watch(
+    selectedUserId,
+    async (id) => {
+        userId.value = id || "";
+        await loadDayCounts();
+        await fetchWeeklyReport();
+    },
+);
+
+onMounted(async () => {
     userId.value = selectedUserId.value || "";
-    fetchWeeklyReport();
+    await loadDayCounts();
+    await fetchWeeklyReport();
 });
 </script>
 
@@ -316,7 +367,13 @@ onMounted(() => {
                     class="day-chip"
                 >
                     <input type="checkbox" v-model="selects" :value="dayDate" />
-                    <span>{{ dayDate }}</span>
+                    <span>{{ weekdayLabels[index] }} {{ dayDate }}</span>
+                    <span
+                        class="day-status"
+                        :class="dayCounts[dayDate] ? 'has-report' : 'no-report'"
+                    >
+                        {{ dayCounts[dayDate] ? "보고 있음" : "보고 없음" }}
+                    </span>
                 </label>
             </div>
 
@@ -438,6 +495,20 @@ onMounted(() => {
     border-color: var(--accent-border);
     background: var(--accent-bg);
     color: var(--text-h);
+}
+
+.day-status {
+    margin-left: 4px;
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.day-status.has-report {
+    color: var(--success);
+}
+
+.day-status.no-report {
+    color: var(--warning);
 }
 
 .generate-bar {

@@ -87,8 +87,17 @@ def load_weekly_prompt():
     return prompt.replace("{{KNOWN_PROJECTS}}", get_known_projects_block())
 
 
+def load_keyword_prompt():
+    with open("./model_asset/keyword_prompt.txt", "r", encoding="utf-8") as f:
+        prompt = f.read()
+    return prompt.replace("{{KNOWN_PROJECTS}}", get_known_projects_block())
+
+
 with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
     weekly_schema = json.load(f)
+
+with open("./model_asset/keyword_json_schema.json", "r", encoding="utf-8") as f:
+    keyword_schema = json.load(f)
 
 MODEL_NAME = "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M"
 LM_BASE_URL = "http://192.168.210.10:8888/v1"
@@ -97,8 +106,10 @@ LLM_TIMEOUT_SECONDS = 600.0
 
 DAILY_MAX_TOKENS = 262144
 WEEKLY_MAX_TOKENS = 262144
+KEYWORD_MAX_TOKENS = 4096
 DAILY_REASONING = "none"
 WEEKLY_REASONING = "none"
+KEYWORD_REASONING = "none"
 
 def _is_allowed_lm_host(hostname: str | None) -> bool:
     if not hostname:
@@ -156,6 +167,10 @@ class ProjectNameRequest(BaseModel):
 
 class ProjectNameKeywordsRequest(BaseModel):
     keywords: str = ""
+
+
+class KeywordRecommendRequest(BaseModel):
+    report: str
 
 
 class UpdateWeeklyData(BaseModel):
@@ -386,8 +401,21 @@ def _weekly_task_tokens(value):
         "예정",
         "착수",
         "시작",
+        "내일",
+        "하겠습니다",
     }
-    return {token for token in text.split() if token and token not in ignored}
+    particles = ("으로", "에서", "에게", "에는", "은", "는", "을", "를", "이", "가", "와", "과", "에")
+    tokens = set()
+    for token in text.split():
+        if not token or token in ignored:
+            continue
+        for particle in particles:
+            if len(token) > len(particle) + 1 and token.endswith(particle):
+                token = token[: -len(particle)]
+                break
+        if token and token not in ignored:
+            tokens.add(token)
+    return tokens
 
 
 def _weekly_tasks_match(left, right):
@@ -439,9 +467,15 @@ def promote_weekly_tasks(report_data, source_reports=None):
             if task and str(task).strip()
         ]
         next_field = "nextPlans" if "nextPlans" in project else "nextWeekPlans"
-        next_plans = [
-            task for task in project.get(next_field, []) if task and str(task).strip()
-        ]
+        next_plans = []
+        seen_plans = set()
+        for field in ("nextPlans", "nextWeekPlans"):
+            for task in project.get(field) or []:
+                text = str(task or "").strip()
+                if not text or text in seen_plans:
+                    continue
+                seen_plans.add(text)
+                next_plans.append(text)
 
         completed_candidates = completed + completed_by_project.get(
             _weekly_project_key(project), []
@@ -456,18 +490,96 @@ def promote_weekly_tasks(report_data, source_reports=None):
                 )
             )
         )
-        active_candidates = completed_candidates + project["inProgressTasks"]
-        project[next_field] = list(
-            dict.fromkeys(
-                task
-                for task in next_plans
-                if not any(
-                    _weekly_tasks_match(task, active_task)
-                    for active_task in active_candidates
-                )
-            )
-        )
+        def _plan_done(plan):
+            plan_tokens = _weekly_task_tokens(plan) - _WEEKLY_GENERIC_ACTIONS
+            if not plan_tokens:
+                return False
+            for completed_task in completed_candidates:
+                if _weekly_tasks_match(plan, completed_task):
+                    return True
+                done_tokens = _weekly_task_tokens(completed_task) - _WEEKLY_GENERIC_ACTIONS
+                if plan_tokens & done_tokens:
+                    return True
+            return False
 
+        cleaned_plans = list(
+            dict.fromkeys(task for task in next_plans if not _plan_done(task))
+        )
+        project[next_field] = cleaned_plans
+        if "nextWeekPlans" in project:
+            project["nextWeekPlans"] = cleaned_plans
+        if "nextPlans" in project:
+            project["nextPlans"] = cleaned_plans
+
+    return report_data
+
+
+def ensure_weekly_projects(report_data, source_reports):
+    if not isinstance(report_data, dict):
+        report_data = {"projects": []}
+    report_data.setdefault("projects", [])
+    existing = {}
+    for project in report_data.get("projects") or []:
+        if isinstance(project, dict):
+            existing[_weekly_project_key(project)] = project
+    for daily in source_reports or []:
+        for project in daily.get("projects") or []:
+            if not isinstance(project, dict) or not project_has_content(project):
+                continue
+            key = _weekly_project_key(project)
+            if key in existing:
+                continue
+            added = {
+                "projectName": reported_project_name(project),
+                "completedTasks": list(project.get("completedTasks") or []),
+                "inProgressTasks": list(project.get("inProgressTasks") or []),
+                "issues": list(project.get("issues") or []),
+                "nextWeekPlans": list(project.get("requests") or [])
+                + list(project.get("nextPlans") or []),
+            }
+            report_data["projects"].append(added)
+            existing[key] = added
+    return report_data
+
+
+def _item_covered(item, candidates):
+    item_tokens = _weekly_task_tokens(item) - _WEEKLY_GENERIC_ACTIONS
+    for candidate in candidates:
+        if _weekly_tasks_match(item, candidate):
+            return True
+        cand_tokens = _weekly_task_tokens(candidate) - _WEEKLY_GENERIC_ACTIONS
+        if item_tokens and item_tokens & cand_tokens:
+            return True
+    return False
+
+
+def ensure_weekly_plans(report_data, source_reports):
+    by_key = {}
+    for project in report_data.get("projects") or []:
+        if isinstance(project, dict):
+            by_key[_weekly_project_key(project)] = project
+    for daily in source_reports or []:
+        for project in daily.get("projects") or []:
+            if not isinstance(project, dict):
+                continue
+            target = by_key.get(_weekly_project_key(project))
+            if not target:
+                continue
+            field = "nextWeekPlans" if "nextWeekPlans" in target else "nextPlans"
+            current = list(target.get(field) or [])
+            covered = current + list(target.get("completedTasks") or [])
+            incoming = list(project.get("requests") or []) + list(
+                project.get("nextPlans") or []
+            )
+            for item in incoming:
+                text = str(item or "").strip()
+                if not text or _item_covered(text, covered):
+                    continue
+                current.append(text)
+                covered.append(text)
+            target[field] = current
+            if "nextWeekPlans" in target:
+                target["nextPlans"] = list(current)
     return report_data
 
 
@@ -618,6 +730,173 @@ def update_project_name_keywords(project_name: str, data: ProjectNameKeywordsReq
     return {"message": f"'{project_name}' 키워드가 저장되었습니다."}
 
 
+def parse_json_object(content):
+    data = content
+    for _ in range(3):
+        if not isinstance(data, str):
+            break
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"JSON 파싱 실패: {str(content)[:200]}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"dict 아님: {type(data)}")
+    return data
+
+
+def _clean_keyword_items(items):
+    cleaned = []
+    seen_names = set()
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("projectName") or "").strip()
+        if not name or name.casefold() in seen_names:
+            continue
+        keywords = []
+        seen_keywords = {name.casefold()}
+        for keyword in item.get("suggestedKeywords") or []:
+            text = str(keyword or "").strip()
+            key = text.casefold()
+            if not text or key in seen_keywords:
+                continue
+            seen_keywords.add(key)
+            keywords.append(text)
+        cleaned.append(
+            {
+                "projectName": name,
+                "suggestedKeywords": keywords,
+                "reason": str(item.get("reason") or "").strip(),
+            }
+        )
+        seen_names.add(name.casefold())
+    return cleaned
+
+
+def normalize_keyword_recommendation(content, registered_rows):
+    data = parse_json_object(content)
+    registered_by_fold = {}
+    existing_keywords = {}
+    for name, keywords in registered_rows:
+        registered_by_fold[name.casefold()] = name
+        existing_keywords[name] = {
+            part.casefold() for part in split_project_keywords(keywords)
+        } | {name.casefold()}
+
+    additions = []
+    new_projects = []
+    for item in _clean_keyword_items(data.get("keywordAdditions")):
+        canonical = registered_by_fold.get(item["projectName"].casefold())
+        if canonical:
+            item["projectName"] = canonical
+            item["suggestedKeywords"] = [
+                keyword
+                for keyword in item["suggestedKeywords"]
+                if keyword.casefold() not in existing_keywords.get(canonical, set())
+            ]
+            if item["suggestedKeywords"]:
+                additions.append(item)
+        else:
+            new_projects.append(item)
+
+    for item in _clean_keyword_items(data.get("newProjects")):
+        canonical = registered_by_fold.get(item["projectName"].casefold())
+        if canonical:
+            extra = [
+                keyword
+                for keyword in item["suggestedKeywords"]
+                if keyword.casefold() not in existing_keywords.get(canonical, set())
+            ]
+            if extra:
+                additions.append(
+                    {
+                        "projectName": canonical,
+                        "suggestedKeywords": extra,
+                        "reason": item["reason"],
+                    }
+                )
+        else:
+            new_projects.append(item)
+
+    merged_additions = []
+    addition_index = {}
+    for item in additions:
+        key = item["projectName"].casefold()
+        if key in addition_index:
+            current = merged_additions[addition_index[key]]
+            seen = {k.casefold() for k in current["suggestedKeywords"]}
+            for keyword in item["suggestedKeywords"]:
+                if keyword.casefold() not in seen:
+                    current["suggestedKeywords"].append(keyword)
+                    seen.add(keyword.casefold())
+        else:
+            addition_index[key] = len(merged_additions)
+            merged_additions.append(item)
+
+    return {"keywordAdditions": merged_additions, "newProjects": new_projects}
+
+
+def call_keyword_model(report):
+    client = OpenAI(
+        base_url=LM_BASE_URL,
+        api_key=LM_API_KEY,
+        timeout=LLM_TIMEOUT_SECONDS,
+    )
+    kwargs = dict(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": load_keyword_prompt()},
+            {"role": "user", "content": report},
+        ],
+        temperature=0.1,
+        max_tokens=KEYWORD_MAX_TOKENS,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "keyword_recommendation",
+                "strict": True,
+                "schema": keyword_schema,
+            },
+        },
+    )
+    if KEYWORD_REASONING:
+        kwargs["reasoning_effort"] = KEYWORD_REASONING
+    completion = client.chat.completions.create(**kwargs)
+    return read_completion(completion, "recommend-keywords")
+
+
+@app.post("/project-names/recommend")
+def recommend_project_keywords(data: KeywordRecommendRequest):
+    report = (data.report or "").strip()
+    if not report:
+        raise HTTPException(status_code=400, detail="원문을 입력해주세요.")
+
+    registered_rows = get_known_project_rows()
+    try:
+        content = call_keyword_model(report)
+        keywords = normalize_keyword_recommendation(content, registered_rows)
+        return {"keywords": keywords}
+    except HTTPException:
+        raise
+    except Exception as e:
+        resp = getattr(e, "response", None)
+        if resp is not None:
+            try:
+                detail = resp.json()
+            except Exception:
+                detail = resp.text
+            print(f"[recommend-keywords] upstream status={resp.status_code} body={detail}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"AI 모델 호출 실패 (status={resp.status_code}). 다시 시도해주세요.",
+            )
+        print(f"[recommend-keywords] error: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI 모델 호출 실패: {e}. 다시 시도해주세요.",
+        )
+
+
 def normalize_selected_dates(selects):
     normalized = set()
     for value in selects or []:
@@ -674,7 +953,12 @@ def generate_weekly_report(member_id, selects):
                     "json_schema": {
                         "name": "weekly_report",
                         "strict": True,
-                        "schema": weekly_schema,
+                        "schema": json.load(
+                            open(
+                                "./model_asset/weekly_json_schema.json",
+                                encoding="utf-8",
+                            )
+                        ),
                     },
                 },
             )
@@ -693,6 +977,9 @@ def generate_weekly_report(member_id, selects):
                     continue
                 if "nextWeekPlans" in project and "nextPlans" not in project:
                     project["nextPlans"] = list(project.get("nextWeekPlans") or [])
+            report_data = promote_weekly_tasks(report_data, reports)
+            report_data = ensure_weekly_projects(report_data, reports)
+            report_data = ensure_weekly_plans(report_data, reports)
             report_data = promote_weekly_tasks(report_data, reports)
             report_data = drop_empty_projects(report_data)
         except HTTPException:
@@ -779,7 +1066,9 @@ def process_daily_report(report: str, report_date: str, member_id: int):
                 "json_schema": {
                     "name": "daily_report",
                     "strict": True,
-                    "schema": daily_schema,
+                    "schema": json.load(
+                        open("./model_asset/json_Schema.json", encoding="utf-8")
+                    ),
                 },
             },
         )
@@ -1210,6 +1499,54 @@ def save_report(data: SaveReportData):
         cursor.execute(
             "DELETE FROM daily_reports WHERE member_id = ? AND report_date = ?",
             (member_id, report_date),
+        )
+        cursor.execute(
+            """
+            INSERT INTO daily_reports (member_id, report_date, raw_text, parsed_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            (member_id, report_date, raw_text, json.dumps(parsed)),
+        )
+
+        cursor.execute(
+            "DELETE FROM projects WHERE member_id = ? AND report_date = ?",
+            (member_id, report_date),
+        )
+        save_projects(conn, parsed, member_id, report_date)
+        conn.commit()
+    return {"message": "Report saved successfully.", "report_date": report_date}
+
+
+def save_projects(conn, report_data, member_id, report_date):
+    cursor = conn.cursor()
+
+    for project in report_data.get("projects", []):
+        if not isinstance(project, dict):
+            continue
+        cursor.execute(
+            """
+            INSERT INTO projects (
+                member_id,
+                name,
+                completed_tasks,
+                in_progress_tasks,
+                issues,
+                requests,
+                next_plans,
+                report_date
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                member_id,
+                project.get("projectName") or "미분류 프로젝트",
+                json.dumps(project.get("completedTasks", [])),
+                json.dumps(project.get("inProgressTasks", [])),
+                json.dumps(project.get("issues", [])),
+                json.dumps(project.get("requests", [])),
+                json.dumps(project.get("nextPlans", [])),
+                report_date,
+            ),
         )
         cursor.execute(
             """

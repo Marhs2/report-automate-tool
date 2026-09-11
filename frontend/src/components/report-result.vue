@@ -4,8 +4,21 @@
             <div>
                 <h1>분석 결과</h1>
                 <p class="page-subtitle">
-                    AI가 정리한 내용을 확인하고 필요한 부분을 수정하세요
+                    오른쪽 원문과 비교해서 틀린 칸만 고친 뒤 저장하세요. 저장 전까지는 목록에 안 올라갑니다.
                 </p>
+            </div>
+        </div>
+        <div class="status-banner">
+            <span>작성자 <strong>{{ userName || "미선택" }}</strong></span>
+            <span>날짜 <strong>{{ reportDate }}</strong></span>
+            <span class="status-chip is-draft">아직 저장 전</span>
+            <div class="save-actions">
+                <button class="btn" @click="retryExtract" :disabled="aiLoading">
+                    {{ aiLoading ? "재추출 중..." : "재추출" }}
+                </button>
+                <button class="btn btn-primary" @click="saveReport" :disabled="aiLoading || saving">
+                    {{ saving ? "저장 중..." : "저장하기" }}
+                </button>
             </div>
         </div>
 
@@ -13,7 +26,7 @@
             <div class="json-container">
                 <div
                     v-for="(project, projectIndex) in reportData.projects"
-                    :key="project.projectName || projectIndex"
+                    :key="project._uid || projectIndex"
                     class="card projects-container"
                 >
                     <input
@@ -184,23 +197,14 @@
                 <button class="btn" @click="addProject">추가</button>
 
                 <div class="card save-bar">
-                    <span class="member-id-display"
-                        >사용자: {{ userName }}</span
-                    >
+                    <span class="member-id-display">저장해야 이날 보고로 남습니다.</span>
                     <div class="save-actions">
-                        <button
-                            class="btn"
-                            @click="retryExtract"
-                            :disabled="aiLoading"
-                        >
-                            {{ aiLoading ? "재추출 중..." : "재추출" }}
-                        </button>
                         <button
                             class="btn btn-primary"
                             @click="saveReport"
-                            :disabled="aiLoading"
+                            :disabled="aiLoading || saving"
                         >
-                            저장하기
+                            {{ saving ? "저장 중..." : "저장하기" }}
                         </button>
                     </div>
                 </div>
@@ -222,13 +226,17 @@
 import { ref, onMounted, watch } from "vue";
 import useAPI from "../composables/useAPI";
 import { useRouter } from "vue-router";
+import { useToast } from "../composables/useToast";
 
 const router = useRouter();
+const { success: toastSuccess, error: toastError } = useToast();
 
 const reportData = ref(null);
 const rawData = ref(null);
 const userName = ref("");
+const reportDate = ref("");
 const aiLoading = ref(false);
+const saving = ref(false);
 const { PostSaveReport, PostReport, getUsers } = useAPI();
 
 watch(
@@ -253,6 +261,8 @@ onMounted(() => {
     if (storedRaw) {
         rawData.value = storedRaw;
     }
+
+    reportDate.value = sessionStorage.getItem("reportDate") || "";
 
     const userId = localStorage.getItem("report-selectedUser") || "";
     if (userId) {
@@ -328,44 +338,45 @@ const removeNextPlan = (project, index) => {
     project.nextPlans.splice(index, 1);
 };
 
-const saveReport = () => {
-    if (reportData.value) {
-        const jsonData = JSON.stringify(reportData.value, null, 2);
-        const reportDate =
-            sessionStorage.getItem("reportDate") ||
-            (() => {
-                const d = new Date();
-                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-            })();
-
-        PostSaveReport(
+const saveReport = async () => {
+    if (!reportData.value) return;
+    const jsonData = JSON.stringify(reportData.value, null, 2);
+    const dateValue =
+        reportDate.value ||
+        sessionStorage.getItem("reportDate") ||
+        (() => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        })();
+    saving.value = true;
+    try {
+        await PostSaveReport(
             jsonData,
             rawData.value,
             parseInt(localStorage.getItem("report-selectedUser") || "0"),
-            reportDate,
-        )
-            .then(() => {
-                alert("보고서가 성공적으로 저장되었습니다.");
-                sessionStorage.removeItem("reportData");
-                sessionStorage.removeItem("reportRaw");
-                sessionStorage.removeItem("reportDate");
-                router.push("/");
-            })
-            .catch((error) => {
-                console.error("보고서 저장 실패:", error);
-                alert("보고서 저장에 실패했습니다. 다시 시도해주세요.");
-            });
+            dateValue,
+        );
+        sessionStorage.removeItem("reportData");
+        sessionStorage.removeItem("reportRaw");
+        sessionStorage.removeItem("reportDate");
+        toastSuccess("보고서를 저장했습니다.");
+        router.push("/");
+    } catch (error) {
+        console.error("보고서 저장 실패:", error);
+        toastError("보고서 저장에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+        saving.value = false;
     }
 };
 
 const retryExtract = async () => {
     if (!rawData.value) {
-        alert("원문이 없어 재추출할 수 없습니다.");
+        toastError("원문이 없어 재추출할 수 없습니다.");
         return;
     }
     const userId = getSelectedMemberId();
     if (userId === null) {
-        alert("사용자 정보가 없습니다.");
+        toastError("사용자 정보가 없습니다.");
         return;
     }
     try {
@@ -385,7 +396,7 @@ const retryExtract = async () => {
         sessionStorage.setItem("reportData", JSON.stringify(res));
     } catch (error) {
         console.error("재추출 실패:", error);
-        alert("재추출에 실패했습니다. 다시 시도해주세요.");
+        toastError("재추출에 실패했습니다. 다시 시도해주세요.");
     } finally {
         aiLoading.value = false;
     }
@@ -518,5 +529,19 @@ const getSelectedMemberId = () => {
     display: flex;
     gap: 8px;
     margin-left: auto;
+}
+
+.status-banner .save-actions {
+    margin-left: auto;
+}
+
+@media (max-width: 960px) {
+    .content-container {
+        flex-direction: column;
+    }
+    .raw-container {
+        position: static;
+        max-width: none;
+    }
 }
 </style>

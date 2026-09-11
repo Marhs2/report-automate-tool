@@ -7,7 +7,7 @@
   "properties": {
     "projects": {
       "type": "array",
-      "description": "프로젝트별 주간 업무 목록. 동일 projectName은 하나의 요소로 병합한다. 4개 배열이 모두 비는 프로젝트는 포함하지 않는다. 입력 JSON에 없는 projectName을 새로 만들지 않는다.",
+      "description": "프로젝트별 주간 업무 목록. 동일 projectName은 하나의 요소로 병합한다. 입력에 업무가 있는 프로젝트는 빠뜨리지 않는다. 4개 배열이 모두 비는 프로젝트는 포함하지 않는다. 입력 JSON에 없는 projectName을 새로 만들지 않는다.",
       "maxItems": 15,
       "items": {
         "type": "object",
@@ -21,21 +21,21 @@
           },
           "completedTasks": {
             "type": "array",
-            "description": "주간 기간 중 완료된 업무. 일일보고의 completedTasks를 모아 중복을 제거한다. 주간 중 inProgressTasks/nextPlans에서 completedTasks로 승격된 업무도 여기에 넣고 다른 필드에서는 제거한다. issues에서 해결된 항목의 조치 내용도 여기에 포함한다.",
+            "description": "주간 기간 중 완료된 업무. 일일보고의 completedTasks를 모아 같은 사건은 1개만 남긴다. 재실행·전체 통과·어제 실패분 통과처럼 한 테스트의 반복 문장은 합친다. 대상·산출물이 다른 완료(프로필 리사이즈와 썸네일 생성)는 둘 다 남긴다. 주간 중 inProgressTasks/nextPlans에서 completedTasks로 승격된 업무도 여기에 넣고 다른 필드에서는 제거한다.",
             "uniqueItems": true,
             "maxItems": 30,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           },
           "inProgressTasks": {
             "type": "array",
-            "description": "주간 마지막 시점에도 진행 중인 업무. 일일보고의 inProgressTasks를 모아 중복을 제거한다. 이미 completedTasks로 승격된 업무는 여기에 넣지 않는다. nextPlans에서 inProgressTasks로 승격된 업무는 여기에 넣고 nextWeekPlans에서는 제거한다.",
+            "description": "주간 마지막 시점에도 진행 중인 업무. 일일보고의 inProgressTasks를 모아 중복을 제거한다. 이미 같은 대상이 completedTasks로 승격된 업무만 여기서 뺀다. 대상이 다른 진행은 다른 화면 완료가 있어도 남긴다.",
             "uniqueItems": true,
             "maxItems": 20,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           },
           "issues": {
             "type": "array",
-            "description": "주간 마지막 시점에 남아 있는 문제·미결 사항. 동일 이슈가 여러 일에 반복되면 하나만 유지한다. 주간 중 해결된 이슈는 status를 '해결'로 바꾸거나, completedTasks에 해결 내용을 넣고 여기서 제거한다. 같은 문제를 completedTasks와 issues(status:미해결)에 동시에 넣지 않는다.",
+            "description": "주간 마지막 시점에 남아 있는 문제·미결 사항. 동일 이슈가 여러 일에 반복되면 최신 1개만 유지한다. 이슈를 제거하려면 completedTasks가 그 문제를 해결했다고 분명해야 한다. '개선'만 있고 재확인 계획이 있으면 미해결로 남긴다. 같은 문제를 completedTasks와 issues(status:미해결)에 동시에 넣지 않는다.",
             "uniqueItems": true,
             "maxItems": 20,
             "items": {
@@ -59,7 +59,7 @@
           },
           "nextWeekPlans": {
             "type": "array",
-            "description": "다음 주 예정 업무. 일일보고의 requests와 nextPlans를 모두 여기로 병합한다. 주간 중 이미 inProgressTasks나 completedTasks로 승격된 업무는 여기에 넣지 않는다. 중복을 제거하고 원문 문장을 그대로 복사한다.",
+            "description": "다음 주 예정 업무. 일일보고의 requests와 nextPlans를 모두 여기로 병합한다. 주간 중 이미 inProgressTasks나 completedTasks로 승격된 업무는 여기에 넣지 않는다. 같은 계획은 날짜·요일이 있는 문장 1개만 남기고 원문 문장을 그대로 복사한다.",
             "uniqueItems": true,
             "maxItems": 20,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }

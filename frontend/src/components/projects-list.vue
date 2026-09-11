@@ -338,6 +338,11 @@ onMounted(() => {
     overflow: hidden;
 }
 
+.report-item:hover {
+    border-color: var(--accent-border);
+    box-shadow: var(--shadow-raised);
+}
+
 .report-header .btn {
     white-space: nowrap;
 }

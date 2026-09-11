@@ -37,6 +37,10 @@ const routes = [
     component: weekly,
   },
   {
+    path: "/weekly-report",
+    redirect: "/weekly",
+  },
+  {
     path: "/users",
     name: "users",
     component: users,

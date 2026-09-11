@@ -15,7 +15,7 @@
             <div class="json-container">
                 <div
                     v-for="(project, projectIndex) in reportData.projects"
-                    :key="project.projectName || projectIndex"
+                    :key="project._uid || projectIndex"
                     class="card projects-container"
                 >
                     <input

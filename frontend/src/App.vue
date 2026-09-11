@@ -12,9 +12,11 @@ import { onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import useAPI from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
+import { useToast } from "./composables/useToast";
 
 const router = useRouter();
 const { getUsers } = useAPI();
+const { toasts } = useToast();
 
 const navGroups = [
     {
@@ -82,7 +84,6 @@ const logout = () => {
 
 onMounted(() => {
     if (selectedUserId.value == null) {
-        alert("사용자를 선택해주세요");
         router.push("/users");
     }
 });
@@ -121,4 +122,14 @@ onMounted(() => {
     <main class="main-content">
         <RouterView />
     </main>
+    <div class="toast-stack" aria-live="polite">
+        <div
+            v-for="item in toasts"
+            :key="item.id"
+            class="toast"
+            :class="'toast-' + item.type"
+        >
+            {{ item.message }}
+        </div>
+    </div>
 </template>
