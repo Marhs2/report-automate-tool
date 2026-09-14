@@ -1,127 +1,86 @@
 <template>
-    <div class="page">
+    <div class="page report-doc">
         <div class="page-header">
             <div>
-                <h1>주간 요약</h1>
+                <button type="button" class="btn back-btn" @click="goBack">
+                    <ArrowLeft :size="16" />
+                    목록으로
+                </button>
+                <h1 class="detail-title">{{ userName || "주간 요약" }}</h1>
+                <p class="page-subtitle">주간 보고서</p>
             </div>
         </div>
 
-        <div v-if="reportData" class="content-container">
+        <div v-if="reportData" class="content-container single">
             <div class="json-container">
-                <div
-                    v-for="(project, projectIndex) in reportData.projects"
-                    :key="project._uid || projectIndex"
-                    class="card projects-container"
-                >
-                    <input
-                        class="input project-name-input"
-                        v-model="project.projectName"
-                    />
+                <div v-for="(project, projectIndex) in reportData.projects" :key="project._uid || projectIndex"
+                    class="card projects-container">
+                    <div class="project-head">
+                        <input class="input project-name-input" v-model="project.projectName" />
+                        <button class="btn btn-danger" @click="removeProject(project)">
+                            삭제
+                        </button>
+                    </div>
+
+
 
                     <div class="field-group completedTasks">
                         <h2>완료된 업무</h2>
-                        <div
-                            v-if="project.completedTasks.length > 0"
-                            v-for="(task, taskIndex) in project.completedTasks"
-                            :key="`completed-${taskIndex}`"
-                            class="task-row"
-                        >
-                            <input
-                                class="input"
-                                v-model="project.completedTasks[taskIndex]"
-                            />
-                            <button
-                                class="btn remove-btn"
-                                @click="
-                                    removeItem(project, 'completedTasks', taskIndex)
-                                "
-                            >
+                        <div v-if="project.completedTasks.length > 0"
+                            v-for="(task, taskIndex) in project.completedTasks" :key="`completed-${taskIndex}`"
+                            class="task-row">
+                            <input class="input" v-model="project.completedTasks[taskIndex]" />
+                            <button class="btn remove-btn" @click="
+                                removeItem(project, 'completedTasks', taskIndex)
+                                ">
                                 -
                             </button>
                         </div>
                         <div v-else class="empty-msg">완료된 업무가 없습니다</div>
-                        <button
-                            class="btn add-btn"
-                            @click="addItem(project, 'completedTasks')"
-                        >
+                        <button class="btn add-btn" @click="addItem(project, 'completedTasks')">
                             +
                         </button>
                     </div>
 
                     <div class="field-group inProgressTasks">
                         <h2>진행 중인 업무</h2>
-                        <div
-                            v-if="project.inProgressTasks.length > 0"
-                            v-for="(task, taskIndex) in project.inProgressTasks"
-                            :key="`progress-${taskIndex}`"
-                            class="task-row"
-                        >
-                            <input
-                                class="input"
-                                v-model="project.inProgressTasks[taskIndex]"
-                            />
-                            <button
-                                class="btn remove-btn"
-                                @click="
-                                    removeItem(project, 'inProgressTasks', taskIndex)
-                                "
-                            >
+                        <div v-if="project.inProgressTasks.length > 0"
+                            v-for="(task, taskIndex) in project.inProgressTasks" :key="`progress-${taskIndex}`"
+                            class="task-row">
+                            <input class="input" v-model="project.inProgressTasks[taskIndex]" />
+                            <button class="btn remove-btn" @click="
+                                removeItem(project, 'inProgressTasks', taskIndex)
+                                ">
                                 -
                             </button>
                         </div>
                         <div v-else class="empty-msg">진행 중인 업무가 없습니다</div>
-                        <button
-                            class="btn add-btn"
-                            @click="addItem(project, 'inProgressTasks')"
-                        >
+                        <button class="btn add-btn" @click="addItem(project, 'inProgressTasks')">
                             +
                         </button>
                     </div>
 
                     <div class="field-group issues">
                         <h2>이슈</h2>
-                        <div
-                            v-if="project.issues.length > 0"
-                            v-for="(issue, issueIndex) in project.issues"
-                            :key="`issue-${issueIndex}`"
-                            class="task-row"
-                        >
-                            <input
-                                class="input"
-                                v-model="project.issues[issueIndex]"
-                            />
-                            <button
-                                class="btn remove-btn"
-                                @click="removeItem(project, 'issues', issueIndex)"
-                            >
+                        <div v-if="project.issues.length > 0" v-for="(issue, issueIndex) in project.issues"
+                            :key="`issue-${issueIndex}`" class="task-row">
+                            <input class="input" v-model="project.issues[issueIndex]" />
+                            <button class="btn remove-btn" @click="removeItem(project, 'issues', issueIndex)">
                                 -
                             </button>
                         </div>
                         <div v-else class="empty-msg">이슈가 없습니다</div>
-                        <button
-                            class="btn add-btn"
-                            @click="addItem(project, 'issues')"
-                        >
+                        <button class="btn add-btn" @click="addItem(project, 'issues')">
                             +
                         </button>
                     </div>
 
                     <div class="field-group nextPlans">
                         <h2>다음 주 계획</h2>
-                        <div
-                            v-if="project.nextPlans.length > 0"
-                            v-for="(plan, planIndex) in project.nextPlans"
-                            :key="`plan-${planIndex}`"
-                            class="task-row"
-                        >
-                            <input
-                                class="input"
-                                v-model="project.nextPlans[planIndex]"
-                            />
-                            <button
-                                class="btn remove-btn"
-                                @click="removeItem(project, 'nextPlans', planIndex)"
-                            >
+                        <div v-if="project.nextPlans.length > 0" v-for="(plan, planIndex) in project.nextPlans"
+                            :key="`plan-${planIndex}`" class="task-row">
+                            <input class="input" v-model="project.nextPlans[planIndex]" />
+                            <button class="btn remove-btn" @click="removeItem(project, 'nextPlans', planIndex)">
                                 -
                             </button>
                         </div>
@@ -130,12 +89,14 @@
                             +
                         </button>
                     </div>
+
+
                 </div>
+                <button class="btn" @click="addProject">추가</button>
+
 
                 <div class="card save-bar">
-                    <span class="member-id-display"
-                        >사용자: {{ userName }}</span
-                    >
+                    <span class="member-id-display">사용자: {{ userName }}</span>
                     <div class="save-actions">
                         <button class="btn" @click="copyReport" :disabled="isSaving">
                             복사
@@ -154,10 +115,17 @@
 
 <script setup>
 import { ref, onMounted, watch } from "vue";
+import { ArrowLeft } from "lucide-vue-next";
 import useAPI from "../composables/useAPI";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
+const router = useRouter();
+const goBack = () => router.push("/weekly");
+const removeProject = (project) => {
+    if (!reportData.value?.projects) return;
+    reportData.value.projects = reportData.value.projects.filter((p) => p !== project);
+};
 
 const reportData = ref(null);
 const userName = ref("");
@@ -251,6 +219,17 @@ onMounted(async () => {
     }
 });
 
+
+const addProject = () => {
+    reportData.value.projects.push({
+        projectName: "",
+        completedTasks: [],
+        inProgressTasks: [],
+        issues: [],
+        nextPlans: [],
+    });
+};
+
 const addItem = (project, field) => {
     project[field].push("");
 };
@@ -332,133 +311,4 @@ const saveReport = async () => {
 };
 </script>
 
-<style scoped>
-/* 전체 레이아웃 (편집기와 원본 보고서 좌우 정렬) */
-.content-container {
-    display: flex;
-    gap: 24px;
-    align-items: flex-start;
-}
-
-/* 왼쪽 편집 폼 영역 */
-.json-container {
-    flex: 2;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-/* 오른쪽 원본 보고서 영역 (스크롤 고정) */
-.raw-container {
-    flex: 1;
-    min-width: 0;
-    position: sticky;
-    top: 32px;
-}
-
-.raw-container h2 {
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-}
-
-.raw-container pre {
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-all;
-    font-size: 13px;
-    line-height: 1.5;
-    max-height: 80vh;
-    overflow-y: auto;
-    color: var(--text);
-}
-
-/* 개별 프로젝트 카드 */
-.projects-container {
-    display: flex;
-    flex-direction: column;
-}
-
-/* 프로젝트명 입력창 */
-.project-name-input {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 16px;
-    color: var(--text-h);
-}
-
-/* 각 업무/이슈/요청/계획 박스 레이아웃 */
-.field-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 16px;
-    border: 1px solid var(--border);
-    background: var(--bg-soft);
-    padding: 14px 16px;
-    border-radius: var(--radius-sm);
-}
-
-.field-group:last-of-type {
-    margin-bottom: 0;
-}
-
-.field-group h2 {
-    margin: 0 0 4px;
-    font-size: 13px;
-    color: var(--text);
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-}
-
-.field-group .empty-msg {
-    font-size: 13px;
-    color: var(--text);
-    font-style: italic;
-    opacity: 0.7;
-}
-
-/* 추가 (+) 버튼 */
-.add-btn {
-    align-self: flex-start;
-    padding: 5px 14px;
-    font-size: 13px;
-}
-
-/* 항목 행 (입력 + 삭제 버튼) */
-.task-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.task-row .input {
-    flex: 1;
-    min-width: 0;
-}
-
-.remove-btn {
-    flex-shrink: 0;
-    padding: 5px 10px;
-    font-size: 13px;
-}
-
-/* 하단 저장 영역 */
-.save-bar {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-}
-
-.save-bar .member-id-display {
-    font-size: 14px;
-    color: var(--text-h);
-}
-
-.save-actions {
-    display: flex;
-    gap: 8px;
-    margin-left: auto;
-}
-</style>
+<style scoped></style>

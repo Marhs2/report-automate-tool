@@ -26,6 +26,10 @@ htmlcov/
 *.cover
 .hypothesis/
 
+
+# -- DB Data --
+backend/db/
+
 # ── SQLite runtime files ────────────────────────────────
 *.db-shm
 *.db-wal

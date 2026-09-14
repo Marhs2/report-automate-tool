@@ -8,7 +8,7 @@ import {
     ArrowLeftRight,
     Settings2,
 } from "lucide-vue-next";
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import useAPI from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
@@ -42,6 +42,21 @@ const navGroups = [
         ],
     },
 ];
+
+
+const pageMeta = computed(() => {
+    const path = route.path;
+    if (path === "/report-result") return { title: "분석 결과", action: null };
+    if (/^\/report\/\d+/.test(path)) return { title: "일일보고", action: { to: "/", label: "목록" } };
+    if (path === "/report") return { title: "보고서 작성", action: null };
+    if (path.startsWith("/weekly-detail")) return { title: "주간 보고서", action: { to: "/weekly", label: "목록" } };
+    if (path === "/weekly") return { title: "주간 보고서", action: null };
+    if (path === "/activities") return { title: "사용자 활동", action: { to: "/report", label: "보고서 작성" } };
+    if (path === "/project-timeline") return { title: "프로젝트 흐름", action: null };
+    if (path === "/project-name") return { title: "프로젝트명 관리", action: null };
+    if (path === "/users") return { title: "사용자 선택", action: null };
+    return { title: "일일보고", action: { to: "/report", label: "보고서 작성" } };
+});
 
 const isNavActive = (to) => {
     const path = route.path;
@@ -129,7 +144,19 @@ onMounted(() => {
     </aside>
 
     <main class="main-content">
-        <RouterView />
+        <header class="topbar">
+            <div class="topbar-title">{{ pageMeta.title }}</div>
+            <router-link
+                v-if="pageMeta.action"
+                class="btn btn-primary"
+                :to="pageMeta.action.to"
+            >
+                {{ pageMeta.action.label }}
+            </router-link>
+        </header>
+        <div class="main-body">
+            <RouterView />
+        </div>
     </main>
     <div class="toast-stack" aria-live="polite">
         <div

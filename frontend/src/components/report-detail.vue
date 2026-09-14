@@ -1,16 +1,12 @@
 <template>
-    <div class="page">
+    <div class="page report-doc">
         <div class="page-header">
             <div>
                 <button type="button" class="btn back-btn" @click="goBack">
                     <ArrowLeft :size="16" />
                     목록으로
                 </button>
-                <h1>일일보고</h1>
-                <p class="page-subtitle">
-                    {{ userName || "작성자 미상" }}
-                    <span v-if="reportDate"> · {{ formatDate(reportDate) }}</span>
-                </p>
+                <h1 class="detail-title">{{ userName || "작성자 미상" }}</h1>
             </div>
         </div>
 
@@ -173,106 +169,7 @@ watch(
 </script>
 
 <style scoped>
-.back-btn {
-    margin-bottom: 14px;
-}
-
-.content-container {
-    display: flex;
-    gap: 24px;
-    align-items: flex-start;
-}
-
-.json-container {
-    flex: 2;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.raw-container {
-    flex: 1;
-    min-width: 0;
-    position: sticky;
-    top: 32px;
-}
-
-.raw-container h2 {
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-}
-
-.raw-container pre {
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-size: 13px;
-    line-height: 1.5;
-    max-height: 80vh;
-    overflow-y: auto;
-    color: var(--text);
-}
-
-.projects-container {
-    display: flex;
-    flex-direction: column;
-}
-
 .project-title {
-    margin: 0 0 12px;
-    font-size: 16px;
-}
-
-.field-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
     margin-bottom: 12px;
-    border: 1px solid var(--border);
-    background: var(--bg);
-    padding: 14px 16px;
-    border-radius: var(--radius-sm);
-}
-
-.field-group:last-of-type {
-    margin-bottom: 0;
-}
-
-.field-group h3 {
-    margin: 0;
-    font-size: 13px;
-    color: var(--text);
-}
-
-.item-list {
-    margin: 0;
-    padding-left: 18px;
-    font-size: 14px;
-    line-height: 1.65;
-    color: var(--text-h);
-}
-
-.item-list li + li {
-    margin-top: 4px;
-}
-
-.empty-msg {
-    margin: 0;
-    font-size: 13px;
-    color: var(--text);
-    font-style: italic;
-    opacity: 0.7;
-}
-
-@media (max-width: 860px) {
-    .content-container {
-        flex-direction: column;
-    }
-
-    .raw-container {
-        position: static;
-    }
 }
 </style>

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted } from "vue";
 import useAPI from "../composables/useApi";
-import { Trash2, Check, Pencil } from "lucide-vue-next";
+import { Trash2, Check, Pencil, Sparkles, Plus, X } from "lucide-vue-next";
 
 const {
     getRegisteredProjectNames,
@@ -35,6 +35,12 @@ const hasRecommendation = computed(() => {
         (data.newProjects && data.newProjects.length > 0)
     );
 });
+
+const keywordList = (value) =>
+    String(value || "")
+        .split(/[,，|/]/)
+        .map((text) => text.trim())
+        .filter(Boolean);
 
 const unwrapKeywords = (payload) => {
     let data = payload?.keywords ?? payload;
@@ -199,67 +205,78 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="page">
-        <div class="page-header">
-            <div>
-                <h1>프로젝트 명 관리</h1>
-                <p class="page-subtitle">
-                    등록된 프로젝트 명은 보고서 작성 시 AI가 프로젝트를
-                    구분하는 데 사용됩니다. 키워드는 원문에 화면·기능명만
-                    적혀 있을 때 프로젝트를 찾는 데 도움을 줍니다
-                </p>
-            </div>
-        </div>
+    <div class="page names-page">
 
-        <div class="card">
-            <h2>원문으로 키워드 추천받기</h2>
-            <p class="card-hint">
-                보고서를 넣으면 기존 프로젝트 키워드와 새 프로젝트 후보를
-                골라 줍니다. 반영·등록을 눌러야 저장됩니다.
-            </p>
-            <div class="field">
-                <label for="source-text">원문</label>
-                <textarea
-                    id="source-text"
-                    v-model="sourceText"
-                    class="textarea"
-                    rows="10"
-                    placeholder="보고서 원문을 붙여넣으세요"
-                ></textarea>
-            </div>
-            <p v-if="recommendError" class="error-text">{{ recommendError }}</p>
-            <div class="recommend-actions">
-                <button
-                    class="btn btn-primary"
-                    :disabled="isRecommending"
-                    @click="requestRecommendation"
-                >
-                    {{ isRecommending ? "분석 중..." : "추천 받기" }}
-                </button>
-            </div>
-        </div>
 
-        <div v-if="recommendation && !hasRecommendation" class="card">
-            <h2>추천 결과</h2>
-            <p class="card-hint">
+        <section class="card recommend-card">
+            <div class="section-head">
+                <div>
+                    <h2>원문으로 키워드 추천</h2>
+ 
+                </div>
+            </div>
+            <div class="recommend-grid">    
+                <div class="field">
+                    <label for="source-text">원문</label>
+                    <textarea
+                        id="source-text"
+                        v-model="sourceText"
+                        class="textarea"
+                        rows="7"
+                        placeholder="보고서 원문을 붙여넣으세요"
+                    ></textarea>
+                </div>
+                <div class="recommend-side">
+                 
+                    <p v-if="recommendError" class="error-text">
+                        {{ recommendError }}
+                    </p>
+                    <button
+                        class="btn btn-primary"
+                        :disabled="isRecommending"
+                        @click="requestRecommendation"
+                    >
+                        <Sparkles :size="14" />
+                        {{ isRecommending ? "분석 중..." : "추천 받기" }}
+                    </button>
+                </div>
+            </div>
+
+            <div v-if="recommendation && !hasRecommendation" class="empty-suggest">
                 원문에서 근거를 찾지 못했습니다. 프로젝트명이 드러나는 문장을
                 포함해보세요.
-            </p>
-        </div>
+            </div>
 
-        <div
-            v-if="recommendation?.keywordAdditions?.length"
-            class="card"
-        >
-            <h2>기존 프로젝트에 키워드 추가</h2>
-            <ul class="suggest-list">
-                <li
-                    v-for="item in recommendation.keywordAdditions"
-                    :key="item.projectName"
-                    class="suggest-item"
-                >
-                    <div class="suggest-body">
-                        <h3>{{ item.projectName }}</h3>
+            <div
+                v-if="recommendation?.keywordAdditions?.length"
+                class="suggest-block"
+            >
+                <h3 class="suggest-title">기존 프로젝트에 키워드 추가</h3>
+                <div class="suggest-grid">
+                    <article
+                        v-for="item in recommendation.keywordAdditions"
+                        :key="item.projectName"
+                        class="suggest-card"
+                    >
+                        <div class="suggest-card-head">
+                            <h4>{{ item.projectName }}</h4>
+                            <button
+                                class="btn btn-primary btn-small"
+                                :disabled="
+                                    applyingName === item.projectName ||
+                                    appliedNames.has(item.projectName)
+                                "
+                                @click="applyKeywordAddition(item)"
+                            >
+                                {{
+                                    appliedNames.has(item.projectName)
+                                        ? "반영됨"
+                                        : applyingName === item.projectName
+                                          ? "반영 중..."
+                                          : "반영"
+                                }}
+                            </button>
+                        </div>
                         <div class="keyword-chips">
                             <span
                                 v-for="keyword in item.suggestedKeywords"
@@ -270,37 +287,40 @@ onMounted(() => {
                             </span>
                         </div>
                         <p class="suggest-reason">{{ item.reason }}</p>
-                    </div>
-                    <button
-                        class="btn btn-primary btn-small"
-                        :disabled="
-                            applyingName === item.projectName ||
-                            appliedNames.has(item.projectName)
-                        "
-                        @click="applyKeywordAddition(item)"
-                    >
-                        {{
-                            appliedNames.has(item.projectName)
-                                ? "반영됨"
-                                : applyingName === item.projectName
-                                  ? "반영 중..."
-                                  : "반영"
-                        }}
-                    </button>
-                </li>
-            </ul>
-        </div>
+                    </article>
+                </div>
+            </div>
 
-        <div v-if="recommendation?.newProjects?.length" class="card">
-            <h2>신규 프로젝트 후보</h2>
-            <ul class="suggest-list">
-                <li
-                    v-for="item in recommendation.newProjects"
-                    :key="item.projectName"
-                    class="suggest-item"
-                >
-                    <div class="suggest-body">
-                        <h3>{{ item.projectName }}</h3>
+            <div
+                v-if="recommendation?.newProjects?.length"
+                class="suggest-block"
+            >
+                <h3 class="suggest-title">신규 프로젝트 후보</h3>
+                <div class="suggest-grid">
+                    <article
+                        v-for="item in recommendation.newProjects"
+                        :key="item.projectName"
+                        class="suggest-card is-new"
+                    >
+                        <div class="suggest-card-head">
+                            <h4>{{ item.projectName }}</h4>
+                            <button
+                                class="btn btn-primary btn-small"
+                                :disabled="
+                                    applyingName === item.projectName ||
+                                    appliedNames.has(item.projectName)
+                                "
+                                @click="applyNewProject(item)"
+                            >
+                                {{
+                                    appliedNames.has(item.projectName)
+                                        ? "등록됨"
+                                        : applyingName === item.projectName
+                                          ? "등록 중..."
+                                          : "등록"
+                                }}
+                            </button>
+                        </div>
                         <div class="keyword-chips">
                             <span
                                 v-for="keyword in item.suggestedKeywords"
@@ -317,30 +337,19 @@ onMounted(() => {
                             </span>
                         </div>
                         <p class="suggest-reason">{{ item.reason }}</p>
-                    </div>
-                    <button
-                        class="btn btn-primary btn-small"
-                        :disabled="
-                            applyingName === item.projectName ||
-                            appliedNames.has(item.projectName)
-                        "
-                        @click="applyNewProject(item)"
-                    >
-                        {{
-                            appliedNames.has(item.projectName)
-                                ? "등록됨"
-                                : applyingName === item.projectName
-                                  ? "등록 중..."
-                                  : "등록"
-                        }}
-                    </button>
-                </li>
-            </ul>
-        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
 
-        <div class="card">
-            <h2>새 프로젝트 명 등록</h2>
-            <div class="add-form">
+        <section class="add-section">
+            <div class="section-head">
+                <div>
+                    <h2>프로젝트 등록</h2>
+            
+                </div>
+            </div>
+            <form class="card add-form" @submit.prevent="addProjectName">
                 <div class="field">
                     <label for="name-input">프로젝트 명</label>
                     <input
@@ -348,178 +357,262 @@ onMounted(() => {
                         type="text"
                         v-model="newName"
                         class="input"
-                        placeholder="예: 일일보고 취합·주간보고 자동화 도구"
-                        @keyup.enter="addProjectName"
+                        placeholder="예: 일일보고 취합"
                     />
                 </div>
                 <div class="field">
-                    <label for="keywords-input"
-                        >키워드 (쉼표로 구분, 선택)</label
-                    >
+                    <label for="keywords-input">키워드</label>
                     <input
                         id="keywords-input"
                         type="text"
                         v-model="newKeywords"
                         class="input"
-                        placeholder="예: 보고서, 취합, 주간보고"
-                        @keyup.enter="addProjectName"
+                        placeholder="쉼표로 구분"
                     />
                 </div>
-                <button class="btn btn-primary add-btn" @click="addProjectName">
+                <button class="btn btn-primary add-btn" type="submit">
+                    <Plus :size="14" />
                     등록
                 </button>
-            </div>
-        </div>
+            </form>
+        </section>
 
-        <div class="card">
-            <h2>등록된 프로젝트 명 목록</h2>
+        <section class="list-section">
+            <div class="section-head">
+                <div>
+                    <h2>등록된 프로젝트</h2>
+                </div>
+                <span v-if="!isLoading" class="count-chip">
+                    {{ projectNames.length }}개 등록
+                </span>
+            </div>
+
             <div v-if="isLoading" class="empty-state">불러오는 중...</div>
-            <div v-else-if="projectNames.length === 0" class="empty-state">
+            <div
+                v-else-if="projectNames.length === 0"
+                class="empty-state"
+            >
                 등록된 프로젝트 명이 없습니다
             </div>
-            <table v-else class="name-table">
-                <thead>
-                    <tr>
-                        <th>프로젝트 명</th>
-                        <th>키워드</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="item in projectNames" :key="item.name">
-                        <td class="name-cell">{{ item.name }}</td>
-                        <td class="keywords-cell">
-                            <template v-if="editingName === item.name">
-                                <input
-                                    type="text"
-                                    v-model="editingKeywords"
-                                    class="input keywords-input"
-                                    placeholder="쉼표로 구분 (예: 보고서, 취합)"
-                                    @keyup.enter="saveKeywords(item)"
-                                />
-                                <button
-                                    class="btn btn-icon"
-                                    @click="saveKeywords(item)"
-                                    :disabled="savingName === item.name"
-                                    title="저장"
-                                >
-                                    <Check :size="14" />
-                                </button>
-                                <button
-                                    class="btn btn-icon"
-                                    @click="cancelEdit"
-                                    title="취소"
-                                >
-                                    <span class="cancel-text">취소</span>
-                                </button>
-                            </template>
-                            <template v-else>
-                                <span class="keywords-text">{{
-                                    item.keywords || "—"
-                                }}</span>
-                                <button
-                                    class="btn btn-icon"
-                                    @click="startEdit(item)"
-                                    title="키워드 수정"
-                                >
-                                    <Pencil :size="14" />
-                                </button>
-                            </template>
-                        </td>
-                        <td class="action-cell">
+            <div v-else class="project-grid">
+
+                <article
+                    v-for="item in projectNames"
+                    :key="item.name"
+                    class="project-card"
+                    :class="{ editing: editingName === item.name }"
+                >
+                    <div class="project-card-head">
+                        <h3 class="project-name">{{ item.name }}</h3>
+                        <div class="card-actions">
                             <button
+                                v-if="editingName !== item.name"
                                 class="btn btn-icon"
-                                @click="removeProjectName(item.name)"
+                                title="키워드 수정"
+                                @click="startEdit(item)"
+                            >
+                                <Pencil :size="14" />
+                            </button>
+                            <button
+                                class="btn btn-icon danger"
                                 title="삭제"
+                                @click="removeProjectName(item.name)"
                             >
                                 <Trash2 :size="14" />
                             </button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                        </div>
+                    </div>
+
+                    <template v-if="editingName === item.name">
+                        <input
+                            type="text"
+                            v-model="editingKeywords"
+                            class="input"
+                            placeholder="쉼표로 구분 (예: 보고서, 취합)"
+                            @keyup.enter="saveKeywords(item)"
+                        />
+                        <div class="edit-actions">
+                            <button
+                                class="btn btn-primary btn-small"
+                                :disabled="savingName === item.name"
+                                @click="saveKeywords(item)"
+                            >
+                                <Check :size="14" />
+                                {{ savingName === item.name ? "저장 중..." : "저장" }}
+                            </button>
+                            <button class="btn btn-small" @click="cancelEdit">
+                                <X :size="14" />
+                                취소
+                            </button>
+                        </div>
+                    </template>
+                    <div v-else class="keyword-chips">
+                        <span
+                            v-for="keyword in keywordList(item.keywords)"
+                            :key="keyword"
+                            class="chip chip-muted"
+                        >
+                            {{ keyword }}
+                        </span>
+                        <span
+                            v-if="!keywordList(item.keywords).length"
+                            class="chip-empty"
+                        >
+                            키워드 없음
+                        </span>
+                    </div>
+                </article>
+            </div>
+        </section>
     </div>
 </template>
 
 <style scoped>
-.card + .card {
-    margin-top: 16px;
+.names-page {
+    max-width: 1120px;
 }
 
-.card h2 {
-    display: block;
-    margin: 0 0 8px;
+.count-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    color: var(--text-h);
+    font-size: 12px;
+    font-weight: 650;
 }
 
-.card-hint {
-    display: block;
-    font-size: 13px;
-    color: var(--text);
-    margin: 0 0 14px;
-    line-height: 1.5;
-}
-
-.recommend-actions {
+.section-head {
     display: flex;
-    justify-content: flex-end;
-    margin-top: 12px;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
 }
 
-.error-text {
-    margin-top: 8px;
-    color: var(--danger);
-    font-size: 13px;
+.section-head h2,
+.card h2 {
+    margin: 0 0 6px;
 }
 
-.suggest-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+
+
+.recommend-card,
+.add-section {
+    margin-bottom: 28px;
+}
+
+.recommend-grid {
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-.suggest-item {
+.recommend-side {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 0;
+}
+
+
+
+.error-text {
+    margin: 0;
+    color: var(--danger);
+    font-size: 13px;
+}
+
+.empty-suggest,
+.suggest-block {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.empty-suggest {
+    font-size: 13px;
+    color: var(--text);
+}
+
+.suggest-title {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--text-h);
+}
+
+.suggest-grid,
+.project-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    align-items: start;
+}
+
+.suggest-card,
+.project-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-elevated);
+    min-width: 0;
+}
+
+.suggest-card.is-new {
+    border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+}
+
+.suggest-card-head,
+.project-card-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
+    gap: 8px;
 }
 
-.suggest-item:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
+.suggest-card-head h4,
+.project-name {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-h);
+    line-height: 1.3;
+    word-break: keep-all;
 }
 
-.suggest-body {
-    min-width: 0;
-    flex: 1;
-}
-
-.suggest-body h3 {
-    margin-bottom: 8px;
+.suggest-reason {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.5;
 }
 
 .keyword-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-bottom: 8px;
 }
 
 .chip {
     display: inline-flex;
     align-items: center;
+    max-width: 100%;
     padding: 3px 8px;
     border-radius: 999px;
     background: var(--accent-bg);
     color: var(--accent);
     font-size: 12px;
     font-weight: 600;
+    line-height: 1.3;
+    word-break: break-word;
 }
 
 .chip-new {
@@ -527,14 +620,19 @@ onMounted(() => {
     color: var(--warning);
 }
 
+.chip-muted {
+    background: var(--bg-soft);
+    color: var(--text-h);
+}
+
 .chip-empty {
     font-size: 12px;
     color: var(--text);
 }
 
-.suggest-reason {
-    font-size: 13px;
-    color: var(--text);
+.list-section h2,
+.add-section h2 {
+    color: var(--text-h);
 }
 
 .add-form {
@@ -546,75 +644,22 @@ onMounted(() => {
 
 .add-form .field {
     flex: 1;
-    min-width: 220px;
+    min-width: 0;
 }
 
 .add-btn {
     flex-shrink: 0;
-    margin-bottom: 0;
 }
 
-.name-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
+.card-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
 }
 
-.name-table th {
-    text-align: left;
-    padding: 10px 12px;
-    border-bottom: 2px solid var(--border);
-    color: var(--text);
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-}
-
-.name-table tbody tr {
-    transition: background 0.15s;
-}
-
-.name-table tbody tr:hover {
-    background: var(--bg-soft);
-}
-
-.name-table td {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-}
-
-.name-table tr:last-child td {
-    border-bottom: none;
-}
-
-.name-cell {
-    font-weight: 600;
-    color: var(--text-h);
-    white-space: nowrap;
-}
-
-.keywords-cell {
-    min-width: 260px;
-}
-
-.keywords-text {
-    color: var(--text);
-    margin-right: 8px;
-}
-
-.keywords-input {
-    max-width: 260px;
-    margin-right: 6px;
-}
-
-.cancel-text {
-    font-size: 12px;
-    color: var(--text);
-}
-
-.action-cell {
-    width: 40px;
-    text-align: center;
+.edit-actions {
+    display: flex;
+    gap: 6px;
 }
 
 .btn-icon {
@@ -622,12 +667,9 @@ onMounted(() => {
     border: none;
     background: none;
     color: var(--text);
-    opacity: 0.6;
+    opacity: 0.65;
     cursor: pointer;
     border-radius: var(--radius-sm);
-    transition:
-        opacity 0.15s,
-        background 0.15s;
 }
 
 .btn-icon:hover {
@@ -637,8 +679,22 @@ onMounted(() => {
     border-color: transparent;
 }
 
-.action-cell .btn-icon:hover {
+.btn-icon.danger:hover {
     background: var(--danger-bg);
     color: var(--danger);
+}
+
+@media (max-width: 860px) {
+    .recommend-side {
+        justify-content: stretch;
+    }
+
+    .recommend-side .btn {
+        width: 100%;
+    }
+
+    .add-form .field {
+        min-width: 100%;
+    }
 }
 </style>

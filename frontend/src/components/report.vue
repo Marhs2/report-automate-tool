@@ -172,10 +172,7 @@ const sendReport = async () => {
         <div class="page-header">
             <div>
                 <h1>보고서 작성</h1>
-                <p class="page-subtitle">
-                    오늘의 업무 내용을 자유롭게 작성하거나 PPTX를 올리면 AI가
-                    항목별로 정리해줍니다
-                </p>
+    
             </div>
         </div>
 
@@ -195,9 +192,7 @@ const sendReport = async () => {
         </div>
 
         <div v-if="!hasUser" class="card">
-            <p class="page-subtitle">
-                사용자를 선택해야 보고서를 넣을 수 있습니다.
-            </p>
+     
             <div class="form-actions">
                 <router-link class="btn btn-primary" to="/users"
                     >사용자 선택</router-link

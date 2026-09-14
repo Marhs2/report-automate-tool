@@ -56,7 +56,6 @@ const groupedByDate = computed(() => {
     }
     groups[entry.date].push(entry);
   }
-  // 최신 날짜가 위에 오도록 역순 정렬
   const sorted = Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
   return sorted;
 });
@@ -136,9 +135,7 @@ onMounted(() => {
     <div class="page-header">
       <div>
         <h1>프로젝트 흐름</h1>
-        <p class="page-subtitle">
-          프로젝트를 선택하면 시간순으로 보고 이력을 조회합니다
-        </p>
+  
       </div>
     </div>
 

@@ -1,11 +1,9 @@
 <template>
-    <div class="page">
+    <div class="page report-doc">
         <div class="page-header">
             <div>
-                <h1>분석 결과</h1>
-                <p class="page-subtitle">
-                    오른쪽 원문과 비교해서 틀린 칸만 고친 뒤 저장하세요. 저장 전까지는 목록에 안 올라갑니다.
-                </p>
+                <h1 class="detail-title">{{ userName || "분석 결과" }}</h1>
+                <p class="page-subtitle">{{ reportDate || "날짜 없음" }}</p>
             </div>
         </div>
         <div class="status-banner">
@@ -29,18 +27,25 @@
                     :key="project._uid || projectIndex"
                     class="card projects-container"
                 >
-                    <input
-                        class="input project-name-input"
-                        v-model="project.projectName"
-                    />
-
-                    <button @click="removeProject(projectIndex)">삭제</button>
+                    <div class="project-head">
+                        <input
+                            class="input project-name-input"
+                            v-model="project.projectName"
+                        />
+                        <button
+                            class="btn btn-danger"
+                            @click="removeProject(projectIndex)"
+                        >
+                            삭제
+                        </button>
+                    </div>
 
                     <div class="field-group completedTasks">
                         <h2>완료된 업무</h2>
                         <div
                             v-if="project.completedTasks.length > 0"
                             v-for="(task, taskIndex) in project.completedTasks"
+                            class="task-row"
                         >
                             <input
                                 :key="`completed-${taskIndex}`"
@@ -49,7 +54,7 @@
                                 v-model="project.completedTasks[taskIndex]"
                             />
                             <button
-                                class="btn"
+                                class="btn remove-btn"
                                 @click="removeCompletedTask(project, taskIndex)"
                             >
                                 -
@@ -72,6 +77,7 @@
                         <div
                             v-if="project.inProgressTasks.length > 0"
                             v-for="(task, taskIndex) in project.inProgressTasks"
+                            class="task-row"
                         >
                             <input
                                 :key="`progress-${taskIndex}`"
@@ -106,6 +112,7 @@
                         <div
                             v-if="project.issues.length > 0"
                             v-for="(issue, issueIndex) in project.issues"
+                            class="task-row"
                         >
                             <input
                                 :key="`issue-${issueIndex}`"
@@ -131,6 +138,7 @@
                         <div
                             v-if="project.requests.length > 0"
                             v-for="(request, requestIndex) in project.requests"
+                            class="task-row"
                         >
                             <input
                                 :key="`request-${requestIndex}`"
@@ -159,6 +167,7 @@
                         <div
                             v-if="project.nextPlans.length > 0"
                             v-for="(plan, planIndex) in project.nextPlans"
+                            class="task-row"
                         >
                             <input
                                 :key="`plan-${planIndex}`"
@@ -429,132 +438,7 @@ const getSelectedMemberId = () => {
 </script>
 
 <style scoped>
-/* 전체 레이아웃 (편집기와 원본 보고서 좌우 정렬) */
-.content-container {
-    display: flex;
-    gap: 24px;
-    align-items: flex-start;
-}
-
-/* 왼쪽 편집 폼 영역 */
-.json-container {
-    flex: 2;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-/* 오른쪽 원본 보고서 영역 (스크롤 고정) */
-.raw-container {
-    flex: 1;
-    min-width: 0;
-    position: sticky;
-    top: 32px;
-}
-
-.raw-container h2 {
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-}
-
-.raw-container pre {
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-all;
-    font-size: 13px;
-    line-height: 1.5;
-    max-height: 80vh;
-    overflow-y: auto;
-    color: var(--text);
-}
-
-/* 개별 프로젝트 카드 */
-.projects-container {
-    display: flex;
-    flex-direction: column;
-}
-
-/* 프로젝트명 입력창 */
-.project-name-input {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 16px;
-    color: var(--text-h);
-}
-
-/* 각 업무/이슈/요청/계획 박스 레이아웃 */
-.field-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 16px;
-    border: 1px solid var(--border);
-    background: var(--bg-soft);
-    padding: 14px 16px;
-    border-radius: var(--radius-sm);
-}
-
-.field-group > div {
-    display: flex;
-}
-
-.field-group:last-of-type {
-    margin-bottom: 0;
-}
-
-.field-group h2 {
-    margin: 0 0 4px;
-    font-size: 13px;
-    color: var(--text);
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-}
-
-.field-group .empty-msg {
-    font-size: 13px;
-    color: var(--text);
-    font-style: italic;
-    opacity: 0.7;
-}
-
-/* 추가 (+) 버튼 */
-.add-btn {
-    align-self: flex-start;
-    padding: 5px 14px;
-    font-size: 13px;
-}
-
-/* 하단 저장 영역 */
-.save-bar {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-}
-
-.save-bar .member-id-display {
-    font-size: 14px;
-    color: var(--text-h);
-}
-
-.save-actions {
-    display: flex;
-    gap: 8px;
-    margin-left: auto;
-}
-
 .status-banner .save-actions {
     margin-left: auto;
-}
-
-@media (max-width: 960px) {
-    .content-container {
-        flex-direction: column;
-    }
-    .raw-container {
-        position: static;
-        max-width: none;
-    }
 }
 </style>

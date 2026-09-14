@@ -114,6 +114,34 @@ const hasActiveFilter = computed(
         Boolean(filterDateEnd.value),
 );
 
+const dashboardStats = computed(() => {
+    const today = formatLocalDate(new Date());
+    const now = new Date();
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const weekStart = formatLocalDate(monday);
+    const weekEnd = formatLocalDate(sunday);
+    const todayCount = reports.value.filter(
+        (report) => report.report_date === today,
+    ).length;
+    const weekCount = reports.value.filter((report) => {
+        const date = report.report_date ?? "";
+        return date >= weekStart && date <= weekEnd;
+    }).length;
+    const issueReports = reports.value.filter(
+        (report) => issueCount(report) > 0,
+    ).length;
+    return {
+        today: todayCount,
+        week: weekCount,
+        issues: issueReports,
+        total: reports.value.length,
+    };
+});
+
 const issueCount = (report) =>
     projectsOf(report).reduce((count, project) => {
         const issues = Array.isArray(project.issues) ? project.issues : [];
@@ -181,16 +209,27 @@ onMounted(() => {
 
 <template>
     <div class="page">
-        <div class="page-header">
-            <div>
-                <h1>일일보고</h1>
-                <p class="page-subtitle">
-                    제출된 보고서를 날짜, 작성자, 프로젝트로 조회합니다
-                </p>
+        <p class="page-subtitle page-lead">
+            제출된 보고서를 날짜, 작성자, 프로젝트로 조회합니다
+        </p>
+
+        <div class="stat-grid">
+            <button type="button" class="stat-card" @click="setPresetToday">
+                <span class="stat-label">오늘 제출</span>
+                <strong class="stat-value">{{ dashboardStats.today }}</strong>
+            </button>
+            <button type="button" class="stat-card" @click="setPresetThisWeek">
+                <span class="stat-label">이번 주</span>
+                <strong class="stat-value">{{ dashboardStats.week }}</strong>
+            </button>
+            <div class="stat-card">
+                <span class="stat-label">이슈 보고</span>
+                <strong class="stat-value">{{ dashboardStats.issues }}</strong>
             </div>
-            <span class="count-chip">
-                {{ filteredReportsByProject.length }}건
-            </span>
+            <div class="stat-card">
+                <span class="stat-label">전체</span>
+                <strong class="stat-value">{{ dashboardStats.total }}</strong>
+            </div>
         </div>
 
         <div class="filter-presets">
@@ -348,6 +387,65 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.page-lead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 16px;
+}
+
+.count-inline {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--accent);
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    text-align: left;
+    cursor: default;
+    font: inherit;
+    color: inherit;
+}
+
+button.stat-card {
+    cursor: pointer;
+}
+
+button.stat-card:hover {
+    border-color: var(--accent);
+}
+
+.stat-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 500;
+    line-height: 1.1;
+    color: var(--text-h);
+    font-family: var(--heading);
+}
+
 .count-chip {
     display: inline-flex;
     align-items: center;
@@ -491,6 +589,9 @@ onMounted(() => {
 }
 
 @media (max-width: 860px) {
+    .stat-grid {
+        grid-template-columns: 1fr 1fr;
+    }
     .filter-card {
         grid-template-columns: 1fr 1fr;
     }

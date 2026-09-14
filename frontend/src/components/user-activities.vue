@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref, reactive, computed, watch } from "vue";
 import { useRouter } from "vue-router";
-    import useApi from "../composables/useApi";
+import useApi from "../composables/useApi";
 
 const router = useRouter();
 const { GetUserActivities, GetReports } = useApi();
@@ -19,7 +19,6 @@ const userActivities = ref([]);
 const currentDate = new Date();
 const selectedYear = ref(currentDate.getFullYear());
 const selectedMonth = ref(currentDate.getMonth() + 1);
-const weekDays = ref([]);
 
 const tooltip = reactive({
     visible: false,
@@ -32,30 +31,17 @@ let hideTimer = null;
 
 const parseDate = (dateStr) => new Date(`${dateStr}T00:00:00`);
 
+const formatDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+};
+
 const startOfToday = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return today;
-};
-
-const getWeekDays = () => {
-    const now = new Date();
-    const day = now.getDay();
-    const diffToMonday = now.getDate() - (day === 0 ? 7 : day) + 1;
-    const monday = new Date(now.setDate(diffToMonday));
-    const formatDate = (d) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}`;
-    };
-    const days = [];
-    for (let i = 0; i < 5; i++) {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        days.push(formatDate(d));
-    }
-    return days;
 };
 
 function metaFor(dateStr) {
@@ -164,7 +150,6 @@ function nextMonth() {
 }
 
 onMounted(() => {
-    weekDays.value = getWeekDays();
     fetchUserActivities();
 });
 
@@ -181,10 +166,6 @@ watch(
     },
 );
 
-const totalCountOf = (activity) =>
-    activity.total_count ??
-    activity.activities.reduce((total, item) => total + (item.count || 0), 0);
-
 const orderedActivities = computed(() =>
     userActivities.value.map((activity) => ({
         ...activity,
@@ -194,19 +175,94 @@ const orderedActivities = computed(() =>
     })),
 );
 
-const hasToday = computed(() => dateMeta.value.some((item) => item.isToday));
+const activityLookup = computed(() => {
+    const byMember = new Map();
+    for (const activity of orderedActivities.value) {
+        const byDate = new Map();
+        for (const item of activity.activities || []) {
+            byDate.set(item.report_date, item);
+        }
+        byMember.set(String(activity.member_id), byDate);
+    }
+    return byMember;
+});
 
-const displayDates = computed(
-    () =>
-        orderedActivities.value[0]?.activities.map(
-            (item) => item.report_date,
-        ) || [],
+const members = computed(() =>
+    orderedActivities.value.map((activity) => ({
+        member_id: activity.member_id,
+        name: activity.name,
+    })),
 );
 
-const dateMeta = computed(() => displayDates.value.map(metaFor));
+const entriesForDate = (dateStr) =>
+    members.value.map((member) => {
+        const item =
+            activityLookup.value
+                .get(String(member.member_id))
+                ?.get(dateStr) || { report_date: dateStr, count: 0 };
+        return {
+            ...member,
+            item,
+            submitted: Boolean(item.count > 0),
+        };
+    });
+
+const visibleEntries = (cell) =>
+    cell.isWeekend
+        ? cell.entries.filter((entry) => entry.submitted)
+        : cell.entries;
+
+const rangeBounds = computed(() => {
+    if (props.startDate && props.endDate) {
+        return {
+            start: parseDate(props.startDate),
+            end: parseDate(props.endDate),
+        };
+    }
+    return {
+        start: new Date(selectedYear.value, selectedMonth.value - 1, 1),
+        end: new Date(selectedYear.value, selectedMonth.value, 0),
+    };
+});
+
+const calendarWeeks = computed(() => {
+    const { start, end } = rangeBounds.value;
+    const gridStart = new Date(start);
+    gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+    const gridEnd = new Date(end);
+    gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()));
+
+    const weeks = [];
+    const cursor = new Date(gridStart);
+    while (cursor.getTime() <= gridEnd.getTime()) {
+        const week = [];
+        for (let i = 0; i < 7; i++) {
+            const dateStr = formatDate(cursor);
+            const inRange =
+                cursor.getTime() >= start.getTime() &&
+                cursor.getTime() <= end.getTime();
+            week.push({
+                ...metaFor(dateStr),
+                outside: !inRange,
+                entries: inRange ? entriesForDate(dateStr) : [],
+            });
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        weeks.push(week);
+    }
+    return weeks;
+});
+
+const inRangeDays = computed(() =>
+    calendarWeeks.value.flat().filter((cell) => !cell.outside),
+);
+
+const hasToday = computed(() =>
+    inRangeDays.value.some((cell) => cell.isToday),
+);
 
 const weekdayCount = computed(
-    () => dateMeta.value.filter((item) => !item.isWeekend).length,
+    () => inRangeDays.value.filter((cell) => !cell.isWeekend).length,
 );
 
 const progressOf = (activity) => {
@@ -226,20 +282,16 @@ const periodLabel = computed(() =>
         ? `${props.startDate} ~ ${props.endDate} 제출 현황`
         : `${selectedYear.value}년 ${selectedMonth.value}월 활동 기록`,
 );
-
-
 </script>
 
 <template>
-    <div :class="embedded ? 'activity-section' : 'page'">
-        <div class="page-header">
+    <div :class="embedded ? 'activity-section' : 'page calendar-page'">
+        <div v-if="!embedded" class="page-header">
             <div>
                 <h1>
                     {{ periodLabel }}
                 </h1>
-                <p class="page-subtitle">
-                    팀원별 보고서 제출 현황을 한눈에 확인하세요
-                </p>
+      
             </div>
         </div>
 
@@ -282,74 +334,109 @@ const periodLabel = computed(() =>
         <div v-if="orderedActivities.length === 0" class="empty-state">
             표시할 활동 기록이 없습니다
         </div>
-        <div
-            v-else
-            class="card activity-card"
-            :style="{ '--day-count': Math.max(displayDates.length, 1) }"
-        >
-            <div class="activity-date-header">
-                <span class="activity-name-cell activity-date-spacer"
-                    >팀원</span
+        <template v-else>
+            <div class="member-summary">
+                <div
+                    v-for="activity in orderedActivities"
+                    :key="activity.member_id"
+                    class="summary-item"
                 >
-                <span
-                    v-for="meta in dateMeta"
-                    :key="meta.date"
-                    class="date-head"
-                    :class="{
-                        weekend: meta.isWeekend,
-                        today: meta.isToday,
-                    }"
-                >
-                    <span class="date-weekday">{{ meta.weekLabel }}</span>
-                    <span class="date-day">{{ meta.day }}</span>
-                </span>
+                    <div class="summary-top">
+                        <span class="summary-name">{{ activity.name }}</span>
+                        <span class="summary-count"
+                            >{{ progressOf(activity).submitted }}/{{
+                                progressOf(activity).total
+                            }}
+                            평일</span
+                        >
+                    </div>
+                    <div
+                        class="progress-track"
+                        :title="`${progressOf(activity).submitted}/${progressOf(activity).total} 평일`"
+                    >
+                        <span
+                            class="progress-fill"
+                            :style="{
+                                width: progressOf(activity).pct + '%',
+                            }"
+                        ></span>
+                    </div>
+                </div>
             </div>
-            <div
-                v-for="activity in orderedActivities"
-                :key="activity.member_id"
-                class="activity-row"
-            >
-                <div class="activity-name-cell">
-                    <h4 class="activity-name">{{ activity.name }}</h4>
-                    <div class="activity-meta">
-                        <span class="activity-total"
-                            >{{ progressOf(activity).submitted }}/{{ progressOf(activity).total }} 평일</span
-                        >
+
+            <div class="card calendar-card">
+                <div class="cal-weekdays">
+                    <span
+                        v-for="label in WEEKDAY_LABELS"
+                        :key="label"
+                        :class="{
+                            weekend: label === '일' || label === '토',
+                        }"
+                    >
+                        {{ label }}
+                    </span>
+                </div>
+                <div class="cal-weeks">
+                    <div
+                        v-for="(week, weekIndex) in calendarWeeks"
+                        :key="weekIndex"
+                        class="cal-week"
+                    >
                         <div
-                            class="progress-track"
-                            :title="`${progressOf(activity).submitted}/${progressOf(activity).total} 평일`"
+                            v-for="cell in week"
+                            :key="cell.date"
+                            class="cal-day"
+                            :class="{
+                                outside: cell.outside,
+                                weekend: cell.isWeekend,
+                                today: cell.isToday && !cell.outside,
+                            }"
                         >
-                            <span
-                                class="progress-fill"
-                                :style="{
-                                    width: progressOf(activity).pct + '%',
-                                }"
-                            ></span>
+                            <div class="cal-day-head">
+                                <span class="cal-day-num">{{ cell.day }}</span>
+                            </div>
+                            <div v-if="!cell.outside" class="cal-entries">
+                                <button
+                                    v-for="entry in visibleEntries(cell)"
+                                    :key="entry.member_id"
+                                    class="cal-chip"
+                                    :class="{
+                                        submitted: entry.submitted,
+                                        missed:
+                                            !entry.submitted &&
+                                            !cell.isWeekend,
+                                    }"
+                                    :disabled="!entry.submitted"
+                                    :aria-label="
+                                        cellLabel(entry.name, entry.item)
+                                    "
+                                    @click="
+                                        openCell(
+                                            {
+                                                member_id: entry.member_id,
+                                                name: entry.name,
+                                            },
+                                            entry.item,
+                                        )
+                                    "
+                                    @mouseenter="
+                                        showTooltip(
+                                            $event,
+                                            entry.name,
+                                            entry.item,
+                                        )
+                                    "
+                                    @mousemove="moveTooltip"
+                                    @mouseleave="hideTooltip"
+                                >
+                                    {{ entry.name }}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div
-                    v-for="item in activity.activities"
-                    :key="item.report_date"
-                    class="log"
-                    :class="{
-                        committed: item.count > 0,
-                        weekend: metaFor(item.report_date).isWeekend,
-                        today: metaFor(item.report_date).isToday,
-                        clickable: canOpenCell(item),
-                    }"
-                    role="button"
-                    :tabindex="canOpenCell(item) ? 0 : -1"
-                    :aria-label="cellLabel(activity.name, item)"
-                    @click="openCell(activity, item)"
-                    @keydown.enter.prevent="openCell(activity, item)"
-                    @keydown.space.prevent="openCell(activity, item)"
-                    @mouseenter="showTooltip($event, activity.name, item)"
-                    @mousemove="moveTooltip"
-                    @mouseleave="hideTooltip"
-                ></div>
             </div>
-        </div>
+        </template>
 
         <transition name="tooltip-fade">
             <div
@@ -365,9 +452,26 @@ const periodLabel = computed(() =>
 
 <style scoped>
 .activity-section {
-    margin-bottom: 32px;
+    margin-bottom: 8px;
+}
+.activity-section .cal-day {
+    min-height: 96px;
+    padding: 6px;
+}
+.activity-section .cal-chip {
+    font-size: 11px;
+    padding: 2px 6px;
+}
+.activity-section .member-summary {
+    margin-bottom: 10px;
+}
+.activity-section .view-controls {
+    margin-bottom: 8px;
 }
 
+.calendar-page {
+    max-width: 1200px;
+}
 
 .view-controls {
     display: flex;
@@ -427,100 +531,37 @@ const periodLabel = computed(() =>
     background: color-mix(in srgb, var(--text) 18%, transparent);
 }
 
-.activity-card {
-    overflow-x: auto;
-    padding: 16px;
-}
-
-.activity-date-header,
-.activity-row {
+.member-summary {
     display: grid;
-    grid-template-columns: 148px repeat(var(--day-count), minmax(18px, 1fr));
-    column-gap: 4px;
-    align-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
 }
 
-.activity-date-header {
-    margin-bottom: 8px;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-}
-
-.date-head {
+.summary-item {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 1px;
-    color: var(--text);
-    min-width: 0;
-}
-
-.date-weekday {
-    font-size: 9px;
-    font-weight: 500;
-    letter-spacing: 0;
-    opacity: 0.7;
-}
-
-.date-day {
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1.1;
-}
-
-.date-head.weekend {
-    color: color-mix(in srgb, var(--text) 70%, transparent);
-}
-
-.date-head.today {
-    color: var(--accent);
-}
-
-.activity-row {
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.activity-row:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.activity-name-cell {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    padding-right: 10px;
-    background: var(--bg);
-}
-
-.activity-date-spacer {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text);
-}
-
-.activity-name {
-    min-width: 0;
-    margin: 0;
-    color: var(--text-h);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.activity-meta {
-    display: flex;
-    align-items: center;
     gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-elevated);
 }
 
-.activity-total {
+.summary-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.summary-name {
+    font-weight: 650;
+    color: var(--text-h);
+    font-size: 13px;
+}
+
+.summary-count {
     color: var(--text);
     font-size: 11px;
     font-weight: 500;
@@ -528,12 +569,10 @@ const periodLabel = computed(() =>
 }
 
 .progress-track {
-    flex: 1;
     height: 4px;
     border-radius: 99px;
     background: var(--border);
     overflow: hidden;
-    min-width: 36px;
 }
 
 .progress-fill {
@@ -543,37 +582,131 @@ const periodLabel = computed(() =>
     background: var(--success);
 }
 
-.log {
+.calendar-card {
+    padding: 16px;
+}
+
+.cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.cal-weekdays span {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--text);
+    padding: 6px 0;
+}
+
+.cal-weekdays .weekend {
+    opacity: 0.7;
+}
+
+.cal-weeks {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cal-week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.cal-day {
+    min-height: 128px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    background: var(--bg-elevated);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cal-day.weekend {
+    background: color-mix(in srgb, var(--text) 5%, var(--bg));
+}
+
+.cal-day.outside {
+    opacity: 0.38;
+    background: transparent;
+}
+
+.cal-day.today {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.cal-day-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cal-day-num {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-h);
+    line-height: 1;
+}
+
+.cal-day.weekend .cal-day-num,
+.cal-day.outside .cal-day-num {
+    color: var(--text);
+}
+
+.cal-day.today .cal-day-num {
+    color: var(--accent);
+}
+
+.cal-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cal-chip {
+    display: block;
     width: 100%;
-    aspect-ratio: 1;
-    max-height: 22px;
-    justify-self: center;
-    border-radius: 4px;
-    background: color-mix(in srgb, var(--text) 16%, transparent);
+    text-align: left;
+    border: none;
+    border-radius: 6px;
+    padding: 3px 6px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    background: transparent;
+    color: color-mix(in srgb, var(--text) 55%, transparent);
+    cursor: default;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cal-chip.submitted {
+    background: color-mix(in srgb, var(--success) 22%, transparent);
+    color: var(--success);
     cursor: pointer;
-    transition:
-        transform 0.12s ease,
-        background 0.12s ease,
-        opacity 0.12s ease;
 }
 
-.log.weekend {
-    background: color-mix(in srgb, var(--text) 7%, transparent);
+.cal-chip.submitted:hover {
+    background: color-mix(in srgb, var(--success) 34%, transparent);
 }
 
-.log.committed {
-    background: var(--success);
+.cal-chip.missed {
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+    color: var(--text);
 }
 
-.log.today {
-    box-shadow: inset 0 0 0 1.5px var(--accent);
+.cal-chip:disabled {
+    cursor: default;
 }
 
-.log:hover {
-    transform: scale(1.18);
-}
-
-/* Tooltip */
 .tooltip {
     position: fixed;
     background: var(--bg);
@@ -600,5 +733,17 @@ const periodLabel = computed(() =>
 .tooltip-fade-leave-to {
     opacity: 0;
     transform: translate(-50%, -60%) scale(0.9);
+}
+
+@media (max-width: 860px) {
+    .cal-day {
+        min-height: 96px;
+        padding: 6px;
+    }
+
+    .cal-chip {
+        font-size: 10px;
+        padding: 2px 4px;
+    }
 }
 </style>

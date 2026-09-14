@@ -18,11 +18,11 @@ Qwen3.8은 평균 **0.85s**(Gemma 5.66s, Muse 8.63s)이고 빈 보고 2건을 �
 ## 실행 조건
 
 - 측정일: 2026-09-14
-- 데이터: `benchmark/dataset/gold_dataset_report.json` 32건
-- 런타임: Unsloth Desktop `http://192.168.210.10:8888/v1`
+- 데이터: `test-data/daily-reports.md` 32건
+- 런타임: Unsloth  `http://127.0.0.1`
 - 퀀트: `UD-Q4_K_XL`, context 32768, temperature 0.1, max_tokens 6144
 - 비교: Qwen3.8-27B, Gemma 4 31B-it, Muse Glimmer-30B
-- 추론: `none` (생략 금지)
+- 추론: `none`
 
 ## 자체 32건
 
@@ -88,11 +88,5 @@ Qwen3.8은 평균 **0.85s**(Gemma 5.66s, Muse 8.63s)이고 빈 보고 2건을 �
 | 2 | Muse Glimmer-30B | 77.0 | Qwen 모델 카드 비교열 |
 | 3 | Gemma 4 31B | 75.6 | OrcaRouter / Artificial Analysis |
 
-Kingy RTX 4090, Q4_K_M (Muse 없음):
-
-| 모델 | 지시 준수 | 단일 툴콜 | 문서 QA | 디코드 tok/s |
-| --- | --- | --- | --- | ---: |
-| Qwen3.8-27B | 43/50 | 90/90 | 23/24 | 49.1 |
-| Gemma 4 31B-it | 44/50 | 90/90 | 22/24 | 45.0 |
 
 출처: [Artificial Analysis](https://artificialanalysis.ai/models/qwen3-8-27b), [Kingy](https://kingy.ai/blog/qwen3-8-27b-vs-qwen3-6-27b-vs-gemma-4-31b/), [Muse Glimmer AA](https://artificialanalysis.ai/models/muse-glimmer), [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B).

@@ -35,11 +35,10 @@ docs/      모델·도구 선정 근거, 채점 방법
 
 ### 1) Unsloth (LLM 로컬 서버) 준비
 
-1. [Unsloth Desktop](https://unsloth.ai/) 설치 후 모델을 다운로드. ([Linux](https://unsloth.ai/download/linux))
+1. [Unsloth Desktop](https://unsloth.ai/) 설치 후 모델을 다운로드. 
    - **권장: Qwen3.8 27B** (`unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL`, 추론 끄기).
    - 선정 근거: [자체 32건](docs/정확도-평가.md), 하드웨어: [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-8-27b), 모델 가이드: [Unsloth Qwen3.8](https://unsloth.ai/docs/models/qwen3.8)
    - **로드 시 추론 끄기**: `unsloth run --model unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL --reasoning off -c 32768 -p 8888`
-   - **API 키**: Unsloth 아바타 → Settings → API에서 키 생성 (`sk-unsloth-…`). OpenAI 호환 엔드포인트는 `http://127.0.0.1:8888/v1` ([API 문서](https://unsloth.ai/docs/basics/api))
    - **추론 차단**: 백엔드는 요청마다 `reasoning_effort: "none"`을 명시적으로 전송.
      Qwen3.8 27B는 이 필드를 생략하면 기본적으로 추론을 켜므로, 필드 생략 대신 `none`이 반드시 필요.
 
@@ -50,20 +49,19 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env
 python init_db.py               
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-환경 변수 (선택, 기본값으로도 동작):
-
 | 변수                | 기본값                     | 설명                                                                                                                                                                                                                                                                                 |
 | ------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `REPORT_MODEL_NAME` | `unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL` | Unsloth에 로드한 모델명. **Qwen3.8 27B `UD-Q4_K_XL`(기본)** — context 32768 ([선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)) |
-| `LM_BASE_URL`       | `http://127.0.0.1:8888/v1` | Unsloth OpenAI 호환 API 주소 ([API 문서](https://unsloth.ai/docs/basics/api)) |
+| `LM_BASE_URL`       | `http://127.0.0.1` |  |
 | `LM_API_KEY`        | `sk-unsloth-…`            |  |
 | `DAILY_MAX_TOKENS`  | `32768`| 일일 구조화 출력 상한|
 | `WEEKLY_MAX_TOKENS` | `32768`| 주간보고 생성 출력 상한|
-| `DAILY_REASONING`   | `none`                     | `none`/`low`/`medium`/`high`. 기본 `none` = 요청에 `reasoning_effort:"none"`을 명시적으로 실어 추론을 끈다(필드 생략은 Unsloth/Qwen이 추론을 켜므로 금지). Qwen3.8 27B는 추론 끄고 사용.  |
+| `DAILY_REASONING`   | `none`                     |   |
 
 ### 3) 프론트엔드
 

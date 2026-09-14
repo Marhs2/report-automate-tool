@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import re
 import sqlite3
 from collections import defaultdict
@@ -7,11 +8,14 @@ from datetime import date, timedelta
 from urllib.parse import urlparse
 
 from db import get_db
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from pptx_to_text import extract_all_text_from_pptx
 from pydantic import BaseModel
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -99,17 +103,17 @@ with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
 with open("./model_asset/keyword_json_schema.json", "r", encoding="utf-8") as f:
     keyword_schema = json.load(f)
 
-MODEL_NAME = "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL"
-LM_BASE_URL = "http://192.168.210.10:8888/v1"
-LM_API_KEY = "sk-unsloth-0ef77ee762fef9a0ccc92e5edadaf492"
-LLM_TIMEOUT_SECONDS = 600.0
+MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL")
+LM_BASE_URL = os.environ.get("LM_BASE_URL", "http://127.0.0.1")
+LM_API_KEY = os.environ.get("LM_API_KEY", "")
+LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
 
-DAILY_MAX_TOKENS = 32768
-WEEKLY_MAX_TOKENS = 32768
-KEYWORD_MAX_TOKENS = 32768
-DAILY_REASONING = "none"
-WEEKLY_REASONING = "none"
-KEYWORD_REASONING = "none"
+DAILY_MAX_TOKENS = int(os.environ.get("DAILY_MAX_TOKENS", "32768"))
+WEEKLY_MAX_TOKENS = int(os.environ.get("WEEKLY_MAX_TOKENS", "32768"))
+KEYWORD_MAX_TOKENS = int(os.environ.get("KEYWORD_MAX_TOKENS", "32768"))
+DAILY_REASONING = os.environ.get("DAILY_REASONING", "none")
+WEEKLY_REASONING = os.environ.get("WEEKLY_REASONING", "none")
+KEYWORD_REASONING = os.environ.get("KEYWORD_REASONING", "none")
 
 def _is_allowed_lm_host(hostname: str | None) -> bool:
     if not hostname:

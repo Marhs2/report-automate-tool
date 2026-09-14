@@ -319,14 +319,10 @@ onMounted(async () => {
 
 <template>
     <div class="page weekly-report-page">
-        <userActivities :embedded="true" :start-date="weekDays[0] || ''"
-            :end-date="weekDays[weekDays.length - 1] || ''"></userActivities>
         <div class="page-header">
             <div>
                 <h1>주간 보고서</h1>
-                <p class="page-subtitle">
-                    이번 주 보고서를 생성하고, 완료된 보고서를 다운로드하세요
-                </p>
+    
             </div>
         </div>
 
@@ -359,6 +355,12 @@ onMounted(async () => {
                     {{ isLoading ? "로딩 중..." : "주간 보고서 생성" }}
                 </button>
             </div>
+        </div>
+
+        <div class="week-status">
+            <h2>이번 주 제출 현황</h2>
+        <userActivities :embedded="true" :start-date="weekDays[0] || ''"
+            :end-date="weekDays[weekDays.length - 1] || ''"></userActivities>
         </div>
 
         <div class="card">
@@ -480,11 +482,25 @@ onMounted(async () => {
     gap: 12px;
 }
 
+.week-status {
+    margin: 24px 0;
+}
+.week-status h2 {
+    margin-bottom: 12px;
+}
 .report-list-item {
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     padding: 14px 16px;
-    background: var(--bg-soft);
+    background: var(--bg);
+}
+.report-list-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.day-chip {
+    border-radius: var(--radius-pill);
 }
 
 .report-list-header {
