@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "WeeklyReportResult",
-  "description": "주간보고 병합 결과. 여러 일일보고 JSON을 프로젝트별로 병합하고, 상태 승격 및 중복 제거를 적용한 결과물. 원문에 없는 업무를 생성하지 않는다. 입력이 비어있으면 projects는 빈 배열이다.",
+  "description": "주간보고 병합 결과. 여러 일일보고 JSON을 프로젝트별로 병합하고, 상태 승격 및 중복 제거를 적용한 결과물. 원문에 없는 업무를 생성하지 않는다. 입력이 비어있으면 projects는 빈 배열이다. confirmQuestions는 병합이 틀릴 수 있는 지점만 묻는 저장 전 확인 질문 3개다.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -50,7 +50,32 @@
         },
         "required": ["projectName", "completedTasks", "inProgressTasks", "issues", "nextWeekPlans"]
       }
+    },
+    "confirmQuestions": {
+      "type": "array",
+      "description": "저장 전에 작성자가 네/아니요로 답할 질문 3개. 병합이 추측한 지점만 고른다. 일반적인 점검 문장('완료가 맞나요?')은 금지. 각 질문은 출력 projects에 실제로 있는 프로젝트명과 업무 문장을 따옴표로 넣는다. 네=지금 칸 배치가 맞음. 아니요=그 항목을 다른 칸으로 옮기거나 고쳐야 함.",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "한 줄 질문. 프로젝트명과 해당 업무/이슈 원문 일부를 반드시 포함한다. 예: 회의록자동화의 '긴 회의록을 열 때 처리 속도가 느려지는 문제 발생'이 이슈에 남아 있습니다. 금요일까지 해결되지 않은 게 맞나요?",
+            "minLength": 24,
+            "maxLength": 180
+          },
+          "ifNo": {
+            "type": "string",
+            "description": "아니요일 때 작성자가 주간 초안에서 할 구체적 수정. 예: 이슈에서 빼고 완료된 업무로 옮기세요.",
+            "minLength": 8,
+            "maxLength": 120
+          }
+        },
+        "required": ["text", "ifNo"]
+      }
     }
   },
-  "required": ["projects"]
+  "required": ["projects", "confirmQuestions"]
 }

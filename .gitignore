@@ -27,8 +27,8 @@ htmlcov/
 .hypothesis/
 
 
-# -- DB Data --
-backend/db/
+# ── DB Data ─────────────────────────────────────────────
+backend/data/
 
 # ── SQLite runtime files ────────────────────────────────
 *.db-shm

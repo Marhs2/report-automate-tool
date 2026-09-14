@@ -110,11 +110,26 @@
         </div>
 
         <div v-else class="empty-state">보고서 데이터가 없습니다.</div>
+
+        <div v-if="askOpen" class="confirm-overlay" role="dialog" aria-modal="true">
+            <div class="card confirm-dialog">
+                <p class="confirm-kicker">저장 전 확인 {{ askIndex + 1 }}/{{ confirmQuestions.length }}</p>
+                <h2 class="confirm-title">{{ confirmQuestions[askIndex]?.text }}</h2>
+                <p v-if="confirmQuestions[askIndex]?.ifNo" class="confirm-help">
+                    아니요면 {{ confirmQuestions[askIndex].ifNo }}
+                </p>
+                <p v-else class="confirm-help">아니요면 해당 항목을 고친 뒤 다시 저장하세요.</p>
+                <div class="confirm-actions">
+                    <button class="btn" type="button" @click="rejectConfirm">아니요</button>
+                    <button class="btn btn-primary" type="button" @click="acceptConfirm">네</button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { ArrowLeft } from "lucide-vue-next";
 import useAPI from "../composables/useAPI";
 import { useRoute, useRouter } from "vue-router";
@@ -130,7 +145,22 @@ const removeProject = (project) => {
 const reportData = ref(null);
 const userName = ref("");
 const isSaving = ref(false);
+const askOpen = ref(false);
+const askIndex = ref(0);
 const { getUsers, GetWeeklyReportById, updateWeeklyReport } = useAPI();
+
+const confirmQuestions = computed(() => {
+    const items = reportData.value?.confirmQuestions;
+    if (!Array.isArray(items)) return [];
+    return items
+        .map((item, index) => ({
+            id: item?.id || `q-${index}`,
+            text: String(item?.text || "").trim(),
+            ifNo: String(item?.ifNo || "").trim(),
+        }))
+        .filter((item) => item.text)
+        .slice(0, 3);
+});
 
 const issueText = (issue) =>
     typeof issue === "string"
@@ -291,13 +321,8 @@ const copyReport = async () => {
     }
 };
 
-const saveReport = async () => {
-    if (!reportData.value) return;
+const persistReport = async () => {
     const reportId = route.params.id;
-    if (!reportId) {
-        alert("저장할 주간 보고서 ID가 없습니다.");
-        return;
-    }
     isSaving.value = true;
     try {
         await updateWeeklyReport(reportId, JSON.stringify(reportData.value));
@@ -309,6 +334,66 @@ const saveReport = async () => {
         isSaving.value = false;
     }
 };
+
+const saveReport = async () => {
+    if (!reportData.value) return;
+    const reportId = route.params.id;
+    if (!reportId) {
+        alert("저장할 주간 보고서 ID가 없습니다.");
+        return;
+    }
+    if (confirmQuestions.value.length) {
+        askIndex.value = 0;
+        askOpen.value = true;
+        return;
+    }
+    await persistReport();
+};
+
+const rejectConfirm = () => {
+    askOpen.value = false;
+    askIndex.value = 0;
+};
+
+const acceptConfirm = async () => {
+    if (askIndex.value < confirmQuestions.value.length - 1) {
+        askIndex.value += 1;
+        return;
+    }
+    askOpen.value = false;
+    await persistReport();
+};
 </script>
 
-<style scoped></style>
+<style scoped>
+.confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(23, 23, 23, 0.28);
+}
+.confirm-dialog {
+    width: min(520px, 100%);
+}
+.confirm-kicker {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--accent);
+}
+.confirm-title {
+    margin: 0 0 8px;
+    font-size: 18px;
+    line-height: 1.4;
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+</style>

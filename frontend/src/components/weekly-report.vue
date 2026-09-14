@@ -94,6 +94,7 @@ const sendDates = async () => {
         await postWeekly(userId.value, selects.value);
         await fetchWeeklyReport();
         toastSuccess("주간 보고서를 만들었습니다.");
+        router.push(`/weekly-detail/${weeklyReport.value[0].id}`);
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("주간 보고서 생성 실패:", error);
@@ -171,7 +172,6 @@ const downloadReport = async (report) => {
             .sort();
         const period_start = sortedDates[0] || "";
         const period_end = sortedDates[sortedDates.length - 1] || "";
-        // 템플릿이 {#selectedDate}{.}{/selectedDate} 루프라서 문자열을 배열로 감싸야 함
         const selectedDateRange = period_start
             ? [`${period_start} ~ ${period_end}`]
             : [];

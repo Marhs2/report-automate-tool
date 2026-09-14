@@ -587,6 +587,225 @@ def ensure_weekly_plans(report_data, source_reports):
     return report_data
 
 
+def _clip_question_item(text, limit=42):
+    cleaned = " ".join(str(text or "").split())
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[: limit - 1] + "…"
+
+
+def _weekday_label(iso_date):
+    try:
+        parsed = date.fromisoformat(str(iso_date)[:10])
+    except ValueError:
+        return str(iso_date)
+    names = ["월", "화", "수", "목", "금", "토", "일"]
+    return f"{names[parsed.weekday()]} {parsed.isoformat()}"
+
+
+def _missing_weekdays(selects):
+    selected = []
+    for raw in selects or []:
+        try:
+            selected.append(date.fromisoformat(str(raw)[:10]).isoformat())
+        except ValueError:
+            continue
+    if not selected:
+        return []
+    selected_set = set(selected)
+    first = date.fromisoformat(min(selected))
+    monday = first - timedelta(days=first.weekday())
+    missing = []
+    for offset in range(5):
+        day = (monday + timedelta(days=offset)).isoformat()
+        if day not in selected_set:
+            missing.append(day)
+    return missing
+
+
+def _confirm_item_text(value):
+    if isinstance(value, dict):
+        return str(value.get("content") or "").strip()
+    return str(value or "").strip()
+
+
+def build_weekly_confirm_questions(report_data, source_reports, selects):
+    questions = []
+    seen = set()
+
+    def add(qid, text):
+        if len(questions) >= 3 or qid in seen or not text:
+            return
+        seen.add(qid)
+        questions.append({"id": qid, "text": text})
+
+    projects = [
+        project
+        for project in (report_data.get("projects") or [])
+        if isinstance(project, dict)
+    ]
+
+    for project in projects:
+        name = reported_project_name(project)
+        completed = [
+            str(task).strip()
+            for task in project.get("completedTasks") or []
+            if str(task or "").strip()
+        ]
+        progress = [
+            str(task).strip()
+            for task in project.get("inProgressTasks") or []
+            if str(task or "").strip()
+        ]
+        for done in completed:
+            for prog in progress:
+                if _weekly_tasks_match(done, prog):
+                    add(
+                        f"dual:{name}:{done}",
+                        f"{name}의 '{_clip_question_item(done)}'이 완료와 진행 중에 같이 있습니다. 이번 주 완료가 맞나요?",
+                    )
+                    break
+
+    by_project = defaultdict(
+        lambda: {"completed": [], "progress": [], "issues": []}
+    )
+    for daily in source_reports or []:
+        day = str(daily.get("_reportDate") or "")
+        for project in daily.get("projects") or []:
+            if not isinstance(project, dict):
+                continue
+            name = reported_project_name(project)
+            for task in project.get("completedTasks") or []:
+                text = str(task or "").strip()
+                if text:
+                    by_project[name]["completed"].append((day, text))
+            for task in project.get("inProgressTasks") or []:
+                text = str(task or "").strip()
+                if text:
+                    by_project[name]["progress"].append((day, text))
+            for issue in project.get("issues") or []:
+                text = _confirm_item_text(issue)
+                if text:
+                    by_project[name]["issues"].append((day, text))
+
+    for name, bucket in by_project.items():
+        found = False
+        for _day_c, done in bucket["completed"]:
+            for _day_p, prog in bucket["progress"]:
+                if _weekly_tasks_match(done, prog):
+                    add(
+                        f"conflict:{name}:{done}",
+                        f"{name}의 '{_clip_question_item(done)}'은 어떤 날엔 완료, 어떤 날엔 진행 중이었습니다. 이번 주 완료가 맞나요?",
+                    )
+                    found = True
+                    break
+            if found:
+                break
+
+    for project in projects:
+        name = reported_project_name(project)
+        completed = [
+            str(task).strip()
+            for task in project.get("completedTasks") or []
+            if str(task or "").strip()
+        ]
+        for issue in project.get("issues") or []:
+            content = _confirm_item_text(issue)
+            if not content:
+                continue
+            if any(_weekly_tasks_match(content, done) for done in completed):
+                add(
+                    f"issue-done:{name}:{content}",
+                    f"{name} 이슈 '{_clip_question_item(content)}'가 완료된 업무에도 있습니다. 아직 열린 이슈가 맞나요?",
+                )
+
+    for project in projects:
+        name = reported_project_name(project)
+        if "미분류" in name:
+            add(
+                "unclassified",
+                f"'{name}'로 묶인 항목이 있습니다. 미분류로 두어도 되나요?",
+            )
+            break
+
+    missing = _missing_weekdays(selects)
+    if missing:
+        labels = ", ".join(_weekday_label(day) for day in missing)
+        add(
+            "missing-days",
+            f"{labels} 일일이 빠져 있습니다. 이대로 저장해도 되나요?",
+        )
+
+    for name, bucket in by_project.items():
+        counts = defaultdict(int)
+        for _day, text in bucket["progress"]:
+            counts[text] += 1
+        for text, count in counts.items():
+            if count >= 3:
+                add(
+                    f"stale:{name}:{text}",
+                    f"{name}의 '{_clip_question_item(text)}'이 여러 날 진행 중이었습니다. 아직 진행 중이 맞나요?",
+                )
+                break
+
+    empty_next = [
+        reported_project_name(project)
+        for project in projects
+        if not any(
+            str(item or "").strip()
+            for item in (project.get("nextPlans") or project.get("nextWeekPlans") or [])
+        )
+    ]
+    if empty_next:
+        add(
+            "empty-next",
+            f"{empty_next[0]}의 다음 주 계획이 비어 있습니다. 일일에 적어 둔 다음 일이 없는 게 맞나요?",
+        )
+
+    return questions[:3]
+
+
+def attach_confirm_questions(report_data, dated_reports, selects):
+    if not isinstance(report_data, dict):
+        report_data = {"projects": []}
+    cleaned = []
+    seen = set()
+    for item in report_data.get("confirmQuestions") or []:
+        if isinstance(item, str):
+            text, if_no = item.strip(), ""
+        elif isinstance(item, dict):
+            text = str(item.get("text") or "").strip()
+            if_no = str(item.get("ifNo") or "").strip()
+        else:
+            continue
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        question = {"text": text}
+        if if_no:
+            question["ifNo"] = if_no
+        cleaned.append(question)
+        if len(cleaned) >= 3:
+            break
+    if len(cleaned) < 3:
+        for item in build_weekly_confirm_questions(
+            report_data, dated_reports, selects
+        ):
+            text = str(item.get("text") or "").strip()
+            if_no = str(item.get("ifNo") or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            question = {"text": text}
+            if if_no:
+                question["ifNo"] = if_no
+            cleaned.append(question)
+            if len(cleaned) >= 3:
+                break
+    report_data["confirmQuestions"] = cleaned[:3]
+    return report_data
+
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
@@ -923,7 +1142,7 @@ def generate_weekly_report(member_id, selects):
     with get_db() as db:
         res = db.execute(
             """
-            SELECT parsed_json FROM daily_reports
+            SELECT report_date, parsed_json FROM daily_reports
             WHERE id IN (
                 SELECT MAX(id) FROM daily_reports
                 WHERE member_id = ? AND report_date IN ({})
@@ -937,7 +1156,14 @@ def generate_weekly_report(member_id, selects):
         if not res:
             return None
 
-        reports = [coerce_report_data(row[0]) for row in res]
+        reports = []
+        dated_reports = []
+        for row in res:
+            daily = coerce_report_data(row[1])
+            reports.append(daily)
+            stamped = dict(daily)
+            stamped["_reportDate"] = str(row[0] or "")
+            dated_reports.append(stamped)
         try:
             client = OpenAI(
                 base_url=LM_BASE_URL,
@@ -948,7 +1174,19 @@ def generate_weekly_report(member_id, selects):
                 model=MODEL_NAME,
                 messages=[
                     {"role": "system", "content": load_weekly_prompt()},
-                    {"role": "user", "content": json.dumps(reports, ensure_ascii=False)},
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            [
+                                {
+                                    "reportDate": daily.get("_reportDate"),
+                                    "projects": daily.get("projects") or [],
+                                }
+                                for daily in dated_reports
+                            ],
+                            ensure_ascii=False,
+                        ),
+                    },
                 ],
                 temperature=0.1,
                 max_tokens=WEEKLY_MAX_TOKENS,
@@ -987,6 +1225,9 @@ def generate_weekly_report(member_id, selects):
             report_data = promote_weekly_tasks(report_data, reports)
             report_data = normalize_issues(report_data)
             report_data = drop_empty_projects(report_data)
+            report_data = attach_confirm_questions(
+                report_data, dated_reports, selects
+            )
         except HTTPException:
             raise
         except Exception as exc:
