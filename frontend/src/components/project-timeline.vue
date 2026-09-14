@@ -82,9 +82,6 @@ const itemText = (value) =>
     ? (value.content ?? "")
     : String(value ?? "");
 
-const statusOf = (value) =>
-  value && typeof value === "object" ? value.status || "" : "";
-
 const visibleSections = (entry) =>
   [
     {
@@ -255,15 +252,6 @@ onMounted(() => {
                     :key="itemIndex"
                   >
                     <span>{{ itemText(item) }}</span>
-                    <span
-                      v-if="section.key === 'issues' && statusOf(item)"
-                      class="status-badge"
-                      :class="
-                        statusOf(item) === '해결' ? 'is-resolved' : 'is-open'
-                      "
-                    >
-                      {{ statusOf(item) }}
-                    </span>
                   </li>
                 </ul>
               </div>
@@ -442,25 +430,5 @@ onMounted(() => {
 
 .item-list li + li {
   margin-top: 4px;
-}
-
-.status-badge {
-  display: inline-flex;
-  margin-left: 8px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 650;
-  vertical-align: middle;
-}
-
-.status-badge.is-open {
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-
-.status-badge.is-resolved {
-  background: color-mix(in srgb, var(--success) 16%, transparent);
-  color: var(--success);
 }
 </style>

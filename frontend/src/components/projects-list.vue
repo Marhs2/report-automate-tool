@@ -114,19 +114,22 @@ const hasActiveFilter = computed(
         Boolean(filterDateEnd.value),
 );
 
-const isUnresolved = (value) =>
-    value && typeof value === "object" ? value.status !== "해결" : false;
+const issueCount = (report) =>
+    projectsOf(report).reduce((count, project) => {
+        const issues = Array.isArray(project.issues) ? project.issues : [];
+        return (
+            count +
+            issues.filter((issue) => {
+                if (typeof issue === "string") return Boolean(issue.trim());
+                return Boolean(issue && String(issue.content || "").trim());
+            }).length
+        );
+    }, 0);
 
 const projectNamesOf = (report) =>
     projectsOf(report)
         .map((project) => project.projectName)
         .filter(Boolean);
-
-const unresolvedIssueCount = (report) =>
-    projectsOf(report).reduce((count, project) => {
-        const issues = Array.isArray(project.issues) ? project.issues : [];
-        return count + issues.filter(isUnresolved).length;
-    }, 0);
 
 const openDetail = (reportId) => {
     router.push(`/report/${reportId}`);
@@ -314,10 +317,10 @@ onMounted(() => {
                                     {{ name }}
                                 </span>
                                 <span
-                                    v-if="unresolvedIssueCount(report) > 0"
+                                    v-if="issueCount(report) > 0"
                                     class="meta-chip issue-chip"
                                 >
-                                    이슈 {{ unresolvedIssueCount(report) }}
+                                    이슈 {{ issueCount(report) }}
                                 </span>
                                 <span
                                     v-else-if="projectNamesOf(report).length === 0"

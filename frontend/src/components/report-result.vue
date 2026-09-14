@@ -110,18 +110,8 @@
                             <input
                                 :key="`issue-${issueIndex}`"
                                 class="input"
-                                :value="issue.content"
-                                v-model="project.issues[issueIndex].content"
+                                v-model="project.issues[issueIndex]"
                             />
-                            <select
-                                :key="`issue-status-${issueIndex}`"
-                                class="input issue-status-select"
-                                :value="issue.status || '미해결'"
-                                @change="toggleIssueStatus(issue, $event)"
-                            >
-                                <option value="미해결">미해결</option>
-                                <option value="해결">해결</option>
-                            </select>
                             <button
                                 class="btn remove-btn"
                                 @click="removeIssue(project, issueIndex)"
@@ -239,6 +229,38 @@ const aiLoading = ref(false);
 const saving = ref(false);
 const { PostSaveReport, PostReport, getUsers } = useAPI();
 
+const issueText = (issue) =>
+    typeof issue === "string"
+        ? issue.trim()
+        : String(issue?.content || "").trim();
+
+const normalizeReportIssues = (report) => {
+    if (!report?.projects) return report;
+    for (const project of report.projects) {
+        const completed = [...(project.completedTasks || [])].filter((task) =>
+            String(task || "").trim(),
+        );
+        const remaining = [];
+        const seen = new Set();
+        for (const issue of project.issues || []) {
+            const content = issueText(issue);
+            if (!content) continue;
+            const status =
+                issue && typeof issue === "object" ? issue.status : "";
+            if (status === "해결") {
+                if (!completed.includes(content)) completed.push(content);
+                continue;
+            }
+            if (completed.includes(content) || seen.has(content)) continue;
+            remaining.push(content);
+            seen.add(content);
+        }
+        project.completedTasks = completed;
+        project.issues = remaining;
+    }
+    return report;
+};
+
 watch(
     reportData,
     (newVal) => {
@@ -253,7 +275,7 @@ onMounted(() => {
     const stored = sessionStorage.getItem("reportData");
 
     if (stored) {
-        reportData.value = JSON.parse(stored);
+        reportData.value = normalizeReportIssues(JSON.parse(stored));
     }
 
     const storedRaw = sessionStorage.getItem("reportRaw");
@@ -311,11 +333,7 @@ const removeInProgressTask = (project, index) => {
 };
 
 const addIssue = (project) => {
-    project.issues.push({ content: "", status: "미해결" });
-};
-
-const toggleIssueStatus = (issue, event) => {
-    issue.status = event.target.value;
+    project.issues.push("");
 };
 
 const removeIssue = (project, index) => {
@@ -392,7 +410,7 @@ const retryExtract = async () => {
             reportDate,
             userId,
         );
-        reportData.value = res;
+        reportData.value = normalizeReportIssues(res);
         sessionStorage.setItem("reportData", JSON.stringify(res));
     } catch (error) {
         console.error("재추출 실패:", error);
@@ -506,11 +524,6 @@ const getSelectedMemberId = () => {
     align-self: flex-start;
     padding: 5px 14px;
     font-size: 13px;
-}
-
-/* 이슈 상태 선택 (미해결/해결) */
-.issue-status-select {
-    max-width: 110px;
 }
 
 /* 하단 저장 영역 */

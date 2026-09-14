@@ -1,23 +1,18 @@
 # 일일보고 취합 · 주간보고 자동화 도구
 
-매일 쌓이는 일일보고(작성자마다 형식이 제각각)를 AI가 자동으로 구조화해 저장하고,
-주 마지막 날 프로젝트별로 정리된 주간보고 초안을 생성해 워드 파일로 내려받는 웹 도구.
-
----
-
 ## 요구 사양
 
-모델 **qwen3.5-4b**(4B 파라미터, 컨텍스트 최대 262,144토큰, 추론 끄기)의 Q4 양자화 추론 기준:
+모델 **Qwen3.8 27B** Unsloth `UD-Q4_K_XL`, context 32768, 추론 끄기 기준:
 
-| 항목     | 최소                               | 권장                 | 
-| -------- | ---------------------------------- | -------------------- |
-| CPU      | 4코어                              | 6코어 이상           |
-| GPU      | NVIDIA 6GB VRAM                    | NVIDIA 8GB VRAM 이상 |
-| RAM      | 16GB                               | 32GB                 |
-| OS       | Windows 10/11  |                      |
-| 저장공간 | 5GB 여유                           | 10GB 여유            |
+| 항목 | 최소 | 권장 |
+| --- | --- | --- |
+| CPU | 6코어 | 8코어 이상 |
+| GPU | NVIDIA 18GB VRAM | NVIDIA 24GB VRAM 이상 |
+| RAM | 32GB | 64GB |
+| OS | Windows 10/11 , Ubuntu|  |
+| 저장공간 | 25GB 여유 | 40GB 여유 |
 
-GPU가 없으면 CPU로도 동작하나 속도가 크게 느려짐. (권장 사양 근거: qwen3.5-4b Q4 파일 크기 3.7GB — [비교 결과](model.md); Qwen3.5-4B Q4 추론 VRAM 3.3~5+GB — [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-5-4b)
+(Q4_K_M 참고: 파일 ≈ 16.67GB, 가중치 VRAM ≈ 17.4GB, 여유 포함 권장 24+GB — [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-8-27b). 운영 퀀트는 `UD-Q4_K_XL`.)
 
 ---
 
@@ -26,28 +21,27 @@ GPU가 없으면 CPU로도 동작하나 속도가 크게 느려짐. (권장 사�
 ```
 backend/   FastAPI + SQLite (LLM 호출, 구조화·주간보고 생성 API)
 frontend/  Vue 3 + Vite (웹 화면)
-benchmark/ 모델 선정 벤치마크 (데이터셋 32건 + 채점 도구)
-docs/      모델·도구 선정 근거, 정확도 자체 평가
+docs/      모델·도구 선정 근거, 채점 방법
 ```
 
 - **백엔드**: FastAPI (`backend/main.py`), SQLite (`backend/data/daily_reports.db`)
 - **프론트엔드**: Vue 3 + Vite, docx 다운로드는 docxtemplater
-- **LLM 런타임**: LM Studio (OpenAI 호환 API, `http://127.0.0.1:1234/v1`)
-- **채택 모델**: qwen3.5-4b (GGUF Q4, 추론 끄기) — 선정 근거는 [비교 결과](model.md)
+- **LLM 런타임**: [Unsloth Desktop](https://unsloth.ai/) (OpenAI 호환 API, `http://127.0.0.1:8888/v1`)
+- **채택 모델**: Qwen3.8 27B (`unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL`, 추론 끄기, context 32768) — [선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)
 
 ---
 
 ## 설치·실행
 
-### 1) LM Studio (LLM 로컬 서버) 준비
+### 1) Unsloth (LLM 로컬 서버) 준비
 
-1. [LM Studio](https://lmstudio.ai/) 설치 후 모델을 다운로드.
-   - **권장: qwen3.5-4b** (mtp , Q4_K_S, ≈ 3.7GB, 추론 끄기). 대안: nuextract3, gemma-4-e2b
-   - 선정 근거: [비교 결과](model.md)
-   - **로드 시 추론 끄기 조건 보장**: `lms load qwen3.5-4b --context-length 32768 --parallel 1`
+1. [Unsloth Desktop](https://unsloth.ai/) 설치 후 모델을 다운로드. ([Linux](https://unsloth.ai/download/linux))
+   - **권장: Qwen3.8 27B** (`unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL`, 추론 끄기).
+   - 선정 근거: [자체 32건](docs/정확도-평가.md), 하드웨어: [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-8-27b), 모델 가이드: [Unsloth Qwen3.8](https://unsloth.ai/docs/models/qwen3.8)
+   - **로드 시 추론 끄기**: `unsloth run --model unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL --reasoning off -c 32768 -p 8888`
+   - **API 키**: Unsloth 아바타 → Settings → API에서 키 생성 (`sk-unsloth-…`). OpenAI 호환 엔드포인트는 `http://127.0.0.1:8888/v1` ([API 문서](https://unsloth.ai/docs/basics/api))
    - **추론 차단**: 백엔드는 요청마다 `reasoning_effort: "none"`을 명시적으로 전송.
-     LM Studio/qwen3.5-4b는 이 필드를 생략하면 기본적으로 추론을 켜므로(실측: 추론 1337B·16.6초),
-     필드 생략 대신 `none`이 반드시 필요.
+     Qwen3.8 27B는 이 필드를 생략하면 기본적으로 추론을 켜므로, 필드 생략 대신 `none`이 반드시 필요.
 
 ### 2) 백엔드
 
@@ -64,12 +58,12 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 | 변수                | 기본값                     | 설명                                                                                                                                                                                                                                                                                 |
 | ------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `REPORT_MODEL_NAME` | `qwen3.5-4b`               | LM Studio에 로드한 모델명. **qwen3.5-4b (기본)** — 추론 끄기 기준 최고 정확도·속도 (문서 `docs/모델-도구-선정-근거.md`)                                                                                                                                                              |
-| `LM_BASE_URL`       | `http://127.0.0.1:1234/v1` | LM Studio 주소                                                                                                                                                                                                                                                                       |
-| `LM_API_KEY`        | `lm-studio`                | 더미 키 (LM Studio 무관)                                                                                                                                                                                                                                                             |
-| `DAILY_MAX_TOKENS`  | `16384`                    | 일일 구조화 출력 상한                                                                                                                                                                                                                                                                |
-| `WEEKLY_MAX_TOKENS` | `2048`                     | 주간보고 생성 출력 상한                                                                                                                                                                                                                                                              |
-| `DAILY_REASONING`   | `none`                     | `none`/`low`/`medium`/`high`. 기본 `none` = 요청에 `reasoning_effort:"none"`을 명시적으로 실어 추론을 끈다(필드 생략은 LM Studio/qwen이 추론을 켜므로 금지). qwen3.5-4b는 추론 꺼도 최고 정확도 (0.883). nuextract3로 바꿀 경우에만 `high` 고려 (문서 `docs/모델-도구-선정-근거.md`) |
+| `REPORT_MODEL_NAME` | `unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL` | Unsloth에 로드한 모델명. **Qwen3.8 27B `UD-Q4_K_XL`(기본)** — context 32768 ([선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)) |
+| `LM_BASE_URL`       | `http://127.0.0.1:8888/v1` | Unsloth OpenAI 호환 API 주소 ([API 문서](https://unsloth.ai/docs/basics/api)) |
+| `LM_API_KEY`        | `sk-unsloth-…`            |  |
+| `DAILY_MAX_TOKENS`  | `32768`| 일일 구조화 출력 상한|
+| `WEEKLY_MAX_TOKENS` | `32768`| 주간보고 생성 출력 상한|
+| `DAILY_REASONING`   | `none`                     | `none`/`low`/`medium`/`high`. 기본 `none` = 요청에 `reasoning_effort:"none"`을 명시적으로 실어 추론을 끈다(필드 생략은 Unsloth/Qwen이 추론을 켜므로 금지). Qwen3.8 27B는 추론 끄고 사용.  |
 
 ### 3) 프론트엔드
 
@@ -86,7 +80,7 @@ bun run dev        # http://localhost:5173
 | 일일보고 입력      | 자유 텍스트(붙여넣기 포함), 작성자·날짜 지정, 같은 날 덮어쓰기                                      |
 | 자동 구조화        | 프로젝트명·완료·진행·이슈·협조 요청·다음 계획 추출, 복수 프로젝트 분리, 원문 보존·대조              |
 | 모아 보기          | 날짜별 / 사람별 / 프로젝트별(타임라인) 조회, 프로젝트명·키워드로 표기 통일                                   |
-| 주간보고 초안      | 기간 선택(주 이동), 프로젝트별 정리, 반복 업무 병합, 미해결 이슈 구분, 같은 기간 재생성 시 덮어쓰기 |
+| 주간보고 초안      | 기간 선택(주 이동), 프로젝트별 정리, 반복 업무 병합, 남은 이슈만 이슈로 남김, 같은 기간 재생성 시 덮어쓰기 |
 | 초안 편집·내보내기 | 초안 수정 후 저장, 화면 복사, 워드(.docx) 다운로드                                                  |
 | 미제출 표시        | 사람별·요일별 제출 현황 (주간보고 화면 상단)                                                        |
 
@@ -101,13 +95,16 @@ bun run dev        # http://localhost:5173
 
 ## 벤치마크 · 정확도
 
-- 모델 선정 근거 및 후보 7종 비교: [모델·도구 선정 근거](docs/모델-도구-선정-근거.md)
-- 정확도 자체 평가 (항목별 추출 정확도 표·케이스별 오류 분석): [정확도 자체 평가](docs/정확도-평가.md)
+자체 32건 (`UD-Q4_K_XL`, context 32768, 추론 끄기):
 
-**결과 요약 (채택: qwen3.5-4b + 추론 끄기, 2026-08-05 테스트 보고 32건)**:
+| 모델 | micro F1 | 평균 지연 |
+| --- | ---: | ---: |
+| Gemma 4 31B-it | 87.9% | 5.66s |
+| Muse Glimmer-30B | 87.5% | 8.63s |
+| **Qwen3.8 27B (채택)** | 86.4% | **0.85s** |
 
-| 모델 / 설정                       | micro F1  | 보고 1건 평균 |
-| --------------------------------- | --------- | ------------- |
-| **qwen3.5-4b + 추론 끄기 (채택)** | **75.8%** | **2.47초**    |
-| nuextract3 + 추론 끄기            | 79.1%     | 1.7초         |
-| google/gemma-4-e2b + 추론 끄기    | 75.6%     | 2.02초        |
+채택 이유: F1은 Gemma가 1.5%p 높지만 Qwen3.8이 약 7배 빠르고 빈 보고를 모두 맞춘다.
+
+- 채점 방법·항목별 표: [정확도 평가](docs/정확도-평가.md)
+- 요구사항·도구·운영 조건: [모델·도구 선정 근거](docs/모델-도구-선정-근거.md)
+- 공개 벤치 참고: [model.md](model.md)

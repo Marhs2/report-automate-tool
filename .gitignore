@@ -86,5 +86,5 @@ temp/
 *.bak
 *.orig
 
-# ── Benchmark───
+# ── Benchmark (dataset, scripts, raw results) ───────────
 benchmark/

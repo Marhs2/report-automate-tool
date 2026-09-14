@@ -39,17 +39,6 @@
                                 :key="entryIndex"
                             >
                                 <span>{{ itemText(entry) }}</span>
-                                <span
-                                    v-if="section.key === 'issues' && statusOf(entry)"
-                                    class="status-badge"
-                                    :class="
-                                        statusOf(entry) === '해결'
-                                            ? 'is-resolved'
-                                            : 'is-open'
-                                    "
-                                >
-                                    {{ statusOf(entry) }}
-                                </span>
                             </li>
                         </ul>
                         <p v-else class="empty-msg">{{ section.empty }}</p>
@@ -103,9 +92,6 @@ const itemText = (value) =>
     value && typeof value === "object"
         ? (value.content ?? "")
         : String(value ?? "");
-
-const statusOf = (value) =>
-    value && typeof value === "object" ? value.status || "" : "";
 
 const hasItems = (list) => Array.isArray(list) && list.length > 0;
 
@@ -278,26 +264,6 @@ watch(
     color: var(--text);
     font-style: italic;
     opacity: 0.7;
-}
-
-.status-badge {
-    display: inline-flex;
-    margin-left: 8px;
-    padding: 1px 7px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 650;
-    vertical-align: middle;
-}
-
-.status-badge.is-open {
-    background: var(--danger-bg);
-    color: var(--danger);
-}
-
-.status-badge.is-resolved {
-    background: color-mix(in srgb, var(--success) 16%, transparent);
-    color: var(--success);
 }
 
 @media (max-width: 860px) {

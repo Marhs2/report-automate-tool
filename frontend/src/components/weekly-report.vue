@@ -166,8 +166,15 @@ const downloadReport = async (report) => {
             linebreaks: true,
         });
 
-        const sortedDates = [...(report.selectedDate || [])].sort();
+        const sortedDates = [...(report.selectedDate || [])]
+            .map((d) => formatLocalDate(new Date(d)))
+            .sort();
+        const period_start = sortedDates[0] || "";
         const period_end = sortedDates[sortedDates.length - 1] || "";
+        // 템플릿이 {#selectedDate}{.}{/selectedDate} 루프라서 문자열을 배열로 감싸야 함
+        const selectedDateRange = period_start
+            ? [`${period_start} ~ ${period_end}`]
+            : [];
 
         const createdDateRaw =
             report.createdAt || report.created_at || new Date().toISOString();
@@ -176,9 +183,9 @@ const downloadReport = async (report) => {
         const asReportItems = (items) => {
             const values = Array.isArray(items)
                 ? items.filter((item) => {
-                      if (item === null || item === undefined) return false;
-                      return typeof item !== "string" || item.trim().length > 0;
-                  })
+                    if (item === null || item === undefined) return false;
+                    return typeof item !== "string" || item.trim().length > 0;
+                })
                 : [];
             return values.length > 0 ? values : ["없음"];
         };
@@ -194,16 +201,11 @@ const downloadReport = async (report) => {
                 completed: asReportItems(p.completedTasks),
                 inProgress: asReportItems(p.inProgressTasks),
                 issues: asReportItems(p.issues).map((issue) => {
-                    if (typeof issue === "string") {
-                        return {
-                            content: issue,
-                            resolved: false,
-                        };
-                    }
-                    return {
-                        content: issue.content || "없음",
-                        resolved: issue.status === "해결",
-                    };
+                    const content =
+                        typeof issue === "string"
+                            ? issue
+                            : issue.content || "없음";
+                    return { content };
                 }),
                 nextPlans: asReportItems(nextPlans),
             };
@@ -213,8 +215,10 @@ const downloadReport = async (report) => {
         const missing = [];
         const missing_count = missing.length;
 
+
+
         const data = {
-            selectedDate: report.selectedDate,
+            selectedDate: selectedDateRange,
             created_date,
             project_count,
             missing_count,
@@ -268,11 +272,7 @@ const formatReport = (report) => {
             for (const issue of project.issues) {
                 const content =
                     typeof issue === "string" ? issue : issue.content || "";
-                const status =
-                    typeof issue === "string"
-                        ? "미해결"
-                        : issue.status || "미해결";
-                lines.push(`- ${content} (${status})`);
+                lines.push(`- ${content}`);
             }
         }
 
@@ -319,11 +319,8 @@ onMounted(async () => {
 
 <template>
     <div class="page weekly-report-page">
-        <userActivities
-            :embedded="true"
-            :start-date="weekDays[0] || ''"
-            :end-date="weekDays[weekDays.length - 1] || ''"
-        ></userActivities>
+        <userActivities :embedded="true" :start-date="weekDays[0] || ''"
+            :end-date="weekDays[weekDays.length - 1] || ''"></userActivities>
         <div class="page-header">
             <div>
                 <h1>주간 보고서</h1>
@@ -336,53 +333,29 @@ onMounted(async () => {
         <div class="card">
             <h2>이번 주 보고서 생성</h2>
             <div class="week-nav">
-                <button
-                    class="btn btn-small"
-                    @click="prevWeek"
-                    :disabled="isLoading"
-                >
+                <button class="btn btn-small" @click="prevWeek" :disabled="isLoading">
                     &lt; 이전 주
                 </button>
                 <span class="week-label">{{ weekLabel }}</span>
-                <button
-                    class="btn btn-small"
-                    @click="nextWeek"
-                    :disabled="isLoading"
-                >
+                <button class="btn btn-small" @click="nextWeek" :disabled="isLoading">
                     다음 주 &gt;
                 </button>
-                <button
-                    v-if="weekOffset !== 0"
-                    class="btn btn-small"
-                    @click="loadWeek(0)"
-                    :disabled="isLoading"
-                >
+                <button v-if="weekOffset !== 0" class="btn btn-small" @click="loadWeek(0)" :disabled="isLoading">
                     이번 주로
                 </button>
             </div>
             <div class="day-grid">
-                <label
-                    v-for="(dayDate, index) in weekDays"
-                    :key="index"
-                    class="day-chip"
-                >
+                <label v-for="(dayDate, index) in weekDays" :key="index" class="day-chip">
                     <input type="checkbox" v-model="selects" :value="dayDate" />
                     <span>{{ weekdayLabels[index] }} {{ dayDate }}</span>
-                    <span
-                        class="day-status"
-                        :class="dayCounts[dayDate] ? 'has-report' : 'no-report'"
-                    >
+                    <span class="day-status" :class="dayCounts[dayDate] ? 'has-report' : 'no-report'">
                         {{ dayCounts[dayDate] ? "보고 있음" : "보고 없음" }}
                     </span>
                 </label>
             </div>
 
             <div class="generate-bar">
-                <button
-                    class="btn btn-primary"
-                    v-on:click="() => sendDates()"
-                    :disabled="isLoading"
-                >
+                <button class="btn btn-primary" v-on:click="() => sendDates()" :disabled="isLoading">
                     {{ isLoading ? "로딩 중..." : "주간 보고서 생성" }}
                 </button>
             </div>
@@ -390,18 +363,11 @@ onMounted(async () => {
 
         <div class="card">
             <h2>주간 보고서 다운로드</h2>
-            <div
-                v-if="!weeklyReport || weeklyReport.length === 0"
-                class="empty-state"
-            >
+            <div v-if="!weeklyReport || weeklyReport.length === 0" class="empty-state">
                 생성된 주간 보고서가 없습니다
             </div>
             <ul v-else class="report-list">
-                <li
-                    v-for="(report, index) in weeklyReport"
-                    :key="index"
-                    class="report-list-item"
-                >
+                <li v-for="(report, index) in weeklyReport" :key="index" class="report-list-item">
                     <div class="report-list-header">
                         <div>
                             <div class="report-user">
@@ -413,41 +379,27 @@ onMounted(async () => {
                         </div>
 
                         <div class="report-list-actions">
-                            <button
-                            class="btn"
-                            @click="() => deleteWeekly(report.id)"
-                        >
-                            삭제
-                        </button>
-                        <button
-                            class="btn"
-                            :disabled="isLoading"
-                            @click="viewReport(report)"
-                        >
-                            보기
-                        </button>
+                            <button class="btn" @click="() => deleteWeekly(report.id)">
+                                삭제
+                            </button>
+                            <button class="btn" :disabled="isLoading" @click="viewReport(report)">
+                                보기
+                            </button>
 
-                        <button class="btn" @click="() => copyReport(report)">
-                            복사
-                        </button>
+                            <button class="btn" @click="() => copyReport(report)">
+                                복사
+                            </button>
 
-                        <button
-                            class="btn"
-                            v-on:click="() => downloadReport(report)"
-                            :disabled="isLoading"
-                        >
-                            <Download :size="14" /> 다운로드
-                        </button>
+                            <button class="btn" v-on:click="() => downloadReport(report)" :disabled="isLoading">
+                                <Download :size="14" /> 다운로드
+                            </button>
                         </div>
 
-             
+
 
                     </div>
                     <ul class="report-projects">
-                        <li
-                            v-for="data in report.report?.projects"
-                            :key="data.projectName"
-                        >
+                        <li v-for="data in report.report?.projects" :key="data.projectName">
                             {{ data.projectName }}
                         </li>
                     </ul>

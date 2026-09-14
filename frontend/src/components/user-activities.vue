@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref, reactive, computed, watch } from "vue";
 import { useRouter } from "vue-router";
-import useApi from "../composables/useApi";
+    import useApi from "../composables/useApi";
 
 const router = useRouter();
 const { GetUserActivities, GetReports } = useApi();
@@ -68,7 +68,6 @@ function metaFor(dateStr) {
         weekLabel: WEEKDAY_LABELS[weekDay],
         isWeekend: weekDay === 0 || weekDay === 6,
         isToday: date.getTime() === today.getTime(),
-        isFuture: date.getTime() > today.getTime(),
     };
 }
 
@@ -81,7 +80,6 @@ const formatDotDate = (dateStr) => {
 const cellStatus = (dateStr, count) => {
     const meta = metaFor(dateStr);
     if (count > 0) return "제출";
-    if (meta.isFuture) return "예정";
     if (meta.isWeekend) return "주말";
     return "미제출";
 };
@@ -196,7 +194,6 @@ const orderedActivities = computed(() =>
     })),
 );
 
-const hasFutureDates = computed(() => dateMeta.value.some((item) => item.isFuture));
 const hasToday = computed(() => dateMeta.value.some((item) => item.isToday));
 
 const displayDates = computed(
@@ -229,6 +226,8 @@ const periodLabel = computed(() =>
         ? `${props.startDate} ~ ${props.endDate} 제출 현황`
         : `${selectedYear.value}년 ${selectedMonth.value}월 활동 기록`,
 );
+
+
 </script>
 
 <template>
@@ -276,9 +275,6 @@ const periodLabel = computed(() =>
                 </span>
                 <span v-if="hasToday" class="legend-item">
                     <span class="swatch today"></span> 오늘
-                </span>
-                <span v-if="hasFutureDates" class="legend-item">
-                    <span class="swatch future"></span> 예정
                 </span>
             </div>
         </div>
@@ -340,7 +336,6 @@ const periodLabel = computed(() =>
                         committed: item.count > 0,
                         weekend: metaFor(item.report_date).isWeekend,
                         today: metaFor(item.report_date).isToday,
-                        future: metaFor(item.report_date).isFuture,
                         clickable: canOpenCell(item),
                     }"
                     role="button"
@@ -372,6 +367,7 @@ const periodLabel = computed(() =>
 .activity-section {
     margin-bottom: 32px;
 }
+
 
 .view-controls {
     display: flex;
@@ -567,11 +563,6 @@ const periodLabel = computed(() =>
 
 .log.committed {
     background: var(--success);
-}
-
-.log.future:not(.committed) {
-    opacity: 0.28;
-    cursor: default;
 }
 
 .log.today {

@@ -80,39 +80,28 @@
 
                     <div class="field-group issues">
                         <h2>이슈</h2>
-                        <template v-if="project.issues.length > 0">
-                            <div
-                                v-for="(issue, issueIndex) in project.issues"
-                                :key="`issue-${issueIndex}`"
-                                class="issue-row"
+                        <div
+                            v-if="project.issues.length > 0"
+                            v-for="(issue, issueIndex) in project.issues"
+                            :key="`issue-${issueIndex}`"
+                            class="task-row"
+                        >
+                            <input
+                                class="input"
+                                v-model="project.issues[issueIndex]"
+                            />
+                            <button
+                                class="btn remove-btn"
+                                @click="removeItem(project, 'issues', issueIndex)"
                             >
-                                <input
-                                    class="input"
-                                    :value="issueText(issue)"
-                                    @input="
-                                        (e) => setIssueContent(issue, e.target.value)
-                                    "
-                                />
-                                <select
-                                    class="input issue-status-select"
-                                    :value="issueStatus(issue)"
-                                    @change="
-                                        (e) => setIssueStatus(issue, e.target.value)
-                                    "
-                                >
-                                    <option value="미해결">미해결</option>
-                                    <option value="해결">해결</option>
-                                </select>
-                                <button
-                                    class="btn remove-btn"
-                                    @click="removeItem(project, 'issues', issueIndex)"
-                                >
-                                    -
-                                </button>
-                            </div>
-                        </template>
+                                -
+                            </button>
+                        </div>
                         <div v-else class="empty-msg">이슈가 없습니다</div>
-                        <button class="btn add-btn" @click="addIssue(project)">
+                        <button
+                            class="btn add-btn"
+                            @click="addItem(project, 'issues')"
+                        >
                             +
                         </button>
                     </div>
@@ -175,6 +164,38 @@ const userName = ref("");
 const isSaving = ref(false);
 const { getUsers, GetWeeklyReportById, updateWeeklyReport } = useAPI();
 
+const issueText = (issue) =>
+    typeof issue === "string"
+        ? issue.trim()
+        : String(issue?.content || "").trim();
+
+const normalizeReportIssues = (report) => {
+    if (!report?.projects) return report;
+    for (const project of report.projects) {
+        const completed = [...(project.completedTasks || [])].filter((task) =>
+            String(task || "").trim(),
+        );
+        const remaining = [];
+        const seen = new Set();
+        for (const issue of project.issues || []) {
+            const content = issueText(issue);
+            if (!content) continue;
+            const status =
+                issue && typeof issue === "object" ? issue.status : "";
+            if (status === "해결") {
+                if (!completed.includes(content)) completed.push(content);
+                continue;
+            }
+            if (completed.includes(content) || seen.has(content)) continue;
+            remaining.push(content);
+            seen.add(content);
+        }
+        project.completedTasks = completed;
+        project.issues = remaining;
+    }
+    return report;
+};
+
 watch(
     reportData,
     (newVal) => {
@@ -191,10 +212,10 @@ onMounted(async () => {
     if (reportId) {
         try {
             const data = await GetWeeklyReportById(reportId);
-            reportData.value = data.report;
+            reportData.value = normalizeReportIssues(data.report);
             userName.value = data.memberName || `사용자 ${data.memberId}`;
 
-            sessionStorage.setItem("reportData", JSON.stringify(data.report));
+            sessionStorage.setItem("reportData", JSON.stringify(reportData.value));
             sessionStorage.setItem("selectedUser", String(data.memberId));
             if (data.createdAt) {
                 sessionStorage.setItem(
@@ -212,7 +233,7 @@ onMounted(async () => {
     const stored = sessionStorage.getItem("reportData");
 
     if (stored) {
-        reportData.value = JSON.parse(stored);
+        reportData.value = normalizeReportIssues(JSON.parse(stored));
     }
 
     const userId = localStorage.getItem("report-selectedUser") || "";
@@ -230,30 +251,8 @@ onMounted(async () => {
     }
 });
 
-const issueText = (issue) =>
-    typeof issue === "string" ? issue : (issue?.content ?? "");
-
-const issueStatus = (issue) =>
-    typeof issue === "string" ? "미해결" : (issue?.status ?? "미해결");
-
-const setIssueContent = (issue, value) => {
-    if (typeof issue === "object") {
-        issue.content = value;
-    }
-};
-
-const setIssueStatus = (issue, value) => {
-    if (typeof issue === "object") {
-        issue.status = value;
-    }
-};
-
 const addItem = (project, field) => {
     project[field].push("");
-};
-
-const addIssue = (project) => {
-    project.issues.push({ content: "", status: "미해결" });
 };
 
 const removeItem = (project, field, index) => {
@@ -285,11 +284,7 @@ const formatReport = (report) => {
             for (const issue of project.issues) {
                 const content =
                     typeof issue === "string" ? issue : issue.content || "";
-                const status =
-                    typeof issue === "string"
-                        ? "미해결"
-                        : issue.status || "미해결";
-                lines.push(`- ${content} (${status})`);
+                lines.push(`- ${content}`);
             }
         }
 
@@ -447,22 +442,6 @@ const saveReport = async () => {
     flex-shrink: 0;
     padding: 5px 10px;
     font-size: 13px;
-}
-
-.issue-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.issue-row .input:first-child {
-    flex: 1;
-    min-width: 0;
-}
-
-.issue-status-select {
-    flex-shrink: 0;
-    max-width: 110px;
 }
 
 /* 하단 저장 영역 */

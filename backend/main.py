@@ -99,14 +99,14 @@ with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
 with open("./model_asset/keyword_json_schema.json", "r", encoding="utf-8") as f:
     keyword_schema = json.load(f)
 
-MODEL_NAME = "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M"
+MODEL_NAME = "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL"
 LM_BASE_URL = "http://192.168.210.10:8888/v1"
-LM_API_KEY = "lm-studio"
+LM_API_KEY = "sk-unsloth-0ef77ee762fef9a0ccc92e5edadaf492"
 LLM_TIMEOUT_SECONDS = 600.0
 
-DAILY_MAX_TOKENS = 262144
-WEEKLY_MAX_TOKENS = 262144
-KEYWORD_MAX_TOKENS = 4096
+DAILY_MAX_TOKENS = 32768
+WEEKLY_MAX_TOKENS = 32768
+KEYWORD_MAX_TOKENS = 32768
 DAILY_REASONING = "none"
 WEEKLY_REASONING = "none"
 KEYWORD_REASONING = "none"
@@ -269,7 +269,7 @@ def coerce_report_data(content, *, strict=False):
     data["projects"] = [
         p for p in projects if isinstance(p, dict) and p.get("projectName")
     ]
-    return data
+    return normalize_issues(data)
 
 
 def project_has_content(project):
@@ -981,6 +981,7 @@ def generate_weekly_report(member_id, selects):
             report_data = ensure_weekly_projects(report_data, reports)
             report_data = ensure_weekly_plans(report_data, reports)
             report_data = promote_weekly_tasks(report_data, reports)
+            report_data = normalize_issues(report_data)
             report_data = drop_empty_projects(report_data)
         except HTTPException:
             raise
@@ -1308,7 +1309,7 @@ def get_weekly(user_id: int):
             "memberId": row[1],
             "memberName": row[2],
             "selectedDate": json.loads(row[3]),
-            "report": json.loads(row[4]),
+            "report": normalize_issues(json.loads(row[4])),
             "createdAt": row[5],
         }
         for row in rows
@@ -1336,7 +1337,7 @@ def get_weekly_by_id(weekly_id: int):
         "memberId": row[1],
         "memberName": row[2],
         "selectedDate": json.loads(row[3]),
-        "report": json.loads(row[4]),
+        "report": normalize_issues(json.loads(row[4])),
         "createdAt": row[5],
     }
 
@@ -1351,6 +1352,7 @@ def update_weekly(weekly_id: int, data: UpdateWeeklyData):
         raise HTTPException(
             status_code=400, detail="주간 보고서 데이터가 유효하지 않습니다."
         )
+    report_data = normalize_issues(report_data)
 
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1459,6 +1461,12 @@ def get_users():
     return [dict(user) for user in users]
 
 
+def _issue_text(issue):
+    if isinstance(issue, dict):
+        return str(issue.get("content") or "").strip()
+    return str(issue or "").strip()
+
+
 def normalize_issues(report_data):
     if isinstance(report_data, str):
         try:
@@ -1468,18 +1476,35 @@ def normalize_issues(report_data):
     if not isinstance(report_data, dict):
         return report_data
     for project in report_data.get("projects", []):
-        normalized = []
-        for issue in project.get("issues", []):
-            if isinstance(issue, dict):
-                content = issue.get("content", "")
-                status = issue.get("status", "미해결")
-                if content and str(content).strip():
-                    normalized.append(
-                        {"content": str(content).strip(), "status": status}
-                    )
-            elif issue and str(issue).strip():
-                normalized.append({"content": str(issue).strip(), "status": "미해결"})
-        project["issues"] = normalized
+        if not isinstance(project, dict):
+            continue
+        completed = [
+            str(task).strip()
+            for task in (project.get("completedTasks") or [])
+            if str(task or "").strip()
+        ]
+        remaining = []
+        seen = set()
+        for issue in project.get("issues") or []:
+            content = _issue_text(issue)
+            if not content:
+                continue
+            status = (
+                str(issue.get("status") or "").strip()
+                if isinstance(issue, dict)
+                else ""
+            )
+            if status == "해결":
+                if content not in completed:
+                    completed.append(content)
+                continue
+            if content in completed:
+                continue
+            if content not in seen:
+                remaining.append(content)
+                seen.add(content)
+        project["completedTasks"] = completed
+        project["issues"] = remaining
     return report_data
 
 
