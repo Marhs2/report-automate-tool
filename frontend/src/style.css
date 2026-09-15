@@ -273,6 +273,100 @@ code {
     overflow-y: auto;
 }
 
+.tomorrow-card {
+    flex-shrink: 0;
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--bg);
+}
+
+.tomorrow-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--accent);
+    color: #fff;
+}
+
+.tomorrow-card-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: #fff;
+    word-break: keep-all;
+}
+
+.tomorrow-card-date {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+
+.tomorrow-card-list {
+    list-style: none;
+    margin: 0;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--accent-bg);
+}
+
+.tomorrow-card-list li {
+    display: grid;
+    grid-template-columns: 8px 1fr;
+    gap: 8px;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+}
+
+.tomorrow-card-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 5px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+}
+
+.tomorrow-card-project {
+    display: block;
+    font-size: 11px;
+    font-weight: 650;
+    color: var(--accent-hover);
+    margin-bottom: 1px;
+    word-break: keep-all;
+}
+
+.tomorrow-card-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--text-h);
+    word-break: keep-all;
+}
+
+.tomorrow-card-empty {
+    margin: 0;
+    padding: 12px;
+    background: var(--accent-bg);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    word-break: keep-all;
+}
+
 .sidebar-footer {
     margin-top: auto;
     padding: 12px 8px 4px;
@@ -289,6 +383,14 @@ code {
     padding: 8px 6px;
     color: var(--text);
     font-size: 13px;
+    min-width: 0;
+}
+
+.sidebar-user-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
 .sidebar-avatar {
@@ -311,6 +413,17 @@ code {
     white-space: nowrap;
     font-weight: 600;
     color: var(--text-h);
+    line-height: 1.3;
+}
+
+.sidebar-user-team {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1.3;
 }
 
 .sidebar-logout {
@@ -653,6 +766,10 @@ input[type="file"]::file-selector-button:hover {
         white-space: nowrap;
     }
 
+    .tomorrow-card {
+        display: none;
+    }
+
     .sidebar-footer {
         margin-top: 0;
         margin-left: auto;
@@ -669,7 +786,8 @@ input[type="file"]::file-selector-button:hover {
         padding: 4px;
     }
 
-    .sidebar-user-name {
+    .sidebar-user-name,
+    .sidebar-user-team {
         display: none;
     }
 

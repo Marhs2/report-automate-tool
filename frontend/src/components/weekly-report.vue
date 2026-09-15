@@ -26,6 +26,18 @@ const weekdayLabels = ["월", "화", "수", "목", "금"];
 const formatLocalDate = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+const normalizeDay = (value) => {
+    if (!value) return "";
+    const text = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return text.slice(0, 10);
+    return formatLocalDate(parsed);
+};
+
+const dateKey = (dates) =>
+    [...(dates || [])].map(normalizeDay).filter(Boolean).sort().join("|");
+
 const weekOffset = ref(0);
 
 const getWeekDays = (offset) => {
@@ -94,7 +106,17 @@ const sendDates = async () => {
         await postWeekly(userId.value, selects.value);
         await fetchWeeklyReport();
         toastSuccess("주간 보고서를 만들었습니다.");
-        router.push(`/weekly-detail/${weeklyReport.value[0].id}`);
+        const wanted = dateKey(selects.value);
+        const reports = [...(weeklyReport.value || [])];
+        const created =
+            reports
+                .filter((report) => dateKey(report.selectedDate) === wanted)
+                .sort((a, b) => Number(b.id) - Number(a.id))[0] ||
+            reports.sort((a, b) => Number(b.id) - Number(a.id))[0];
+        if (created?.id) {
+            router.push(`/weekly-detail/${created.id}`);
+            return;
+        }
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("주간 보고서 생성 실패:", error);
@@ -381,14 +403,14 @@ onMounted(async () => {
                         </div>
 
                         <div class="report-list-actions">
-                            <button class="btn" @click="() => deleteWeekly(report.id)">
+                            <button class="btn" @click="() => deleteWeekly(report.id)" :disabled="isLoading">
                                 삭제
                             </button>
                             <button class="btn" :disabled="isLoading" @click="viewReport(report)">
                                 보기
                             </button>
 
-                            <button class="btn" @click="() => copyReport(report)">
+                            <button class="btn" @click="() => copyReport(report)" :disabled="isLoading">
                                 복사
                             </button>
 

@@ -196,7 +196,6 @@
                 <button class="btn" @click="addProject">추가</button>
 
                 <div class="card save-bar">
-                    <span class="member-id-display">저장해야 이날 보고로 남습니다.</span>
                     <div class="save-actions">
                         <button
                             class="btn btn-primary"

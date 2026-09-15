@@ -7,16 +7,18 @@ import {
     GitGraph,
     ArrowLeftRight,
     Settings2,
+    UsersRound,
 } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import useAPI from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
+import { selectedTeamId } from "./composables/useSelectedTeam";
 import { useToast } from "./composables/useToast";
 
 const router = useRouter();
 const route = useRoute();
-const { getUsers } = useAPI();
+const { getUsers, getTeams, GetReports } = useAPI();
 const { toasts } = useToast();
 
 const navGroups = [
@@ -39,6 +41,7 @@ const navGroups = [
         label: "관리",
         items: [
             { to: "/project-name", label: "프로젝트명 관리", icon: Settings2 },
+            { to: "/team-select", label: "팀 선택", icon: UsersRound },
         ],
     },
 ];
@@ -55,6 +58,7 @@ const pageMeta = computed(() => {
     if (path === "/project-timeline") return { title: "프로젝트 흐름", action: null };
     if (path === "/project-name") return { title: "프로젝트명 관리", action: null };
     if (path === "/users") return { title: "사용자 선택", action: null };
+    if (path === "/team-select") return { title: "팀 선택", action: null };
     return { title: "일일보고", action: { to: "/report", label: "보고서 작성" } };
 });
 
@@ -66,27 +70,93 @@ const isNavActive = (to) => {
 };
 
 const currentUser = ref("");
+const currentTeam = ref("");
+const tomorrowPlans = ref([]);
 
-const loadCurrentUser = async (storedId) => {
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+const tomorrowLabel = computed(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return `${d.getMonth() + 1}.${d.getDate()} ${WEEKDAYS[d.getDay()]}`;
+});
+
+const projectsOf = (parsedJson) => {
+    if (!parsedJson) return [];
+    let parsed = parsedJson;
+    if (typeof parsed === "string") {
+        try {
+            parsed = JSON.parse(parsed);
+        } catch {
+            return [];
+        }
+    }
+    return parsed.projects || [];
+};
+
+const loadTomorrowPlans = async (userId) => {
+    tomorrowPlans.value = [];
+    if (!userId) return;
+    try {
+        const reports = await GetReports();
+        const mine = (reports || []).filter(
+            (row) => String(row.member_id) === String(userId),
+        );
+        if (!mine.length) return;
+        const today = new Date();
+        const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        const latest =
+            mine.find((row) => row.report_date === todayKey) || mine[0];
+        const items = [];
+        for (const project of projectsOf(latest.parsed_json)) {
+            for (const plan of project.nextPlans || []) {
+                const text = String(plan || "").trim();
+                if (!text) continue;
+                items.push({
+                    project: project.projectName || "미분류 프로젝트",
+                    text,
+                });
+                if (items.length >= 5) break;
+            }
+            if (items.length >= 5) break;
+        }
+        tomorrowPlans.value = items;
+    } catch {
+        tomorrowPlans.value = [];
+    }
+};
+
+const loadCurrent = async (storedId, storedTeamId) => {
     if (!storedId) {
         currentUser.value = "";
+        currentTeam.value = "";
         return;
     }
     try {
         const users = await getUsers();
         const found = users.find((u) => String(u.id) === String(storedId));
         currentUser.value = found ? found.name : `사용자 ${storedId}`;
+        const teams = await getTeams();
+        const foundTeam = teams.find((t) => String(t.id) === String(storedTeamId));
+        currentTeam.value = foundTeam ? foundTeam.team_name : `팀 ${storedTeamId}`;
     } catch {
         currentUser.value = `사용자 ${storedId}`;
+        currentTeam.value = `팀 ${storedTeamId}`;
     }
 };
 
 watch(
-    selectedUserId,
-    (id) => {
-        loadCurrentUser(id);
+    [selectedUserId, selectedTeamId],
+    ([id, teamId]) => {
+        loadCurrent(id, teamId);
+        loadTomorrowPlans(id);
     },
-    { immediate: true }
+    { immediate: true },
+);
+
+watch(
+    () => route.path,
+    () => loadTomorrowPlans(selectedUserId.value),
 );
 
 const userInitial = () => {
@@ -115,26 +185,44 @@ onMounted(() => {
 <template>
     <aside class="sidebar">
 
+
         <nav class="nav-links">
             <div v-for="group in navGroups" :key="group.label" class="nav-group">
                 <p class="nav-group-label">{{ group.label }}</p>
-                <router-link
-                    v-for="item in group.items"
-                    :key="item.to"
-                    :to="item.to"
-                    class="nav-link"
-                    :class="{ 'router-link-exact-active': isNavActive(item.to) }"
-                >
+                <router-link v-for="item in group.items" :key="item.to" :to="item.to" class="nav-link"
+                    :class="{ 'router-link-exact-active': isNavActive(item.to) }">
                     <component :is="item.icon" :size="16" />
                     {{ item.label }}
                 </router-link>
             </div>
+
         </nav>
+
+        <section class="tomorrow-card" aria-label="내일 할 일">
+
+            <div class="tomorrow-card-head">
+                <p class="tomorrow-card-title">내일 할 일</p>
+                <span class="tomorrow-card-date">{{ tomorrowLabel }}</span>
+            </div>
+            <ul v-if="tomorrowPlans.length" class="tomorrow-card-list">
+                <li v-for="(item, index) in tomorrowPlans" :key="index">
+                    <span class="tomorrow-card-dot"></span>
+                    <span>
+                        <span class="tomorrow-card-project">{{ item.project }}</span>
+                        <span class="tomorrow-card-text">{{ item.text }}</span>
+                    </span>
+                </li>
+            </ul>
+            <p v-else class="tomorrow-card-empty">내일 예정 업무가 없어요</p>
+        </section>
 
         <div class="sidebar-footer">
             <div class="sidebar-user">
                 <span class="sidebar-avatar">{{ userInitial() }}</span>
-                <span class="sidebar-user-name">{{ currentUser || "사용자 미선택" }}</span>
+                <span class="sidebar-user-meta">
+                    <span class="sidebar-user-name">{{ currentUser || "사용자 미선택" }}</span>
+                    <span class="sidebar-user-team">{{ currentTeam || "팀 미선택" }}</span>
+                </span>
             </div>
             <button class="sidebar-logout" @click="logout">
                 <ArrowLeftRight :size="14" />
@@ -146,11 +234,7 @@ onMounted(() => {
     <main class="main-content">
         <header class="topbar">
             <div class="topbar-title">{{ pageMeta.title }}</div>
-            <router-link
-                v-if="pageMeta.action"
-                class="btn btn-primary"
-                :to="pageMeta.action.to"
-            >
+            <router-link v-if="pageMeta.action" class="btn btn-primary" :to="pageMeta.action.to">
                 {{ pageMeta.action.label }}
             </router-link>
         </header>
@@ -159,12 +243,7 @@ onMounted(() => {
         </div>
     </main>
     <div class="toast-stack" aria-live="polite">
-        <div
-            v-for="item in toasts"
-            :key="item.id"
-            class="toast"
-            :class="'toast-' + item.type"
-        >
+        <div v-for="item in toasts" :key="item.id" class="toast" :class="'toast-' + item.type">
             {{ item.message }}
         </div>
     </div>

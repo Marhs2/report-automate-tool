@@ -104,6 +104,18 @@ export default function useAPI() {
     }
   };
 
+  const GetHolidays = async (year) => {
+    try {
+      const response = await axios.get(`${baseURL}/holidays`, {
+        params: { year },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching holidays:", error);
+      return [];
+    }
+  };
+
   const GetUserActivities = async (year, month, startDate, endDate) => {
     try {
       const response = await axios.get(`${baseURL}/user-activities`, {
@@ -165,14 +177,16 @@ export default function useAPI() {
     }
   };
 
-  const postUsers = async (name) => {
+  const postUsers = async (name, teamId) => {
     try {
-      const response = await axios.post(`${baseURL}/users`, {
-        name: name,
-      });
+      const payload = { name: name };
+      if (teamId != null && teamId !== "") {
+        payload.team_id = teamId;
+      }
+      const response = await axios.post(`${baseURL}/users`, payload);
       return response.data;
     } catch (error) {
-      console.error("Error fetching users:", error);
+      console.error("Error creating user:", error);
       throw error;
     }
   };
@@ -183,6 +197,51 @@ export default function useAPI() {
       return response.data;
     } catch (error) {
       console.error("Error fetching users:", error);
+      throw error;
+    }
+  };
+
+  const postTeams = async (name) => {
+    try {
+      const response = await axios.post(`${baseURL}/teams`, {
+        team_name: name,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error creating team:", error);
+      throw error;
+    }
+  };
+
+  const setTeam = async (teamId, userId) => {
+    try {
+      const response = await axios.post(`${baseURL}/teams/set`, {
+        team_id: teamId,
+        user_id: userId,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error setting team:", error);
+      throw error;
+    }
+  };
+
+  const getTeams = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/teams`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      throw error;
+    }
+  };
+
+  const getTeamByMemberId = async (memberId) => {
+    try {
+      const response = await axios.get(`${baseURL}/teams/${memberId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching team by member id:", error);
       throw error;
     }
   };
@@ -278,12 +337,15 @@ export default function useAPI() {
     GetReports,
     GetReportById,
     GetUserActivities,
+    GetHolidays,
     postWeekly,
     GetWeeklyReport,
     GetWeeklyReportById,
     updateWeeklyReport,
     postUsers,
     getUsers,
+    postTeams,
+    getTeams,
     getProjectNames,
     getRegisteredProjectNames,
     postProjectName,
@@ -292,6 +354,8 @@ export default function useAPI() {
     recommendKeywords,
     getProjectTimeline,
     deleteWeeklyReport,
-    deleteReport
+    deleteReport,
+    getTeamByMemberId,
+    setTeam,
   };
 }

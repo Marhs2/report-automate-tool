@@ -9,6 +9,7 @@ import weeklyDetail from "../components/weekly-detail.vue";
 import reportDetail from "../components/report-detail.vue";
 import projectTimeline from "../components/project-timeline.vue";
 import projectName from "../components/project-name.vue";
+import teamSelect from "../components/team-select.vue";
 
 const routes = [
   {
@@ -65,6 +66,11 @@ const routes = [
     path: "/project-name",
     name: "project-name",
     component: projectName,
+  },
+  {
+    path: "/team-select",
+    name: "team-select",
+    component: teamSelect,
   },
 ];
 const router = createRouter({

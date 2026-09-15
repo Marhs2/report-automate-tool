@@ -4,7 +4,7 @@ import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 
 const router = useRouter();
-const { GetUserActivities, GetReports } = useApi();
+const { GetUserActivities, GetReports, GetHolidays } = useApi();
 
 const props = defineProps({
     startDate: { type: String, default: "" },
@@ -15,6 +15,7 @@ const props = defineProps({
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 const userActivities = ref([]);
+const holidayNames = ref({});
 
 const currentDate = new Date();
 const selectedYear = ref(currentDate.getFullYear());
@@ -48,11 +49,17 @@ function metaFor(dateStr) {
     const date = parseDate(dateStr);
     const weekDay = date.getDay();
     const today = startOfToday();
+    const holidayName = holidayNames.value[dateStr] || "";
+    const isWeekend = weekDay === 0 || weekDay === 6;
+    const isHoliday = Boolean(holidayName);
     return {
         date: dateStr,
         day: date.getDate(),
         weekLabel: WEEKDAY_LABELS[weekDay],
-        isWeekend: weekDay === 0 || weekDay === 6,
+        holidayName,
+        isWeekend,
+        isHoliday,
+        isOffday: isWeekend || isHoliday,
         isToday: date.getTime() === today.getTime(),
     };
 }
@@ -66,6 +73,7 @@ const formatDotDate = (dateStr) => {
 const cellStatus = (dateStr, count) => {
     const meta = metaFor(dateStr);
     if (count > 0) return "제출";
+    if (meta.isHoliday) return meta.holidayName;
     if (meta.isWeekend) return "주말";
     return "미제출";
 };
@@ -119,7 +127,28 @@ function hideTooltip() {
     }, 60);
 }
 
+async function fetchHolidaysForView() {
+    const years = new Set();
+    if (props.startDate && props.endDate) {
+        years.add(Number(props.startDate.slice(0, 4)));
+        years.add(Number(props.endDate.slice(0, 4)));
+    } else {
+        years.add(selectedYear.value);
+    }
+    const map = {};
+    await Promise.all(
+        [...years].map(async (year) => {
+            const rows = await GetHolidays(year);
+            for (const row of rows || []) {
+                if (row?.date) map[row.date] = row.name;
+            }
+        }),
+    );
+    holidayNames.value = map;
+}
+
 async function fetchUserActivities() {
+    await fetchHolidaysForView();
     const activities = await GetUserActivities(
         selectedYear.value,
         selectedMonth.value,
@@ -208,7 +237,7 @@ const entriesForDate = (dateStr) =>
     });
 
 const visibleEntries = (cell) =>
-    cell.isWeekend
+    cell.isOffday
         ? cell.entries.filter((entry) => entry.submitted)
         : cell.entries;
 
@@ -262,7 +291,7 @@ const hasToday = computed(() =>
 );
 
 const weekdayCount = computed(
-    () => inRangeDays.value.filter((cell) => !cell.isWeekend).length,
+    () => inRangeDays.value.filter((cell) => !cell.isOffday).length,
 );
 
 const progressOf = (activity) => {
@@ -324,6 +353,9 @@ const periodLabel = computed(() =>
                 </span>
                 <span class="legend-item">
                     <span class="swatch weekend"></span> 주말
+                </span>
+                <span class="legend-item">
+                    <span class="swatch holiday"></span> 공휴일
                 </span>
                 <span v-if="hasToday" class="legend-item">
                     <span class="swatch today"></span> 오늘
@@ -389,11 +421,17 @@ const periodLabel = computed(() =>
                             :class="{
                                 outside: cell.outside,
                                 weekend: cell.isWeekend,
+                                holiday: cell.isHoliday,
                                 today: cell.isToday && !cell.outside,
                             }"
                         >
                             <div class="cal-day-head">
                                 <span class="cal-day-num">{{ cell.day }}</span>
+                                <span
+                                    v-if="cell.holidayName && !cell.outside"
+                                    class="cal-holiday"
+                                    :title="cell.holidayName"
+                                >{{ cell.holidayName }}</span>
                             </div>
                             <div v-if="!cell.outside" class="cal-entries">
                                 <button
@@ -404,7 +442,7 @@ const periodLabel = computed(() =>
                                         submitted: entry.submitted,
                                         missed:
                                             !entry.submitted &&
-                                            !cell.isWeekend,
+                                            !cell.isOffday,
                                     }"
                                     :disabled="!entry.submitted"
                                     :aria-label="
@@ -526,6 +564,11 @@ const periodLabel = computed(() =>
     box-shadow: inset 0 0 0 1px var(--border);
 }
 
+.swatch.holiday {
+    background: var(--danger-bg);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
 .swatch.today {
     box-shadow: 0 0 0 2px var(--accent);
     background: color-mix(in srgb, var(--text) 18%, transparent);
@@ -628,8 +671,13 @@ const periodLabel = computed(() =>
     gap: 6px;
 }
 
-.cal-day.weekend {
+.cal-day.weekend,
+.cal-day.holiday {
     background: color-mix(in srgb, var(--text) 5%, var(--bg));
+}
+
+.cal-day.holiday {
+    background: color-mix(in srgb, var(--danger) 6%, var(--bg-elevated));
 }
 
 .cal-day.outside {
@@ -646,6 +694,8 @@ const periodLabel = computed(() =>
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 4px;
+    min-width: 0;
 }
 
 .cal-day-num {
@@ -658,6 +708,22 @@ const periodLabel = computed(() =>
 .cal-day.weekend .cal-day-num,
 .cal-day.outside .cal-day-num {
     color: var(--text);
+}
+
+.cal-day.holiday .cal-day-num,
+.cal-holiday {
+    color: var(--danger);
+}
+
+.cal-holiday {
+    font-size: 10px;
+    font-weight: 650;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    word-break: keep-all;
 }
 
 .cal-day.today .cal-day-num {

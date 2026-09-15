@@ -98,6 +98,9 @@
                 <div class="card save-bar">
                     <span class="member-id-display">사용자: {{ userName }}</span>
                     <div class="save-actions">
+                        <p v-if="confirmQuestions.length" class="confirm-hint">
+                            저장 시 확인 질문 {{ confirmQuestions.length }}개
+                        </p>
                         <button class="btn" @click="copyReport" :disabled="isSaving">
                             복사
                         </button>
@@ -115,10 +118,7 @@
             <div class="card confirm-dialog">
                 <p class="confirm-kicker">저장 전 확인 {{ askIndex + 1 }}/{{ confirmQuestions.length }}</p>
                 <h2 class="confirm-title">{{ confirmQuestions[askIndex]?.text }}</h2>
-                <p v-if="confirmQuestions[askIndex]?.ifNo" class="confirm-help">
-                    아니요면 {{ confirmQuestions[askIndex].ifNo }}
-                </p>
-                <p v-else class="confirm-help">아니요면 해당 항목을 고친 뒤 다시 저장하세요.</p>
+                <p class="confirm-help">아니요면 해당 항목을 고친 뒤 다시 저장하세요.</p>
                 <div class="confirm-actions">
                     <button class="btn" type="button" @click="rejectConfirm">아니요</button>
                     <button class="btn btn-primary" type="button" @click="acceptConfirm">네</button>
@@ -170,6 +170,13 @@ const issueText = (issue) =>
 const normalizeReportIssues = (report) => {
     if (!report?.projects) return report;
     for (const project of report.projects) {
+        if (!Array.isArray(project.nextPlans) || project.nextPlans.length === 0) {
+            const weeklyPlans = (project.nextWeekPlans || []).filter((plan) =>
+                String(plan || "").trim(),
+            );
+            if (weeklyPlans.length) project.nextPlans = weeklyPlans;
+            else project.nextPlans = [];
+        }
         const completed = [...(project.completedTasks || [])].filter((task) =>
             String(task || "").trim(),
         );
@@ -374,7 +381,7 @@ const acceptConfirm = async () => {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(23, 23, 23, 0.28);
+    background: rgba(38, 37, 30, 0.28);
 }
 .confirm-dialog {
     width: min(520px, 100%);
@@ -395,5 +402,25 @@ const acceptConfirm = async () => {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+}
+.confirm-help {
+    margin: 0 0 16px;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.45;
+}
+.save-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.confirm-hint {
+    margin: 0;
+    margin-right: auto;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--accent);
 }
 </style>

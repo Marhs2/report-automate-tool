@@ -46,7 +46,12 @@ const saveUser = async () => {
         alert(`'${name}' 사용자를 생성했습니다.`);
     } catch (error) {
         console.error("사용자 생성 실패:", error);
-        alert("사용자 생성에 실패했습니다. 중복된 이름인지 확인해주세요.");
+        const detail = error?.response?.data?.detail;
+        const message =
+            typeof detail === "string" && detail.trim()
+                ? detail
+                : "사용자 생성에 실패했습니다.";
+        alert(message);
     } finally {
         isSaving.value = false;
     }
@@ -60,9 +65,6 @@ onMounted(async () => {
 
 <template>
     <div class="page users-page">
-        <p class="page-subtitle page-lead">
-            보고서를 작성할 사용자를 선택하세요
-        </p>
 
         <div v-if="users.length > 0" class="user-toolbar">
             <input
@@ -126,10 +128,6 @@ onMounted(async () => {
 <style scoped>
 .users-page {
     max-width: 720px;
-}
-
-.page-lead {
-    margin: 0 0 16px;
 }
 
 .user-toolbar {

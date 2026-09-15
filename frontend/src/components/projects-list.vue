@@ -1,20 +1,22 @@
 <script setup>
 import { onMounted, ref, computed } from "vue";
-import useAPI from "../composables/useApi";
 import { Search, Trash2 } from "lucide-vue-next";
+import useAPI from "../composables/useApi";
 import { useRouter } from "vue-router";
 import { useToast } from "../composables/useToast";
 
 const router = useRouter();
 const { success: toastSuccess, error: toastError } = useToast();
-const { GetReports, deleteReport } = useAPI();
+const { GetReports, deleteReport , getTeams } = useAPI();
 
 const reports = ref([]);
+const teams = ref([]);
 const isLoading = ref(false);
 const filterMember = ref("");
 const filterProject = ref("");
 const filterDateFrom = ref("");
 const filterDateEnd = ref("");
+const filterTeam = ref("all");
 
 const formatLocalDate = (value) => {
     const year = value.getFullYear();
@@ -33,6 +35,15 @@ const getReports = async () => {
         toastError("보고서를 불러오지 못했습니다.");
     } finally {
         isLoading.value = false;
+    }
+};
+
+const fetchTeams = async () => {
+    try {
+        teams.value = await getTeams();
+    } catch (error) {
+        console.error("Error fetching teams:", error);
+        toastError("팀을 불러오지 못했습니다.");
     }
 };
 
@@ -64,6 +75,12 @@ const toParsed = (parsedJson) => {
 
 const projectsOf = (report) => toParsed(report.parsed_json)?.projects ?? [];
 
+const issueCount = (report) =>
+    projectsOf(report).reduce((sum, project) => {
+        const issues = project?.issues;
+        return sum + (Array.isArray(issues) ? issues.length : 0);
+    }, 0);
+
 const matchesProjectFilter = (parsedJson) => {
     if (filterProject.value === "") return true;
     const parsed = toParsed(parsedJson);
@@ -83,22 +100,35 @@ const filteredReportsByProject = computed(() => {
         const matchMember =
             filterMember.value === "" ||
             String(report.member_name).includes(filterMember.value);
+        const matchTeam =
+            filterTeam.value === "all" ||
+            String(report.member_team_id) === String(filterTeam.value);
         return (
             matchFrom &&
             matchEnd &&
             matchMember &&
+            matchTeam &&
             matchesProjectFilter(report.parsed_json)
         );
     });
 });
 
-const memberOptions = computed(() =>
-    [...new Set(reports.value.map((report) => report.member_name).filter(Boolean))].sort(),
-);
+const memberOptions = computed(() => {
+    const source =
+        filterTeam.value === "all"
+            ? reports.value
+            : reports.value.filter(
+                  (report) =>
+                      String(report.member_team_id) === String(filterTeam.value),
+              );
+    return [
+        ...new Set(source.map((report) => report.member_name).filter(Boolean)),
+    ].sort();
+});
 
 const projectOptions = computed(() => {
     const names = new Set();
-    for (const report of reports.value) {
+    for (const report of filteredReportsByProject.value) {
         for (const project of projectsOf(report)) {
             if (project.projectName) names.add(project.projectName);
         }
@@ -111,8 +141,32 @@ const hasActiveFilter = computed(
         Boolean(filterMember.value) ||
         Boolean(filterProject.value) ||
         Boolean(filterDateFrom.value) ||
-        Boolean(filterDateEnd.value),
+        Boolean(filterDateEnd.value) ||
+        filterTeam.value !== "all",
 );
+
+const weekRange = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return {
+        start: formatLocalDate(monday),
+        end: formatLocalDate(sunday),
+    };
+};
+
+const isTodayPreset = computed(() => {
+    const today = formatLocalDate(new Date());
+    return filterDateFrom.value === today && filterDateEnd.value === today;
+});
+
+const isWeekPreset = computed(() => {
+    const { start, end } = weekRange();
+    return filterDateFrom.value === start && filterDateEnd.value === end;
+});
 
 const dashboardStats = computed(() => {
     const today = formatLocalDate(new Date());
@@ -141,18 +195,6 @@ const dashboardStats = computed(() => {
         total: reports.value.length,
     };
 });
-
-const issueCount = (report) =>
-    projectsOf(report).reduce((count, project) => {
-        const issues = Array.isArray(project.issues) ? project.issues : [];
-        return (
-            count +
-            issues.filter((issue) => {
-                if (typeof issue === "string") return Boolean(issue.trim());
-                return Boolean(issue && String(issue.content || "").trim());
-            }).length
-        );
-    }, 0);
 
 const projectNamesOf = (report) =>
     projectsOf(report)
@@ -184,14 +226,9 @@ const setPresetToday = () => {
 };
 
 const setPresetThisWeek = () => {
-    const now = new Date();
-    const day = now.getDay();
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    filterDateFrom.value = formatLocalDate(monday);
-    filterDateEnd.value = formatLocalDate(sunday);
+    const { start, end } = weekRange();
+    filterDateFrom.value = start;
+    filterDateEnd.value = end;
 };
 
 const clearFilters = () => {
@@ -199,26 +236,26 @@ const clearFilters = () => {
     filterProject.value = "";
     filterDateFrom.value = "";
     filterDateEnd.value = "";
+    filterTeam.value = "all";
 };
 
 onMounted(() => {
     document.title = "일일보고";
     getReports();
+    fetchTeams();
 });
 </script>
 
 <template>
     <div class="page">
-        <p class="page-subtitle page-lead">
-            제출된 보고서를 날짜, 작성자, 프로젝트로 조회합니다
-        </p>
+
 
         <div class="stat-grid">
-            <button type="button" class="stat-card" @click="setPresetToday">
+            <button type="button" class="stat-card" :class="{ 'is-active': isTodayPreset }" @click="setPresetToday">
                 <span class="stat-label">오늘 제출</span>
                 <strong class="stat-value">{{ dashboardStats.today }}</strong>
             </button>
-            <button type="button" class="stat-card" @click="setPresetThisWeek">
+            <button type="button" class="stat-card" :class="{ 'is-active': isWeekPreset }" @click="setPresetThisWeek">
                 <span class="stat-label">이번 주</span>
                 <strong class="stat-value">{{ dashboardStats.week }}</strong>
             </button>
@@ -233,110 +270,73 @@ onMounted(() => {
         </div>
 
         <div class="filter-presets">
-            <button type="button" class="btn btn-small" @click="setPresetToday">
+            <button type="button" class="btn btn-small" :class="{ 'is-active': isTodayPreset }" @click="setPresetToday">
                 오늘
             </button>
-            <button
-                type="button"
-                class="btn btn-small"
-                @click="setPresetThisWeek"
-            >
+            <button type="button" class="btn btn-small" :class="{ 'is-active': isWeekPreset }" @click="setPresetThisWeek">
                 이번 주
             </button>
-            <button
-                type="button"
-                class="btn btn-small"
-                :disabled="!hasActiveFilter"
-                @click="clearFilters"
-            >
+            <button type="button" class="btn btn-small" :disabled="!hasActiveFilter" @click="clearFilters">
                 초기화
             </button>
+            <span v-if="!isLoading" class="list-count">{{ filteredReportsByProject.length }}건</span>
         </div>
 
         <div class="filter-card">
             <div class="field">
                 <label for="filterDateFrom">시작일</label>
-                <input
-                    type="date"
-                    v-model="filterDateFrom"
-                    id="filterDateFrom"
-                    class="input"
-                />
+                <input type="date" v-model="filterDateFrom" id="filterDateFrom" class="input" />
             </div>
             <div class="field">
                 <label for="filterDateEnd">종료일</label>
-                <input
-                    type="date"
-                    v-model="filterDateEnd"
-                    id="filterDateEnd"
+                <input type="date" v-model="filterDateEnd" id="filterDateEnd" class="input" />
+            </div>
+            <div class="field">
+                <label for="filterTeam">팀</label>
+                <select
+                    id="filterTeam"
+                    v-model="filterTeam"
                     class="input"
-                />
+                >
+                    <option value="all">전체</option>
+                    <option
+                        v-for="team in teams"
+                        :key="team.id"
+                        :value="String(team.id)"
+                    >
+                        {{ team.team_name }}
+                    </option>
+                </select>
             </div>
             <div class="field">
                 <label for="filterMember">작성자</label>
-                <input
-                    id="filterMember"
-                    type="text"
-                    list="member-options"
-                    placeholder="이름 검색"
-                    v-model="filterMember"
-                    class="input"
-                    autocomplete="off"
-                />
+                <input id="filterMember" type="text" list="member-options" placeholder="이름 검색" v-model="filterMember"
+                    class="input" autocomplete="off" />
                 <datalist id="member-options">
-                    <option
-                        v-for="name in memberOptions"
-                        :key="name"
-                        :value="name"
-                    />
+                    <option v-for="name in memberOptions" :key="name" :value="name" />
                 </datalist>
             </div>
             <div class="field">
                 <label for="filterProject">프로젝트</label>
-                <input
-                    id="filterProject"
-                    type="text"
-                    list="project-options"
-                    placeholder="프로젝트명 검색"
-                    v-model="filterProject"
-                    class="input"
-                    autocomplete="off"
-                />
+                <input id="filterProject" type="text" list="project-options" placeholder="프로젝트명 검색"
+                    v-model="filterProject" class="input" autocomplete="off" />
                 <datalist id="project-options">
-                    <option
-                        v-for="name in projectOptions"
-                        :key="name"
-                        :value="name"
-                    />
+                    <option v-for="name in projectOptions" :key="name" :value="name" />
                 </datalist>
             </div>
         </div>
 
         <div v-if="isLoading" class="empty-state">보고서를 불러오는 중...</div>
-        <div
-            v-else-if="filteredReportsByProject.length === 0"
-            class="empty-state"
-        >
+        <div v-else-if="filteredReportsByProject.length === 0" class="empty-state">
             <Search :size="20" />
             <p>조건에 맞는 보고서가 없습니다</p>
-            <button
-                v-if="hasActiveFilter"
-                type="button"
-                class="btn"
-                @click="clearFilters"
-            >
+            <button v-if="hasActiveFilter" type="button" class="btn" @click="clearFilters">
                 필터 초기화
             </button>
         </div>
         <div v-else class="reports-container">
-            <article
-                v-for="report in filteredReportsByProject"
-                :key="report.id"
-                class="card report-item"
-                tabindex="0"
-                @click="openDetail(report.id)"
-                @keydown="onCardKeydown($event, report.id)"
-            >
+            <article v-for="report in filteredReportsByProject" :key="report.id" class="card report-item" tabindex="0"
+                @click="openDetail(report.id)" @keydown="onCardKeydown($event, report.id)">
                 <header class="report-header">
                     <div class="report-identity">
                         <span class="avatar">{{
@@ -348,35 +348,21 @@ onMounted(() => {
                                 {{ formatDate(report.report_date) }}
                             </p>
                             <div class="report-meta">
-                                <span
-                                    v-for="name in projectNamesOf(report)"
-                                    :key="name"
-                                    class="meta-chip"
-                                >
+                                <span v-for="name in projectNamesOf(report)" :key="name" class="meta-chip">
                                     {{ name }}
                                 </span>
-                                <span
-                                    v-if="issueCount(report) > 0"
-                                    class="meta-chip issue-chip"
-                                >
+                                <span v-if="issueCount(report) > 0" class="meta-chip issue-chip">
                                     이슈 {{ issueCount(report) }}
                                 </span>
-                                <span
-                                    v-else-if="projectNamesOf(report).length === 0"
-                                    class="meta-chip"
-                                >
+                                <span v-else-if="projectNamesOf(report).length === 0" class="meta-chip">
                                     내용 없음
                                 </span>
                             </div>
                         </div>
                     </div>
                     <div class="report-actions">
-                        <button
-                            type="button"
-                            class="btn btn-danger btn-icon"
-                            aria-label="보고서 삭제"
-                            @click="deleteProjectReport(report.id, $event)"
-                        >
+                        <button type="button" class="btn btn-danger btn-icon" aria-label="보고서 삭제"
+                            @click="deleteProjectReport(report.id, $event)">
                             <Trash2 :size="15" />
                         </button>
                     </div>
@@ -387,13 +373,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page-lead {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 0 0 16px;
-}
+
 
 .count-inline {
     flex-shrink: 0;
@@ -414,10 +394,10 @@ onMounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
-    padding: 16px 18px;
+    padding: 20px 20px 16px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--bg);
+    background: var(--bg-elevated);
     text-align: left;
     cursor: default;
     font: inherit;
@@ -429,18 +409,27 @@ button.stat-card {
 }
 
 button.stat-card:hover {
-    border-color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+}
+
+.stat-card.is-active {
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
 }
 
 .stat-label {
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.88px;
+    text-transform: uppercase;
     color: var(--text);
 }
 
 .stat-value {
     font-size: 28px;
-    font-weight: 500;
+    font-weight: 400;
+    letter-spacing: -0.5px;
     line-height: 1.1;
     color: var(--text-h);
     font-family: var(--heading);
@@ -461,20 +450,27 @@ button.stat-card:hover {
 .filter-presets {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
     margin-bottom: 12px;
 }
 
+.list-count {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--text);
+}
+
 .filter-card {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px 16px;
     margin-bottom: 22px;
-    padding: 16px;
+    padding: 16px 18px;
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: var(--shadow);
 }
 
 .reports-container {
@@ -490,8 +486,8 @@ button.stat-card:hover {
 }
 
 .report-item:hover {
-    border-color: var(--accent-border);
-    box-shadow: var(--shadow-raised);
+    border-color: var(--border-strong);
+    background: var(--bg-pane);
 }
 
 .report-item:focus-visible {
@@ -510,7 +506,7 @@ button.stat-card:hover {
 
 .report-identity {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     min-width: 0;
 }
@@ -520,15 +516,16 @@ button.stat-card:hover {
 }
 
 .avatar {
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
     background: var(--bg-soft);
     color: var(--text-h);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 600;
     flex-shrink: 0;
 }
 
@@ -588,12 +585,34 @@ button.stat-card:hover {
     gap: 8px;
 }
 
+@media (max-width: 1100px) {
+    .filter-card {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 860px) {
     .stat-grid {
         grid-template-columns: 1fr 1fr;
     }
+
     .filter-card {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .list-count {
+        margin-left: 0;
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .stat-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-card {
+        grid-template-columns: 1fr;
     }
 }
 </style>

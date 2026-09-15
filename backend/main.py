@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 from db import get_db
 from dotenv import load_dotenv
+from kr_holidays import kr_holiday_map
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
@@ -97,6 +98,11 @@ def load_keyword_prompt():
     return prompt.replace("{{KNOWN_PROJECTS}}", get_known_projects_block())
 
 
+def load_weekly_confirm_prompt():
+    with open("./model_asset/weekly_confirm_prompt.txt", "r", encoding="utf-8") as f:
+        return f.read()
+
+
 with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
     weekly_schema = json.load(f)
 
@@ -150,6 +156,16 @@ class ReportRequest(BaseModel):
 
 class UserRequest(BaseModel):
     name: str
+    team_id: int | None = None
+
+
+class TeamRequest(BaseModel):
+    team_name: str
+
+
+class SetTeamData(BaseModel):
+    team_id: int
+    user_id: int
 
 
 class WeeklyReportRequest(BaseModel):
@@ -197,6 +213,32 @@ def validate_member(conn, member_id):
         status_code=400,
         detail="유효하지 않은 사용자입니다. 사용자 선택 화면에서 다시 선택해주세요.",
     )
+
+
+UNASSIGNED_TEAM_NAME = "미지정"
+
+
+def get_or_create_unassigned_team(conn):
+    row = conn.execute(
+        "SELECT id FROM teams WHERE team_name = ?",
+        (UNASSIGNED_TEAM_NAME,),
+    ).fetchone()
+    if row:
+        return row["id"]
+    try:
+        cursor = conn.execute(
+            "INSERT INTO teams (team_name) VALUES (?)",
+            (UNASSIGNED_TEAM_NAME,),
+        )
+        return cursor.lastrowid
+    except sqlite3.IntegrityError:
+        row = conn.execute(
+            "SELECT id FROM teams WHERE team_name = ?",
+            (UNASSIGNED_TEAM_NAME,),
+        ).fetchone()
+        if row:
+            return row["id"]
+        raise
 
 
 def ensure_runtime_schema():
@@ -384,7 +426,38 @@ _WEEKLY_GENERIC_ACTIONS = {
     "확인",
     "테스트",
     "반영",
+    "개선",
+    "추가",
+    "삭제",
+    "조회",
+    "렌더링",
+    "작성",
+    "등록",
 }
+_WEEKLY_GENERIC_NOUNS = {
+    "목록",
+    "화면",
+    "기능",
+    "보고서",
+    "버그",
+    "오류",
+    "속도",
+    "성능",
+    "데이터",
+    "모듈",
+    "페이지",
+    "항목",
+    "내용",
+    "문제",
+    "이슈",
+    "요청",
+    "회의록",
+    "메모리",
+    "log",
+    "api",
+    "ui",
+}
+_WEEKLY_GENERIC_TOKENS = _WEEKLY_GENERIC_ACTIONS | _WEEKLY_GENERIC_NOUNS
 
 
 def _weekly_task_tokens(value):
@@ -423,17 +496,17 @@ def _weekly_task_tokens(value):
 
 
 def _weekly_tasks_match(left, right):
+    """같은 업무 대상으로 볼 만큼 구체적인 토큰이 겹칠 때만 True."""
     left_tokens = _weekly_task_tokens(left)
     right_tokens = _weekly_task_tokens(right)
-    common = left_tokens & right_tokens
-    if len(common) >= 2:
+    specific_common = (left_tokens & right_tokens) - _WEEKLY_GENERIC_TOKENS
+    if len(specific_common) >= 2:
         return True
-    specific_common = common - _WEEKLY_GENERIC_ACTIONS
-    return (
-        bool(specific_common)
-        and len(left_tokens) == 1
-        or (bool(specific_common) and len(right_tokens) == 1)
-    )
+    if len(specific_common) == 1:
+        token = next(iter(specific_common))
+        # '미리보기'처럼 구체적이고 충분히 긴 단어 1개만 겹쳐도 같은 대상으로 본다.
+        return len(token) >= 4
+    return False
 
 
 def reported_project_name(project):
@@ -495,16 +568,10 @@ def promote_weekly_tasks(report_data, source_reports=None):
             )
         )
         def _plan_done(plan):
-            plan_tokens = _weekly_task_tokens(plan) - _WEEKLY_GENERIC_ACTIONS
-            if not plan_tokens:
-                return False
-            for completed_task in completed_candidates:
-                if _weekly_tasks_match(plan, completed_task):
-                    return True
-                done_tokens = _weekly_task_tokens(completed_task) - _WEEKLY_GENERIC_ACTIONS
-                if plan_tokens & done_tokens:
-                    return True
-            return False
+            return any(
+                _weekly_tasks_match(plan, completed_task)
+                for completed_task in completed_candidates
+            )
 
         cleaned_plans = list(
             dict.fromkeys(task for task in next_plans if not _plan_done(task))
@@ -547,14 +614,7 @@ def ensure_weekly_projects(report_data, source_reports):
 
 
 def _item_covered(item, candidates):
-    item_tokens = _weekly_task_tokens(item) - _WEEKLY_GENERIC_ACTIONS
-    for candidate in candidates:
-        if _weekly_tasks_match(item, candidate):
-            return True
-        cand_tokens = _weekly_task_tokens(candidate) - _WEEKLY_GENERIC_ACTIONS
-        if item_tokens and item_tokens & cand_tokens:
-            return True
-    return False
+    return any(_weekly_tasks_match(item, candidate) for candidate in candidates)
 
 
 def ensure_weekly_plans(report_data, source_reports):
@@ -615,10 +675,12 @@ def _missing_weekdays(selects):
     selected_set = set(selected)
     first = date.fromisoformat(min(selected))
     monday = first - timedelta(days=first.weekday())
+    friday = monday + timedelta(days=4)
+    holiday_names = kr_holiday_map(monday.year, friday.year)
     missing = []
     for offset in range(5):
         day = (monday + timedelta(days=offset)).isoformat()
-        if day not in selected_set:
+        if day not in selected_set and day not in holiday_names:
             missing.append(day)
     return missing
 
@@ -629,15 +691,42 @@ def _confirm_item_text(value):
     return str(value or "").strip()
 
 
+def _issue_looks_resolved(content):
+    text = str(content or "")
+    if any(
+        marker in text
+        for marker in (
+            "해결되지",
+            "미해결",
+            "해결 안",
+            "안 됐",
+            "않음",
+            "재현",
+            "아직",
+            "남아",
+            "미결정",
+            "보류",
+        )
+    ):
+        return False
+    return any(
+        marker in text
+        for marker in ("완료", "해결됨", "해결했", "수정됨", "반영됨", "고침")
+    )
+
+
 def build_weekly_confirm_questions(report_data, source_reports, selects):
     questions = []
     seen = set()
 
-    def add(qid, text):
+    def add(qid, text, if_no=""):
         if len(questions) >= 3 or qid in seen or not text:
             return
         seen.add(qid)
-        questions.append({"id": qid, "text": text})
+        item = {"id": qid, "text": text}
+        if if_no:
+            item["ifNo"] = if_no
+        questions.append(item)
 
     projects = [
         project
@@ -657,14 +746,38 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
             for task in project.get("inProgressTasks") or []
             if str(task or "").strip()
         ]
+        next_plans = [
+            str(item).strip()
+            for item in (project.get("nextPlans") or project.get("nextWeekPlans") or [])
+            if str(item or "").strip()
+        ]
         for done in completed:
             for prog in progress:
-                if _weekly_tasks_match(done, prog):
-                    add(
-                        f"dual:{name}:{done}",
-                        f"{name}의 '{_clip_question_item(done)}'이 완료와 진행 중에 같이 있습니다. 이번 주 완료가 맞나요?",
-                    )
-                    break
+                if not _weekly_tasks_match(done, prog):
+                    continue
+                add(
+                    f"dual:{name}:{done}",
+                    (
+                        f"{name}의 completedTasks '{_clip_question_item(done)}'와 "
+                        f"inProgressTasks '{_clip_question_item(prog)}'가 같은 대상으로 보입니다. "
+                        f"이번 주 완료가 맞나요?"
+                    ),
+                    "진행에서 해당 문장을 빼 주세요.",
+                )
+                break
+            for plan in next_plans:
+                if not _weekly_tasks_match(done, plan):
+                    continue
+                add(
+                    f"done-plan:{name}:{done}",
+                    (
+                        f"{name}의 '{_clip_question_item(done)}'이 완료인데 "
+                        f"nextWeekPlans에도 '{_clip_question_item(plan)}'이 있습니다. "
+                        f"다음 주 계획에서 빼도 될까요?"
+                    ),
+                    "다음 주 계획에서 해당 문장을 빼 주세요.",
+                )
+                break
 
     by_project = defaultdict(
         lambda: {"completed": [], "progress": [], "issues": []}
@@ -692,13 +805,18 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
         found = False
         for _day_c, done in bucket["completed"]:
             for _day_p, prog in bucket["progress"]:
-                if _weekly_tasks_match(done, prog):
-                    add(
-                        f"conflict:{name}:{done}",
-                        f"{name}의 '{_clip_question_item(done)}'은 어떤 날엔 완료, 어떤 날엔 진행 중이었습니다. 이번 주 완료가 맞나요?",
-                    )
-                    found = True
-                    break
+                if not _weekly_tasks_match(done, prog):
+                    continue
+                add(
+                    f"conflict:{name}:{done}",
+                    (
+                        f"{name}의 '{_clip_question_item(done)}'은 어떤 날엔 완료, "
+                        f"어떤 날엔 진행 중이었습니다. 이번 주 완료가 맞나요?"
+                    ),
+                    "진행·이슈에 남은 같은 대상 문장을 정리해 주세요.",
+                )
+                found = True
+                break
             if found:
                 break
 
@@ -713,11 +831,21 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
             content = _confirm_item_text(issue)
             if not content:
                 continue
-            if any(_weekly_tasks_match(content, done) for done in completed):
-                add(
-                    f"issue-done:{name}:{content}",
-                    f"{name} 이슈 '{_clip_question_item(content)}'가 완료된 업무에도 있습니다. 아직 열린 이슈가 맞나요?",
-                )
+            looks_done = _issue_looks_resolved(content)
+            overlaps_done = any(
+                _weekly_tasks_match(content, done) for done in completed
+            )
+            if not looks_done and not overlaps_done:
+                continue
+            add(
+                f"issue-done:{name}:{content}",
+                (
+                    f"{name} 이슈 '{_clip_question_item(content)}'가 "
+                    f"{'완료된 업무와 겹칩니다' if overlaps_done else '이미 끝난 것처럼 읽힙니다'}. "
+                    f"아직 열린 이슈가 맞나요?"
+                ),
+                "이슈에서 빼고 필요하면 완료로 옮기세요.",
+            )
 
     for project in projects:
         name = reported_project_name(project)
@@ -725,6 +853,7 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
             add(
                 "unclassified",
                 f"'{name}'로 묶인 항목이 있습니다. 미분류로 두어도 되나요?",
+                "올바른 프로젝트명으로 바꿔 주세요.",
             )
             break
 
@@ -733,7 +862,8 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
         labels = ", ".join(_weekday_label(day) for day in missing)
         add(
             "missing-days",
-            f"{labels} 일일이 빠져 있습니다. 이대로 저장해도 되나요?",
+            f"{labels} 일일이 빠져 있습니다. 이 주 범위가 맞나요?",
+            "빠진 날짜의 일일보고를 추가하거나 기간을 다시 선택하세요.",
         )
 
     for name, bucket in by_project.items():
@@ -741,12 +871,17 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
         for _day, text in bucket["progress"]:
             counts[text] += 1
         for text, count in counts.items():
-            if count >= 3:
-                add(
-                    f"stale:{name}:{text}",
-                    f"{name}의 '{_clip_question_item(text)}'이 여러 날 진행 중이었습니다. 아직 진행 중이 맞나요?",
-                )
-                break
+            if count < 3:
+                continue
+            add(
+                f"stale:{name}:{text}",
+                (
+                    f"{name}의 '{_clip_question_item(text)}'이 여러 날 진행 중이었습니다. "
+                    f"아직 진행 중이 맞나요?"
+                ),
+                "끝났으면 완료로 옮기고 진행에서 빼 주세요.",
+            )
+            break
 
     empty_next = [
         reported_project_name(project)
@@ -755,45 +890,237 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
             str(item or "").strip()
             for item in (project.get("nextPlans") or project.get("nextWeekPlans") or [])
         )
+        and any(
+            str(item or "").strip()
+            for key in ("completedTasks", "inProgressTasks", "issues")
+            for item in (project.get(key) or [])
+        )
     ]
     if empty_next:
+        label = empty_next[0] if len(empty_next) == 1 else f"{empty_next[0]} 외 {len(empty_next) - 1}개"
         add(
             "empty-next",
-            f"{empty_next[0]}의 다음 주 계획이 비어 있습니다. 일일에 적어 둔 다음 일이 없는 게 맞나요?",
+            f"{label}의 다음 주 계획이 비어 있습니다. 다음 일이 없는 게 맞나요?",
+            "다음 주 할 일이 있으면 nextWeekPlans에 추가해 주세요.",
         )
 
     return questions[:3]
 
 
-def attach_confirm_questions(report_data, dated_reports, selects):
+def _quoted_snippets(text):
+    found = []
+    for match in re.finditer(
+        r"'([^']+)'|\"([^\"]+)\"|‘([^’]+)’|“([^”]+)”", str(text or "")
+    ):
+        snippet = next((group for group in match.groups() if group), "").strip()
+        if snippet:
+            found.append(snippet)
+    return found
+
+
+def _weekly_field_texts(report_data, fields):
+    values = []
+    for project in report_data.get("projects") or []:
+        if not isinstance(project, dict):
+            continue
+        for field in fields:
+            for item in project.get(field) or []:
+                text = _confirm_item_text(item)
+                if text:
+                    values.append(text)
+        name = reported_project_name(project)
+        if name:
+            values.append(name)
+    return values
+
+
+def _snippet_in(snippet, texts):
+    return any(snippet in text or text in snippet for text in texts if text)
+
+
+def _question_claims_merge_of_distinct_tasks(text, if_no=""):
+    """관련·원인·같은 이슈를 추측해 묶거나 가르는 질문인지."""
+    blob = f"{text}\n{if_no}"
+    return any(
+        marker in blob
+        for marker in (
+            "통합",
+            "합치",
+            "같은 작업이면",
+            "같은 일이면",
+            "같은 이슈",
+            "같은 문제",
+            "별개 작업으로 봐도",
+            "별개로 봐도",
+            "별개 문제",
+            "별개라면",
+            "원인이라면",
+            "원인이면",
+            "두 칸 배치",
+            "관련인데",
+            "관련이라",
+        )
+    )
+
+
+def _quoted_pair_matches(quotes):
+    for index, left in enumerate(quotes):
+        for right in quotes[index + 1 :]:
+            if _weekly_tasks_match(left, right):
+                return True
+    return False
+
+
+def _question_is_grounded(text, report_data, if_no=""):
+    quotes = _quoted_snippets(text)
+    if not quotes:
+        return False
+    forbidden = (
+        "이대로 저장",
+        "이대로 확정",
+        "이대로 두어도",
+        "별개 작업으로 봐도",
+        "별개로 봐도",
+        "별개 문제",
+        "별개라면",
+        "같은 이슈",
+        "같은 문제",
+        "원인이라면",
+        "원인이면",
+        "두 칸 배치",
+    )
+    if any(marker in text for marker in forbidden):
+        return False
+    all_texts = _weekly_field_texts(
+        report_data,
+        (
+            "completedTasks",
+            "inProgressTasks",
+            "issues",
+            "nextPlans",
+            "nextWeekPlans",
+        ),
+    )
+    for project in report_data.get("projects") or []:
+        if isinstance(project, dict):
+            name = reported_project_name(project)
+            if name:
+                all_texts.append(name)
+    nexts = _weekly_field_texts(report_data, ("nextPlans", "nextWeekPlans"))
+    issues = _weekly_field_texts(report_data, ("issues",))
+    completed = _weekly_field_texts(report_data, ("completedTasks",))
+    progress = _weekly_field_texts(report_data, ("inProgressTasks",))
+    in_weekly = all(_snippet_in(quote, all_texts) for quote in quotes)
+    says_missing = "빠졌" in text
+    if says_missing:
+        return False
+    if not in_weekly:
+        return False
+    if "다음 주 계획에" in text or "nextWeekPlans에" in text or "nextWeekPlans에도" in text:
+        if not any(_snippet_in(quote, nexts) for quote in quotes):
+            return False
+    if "이슈에" in text or "이슈 '" in text or "issues에" in text:
+        if not any(_snippet_in(quote, issues) for quote in quotes):
+            return False
+    claims_in_progress = (
+        "진행 중에 있습니다" in text
+        or "진행 중으로" in text
+        or "inProgressTasks에" in text
+        or "inProgressTasks '" in text
+    )
+    if claims_in_progress:
+        if not any(_snippet_in(quote, progress) for quote in quotes):
+            return False
+    if (
+        "완료에 있습니다" in text
+        or "완료된 업무로 처리" in text
+        or "completedTasks에" in text
+        or "completedTasks '" in text
+    ):
+        if not any(_snippet_in(quote, completed) for quote in quotes):
+            return False
+    # 진행+이슈를 인용하며 같은지/별개인지만 묻는 질문은 버린다(정상 배치).
+    quotes_progress = any(_snippet_in(quote, progress) for quote in quotes)
+    quotes_issue = any(_snippet_in(quote, issues) for quote in quotes)
+    if quotes_progress and quotes_issue and "완료" not in text:
+        return False
+    if (
+        len(quotes) >= 2
+        and _question_claims_merge_of_distinct_tasks(text, if_no)
+        and not _quoted_pair_matches(quotes)
+    ):
+        return False
+    return True
+
+
+def ask_weekly_confirm_questions(client, report_data, dated_reports, selects):
+    weekly_view = {
+        "projects": [
+            {
+                "projectName": project.get("projectName"),
+                "completedTasks": list(project.get("completedTasks") or []),
+                "inProgressTasks": list(project.get("inProgressTasks") or []),
+                "issues": [
+                    _confirm_item_text(issue)
+                    for issue in project.get("issues") or []
+                    if _confirm_item_text(issue)
+                ],
+                "nextWeekPlans": list(
+                    project.get("nextPlans") or project.get("nextWeekPlans") or []
+                ),
+            }
+            for project in report_data.get("projects") or []
+            if isinstance(project, dict)
+        ]
+    }
+    payload = {"weeklyDraft": weekly_view}
+    with open("./model_asset/weekly_confirm_json_schema.json", encoding="utf-8") as handle:
+        confirm_schema = json.load(handle)
+    kwargs = dict(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": load_weekly_confirm_prompt()},
+            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+        ],
+        temperature=0.1,
+        max_tokens=min(4096, WEEKLY_MAX_TOKENS),
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "weekly_confirm",
+                "strict": True,
+                "schema": confirm_schema,
+            },
+        },
+    )
+    if WEEKLY_REASONING:
+        kwargs["reasoning_effort"] = WEEKLY_REASONING
+    completion = client.chat.completions.create(**kwargs)
+    parsed = json.loads(read_completion(completion, "weekly-confirm"))
+    return parsed.get("confirmQuestions") or []
+
+
+def attach_confirm_questions(
+    report_data, dated_reports, selects, model_questions=None
+):
     if not isinstance(report_data, dict):
         report_data = {"projects": []}
     cleaned = []
     seen = set()
-    for item in report_data.get("confirmQuestions") or []:
-        if isinstance(item, str):
-            text, if_no = item.strip(), ""
-        elif isinstance(item, dict):
-            text = str(item.get("text") or "").strip()
-            if_no = str(item.get("ifNo") or "").strip()
-        else:
-            continue
-        if not text or text in seen:
-            continue
-        seen.add(text)
-        question = {"text": text}
-        if if_no:
-            question["ifNo"] = if_no
-        cleaned.append(question)
-        if len(cleaned) >= 3:
-            break
-    if len(cleaned) < 3:
-        for item in build_weekly_confirm_questions(
-            report_data, dated_reports, selects
-        ):
-            text = str(item.get("text") or "").strip()
-            if_no = str(item.get("ifNo") or "").strip()
+
+    def take(items, *, trust=False):
+        for item in items or []:
+            if isinstance(item, str):
+                text, if_no = item.strip(), ""
+            elif isinstance(item, dict):
+                text = str(item.get("text") or "").strip()
+                if_no = str(item.get("ifNo") or "").strip()
+            else:
+                continue
             if not text or text in seen:
+                continue
+            # 모델 질문만 grounding. 서버 heuristic은 이미 초안 근거로 만든 문장이다.
+            if not trust and not _question_is_grounded(text, report_data, if_no=if_no):
                 continue
             seen.add(text)
             question = {"text": text}
@@ -801,8 +1128,20 @@ def attach_confirm_questions(report_data, dated_reports, selects):
                 question["ifNo"] = if_no
             cleaned.append(question)
             if len(cleaned) >= 3:
-                break
+                return
+
+    take(model_questions, trust=False)
+    model_kept = len(cleaned)
+    if len(cleaned) < 3:
+        take(
+            build_weekly_confirm_questions(report_data, dated_reports, selects),
+            trust=True,
+        )
     report_data["confirmQuestions"] = cleaned[:3]
+    print(
+        f"[weekly-confirm] model={len(model_questions or [])} "
+        f"kept={model_kept} final={len(report_data['confirmQuestions'])}"
+    )
     return report_data
 
 
@@ -1225,8 +1564,16 @@ def generate_weekly_report(member_id, selects):
             report_data = promote_weekly_tasks(report_data, reports)
             report_data = normalize_issues(report_data)
             report_data = drop_empty_projects(report_data)
+            report_data.pop("confirmQuestions", None)
+            model_questions = []
+            try:
+                model_questions = ask_weekly_confirm_questions(
+                    client, report_data, dated_reports, selects
+                )
+            except Exception as confirm_exc:
+                print(f"[weekly-confirm] {confirm_exc}")
             report_data = attach_confirm_questions(
-                report_data, dated_reports, selects
+                report_data, dated_reports, selects, model_questions
             )
         except HTTPException:
             raise
@@ -1406,6 +1753,12 @@ def get_report_draft(member_id: int, report_date: str):
         "raw_text": row[0],
         "updated_at": row[1],
     }
+
+
+@app.get("/holidays")
+def get_holidays(year: int):
+    items = kr_holiday_map(year - 1, year, year + 1)
+    return [{"date": day, "name": name} for day, name in items.items()]
 
 
 @app.get("/user-activities")
@@ -1622,6 +1975,7 @@ def get_reports():
                 d.id,
                 d.member_id,
                 m.name AS member_name,
+                m.team_id AS member_team_id,
                 d.report_date,
                 d.raw_text,
                 d.parsed_json,
@@ -1640,7 +1994,7 @@ def get_reports():
         rows = cursor.fetchall()
         reports = []
         for row in rows:
-            parsed = json.loads(row[5]) if row[5] else None
+            parsed = json.loads(row[6]) if row[6] else None
             if parsed:
                 parsed = normalize_issues(parsed)
             reports.append(
@@ -1648,10 +2002,11 @@ def get_reports():
                     "id": row[0],
                     "member_id": row[1],
                     "member_name": row[2],
-                    "report_date": row[3],
-                    "raw_text": row[4],
+                    "member_team_id": row[3],
+                    "report_date": row[4],
+                    "raw_text": row[5],
                     "parsed_json": parsed,
-                    "created_at": row[6],
+                    "created_at": row[7],
                 }
             )
     return reports
@@ -1688,14 +2043,35 @@ def save_user(data: UserRequest):
         raise HTTPException(status_code=400, detail="이름을 입력해주세요.")
     with get_db() as conn:
         cursor = conn.cursor()
+        team_id = data.team_id
+        if team_id is None:
+            team_id = get_or_create_unassigned_team(conn)
+        elif not conn.execute(
+            "SELECT 1 FROM teams WHERE id = ?", (team_id,)
+        ).fetchone():
+            raise HTTPException(status_code=400, detail="유효하지 않은 팀입니다.")
         try:
-            cursor.execute("INSERT INTO members (name) VALUES (?)", (name,))
-        except sqlite3.IntegrityError:
-            raise HTTPException(
-                status_code=409, detail=f"'{name}' 사용자가 이미 존재합니다."
+            cursor.execute(
+                "INSERT INTO members (name, team_id) VALUES (?, ?)",
+                (name, team_id),
             )
+        except sqlite3.IntegrityError as exc:
+            err = str(exc).lower()
+            if "unique" in err:
+                raise HTTPException(
+                    status_code=409, detail=f"'{name}' 사용자가 이미 존재합니다."
+                )
+            raise HTTPException(
+                status_code=400, detail="사용자를 저장하지 못했습니다."
+            )
+        user_id = cursor.lastrowid
         conn.commit()
-    return {"message": "User saved successfully."}
+    return {
+        "id": user_id,
+        "name": name,
+        "team_id": team_id,
+        "message": "User saved successfully.",
+    }
 
 
 @app.get("/users")
@@ -1704,6 +2080,66 @@ def get_users():
         users = db.execute("SELECT * FROM members").fetchall()
 
     return [dict(user) for user in users]
+
+@app.post("/teams/set")
+def set_team(data: SetTeamData):
+    team_id = data.team_id
+    user_id = data.user_id
+    with get_db() as conn:
+        validate_member(conn, user_id)
+        if not conn.execute("SELECT 1 FROM teams WHERE id = ?", (team_id,)).fetchone():
+            raise HTTPException(status_code=400, detail="유효하지 않은 팀입니다.")
+        cursor = conn.cursor()
+        cursor.execute("UPDATE members SET team_id = ? WHERE id = ?", (team_id, user_id))
+        conn.commit()
+    return {"message": "Team set successfully."}
+
+@app.post("/teams")
+def save_team(data: TeamRequest):
+    team_name = data.team_name.strip()
+    if not team_name:
+        raise HTTPException(status_code=400, detail="팀 이름을 입력해주세요.")
+    with get_db() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO teams (team_name) VALUES (?)", (team_name,)
+            )
+        except sqlite3.IntegrityError:
+            raise HTTPException(
+                status_code=409, detail=f"'{team_name}' 팀이 이미 존재합니다."
+            )
+        conn.commit()
+    return {"message": "Team saved successfully."}
+
+@app.get("/teams/{member_id}")
+def get_team_by_member_id(member_id: int):
+    with get_db() as db:
+        row = db.execute(
+            """
+            SELECT m.team_id AS id, t.team_name, t.created_at
+            FROM members m
+            LEFT JOIN teams t ON t.id = m.team_id
+            WHERE m.id = ?
+            """,
+            (member_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    data = dict(row)
+    if data["id"] is None:
+        raise HTTPException(
+            status_code=404, detail="팀에 소속되지 않은 사용자입니다."
+        )
+    return data
+
+
+@app.get("/teams")
+def get_teams():
+    with get_db() as db:
+        teams = db.execute("SELECT * FROM teams").fetchall()
+
+    return [dict(team) for team in teams]
 
 
 def _issue_text(issue):

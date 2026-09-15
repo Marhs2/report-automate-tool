@@ -7,6 +7,10 @@
                     목록으로
                 </button>
                 <h1 class="detail-title">{{ userName || "작성자 미상" }}</h1>
+                <p v-if="reportDate" class="page-subtitle">
+                    {{ formatDate(reportDate) }}
+                    {{ weekday(reportDate) }}
+                </p>
             </div>
         </div>
 
@@ -23,22 +27,30 @@
                         {{ project.projectName || "이름 없는 프로젝트" }}
                     </h2>
 
-                    <div
-                        v-for="section in visibleSections(project)"
-                        :key="section.key"
-                        class="field-group"
-                    >
-                        <h3>{{ section.label }}</h3>
-                        <ul v-if="section.items.length" class="item-list">
-                            <li
-                                v-for="(entry, entryIndex) in section.items"
-                                :key="entryIndex"
-                            >
-                                <span>{{ itemText(entry) }}</span>
-                            </li>
-                        </ul>
-                        <p v-else class="empty-msg">{{ section.empty }}</p>
+                    <div v-if="taskGroups(project).length" class="task-groups">
+                        <section
+                            v-for="group in taskGroups(project)"
+                            :key="group.kind"
+                            class="task-group"
+                        >
+                            <h3 class="task-group-label" :class="group.kind">
+                                {{ group.label }}
+                            </h3>
+                            <ul class="task-cards">
+                                <li
+                                    v-for="(text, itemIndex) in group.items"
+                                    :key="itemIndex"
+                                    class="task-card"
+                                    :class="group.kind"
+                                >
+                                    {{ text }}
+                                </li>
+                            </ul>
+                        </section>
                     </div>
+                    <p v-else class="empty-msg">
+                        이 프로젝트에 적힌 업무가 없습니다
+                    </p>
                 </section>
             </div>
 
@@ -84,51 +96,36 @@ const toParsed = (parsedJson) => {
     return parsedJson;
 };
 
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
 const itemText = (value) =>
     value && typeof value === "object"
-        ? (value.content ?? "")
-        : String(value ?? "");
+        ? String(value.content ?? "").trim()
+        : String(value ?? "").trim();
 
-const hasItems = (list) => Array.isArray(list) && list.length > 0;
+const textsOf = (list) =>
+    (Array.isArray(list) ? list : []).map(itemText).filter(Boolean);
 
-const visibleSections = (project) => [
-    {
-        key: "completed",
-        label: "완료된 업무",
-        items: project.completedTasks || [],
-        empty: "완료된 업무가 없습니다",
-    },
-    {
-        key: "progress",
-        label: "진행 중인 업무",
-        items: project.inProgressTasks || [],
-        empty: "진행 중인 업무가 없습니다",
-    },
-    {
-        key: "issues",
-        label: "이슈",
-        items: project.issues || [],
-        empty: "이슈가 없습니다",
-    },
-    {
-        key: "requests",
-        label: "요청사항",
-        items: project.requests || [],
-        empty: "요청사항이 없습니다",
-    },
-    {
-        key: "plans",
-        label: "다음 계획",
-        items: project.nextPlans || [],
-        empty: "다음 계획이 없습니다",
-    },
-].filter((section) => hasItems(section.items));
+const taskGroups = (project) =>
+    [
+        { kind: "done", label: "완료", items: textsOf(project.completedTasks) },
+        { kind: "progress", label: "진행", items: textsOf(project.inProgressTasks) },
+        { kind: "issue", label: "이슈", items: textsOf(project.issues) },
+        { kind: "request", label: "요청", items: textsOf(project.requests) },
+        { kind: "plan", label: "다음", items: textsOf(project.nextPlans) },
+    ].filter((group) => group.items.length);
 
 const formatDate = (value) => {
     if (!value) return "-";
     const [y, m, d] = String(value).split("-");
     if (!y || !m || !d) return value;
     return `${y}.${m}.${d}`;
+};
+
+const weekday = (value) => {
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return "";
+    return WEEKDAYS[date.getDay()];
 };
 
 const goBack = () => {
@@ -170,6 +167,57 @@ watch(
 
 <style scoped>
 .project-title {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
+}
+
+.task-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.task-group-label {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--text);
+}
+
+.task-group-label.done {
+    color: var(--accent);
+}
+
+.task-group-label.issue {
+    color: var(--danger);
+}
+
+.task-cards {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.task-card {
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    font-size: 14px;
+    color: var(--text-h);
+    line-height: 1.5;
+    word-break: keep-all;
+}
+
+.task-card.done {
+    background: var(--accent-bg);
+    border-color: var(--accent-border);
+}
+
+.task-card.issue {
+    background: var(--danger-bg);
+    border-color: color-mix(in srgb, var(--danger) 28%, var(--border));
 }
 </style>

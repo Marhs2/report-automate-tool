@@ -29,6 +29,7 @@ htmlcov/
 
 # ── DB Data ─────────────────────────────────────────────
 backend/data/
+backend/.vendor/
 
 # ── SQLite runtime files ────────────────────────────────
 *.db-shm
