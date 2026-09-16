@@ -62,31 +62,13 @@ const navGroups = [
 ];
 
 
-const pageMeta = computed(() => {
-    const path = route.path;
-    if (/^\/report-result\/\d+/.test(path) || /^\/report\/\d+/.test(path)) {
-        return { title: "일일보고", action: { to: "/", label: "목록" } };
-    }
-    if (path === "/report-result") return { title: "분석 결과", action: null };
-    if (path === "/report") return { title: "보고서 작성", action: null };
-    if (path.startsWith("/weekly-detail")) return { title: "주간 보고서", action: { to: "/weekly", label: "목록" } };
-    if (path === "/weekly") return { title: "주간 보고서", action: null };
-    if (path === "/activities") return { title: "사용자 활동", action: { to: "/report", label: "보고서 작성" } };
-    if (path === "/project-timeline") return { title: "프로젝트 흐름", action: null };
-    if (path === "/project-name") return { title: "프로젝트명 관리", action: null };
-    if (path === "/users") return { title: "사용자 선택", action: null };
-    if (path === "/team-select") return { title: "팀 선택", action: null };
-    return { title: "일일보고", action: { to: "/report", label: "보고서 작성" } };
-});
+const pageMeta = computed(() => ({
+    title: route.meta.title || "일일보고",
+    parent: route.meta.parent || null,
+    action: route.meta.action || null,
+}));
 
-const isNavActive = (to) => {
-    const path = route.path;
-    if (to === "/") {
-        return path === "/" || /^\/report\/\d+/.test(path) || /^\/report-result\/\d+/.test(path);
-    }
-    if (to === "/report") return path === "/report" || path === "/report-result";
-    return path === to || path.startsWith(`${to}/`);
-};
+const isNavActive = (to) => route.meta.navKey === to;
 
 const currentUser = ref("");
 const currentTeam = ref("");
@@ -376,8 +358,14 @@ onUnmounted(() => {
 
     <main class="main-content">
         <header class="topbar">
-            <div class="topbar-title">{{ pageMeta.title }}</div>
-            <router-link v-if="pageMeta.action" class="btn btn-primary" :to="pageMeta.action.to">
+            <nav class="topbar-crumbs" aria-label="현재 위치">
+                <router-link v-if="pageMeta.parent" class="topbar-crumb" :to="pageMeta.parent.to">
+                    {{ pageMeta.parent.label }}
+                </router-link>
+                <span v-if="pageMeta.parent" class="topbar-crumb-sep" aria-hidden="true">›</span>
+                <span class="topbar-title" aria-current="page">{{ pageMeta.title }}</span>
+            </nav>
+            <router-link v-if="pageMeta.action" class="btn btn-primary btn-small" :to="pageMeta.action.to">
                 {{ pageMeta.action.label }}
             </router-link>
         </header>
