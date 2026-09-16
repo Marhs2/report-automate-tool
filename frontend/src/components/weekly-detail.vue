@@ -131,7 +131,7 @@
 <script setup>
 import { computed, ref, onMounted, watch } from "vue";
 import { ArrowLeft } from "lucide-vue-next";
-import useAPI from "../composables/useAPI";
+import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
@@ -147,7 +147,7 @@ const userName = ref("");
 const isSaving = ref(false);
 const askOpen = ref(false);
 const askIndex = ref(0);
-const { getUsers, GetWeeklyReportById, updateWeeklyReport } = useAPI();
+const { getUsers, getWeeklyReportById, updateWeeklyReport } = useApi();
 
 const confirmQuestions = computed(() => {
     const items = reportData.value?.confirmQuestions;
@@ -216,7 +216,7 @@ onMounted(async () => {
 
     if (reportId) {
         try {
-            const data = await GetWeeklyReportById(reportId);
+            const data = await getWeeklyReportById(reportId);
             reportData.value = normalizeReportIssues(data.report);
             userName.value = data.memberName || `사용자 ${data.memberId}`;
 

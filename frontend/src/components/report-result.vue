@@ -222,7 +222,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from "vue";
-import useAPI from "../composables/useAPI";
+import useApi from "../composables/useApi";
 import { useRouter } from "vue-router";
 import { useToast } from "../composables/useToast";
 
@@ -235,7 +235,7 @@ const userName = ref("");
 const reportDate = ref("");
 const aiLoading = ref(false);
 const saving = ref(false);
-const { PostSaveReport, PostReport, getUsers } = useAPI();
+const { postSaveReport, postReport, getUsers } = useApi();
 
 const issueText = (issue) =>
     typeof issue === "string"
@@ -376,7 +376,7 @@ const saveReport = async () => {
         })();
     saving.value = true;
     try {
-        await PostSaveReport(
+        await postSaveReport(
             jsonData,
             rawData.value,
             parseInt(localStorage.getItem("report-selectedUser") || "0"),
@@ -413,7 +413,7 @@ const retryExtract = async () => {
                 const d = new Date();
                 return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
             })();
-        const res = await PostReport(
+        const res = await postReport(
             { content: rawData.value },
             reportDate,
             userId,

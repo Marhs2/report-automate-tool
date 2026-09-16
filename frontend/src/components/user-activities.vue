@@ -2,14 +2,17 @@
 import { onMounted, ref, reactive, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
+import { useToast } from "../composables/useToast";
 
 const router = useRouter();
-const { GetUserActivities, GetReports, GetHolidays } = useApi();
+const { error: toastError } = useToast();
+const { getUserActivities, getReports, getHolidays, getTeams } = useApi();
 
 const props = defineProps({
     startDate: { type: String, default: "" },
     endDate: { type: String, default: "" },
     embedded: { type: Boolean, default: false },
+    filterTeam: { type: String, default: "all" },
 });
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -30,6 +33,9 @@ const tooltip = reactive({
 
 let hideTimer = null;
 
+const teams = ref([]);
+const filterTeam = ref("all");
+
 const parseDate = (dateStr) => new Date(`${dateStr}T00:00:00`);
 
 const formatDate = (date) => {
@@ -44,6 +50,16 @@ const startOfToday = () => {
     today.setHours(0, 0, 0, 0);
     return today;
 };
+
+const fetchTeams = async () => {
+    try {
+        teams.value = await getTeams();
+    } catch (error) {
+        console.error("Error fetching teams:", error);
+        toastError("팀을 불러오지 못했습니다.");
+    }
+};
+
 
 function metaFor(dateStr) {
     const date = parseDate(dateStr);
@@ -86,7 +102,7 @@ const openCell = async (activity, item) => {
     let reportId = item.report_id;
     if (!reportId) {
         try {
-            const reports = await GetReports();
+            const reports = await getReports();
             const found = (reports || []).find(
                 (report) =>
                     String(report.member_id) === String(activity.member_id) &&
@@ -138,7 +154,7 @@ async function fetchHolidaysForView() {
     const map = {};
     await Promise.all(
         [...years].map(async (year) => {
-            const rows = await GetHolidays(year);
+            const rows = await getHolidays(year);
             for (const row of rows || []) {
                 if (row?.date) map[row.date] = row.name;
             }
@@ -149,7 +165,7 @@ async function fetchHolidaysForView() {
 
 async function fetchUserActivities() {
     await fetchHolidaysForView();
-    const activities = await GetUserActivities(
+    const activities = await getUserActivities(
         selectedYear.value,
         selectedMonth.value,
         props.startDate,
@@ -180,6 +196,7 @@ function nextMonth() {
 
 onMounted(() => {
     fetchUserActivities();
+    fetchTeams();
 });
 
 watch(
@@ -195,13 +212,23 @@ watch(
     },
 );
 
+const activeFilterTeam = computed(() =>
+    props.embedded ? String(props.filterTeam ?? "all") : filterTeam.value,
+);
+
 const orderedActivities = computed(() =>
-    userActivities.value.map((activity) => ({
-        ...activity,
-        activities: [...(activity.activities || [])].sort((left, right) =>
-            left.report_date.localeCompare(right.report_date),
-        ),
-    })),
+    userActivities.value
+        .filter(
+            (activity) =>
+                activeFilterTeam.value === "all" ||
+                String(activity.team_id) === String(activeFilterTeam.value),
+        )
+        .map((activity) => ({
+            ...activity,
+            activities: [...(activity.activities || [])].sort((left, right) =>
+                left.report_date.localeCompare(right.report_date),
+            ),
+        })),
 );
 
 const activityLookup = computed(() => {
@@ -320,29 +347,33 @@ const periodLabel = computed(() =>
                 <h1>
                     {{ periodLabel }}
                 </h1>
-      
+
             </div>
         </div>
 
         <div class="view-controls">
-            <div v-if="!embedded" class="month-nav">
-                <button
-                    class="btn btn-small"
-                    aria-label="이전 달"
-                    @click="prevMonth"
+            <div v-if="!embedded" class="month-tools">
+                <div class="month-nav">
+                    <button class="btn btn-small" aria-label="이전 달" @click="prevMonth">
+                        &lt;
+                    </button>
+                    <span class="current-period">{{ selectedYear }}년 {{ selectedMonth }}월</span>
+                    <button class="btn btn-small" aria-label="다음 달" @click="nextMonth">
+                        &gt;
+                    </button>
+                </div>
+                <select
+                    id="activity-filter-team"
+                    class="month-team-select"
+                    v-model="filterTeam"
+                    aria-label="팀"
+                    autocomplete="off"
                 >
-                    &lt;
-                </button>
-                <span class="current-period"
-                    >{{ selectedYear }}년 {{ selectedMonth }}월</span
-                >
-                <button
-                    class="btn btn-small"
-                    aria-label="다음 달"
-                    @click="nextMonth"
-                >
-                    &gt;
-                </button>
+                    <option value="all">전체</option>
+                    <option v-for="team in teams" :key="team.id" :value="String(team.id)">
+                        {{ team.team_name }}
+                    </option>
+                </select>
             </div>
             <div v-if="orderedActivities.length" class="legend">
                 <span class="legend-item">
@@ -368,105 +399,67 @@ const periodLabel = computed(() =>
         </div>
         <template v-else>
             <div class="member-summary">
-                <div
-                    v-for="activity in orderedActivities"
-                    :key="activity.member_id"
-                    class="summary-item"
-                >
+                <div v-for="activity in orderedActivities" :key="activity.member_id" class="summary-item">
                     <div class="summary-top">
                         <span class="summary-name">{{ activity.name }}</span>
-                        <span class="summary-count"
-                            >{{ progressOf(activity).submitted }}/{{
-                                progressOf(activity).total
-                            }}
-                            평일</span
-                        >
+                        <span class="summary-count">{{ progressOf(activity).submitted }}/{{
+                            progressOf(activity).total
+                        }}
+                            평일</span>
                     </div>
-                    <div
-                        class="progress-track"
-                        :title="`${progressOf(activity).submitted}/${progressOf(activity).total} 평일`"
-                    >
-                        <span
-                            class="progress-fill"
-                            :style="{
-                                width: progressOf(activity).pct + '%',
-                            }"
-                        ></span>
+                    <div class="progress-track"
+                        :title="`${progressOf(activity).submitted}/${progressOf(activity).total} 평일`">
+                        <span class="progress-fill" :style="{
+                            width: progressOf(activity).pct + '%',
+                        }"></span>
                     </div>
                 </div>
             </div>
 
             <div class="card calendar-card">
                 <div class="cal-weekdays">
-                    <span
-                        v-for="label in WEEKDAY_LABELS"
-                        :key="label"
-                        :class="{
-                            weekend: label === '일' || label === '토',
-                        }"
-                    >
+                    <span v-for="label in WEEKDAY_LABELS" :key="label" :class="{
+                        weekend: label === '일' || label === '토',
+                    }">
                         {{ label }}
                     </span>
                 </div>
                 <div class="cal-weeks">
-                    <div
-                        v-for="(week, weekIndex) in calendarWeeks"
-                        :key="weekIndex"
-                        class="cal-week"
-                    >
-                        <div
-                            v-for="cell in week"
-                            :key="cell.date"
-                            class="cal-day"
-                            :class="{
-                                outside: cell.outside,
-                                weekend: cell.isWeekend,
-                                holiday: cell.isHoliday,
-                                today: cell.isToday && !cell.outside,
-                            }"
-                        >
+                    <div v-for="(week, weekIndex) in calendarWeeks" :key="weekIndex" class="cal-week">
+                        <div v-for="cell in week" :key="cell.date" class="cal-day" :class="{
+                            outside: cell.outside,
+                            weekend: cell.isWeekend,
+                            holiday: cell.isHoliday,
+                            today: cell.isToday && !cell.outside,
+                        }">
                             <div class="cal-day-head">
                                 <span class="cal-day-num">{{ cell.day }}</span>
-                                <span
-                                    v-if="cell.holidayName && !cell.outside"
-                                    class="cal-holiday"
-                                    :title="cell.holidayName"
-                                >{{ cell.holidayName }}</span>
+                                <span v-if="cell.holidayName && !cell.outside" class="cal-holiday"
+                                    :title="cell.holidayName">{{ cell.holidayName }}</span>
                             </div>
                             <div v-if="!cell.outside" class="cal-entries">
-                                <button
-                                    v-for="entry in visibleEntries(cell)"
-                                    :key="entry.member_id"
-                                    class="cal-chip"
+                                <button v-for="entry in visibleEntries(cell)" :key="entry.member_id" class="cal-chip"
                                     :class="{
                                         submitted: entry.submitted,
                                         missed:
                                             !entry.submitted &&
                                             !cell.isOffday,
-                                    }"
-                                    :disabled="!entry.submitted"
-                                    :aria-label="
-                                        cellLabel(entry.name, entry.item)
-                                    "
-                                    @click="
-                                        openCell(
-                                            {
-                                                member_id: entry.member_id,
-                                                name: entry.name,
-                                            },
-                                            entry.item,
-                                        )
-                                    "
-                                    @mouseenter="
-                                        showTooltip(
-                                            $event,
-                                            entry.name,
-                                            entry.item,
-                                        )
-                                    "
-                                    @mousemove="moveTooltip"
-                                    @mouseleave="hideTooltip"
-                                >
+                                    }" :disabled="!entry.submitted" :aria-label="cellLabel(entry.name, entry.item)
+                                        " @click="
+                                            openCell(
+                                                {
+                                                    member_id: entry.member_id,
+                                                    name: entry.name,
+                                                },
+                                                entry.item,
+                                            )
+                                            " @mouseenter="
+                                                showTooltip(
+                                                    $event,
+                                                    entry.name,
+                                                    entry.item,
+                                                )
+                                                " @mousemove="moveTooltip" @mouseleave="hideTooltip">
                                     {{ entry.name }}
                                 </button>
                             </div>
@@ -477,11 +470,7 @@ const periodLabel = computed(() =>
         </template>
 
         <transition name="tooltip-fade">
-            <div
-                v-if="tooltip.visible"
-                class="tooltip"
-                :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
-            >
+            <div v-if="tooltip.visible" class="tooltip" :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }">
                 {{ tooltip.content }}
             </div>
         </transition>
@@ -492,17 +481,21 @@ const periodLabel = computed(() =>
 .activity-section {
     margin-bottom: 8px;
 }
+
 .activity-section .cal-day {
     min-height: 96px;
     padding: 6px;
 }
+
 .activity-section .cal-chip {
     font-size: 11px;
     padding: 2px 6px;
 }
+
 .activity-section .member-summary {
     margin-bottom: 10px;
 }
+
 .activity-section .view-controls {
     margin-bottom: 8px;
 }
@@ -520,15 +513,49 @@ const periodLabel = computed(() =>
     margin-bottom: 12px;
 }
 
+.month-tools {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
 .month-nav {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
 }
 
 .current-period {
     font-weight: 600;
     color: var(--text-h);
+    white-space: nowrap;
+}
+
+.month-team-select {
+    height: 32px;
+    width: auto;
+    min-width: 108px;
+    padding: 0 28px 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg);
+    color: var(--text-h);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.month-team-select:hover {
+    border-color: var(--text);
+}
+
+.month-team-select:focus {
+    outline: none;
+    border-color: var(--text-h);
 }
 
 .legend {

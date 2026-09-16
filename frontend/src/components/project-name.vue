@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted, nextTick } from "vue";
 import { Trash2, Check, Sparkles, Plus, X, ChevronDown } from "lucide-vue-next";
-import useAPI from "../composables/useApi";
+import useApi from "../composables/useApi";
 
 const {
     getRegisteredProjectNames,
@@ -9,7 +9,7 @@ const {
     deleteProjectName,
     updateProjectNameKeywords,
     recommendKeywords,
-} = useAPI();
+} = useApi();
 
 const projectNames = ref([]);
 const newName = ref("");

@@ -1797,7 +1797,7 @@ def get_user_activities(
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, name
+            SELECT id, name, team_id
             FROM members
             ORDER BY id
         """)
@@ -1834,7 +1834,7 @@ def get_user_activities(
 
     result = []
 
-    for member_id, name in members:
+    for member_id, name, team_id in members:
         activities = []
 
         current = first_day
@@ -1855,6 +1855,7 @@ def get_user_activities(
             {
                 "member_id": member_id,
                 "name": name,
+                "team_id": team_id,
                 "total_count": total_counts.get(member_id, 0),
                 "activities": activities,
             }

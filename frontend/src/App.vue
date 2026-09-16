@@ -8,17 +8,18 @@ import {
     ArrowLeftRight,
     Settings2,
     UsersRound,
+    ChevronDown,
 } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import useAPI from "./composables/useApi";
+import useApi from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
 import { selectedTeamId } from "./composables/useSelectedTeam";
 import { useToast } from "./composables/useToast";
 
 const router = useRouter();
 const route = useRoute();
-const { getUsers, getTeams, GetReports } = useAPI();
+const { getUsers, getTeams, getReports } = useApi();
 const { toasts } = useToast();
 
 const navGroups = [
@@ -81,6 +82,81 @@ const tomorrowLabel = computed(() => {
     return `${d.getMonth() + 1}.${d.getDate()} ${WEEKDAYS[d.getDay()]}`;
 });
 
+const groupedTomorrowPlans = computed(() => {
+    const groups = [];
+    const indexByProject = new Map();
+    for (const item of tomorrowPlans.value) {
+        const project = item.project || "미분류 프로젝트";
+        if (!indexByProject.has(project)) {
+            indexByProject.set(project, groups.length);
+            groups.push({ project, items: [] });
+        }
+        groups[indexByProject.get(project)].items.push(item.text);
+    }
+    return groups;
+});
+
+const PROJECT_TONES = [
+    "#8b9a6e",
+    "#6e8b9a",
+    "#9a846e",
+    "#7a6e9a",
+    "#9a6e76",
+    "#6e9a86",
+    "#8b7a6e",
+    "#6e7a9a",
+];
+
+const projectTone = (name) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i += 1) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return PROJECT_TONES[Math.abs(hash) % PROJECT_TONES.length];
+};
+
+const expandedProjects = ref(new Set());
+
+watch(groupedTomorrowPlans, (groups) => {
+    if (!groups.length) {
+        expandedProjects.value = new Set();
+        return;
+    }
+    const total = groups.reduce((sum, group) => sum + group.items.length, 0);
+    if (total <= 8 && groups.length <= 3) {
+        expandedProjects.value = new Set(groups.map((group) => group.project));
+        return;
+    }
+    expandedProjects.value = new Set();
+});
+
+const isGroupOpen = (project) => expandedProjects.value.has(project);
+
+const toggleGroup = (project) => {
+    const next = new Set(expandedProjects.value);
+    if (next.has(project)) next.delete(project);
+    else next.add(project);
+    expandedProjects.value = next;
+};
+
+const allExpanded = computed(
+    () =>
+        groupedTomorrowPlans.value.length > 0 &&
+        groupedTomorrowPlans.value.every((group) =>
+            expandedProjects.value.has(group.project),
+        ),
+);
+
+const toggleAllGroups = () => {
+    if (allExpanded.value) {
+        expandedProjects.value = new Set();
+        return;
+    }
+    expandedProjects.value = new Set(
+        groupedTomorrowPlans.value.map((group) => group.project),
+    );
+};
+
 const projectsOf = (parsedJson) => {
     if (!parsedJson) return [];
     let parsed = parsedJson;
@@ -98,7 +174,7 @@ const loadTomorrowPlans = async (userId) => {
     tomorrowPlans.value = [];
     if (!userId) return;
     try {
-        const reports = await GetReports();
+        const reports = await getReports();
         const mine = (reports || []).filter(
             (row) => String(row.member_id) === String(userId),
         );
@@ -116,9 +192,7 @@ const loadTomorrowPlans = async (userId) => {
                     project: project.projectName || "미분류 프로젝트",
                     text,
                 });
-                if (items.length >= 5) break;
             }
-            if (items.length >= 5) break;
         }
         tomorrowPlans.value = items;
     } catch {
@@ -175,6 +249,7 @@ const logout = () => {
     }
 };
 
+
 onMounted(() => {
     if (selectedUserId.value == null) {
         router.push("/users");
@@ -199,20 +274,53 @@ onMounted(() => {
         </nav>
 
         <section class="tomorrow-card" aria-label="내일 할 일">
-
             <div class="tomorrow-card-head">
-                <p class="tomorrow-card-title">내일 할 일</p>
+                <div class="tomorrow-card-heading">
+                    <p class="tomorrow-card-title">내일 할 일</p>
+                    <span v-if="tomorrowPlans.length" class="tomorrow-card-count">{{ tomorrowPlans.length }}</span>
+                </div>
                 <span class="tomorrow-card-date">{{ tomorrowLabel }}</span>
             </div>
-            <ul v-if="tomorrowPlans.length" class="tomorrow-card-list">
-                <li v-for="(item, index) in tomorrowPlans" :key="index">
-                    <span class="tomorrow-card-dot"></span>
-                    <span>
-                        <span class="tomorrow-card-project">{{ item.project }}</span>
-                        <span class="tomorrow-card-text">{{ item.text }}</span>
-                    </span>
-                </li>
-            </ul>
+            <div v-if="groupedTomorrowPlans.length" class="tomorrow-card-toolbar">
+                <p class="tomorrow-card-summary">
+                    {{ groupedTomorrowPlans.length }}개 프로젝트
+                </p>
+                <button type="button" class="tomorrow-card-toggle-all" @click="toggleAllGroups">
+                    {{ allExpanded ? "모두 접기" : "모두 펼치기" }}
+                </button>
+            </div>
+            <div v-if="groupedTomorrowPlans.length" class="tomorrow-card-body">
+                <section
+                    v-for="(group, groupIndex) in groupedTomorrowPlans"
+                    :key="group.project"
+                    class="tomorrow-group"
+                    :class="{ 'is-open': isGroupOpen(group.project) }"
+                    :style="{ '--group-tone': projectTone(group.project) }"
+                >
+                    <button
+                        type="button"
+                        class="tomorrow-group-head"
+                        :aria-expanded="isGroupOpen(group.project)"
+                        :aria-controls="`tomorrow-group-${groupIndex}`"
+                        @click="toggleGroup(group.project)"
+                    >
+                        <ChevronDown :size="14" class="tomorrow-group-chevron" />
+                        <span class="tomorrow-group-name">{{ group.project }}</span>
+                        <span class="tomorrow-group-count">{{ group.items.length }}</span>
+                    </button>
+                    <div
+                        class="tomorrow-group-panel"
+                        :id="`tomorrow-group-${groupIndex}`"
+                        :aria-hidden="!isGroupOpen(group.project)"
+                    >
+                        <ul class="tomorrow-card-list">
+                            <li v-for="(text, index) in group.items" :key="index">
+                                {{ text }}
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+            </div>
             <p v-else class="tomorrow-card-empty">내일 예정 업무가 없어요</p>
         </section>
 

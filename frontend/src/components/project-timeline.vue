@@ -1,10 +1,10 @@
 <script setup>
 import { onMounted, ref, computed } from "vue";
 import { useRouter } from "vue-router";
-import useAPI from "../composables/useApi";
+import useApi from "../composables/useApi";
 
 const router = useRouter();
-const { getProjectNames, getProjectTimeline } = useAPI();
+const { getProjectNames, getProjectTimeline } = useApi();
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const CLOSE_KEYS = [

@@ -1,13 +1,13 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import useAPI from "../composables/useApi";
+import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser.js";
 import { useRouter } from "vue-router";
 import { Plus } from "lucide-vue-next";
 
 const router = useRouter();
 
-const { getUsers, postUsers } = useAPI();
+const { getUsers, postUsers } = useApi();
 
 const users = ref([]);
 const newUser = ref("");

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import useAPI from "../composables/useApi";
+import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { useToast } from "../composables/useToast";
 import PizZip from "pizzip";
@@ -12,7 +12,7 @@ import userActivities from "./user-activities.vue";
 
 const router = useRouter();
 
-const { postWeekly, GetWeeklyReport, deleteWeeklyReport, GetUserActivities } = useAPI();
+const { postWeeklyReport, getWeeklyReport, deleteWeeklyReport, getUserActivities, getTeams } = useApi();
 const { success: toastSuccess, error: toastError } = useToast();
 
 const selects = ref([]);
@@ -22,6 +22,8 @@ const weeklyReport = ref(null);
 const isLoading = ref(false);
 const dayCounts = ref({});
 const weekdayLabels = ["월", "화", "수", "목", "금"];
+const teams = ref([]);
+const filterTeam = ref("all");
 
 const formatLocalDate = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -103,7 +105,7 @@ const sendDates = async () => {
     }
     isLoading.value = true;
     try {
-        await postWeekly(userId.value, selects.value);
+        await postWeeklyReport(userId.value, selects.value);
         await fetchWeeklyReport();
         toastSuccess("주간 보고서를 만들었습니다.");
         const wanted = dateKey(selects.value);
@@ -130,7 +132,7 @@ const loadDayCounts = async () => {
     dayCounts.value = {};
     if (!userId.value || weekDays.value.length < 5) return;
     try {
-        const rows = await GetUserActivities(
+        const rows = await getUserActivities(
             Number(weekDays.value[0].slice(0, 4)),
             Number(weekDays.value[0].slice(5, 7)),
             weekDays.value[0],
@@ -160,7 +162,7 @@ const fetchWeeklyReport = async () => {
     }
     isLoading.value = true;
     try {
-        weeklyReport.value = await GetWeeklyReport(userId.value);
+        weeklyReport.value = await getWeeklyReport(userId.value);
     } catch (error) {
         console.error("주간 보고서 조회 실패:", error);
         weeklyReport.value = [];
@@ -177,11 +179,15 @@ const downloadReport = async (report) => {
     try {
         isLoading.value = true;
 
-        const response = await fetch("/asset/주간_보고서_템플릿.docx");
+        const response = await fetch("/asset/weekly-report-template.docx");
         if (!response.ok) {
             throw new Error("템플릿 파일을 찾을 수 없습니다.");
         }
         const arrayBuffer = await response.arrayBuffer();
+        const header = new Uint8Array(arrayBuffer, 0, 2);
+        if (header.length < 2 || header[0] !== 0x50 || header[1] !== 0x4b) {
+            throw new Error("템플릿 파일이 올바른 Word 문서가 아닙니다.");
+        }
 
         const zip = new PizZip(arrayBuffer);
         const doc = new Docxtemplater(zip, {
@@ -332,10 +338,21 @@ watch(
     },
 );
 
+const fetchTeams = async () => {
+    try {
+        teams.value = await getTeams();
+    } catch (error) {
+        console.error("Error fetching teams:", error);
+        toastError("팀을 불러오지 못했습니다.");
+    }
+};
+
+
 onMounted(async () => {
     userId.value = selectedUserId.value || "";
     await loadDayCounts();
     await fetchWeeklyReport();
+    await fetchTeams();
 });
 </script>
 
@@ -380,9 +397,32 @@ onMounted(async () => {
         </div>
 
         <div class="week-status">
-            <h2>이번 주 제출 현황</h2>
-        <userActivities :embedded="true" :start-date="weekDays[0] || ''"
-            :end-date="weekDays[weekDays.length - 1] || ''"></userActivities>
+            <div class="week-status-head">
+                <h2>이번 주 제출 현황</h2>
+                <select
+                    id="weekly-report-filter-team"
+                    class="team-filter"
+                    v-model="filterTeam"
+                    aria-label="팀"
+                    autocomplete="off"
+                >
+                    <option value="all">전체</option>
+                    <option
+                        v-for="team in teams"
+                        :key="team.id"
+                        :value="String(team.id)"
+                    >
+                        {{ team.team_name }}
+                    </option>
+                </select>
+            </div>
+
+            <userActivities
+                :embedded="true"
+                :start-date="weekDays[0] || ''"
+                :end-date="weekDays[weekDays.length - 1] || ''"
+                :filter-team="filterTeam"
+            />
         </div>
 
         <div class="card">
@@ -507,8 +547,43 @@ onMounted(async () => {
 .week-status {
     margin: 24px 0;
 }
-.week-status h2 {
+
+.week-status-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
     margin-bottom: 12px;
+}
+
+.week-status-head h2 {
+    margin: 0;
+}
+
+.team-filter {
+    height: 32px;
+    width: auto;
+    min-width: 108px;
+    max-width: 180px;
+    margin-left: auto;
+    padding: 0 28px 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg);
+    color: var(--text-h);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.team-filter:hover {
+    border-color: var(--text);
+}
+
+.team-filter:focus {
+    outline: none;
+    border-color: var(--text-h);
 }
 .report-list-item {
     border: 1px solid var(--border);

@@ -3,8 +3,8 @@ import { toRaw } from "vue";
 
 const baseURL = "http://127.0.0.1:8000";
 
-export default function useAPI() {
-  const PostReport = async (reportData, dateData, memberId) => {
+export default function useApi() {
+  const postReport = async (reportData, dateData, memberId) => {
     try {
       const response = await axios.post(`${baseURL}/send-report`, {
         report: reportData.content,
@@ -18,7 +18,7 @@ export default function useAPI() {
     }
   };
 
-  const PostReportPptx = async (file, dateData, memberId) => {
+  const postReportPptx = async (file, dateData, memberId) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("date", dateData);
@@ -56,14 +56,14 @@ export default function useAPI() {
     }
   };
 
-  const GetReportDraft = async (memberId, reportDate) => {
+  const getReportDraft = async (memberId, reportDate) => {
     const response = await axios.get(
       `${baseURL}/report-drafts/${memberId}/${reportDate}`,
     );
     return response.data;
   };
 
-  const postWeekly = async (userId, selects) => {
+  const postWeeklyReport = async (userId, selects) => {
     const response = await axios.post(`${baseURL}/weekly-report`, {
       userId,
       selects: toRaw(selects),
@@ -72,7 +72,7 @@ export default function useAPI() {
     return response;
   };
 
-  const GetWeeklyReport = async (userId) => {
+  const getWeeklyReport = async (userId) => {
     try {
       const response = await axios.get(`${baseURL}/weekly/${userId}`);
       return response.data;
@@ -82,7 +82,7 @@ export default function useAPI() {
     }
   };
 
-  const GetWeeklyReportById = async (weeklyId) => {
+  const getWeeklyReportById = async (weeklyId) => {
     try {
       const response = await axios.get(`${baseURL}/weeklyById/${weeklyId}`);
       return response.data;
@@ -104,7 +104,7 @@ export default function useAPI() {
     }
   };
 
-  const GetHolidays = async (year) => {
+  const getHolidays = async (year) => {
     try {
       const response = await axios.get(`${baseURL}/holidays`, {
         params: { year },
@@ -116,7 +116,7 @@ export default function useAPI() {
     }
   };
 
-  const GetUserActivities = async (year, month, startDate, endDate) => {
+  const getUserActivities = async (year, month, startDate, endDate) => {
     try {
       const response = await axios.get(`${baseURL}/user-activities`, {
         params: {
@@ -134,7 +134,7 @@ export default function useAPI() {
     }
   };
 
-  const PostSaveReport = async (
+  const postSaveReport = async (
     parsed_json,
     rawData,
     member_id,
@@ -157,7 +157,7 @@ export default function useAPI() {
     }
   };
 
-  const GetReports = async () => {
+  const getReports = async () => {
     try {
       const response = await axios.get(`${baseURL}/reports`);
       return response.data;
@@ -167,7 +167,7 @@ export default function useAPI() {
     }
   };
 
-  const GetReportById = async (reportId) => {
+  const getReportById = async (reportId) => {
     try {
       const response = await axios.get(`${baseURL}/reports/${reportId}`);
       return response.data;
@@ -330,17 +330,17 @@ export default function useAPI() {
   };
 
   return {
-    PostReport,
-    PostReportPptx,
-    GetReportDraft,
-    PostSaveReport,
-    GetReports,
-    GetReportById,
-    GetUserActivities,
-    GetHolidays,
-    postWeekly,
-    GetWeeklyReport,
-    GetWeeklyReportById,
+    postReport,
+    postReportPptx,
+    getReportDraft,
+    postSaveReport,
+    getReports,
+    getReportById,
+    getUserActivities,
+    getHolidays,
+    postWeeklyReport,
+    getWeeklyReport,
+    getWeeklyReportById,
     updateWeeklyReport,
     postUsers,
     getUsers,

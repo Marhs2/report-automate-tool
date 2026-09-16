@@ -70,7 +70,7 @@
 <script setup>
 import { ref, watch } from "vue";
 import { ArrowLeft } from "lucide-vue-next";
-import useAPI from "../composables/useApi";
+import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
@@ -82,7 +82,7 @@ const userName = ref("");
 const reportDate = ref("");
 const isLoading = ref(false);
 
-const { getUsers, GetReportById } = useAPI();
+const { getUsers, getReportById } = useApi();
 
 const toParsed = (parsedJson) => {
     if (!parsedJson) return null;
@@ -137,7 +137,7 @@ const loadReport = async (id) => {
     isLoading.value = true;
     reportData.value = null;
     try {
-        const data = await GetReportById(id);
+        const data = await getReportById(id);
         reportData.value = toParsed(data.parsed_json);
         rawData.value = data.raw_text;
         reportDate.value = data.report_date || "";

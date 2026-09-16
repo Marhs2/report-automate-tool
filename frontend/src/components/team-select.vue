@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import { Plus } from "lucide-vue-next";
-import useAPI from "../composables/useApi";
+import useApi from "../composables/useApi";
 import { selectedTeamId } from "../composables/useSelectedTeam.js";
 import { selectedUserId } from "../composables/useSelectedUser.js";
 
@@ -9,7 +9,7 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 
-const { getTeams, postTeams, setTeam } = useAPI();
+const { getTeams, postTeams, setTeam } = useApi();
 
 const teams = ref([]);
 const newTeam = ref("");

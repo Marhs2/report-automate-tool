@@ -1,8 +1,8 @@
 import { ref, watch } from "vue";
-import useAPI from "./useApi";
+import useApi from "./useApi";
 import { selectedUserId } from "./useSelectedUser";
 
-const { getTeamByMemberId } = useAPI();
+const { getTeamByMemberId } = useApi();
 
 /** 선택된 사용자의 members.team_id (부서 id) — DB에서 조회 */
 export const selectedTeamId = ref(null);

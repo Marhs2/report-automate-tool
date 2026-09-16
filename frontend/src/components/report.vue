@@ -1,12 +1,12 @@
 <script setup>
 import { computed, ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
-import useAPI from "../composables/useAPI";
+import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { useToast } from "../composables/useToast";
 
-const { PostReport, PostReportPptx, GetReportDraft, GetUserActivities, getUsers } =
-    useAPI();
+const { postReport, postReportPptx, getReportDraft, getUserActivities, getUsers } =
+    useApi();
 const router = useRouter();
 const { error: toastError } = useToast();
 
@@ -52,7 +52,7 @@ const loadSavedState = async () => {
     alreadySaved.value = false;
     if (memberId === null || !date.value) return;
     try {
-        const rows = await GetUserActivities(
+        const rows = await getUserActivities(
             Number(date.value.slice(0, 4)),
             Number(date.value.slice(5, 7)),
             date.value,
@@ -71,7 +71,7 @@ const loadDraft = async () => {
     const memberId = getSelectedMemberId();
     if (memberId === null || input.value.trim()) return;
     try {
-        const draft = await GetReportDraft(memberId, date.value);
+        const draft = await getReportDraft(memberId, date.value);
         input.value = draft.raw_text;
     } catch (error) {
         if (error.response?.status !== 404) {
@@ -138,13 +138,13 @@ const sendReport = async () => {
 
         if (buttonType.value === "text") {
             rawText = input.value;
-            parsed = await PostReport(
+            parsed = await postReport(
                 { content: rawText },
                 date.value,
                 memberId,
             );
         } else {
-            const res = await PostReportPptx(file.value, date.value, memberId);
+            const res = await postReportPptx(file.value, date.value, memberId);
             parsed = res.parsed;
             rawText = res.raw_text;
         }

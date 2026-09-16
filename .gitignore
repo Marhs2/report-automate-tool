@@ -27,6 +27,12 @@ htmlcov/
 .hypothesis/
 
 
+
+-- Design files ─────────────────────────────────────────
+.superdesign/
+DESIGN.md
+
+
 # ── DB Data ─────────────────────────────────────────────
 backend/data/
 backend/.vendor/
@@ -93,3 +99,6 @@ temp/
 
 # ── Benchmark (dataset, scripts, raw results) ───────────
 benchmark/
+
+# Superdesign temp HTML
+.superdesign/tmp/
