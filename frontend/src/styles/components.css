@@ -234,6 +234,72 @@ input[type="file"]::file-selector-button:hover {
     color: var(--accent-hover);
 }
 
+/* 선택 카드 그리드 — team-select / user-select 공용.
+   `.selected`는 두 화면의 템플릿이 :class로 붙이는 상태 클래스다. */
+.select-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+    max-height: min(52vh, 420px);
+    overflow-y: auto;
+    padding-right: var(--space-1);
+}
+
+.select-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    transition:
+        border-color var(--dur-fast) var(--ease),
+        background var(--dur-fast) var(--ease);
+}
+
+.select-card:hover {
+    border-color: var(--accent);
+}
+
+.select-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.select-card .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-soft);
+    color: var(--text-strong);
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    flex-shrink: 0;
+}
+
+.select-card.selected .avatar {
+    background: var(--accent);
+    color: var(--surface);
+}
+
+.select-card-name {
+    font-size: 15px;
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .empty-state {
     padding: var(--space-8) var(--space-6);
     text-align: center;

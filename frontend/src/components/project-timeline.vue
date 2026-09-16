@@ -499,8 +499,8 @@ onMounted(() => {
 }
 
 .filter-hint {
-  margin: -8px 0 20px;
-  font-size: 12px;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-5);
+  font-size: var(--fs-12);
   color: var(--text);
   word-break: keep-all;
 }
@@ -508,77 +508,75 @@ onMounted(() => {
 .timeline-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .summary-badge {
   display: inline-flex;
   align-items: center;
-  padding: 5px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: 999px;
-  background: var(--accent-bg);
+  padding: 5px var(--space-3);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-medium);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
 .summary-badge.danger {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-fg);
 }
 
 .summary-badge.muted {
-  background: var(--bg-soft);
+  background: var(--surface-soft);
   color: var(--text);
 }
 
 .open-issues {
-  margin-bottom: 24px;
-  padding: 16px 18px;
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
 }
 
 .open-issues h2 {
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 600;
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
   color: var(--text);
 }
 
 .issue-group + .issue-group {
-  margin-top: 16px;
-  padding-top: 12px;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
 
 .issue-group h3 {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 650;
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
   color: var(--text);
 }
 
 .issue-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--space-2);
   width: 100%;
   margin: 0;
-  padding: 8px 0;
+  padding: var(--space-2) 0;
   border: 0;
   border-top: 1px solid var(--border);
   background: transparent;
   text-align: left;
   cursor: pointer;
+  transition: background var(--dur) var(--ease);
 }
-
 
 .issue-row:hover {
-  background: var(--bg-soft);
+  background: var(--surface-soft);
   border-radius: var(--radius-sm);
-  transition: background 0.2s ease-in-out;
 }
-
 
 .issue-group .issue-row:first-of-type {
   border-top: 0;
@@ -586,27 +584,27 @@ onMounted(() => {
 }
 
 .issue-row:hover .issue-text {
-  color: var(--text-h);
+  color: var(--text-strong);
 }
 
 .issue-chip {
   flex: 0 0 auto;
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
   background: var(--danger-bg);
-  color: var(--danger);
-  font-size: 11px;
-  font-weight: 650;
+  color: var(--danger-fg);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-semibold);
   line-height: 1.4;
 }
 
 .issue-chip.muted {
-  background: var(--bg-soft);
+  background: var(--surface-soft);
   color: var(--text);
 }
 
 .issue-chip.done {
-  background: var(--accent-bg);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
@@ -618,53 +616,53 @@ onMounted(() => {
 }
 
 .issue-text {
-  font-size: 14px;
-  color: var(--text-h);
+  font-size: var(--fs-14);
+  color: var(--text-strong);
   word-break: keep-all;
 }
 
 .issue-meta {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text);
 }
 
 .flow {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .day {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px 18px;
+  padding: var(--space-4);
   background: var(--bg);
 }
 
 .day-head {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .day-date {
   font-size: 15px;
-  font-weight: 600;
-  color: var(--text-h);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
 }
 
 .day-week {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text);
 }
 
 .date-count {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text);
-  background: var(--bg-soft);
-  padding: 2px 8px;
-  border-radius: 999px;
+  background: var(--surface-soft);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
 }
 
 .day-entry {
@@ -673,13 +671,13 @@ onMounted(() => {
 }
 
 .day-entry + .day-entry {
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
 
 .day-entry:hover .v {
-  color: var(--text-h);
+  color: var(--text-strong);
 }
 
 .day-entry:focus-visible {
@@ -690,40 +688,40 @@ onMounted(() => {
 .entry-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .avatar {
   width: 28px;
   height: 28px;
-  border-radius: 10px;
-  background: var(--bg-soft);
-  color: var(--text-h);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--text-strong);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 12px;
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-12);
   flex-shrink: 0;
 }
 
 .entry-name {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 .row {
   display: grid;
   grid-template-columns: 44px 1fr;
-  gap: 10px;
+  gap: var(--space-2);
   align-items: start;
-  padding: 4px 0;
+  padding: var(--space-1) 0;
 }
 
 .k {
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
   color: var(--text);
   padding-top: 2px;
 }
@@ -733,24 +731,24 @@ onMounted(() => {
 }
 
 .k.issue {
-  color: var(--danger);
+  color: var(--danger-fg);
 }
 
 .v {
   margin: 0;
-  font-size: 14px;
-  color: var(--text-h);
-  line-height: 1.5;
+  font-size: var(--fs-14);
+  color: var(--text-strong);
+  line-height: var(--lh-base);
   word-break: keep-all;
 }
 
 .gap {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 8px 0;
+  gap: var(--space-3);
+  margin: var(--space-2) 0;
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 
 .gap::before,

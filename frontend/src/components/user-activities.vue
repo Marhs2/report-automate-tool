@@ -473,25 +473,25 @@ const periodLabel = computed(() =>
 
 <style scoped>
 .activity-section {
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
 }
 
 .activity-section .cal-day {
     min-height: 96px;
-    padding: 6px;
+    padding: var(--space-2);
 }
 
 .activity-section .cal-chip {
-    font-size: 11px;
-    padding: 2px 6px;
+    font-size: var(--fs-11);
+    padding: 2px var(--space-2);
 }
 
 .activity-section .member-summary {
-    margin-bottom: 10px;
+    margin-bottom: var(--space-2);
 }
 
 .activity-section .view-controls {
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
 }
 
 .calendar-page {
@@ -502,15 +502,15 @@ const periodLabel = computed(() =>
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 16px;
+    gap: var(--space-4);
     flex-wrap: wrap;
-    margin-bottom: 12px;
+    margin-bottom: var(--space-3);
 }
 
 .month-tools {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     flex-wrap: wrap;
     min-width: 0;
 }
@@ -518,13 +518,13 @@ const periodLabel = computed(() =>
 .month-nav {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     flex-shrink: 0;
 }
 
 .current-period {
-    font-weight: 600;
-    color: var(--text-h);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
     white-space: nowrap;
 }
 
@@ -532,14 +532,14 @@ const periodLabel = computed(() =>
     height: 32px;
     width: auto;
     min-width: 108px;
-    padding: 0 28px 0 12px;
+    padding: 0 var(--space-6) 0 var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     background: var(--bg);
-    color: var(--text-h);
+    color: var(--text-strong);
     font: inherit;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
     cursor: pointer;
 }
 
@@ -549,23 +549,25 @@ const periodLabel = computed(() =>
 
 .month-team-select:focus {
     outline: none;
-    border-color: var(--text-h);
+    border-color: var(--text-strong);
 }
 
 .legend {
     display: flex;
-    gap: 14px;
-    font-size: 12px;
+    gap: var(--space-3);
+    font-size: var(--fs-12);
     color: var(--text);
 }
 
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-2);
 }
 
+/* 범례 스와치는 달력 셀/칩과 같은 상태 토큰을 쓴다. 테두리는 box-shadow 대신 border. */
 .swatch {
+    box-sizing: border-box;
     width: 10px;
     height: 10px;
     border-radius: 3px;
@@ -573,68 +575,68 @@ const periodLabel = computed(() =>
 }
 
 .swatch.submitted {
-    background: var(--success);
+    background: var(--success-fg);
 }
 
 .swatch.missed {
-    background: color-mix(in srgb, var(--text) 18%, transparent);
+    background: var(--border-strong);
 }
 
 .swatch.weekend {
-    background: color-mix(in srgb, var(--text) 8%, transparent);
-    box-shadow: inset 0 0 0 1px var(--border);
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
 }
 
 .swatch.holiday {
     background: var(--danger-bg);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, var(--border));
+    border: 1px solid var(--danger-border);
 }
 
 .swatch.today {
-    box-shadow: 0 0 0 2px var(--accent);
-    background: color-mix(in srgb, var(--text) 18%, transparent);
+    background: var(--surface);
+    outline: 2px solid var(--accent);
 }
 
 .member-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
 }
 
 .summary-item {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 10px 12px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
 }
 
 .summary-top {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .summary-name {
-    font-weight: 650;
-    color: var(--text-h);
-    font-size: 13px;
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    font-size: var(--fs-13);
 }
 
 .summary-count {
     color: var(--text);
-    font-size: 11px;
-    font-weight: 500;
+    font-size: var(--fs-11);
+    font-weight: var(--fw-medium);
     white-space: nowrap;
 }
 
 .progress-track {
     height: 4px;
-    border-radius: 99px;
+    border-radius: var(--radius-pill);
     background: var(--border);
     overflow: hidden;
 }
@@ -643,26 +645,26 @@ const periodLabel = computed(() =>
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: var(--success);
+    background: var(--success-fg);
 }
 
 .calendar-card {
-    padding: 16px;
+    padding: var(--space-4);
 }
 
 .cal-weekdays {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 6px;
-    margin-bottom: 6px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
 }
 
 .cal-weekdays span {
     text-align: center;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
     color: var(--text);
-    padding: 6px 0;
+    padding: var(--space-2) 0;
 }
 
 .cal-weekdays .weekend {
@@ -672,33 +674,34 @@ const periodLabel = computed(() =>
 .cal-weeks {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-2);
 }
 
 .cal-week {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 6px;
+    gap: var(--space-2);
 }
 
 .cal-day {
     min-height: 128px;
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px;
-    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2);
+    background: var(--surface);
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-2);
 }
 
+/* 주말은 중립 톤(--surface-soft), 공휴일은 위험 톤(--danger-bg)으로 구분한다. */
 .cal-day.weekend,
 .cal-day.holiday {
-    background: color-mix(in srgb, var(--text) 5%, var(--bg));
+    background: var(--surface-soft);
 }
 
 .cal-day.holiday {
-    background: color-mix(in srgb, var(--danger) 6%, var(--bg-elevated));
+    background: var(--danger-bg);
 }
 
 .cal-day.outside {
@@ -706,23 +709,24 @@ const periodLabel = computed(() =>
     background: transparent;
 }
 
+/* 오늘 강조: 기존 1px 테두리 + 1px box-shadow 링을 border + outline으로 대체(레이아웃 변화 없음). */
 .cal-day.today {
     border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
+    outline: 1px solid var(--accent);
 }
 
 .cal-day-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 4px;
+    gap: var(--space-1);
     min-width: 0;
 }
 
 .cal-day-num {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-h);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
     line-height: 1;
 }
 
@@ -733,12 +737,12 @@ const periodLabel = computed(() =>
 
 .cal-day.holiday .cal-day-num,
 .cal-holiday {
-    color: var(--danger);
+    color: var(--danger-fg);
 }
 
 .cal-holiday {
     font-size: 10px;
-    font-weight: 650;
+    font-weight: var(--fw-semibold);
     line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -754,7 +758,7 @@ const periodLabel = computed(() =>
 .cal-entries {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .cal-chip {
@@ -762,13 +766,13 @@ const periodLabel = computed(() =>
     width: 100%;
     text-align: left;
     border: none;
-    border-radius: 6px;
-    padding: 3px 6px;
+    border-radius: var(--radius-sm);
+    padding: 3px var(--space-2);
     font: inherit;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: var(--fs-11);
+    font-weight: var(--fw-semibold);
     background: transparent;
-    color: color-mix(in srgb, var(--text) 55%, transparent);
+    color: var(--text-muted);
     cursor: default;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -776,17 +780,17 @@ const periodLabel = computed(() =>
 }
 
 .cal-chip.submitted {
-    background: color-mix(in srgb, var(--success) 22%, transparent);
-    color: var(--success);
+    background: var(--success-bg);
+    color: var(--success-fg);
     cursor: pointer;
 }
 
 .cal-chip.submitted:hover {
-    background: color-mix(in srgb, var(--success) 34%, transparent);
+    background: var(--success-border);
 }
 
 .cal-chip.missed {
-    background: color-mix(in srgb, var(--text) 10%, transparent);
+    background: var(--surface-soft);
     color: var(--text);
 }
 
@@ -798,13 +802,12 @@ const periodLabel = computed(() =>
     position: fixed;
     background: var(--bg);
     border: 1px solid var(--border);
-    color: var(--text-h);
-    padding: 6px 10px;
+    color: var(--text-strong);
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-sm);
-    font-size: 12px;
+    font-size: var(--fs-12);
     white-space: nowrap;
     z-index: 100;
-    box-shadow: var(--shadow);
     pointer-events: none;
     transform: translate(-50%, -50%);
 }
@@ -812,8 +815,8 @@ const periodLabel = computed(() =>
 .tooltip-fade-enter-active,
 .tooltip-fade-leave-active {
     transition:
-        opacity 0.15s ease,
-        transform 0.15s ease;
+        opacity var(--dur-fast) var(--ease),
+        transform var(--dur-fast) var(--ease);
 }
 
 .tooltip-fade-enter-from,
@@ -825,12 +828,12 @@ const periodLabel = computed(() =>
 @media (max-width: 860px) {
     .cal-day {
         min-height: 96px;
-        padding: 6px;
+        padding: var(--space-2);
     }
 
     .cal-chip {
         font-size: 10px;
-        padding: 2px 4px;
+        padding: 2px var(--space-1);
     }
 }
 </style>

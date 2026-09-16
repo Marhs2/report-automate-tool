@@ -113,19 +113,19 @@ onMounted(async () => {
         <div v-else-if="filteredTeams.length === 0" class="empty-state">
             '{{ query.trim() }}'에 해당하는 팀이 없습니다
         </div>
-        <div v-else class="team-grid">
+        <div v-else class="select-grid">
             <button
                 v-for="team in filteredTeams"
                 :key="team.id"
                 type="button"
-                class="team-card"
+                class="select-card"
                 :class="{ selected: isSelected(team.id) }"
                 @click="assignTeam(team.id)"
             >
                 <span class="avatar">{{
                     String(teamLabel(team) || "?").slice(0, 1)
                 }}</span>
-                <span class="team-name">{{ teamLabel(team) }}</span>
+                <span class="select-card-name">{{ teamLabel(team) }}</span>
             </button>
         </div>
 
@@ -158,11 +158,12 @@ onMounted(async () => {
     max-width: 720px;
 }
 
+/* 카드 그리드(.select-grid/.select-card)는 components.css 전역 규칙을 쓴다. */
 .team-toolbar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
 }
 
 .team-toolbar .input {
@@ -172,79 +173,18 @@ onMounted(async () => {
 
 .team-count {
     flex-shrink: 0;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
     color: var(--text);
 }
 
-.team-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 12px;
-    margin-bottom: 28px;
-    max-height: min(52vh, 420px);
-    overflow-y: auto;
-    padding-right: 4px;
-}
-
-.team-card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--bg);
-    cursor: pointer;
-    text-align: left;
-    font: inherit;
-    color: inherit;
-}
-
-.team-card:hover {
-    border-color: var(--accent);
-}
-
-.team-card.selected {
-    border-color: var(--accent);
-    background: var(--accent-bg);
-}
-
-.avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--bg-soft);
-    color: var(--text-h);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 600;
-    flex-shrink: 0;
-}
-
-.team-card.selected .avatar {
-    background: var(--accent);
-    color: #fff;
-}
-
-.team-name {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--text-h);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .add-card h2 {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-3);
 }
 
 .add-row {
     display: flex;
-    gap: 10px;
+    gap: var(--space-2);
     align-items: center;
 }
 

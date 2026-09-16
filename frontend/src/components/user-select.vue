@@ -92,19 +92,19 @@ onMounted(async () => {
         <div v-else-if="filteredUsers.length === 0" class="empty-state">
             '{{ query.trim() }}'에 해당하는 사용자가 없습니다
         </div>
-        <div v-else class="user-grid">
+        <div v-else class="select-grid">
             <button
                 v-for="user in filteredUsers"
                 :key="user.id"
                 type="button"
-                class="user-card"
+                class="select-card"
                 :class="{ selected: isSelected(user.id) }"
                 @click="setUser(user.id)"
             >
                 <span class="avatar">{{
                     String(user.name || "?").slice(0, 1)
                 }}</span>
-                <span class="user-name">{{ user.name }}</span>
+                <span class="select-card-name">{{ user.name }}</span>
             </button>
         </div>
 
@@ -137,11 +137,12 @@ onMounted(async () => {
     max-width: 720px;
 }
 
+/* 카드 그리드(.select-grid/.select-card)는 components.css 전역 규칙을 쓴다. */
 .user-toolbar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
 }
 
 .user-toolbar .input {
@@ -151,79 +152,18 @@ onMounted(async () => {
 
 .user-count {
     flex-shrink: 0;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
     color: var(--text);
 }
 
-.user-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 12px;
-    margin-bottom: 28px;
-    max-height: min(52vh, 420px);
-    overflow-y: auto;
-    padding-right: 4px;
-}
-
-.user-card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--bg);
-    cursor: pointer;
-    text-align: left;
-    font: inherit;
-    color: inherit;
-}
-
-.user-card:hover {
-    border-color: var(--accent);
-}
-
-.user-card.selected {
-    border-color: var(--accent);
-    background: var(--accent-bg);
-}
-
-.avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--bg-soft);
-    color: var(--text-h);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 650;
-    flex-shrink: 0;
-}
-
-.user-card.selected .avatar {
-    background: var(--accent);
-    color: #fff;
-}
-
-.user-name {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--text-h);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .add-card h2 {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-3);
 }
 
 .add-row {
     display: flex;
-    gap: 10px;
+    gap: var(--space-2);
     align-items: center;
 }
 

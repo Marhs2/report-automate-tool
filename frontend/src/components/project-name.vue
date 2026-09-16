@@ -489,7 +489,7 @@ onMounted(() => {
                                 <span
                                     v-for="keyword in item.suggestedKeywords"
                                     :key="keyword"
-                                    class="chip"
+                                    class="chip is-accent"
                                 >
                                     {{ keyword }}
                                 </span>
@@ -554,34 +554,20 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.names-page {
-    max-width: 1120px;
-}
-
-.count-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 5px 10px;
-    border-radius: 999px;
-    background: var(--bg-soft);
-    border: 1px solid var(--border);
-    color: var(--text-h);
-    font-size: 12px;
-    font-weight: 650;
-}
-
+/* .count-chip, .chip 기본 모양은 components.css 전역 규칙을 쓴다.
+   전역 .chip은 중립색이므로 액센트가 필요한 키워드 칩은 템플릿에서 `chip is-accent`를 붙인다. */
 .section-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
 }
 
 .section-title {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     min-width: 0;
 }
 
@@ -590,19 +576,19 @@ onMounted(() => {
 }
 
 .list-section {
-    margin-bottom: 24px;
+    margin-bottom: var(--space-6);
 }
 
 .list-section h2 {
-    color: var(--text-h);
+    color: var(--text-strong);
 }
 
 .add-form {
     display: flex;
     align-items: flex-end;
-    gap: 12px;
+    gap: var(--space-3);
     flex-wrap: wrap;
-    margin-bottom: 14px;
+    margin-bottom: var(--space-3);
 }
 
 .add-form .field {
@@ -619,15 +605,15 @@ onMounted(() => {
     flex-direction: column;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--bg-elevated);
+    background: var(--surface);
     overflow: hidden;
 }
 
 .project-row {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 12px 16px;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--border);
 }
 
@@ -636,22 +622,22 @@ onMounted(() => {
 }
 
 .project-row.editing {
-    background: color-mix(in srgb, var(--accent) 7%, var(--bg-elevated));
+    background: var(--accent-soft);
 }
 
 .project-row-head {
     display: grid;
     grid-template-columns: minmax(140px, 220px) 1fr auto;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
     cursor: pointer;
 }
 
 .project-name {
     margin: 0;
     font-size: 15px;
-    font-weight: 700;
-    color: var(--text-h);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
     line-height: 1.3;
     word-break: keep-all;
 }
@@ -659,53 +645,38 @@ onMounted(() => {
 .project-row-edit {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2);
     padding-left: 0;
 }
 
 .keyword-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-2);
     min-width: 0;
 }
 
+/* 키워드는 길 수 있으므로 전역 .chip의 nowrap 대신 줄바꿈을 허용한다. */
 .chip {
-    display: inline-flex;
-    align-items: center;
     max-width: 100%;
-    padding: 3px 8px;
-    border-radius: 999px;
-    background: var(--accent-bg);
-    color: var(--accent);
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1.3;
+    white-space: normal;
     word-break: break-word;
 }
 
 .chip-new {
-    background: color-mix(in srgb, var(--warning) 16%, transparent);
-    color: var(--warning);
+    background: var(--warning-bg);
+    color: var(--warning-fg);
 }
 
-.chip-muted,
-.chip-more {
-    background: var(--bg-soft);
-    color: var(--text-h);
-}
-
-.chip-more {
-    color: var(--text);
-    font-weight: 650;
+.chip-muted {
+    color: var(--text-strong);
 }
 
 .chip-edit {
     border: 1px solid var(--border);
-    padding: 3px 8px;
-    padding-right: 4px;
-    gap: 4px;
-    color: var(--text-h);
+    padding-right: var(--space-1);
+    background: var(--accent-soft);
+    color: var(--text-strong);
 }
 
 .chip-remove {
@@ -716,7 +687,7 @@ onMounted(() => {
     height: 16px;
     padding: 0;
     border: none;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: transparent;
     color: var(--text);
     cursor: pointer;
@@ -724,11 +695,11 @@ onMounted(() => {
 
 .chip-remove:hover {
     background: var(--danger-bg);
-    color: var(--danger);
+    color: var(--danger-fg);
 }
 
 .chip-empty {
-    font-size: 12px;
+    font-size: var(--fs-12);
     color: var(--text);
 }
 
@@ -744,11 +715,11 @@ onMounted(() => {
 
 .edit-actions {
     display: flex;
-    gap: 6px;
+    gap: var(--space-2);
 }
 
 .btn-icon {
-    padding: 6px;
+    padding: var(--space-2);
     border: none;
     background: none;
     color: var(--text);
@@ -759,14 +730,14 @@ onMounted(() => {
 
 .btn-icon:hover {
     opacity: 1;
-    background: var(--accent-bg);
+    background: var(--accent-soft);
     color: var(--accent);
     border-color: transparent;
 }
 
 .btn-icon.danger:hover {
     background: var(--danger-bg);
-    color: var(--danger);
+    color: var(--danger-fg);
 }
 
 .recommend-card {
@@ -778,13 +749,13 @@ onMounted(() => {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    padding: 14px 16px;
+    padding: var(--space-3) var(--space-4);
     border: none;
     background: none;
-    color: var(--text-h);
+    color: var(--text-strong);
     font: inherit;
     font-size: 15px;
-    font-weight: 650;
+    font-weight: var(--fw-semibold);
     cursor: pointer;
     text-align: left;
 }
@@ -792,12 +763,12 @@ onMounted(() => {
 .recommend-toggle-copy {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .recommend-chevron {
     color: var(--text);
-    transition: transform 0.15s ease;
+    transition: transform var(--dur-fast) var(--ease);
 }
 
 .recommend-chevron.open {
@@ -805,13 +776,13 @@ onMounted(() => {
 }
 
 .recommend-body {
-    padding: 0 16px 16px;
+    padding: 0 var(--space-4) var(--space-4);
 }
 
 .recommend-grid {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
 }
 
 .recommend-side {
@@ -819,77 +790,77 @@ onMounted(() => {
     flex-direction: row;
     align-items: center;
     justify-content: flex-end;
-    gap: 12px;
+    gap: var(--space-3);
 }
 
 .error-text {
     margin: 0;
-    color: var(--danger);
-    font-size: 13px;
+    color: var(--danger-fg);
+    font-size: var(--fs-13);
 }
 
 .empty-suggest,
 .suggest-block {
-    margin-top: 18px;
-    padding-top: 16px;
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
     border-top: 1px solid var(--border);
 }
 
 .empty-suggest {
-    font-size: 13px;
+    font-size: var(--fs-13);
     color: var(--text);
 }
 
 .suggest-title {
-    margin: 0 0 10px;
-    font-size: 13px;
-    font-weight: 650;
-    color: var(--text-h);
+    margin: 0 0 var(--space-2);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
 }
 
 .suggest-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 12px;
+    gap: var(--space-3);
     align-items: start;
 }
 
 .suggest-card {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 14px;
+    gap: var(--space-2);
+    padding: var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--bg-elevated);
+    border-radius: var(--radius);
+    background: var(--surface);
     min-width: 0;
 }
 
 .suggest-card.is-new {
-    border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+    border-color: var(--warning-border);
 }
 
 .suggest-card-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .suggest-card-head h4 {
     margin: 0;
     font-size: 15px;
-    font-weight: 700;
-    color: var(--text-h);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
     line-height: 1.3;
     word-break: keep-all;
 }
 
 .suggest-reason {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--fs-12);
     color: var(--text);
-    line-height: 1.5;
+    line-height: var(--lh-base);
 }
 
 @media (max-width: 860px) {
