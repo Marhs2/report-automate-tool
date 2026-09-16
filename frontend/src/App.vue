@@ -9,6 +9,8 @@ import {
     Settings2,
     UsersRound,
     ChevronDown,
+    PanelLeftClose,
+    PanelLeftOpen,
 } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -17,11 +19,14 @@ import { selectedUserId } from "./composables/useSelectedUser";
 import { selectedTeamId } from "./composables/useSelectedTeam";
 import { useToast } from "./composables/useToast";
 import { useDialog } from "./composables/useDialog";
+import { useSidebar } from "./composables/useSidebar";
 
 const router = useRouter();
 const route = useRoute();
 const { getUsers, getTeams, getReports } = useApi();
 const { toasts } = useToast();
+// drawerOpen / openDrawer / closeDrawer는 Task 5(좁은 화면 드로어)에서 사용한다.
+const { collapsed, toggleCollapsed, drawerOpen, openDrawer, closeDrawer } = useSidebar();
 const {
     open: dialogOpen,
     locked: dialogLocked,
@@ -275,19 +280,36 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <aside class="sidebar">
-
+    <aside class="sidebar" :class="{ 'is-collapsed': collapsed }">
+        <div class="sidebar-brand">
+            <span v-if="!collapsed" class="sidebar-brand-name">일일보고</span>
+            <button
+                type="button"
+                class="sidebar-collapse-btn"
+                :aria-label="collapsed ? '사이드바 펼치기' : '사이드바 접기'"
+                :title="collapsed ? '사이드바 펼치기' : '사이드바 접기'"
+                @click="toggleCollapsed"
+            >
+                <PanelLeftOpen v-if="collapsed" :size="16" />
+                <PanelLeftClose v-else :size="16" />
+            </button>
+        </div>
 
         <nav class="nav-links">
             <div v-for="group in navGroups" :key="group.label" class="nav-group">
                 <p class="nav-group-label">{{ group.label }}</p>
-                <router-link v-for="item in group.items" :key="item.to" :to="item.to" class="nav-link"
-                    :class="{ 'router-link-exact-active': isNavActive(item.to) }">
+                <router-link
+                    v-for="item in group.items"
+                    :key="item.to"
+                    :to="item.to"
+                    class="nav-link"
+                    :class="{ 'router-link-exact-active': isNavActive(item.to) }"
+                    :title="collapsed ? item.label : null"
+                >
                     <component :is="item.icon" :size="16" />
-                    {{ item.label }}
+                    <span v-if="!collapsed" class="nav-link-label">{{ item.label }}</span>
                 </router-link>
             </div>
-
         </nav>
 
         <section class="tomorrow-card" aria-label="내일 할 일">
@@ -349,9 +371,14 @@ onUnmounted(() => {
                     <span class="sidebar-user-team">{{ currentTeam || "팀 미선택" }}</span>
                 </span>
             </div>
-            <button type="button" class="sidebar-logout" @click="logout">
+            <button
+                type="button"
+                class="sidebar-logout"
+                :title="collapsed ? '사용자 변경' : null"
+                @click="logout"
+            >
                 <ArrowLeftRight :size="14" />
-                사용자 변경
+                <span>사용자 변경</span>
             </button>
         </div>
     </aside>
