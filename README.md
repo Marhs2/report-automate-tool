@@ -2,7 +2,7 @@
 
 ## 요구 사양
 
-모델 **Qwen3.8 27B** Unsloth `UD-Q4_K_XL`, context 32768, 추론 끄기 기준:
+모델 **Qwen3.8 27B** Unsloth `Q4_K_M`, context 32768, 추론 끄기 기준:
 
 | 항목 | 최소 | 권장 |
 | --- | --- | --- |
@@ -12,7 +12,7 @@
 | OS | Windows 10/11 , Ubuntu|  |
 | 저장공간 | 25GB 여유 | 40GB 여유 |
 
-(Q4_K_M 참고: 파일 ≈ 16.67GB, 가중치 VRAM ≈ 17.4GB, 여유 포함 권장 24+GB — [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-8-27b). 운영 퀀트는 `UD-Q4_K_XL`.)
+(Q4_K_M 참고: 파일 ≈ 16.67GB, 가중치 VRAM ≈ 17.4GB, 여유 포함 권장 24+GB — [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-8-27b). 운영 퀀트는 `Q4_K_M`.)
 
 ---
 
@@ -27,7 +27,7 @@ docs/      모델·도구 선정 근거, 채점 방법
 - **백엔드**: FastAPI (`backend/main.py`), SQLite (`backend/data/daily_reports.db`)
 - **프론트엔드**: Vue 3 + Vite, docx 다운로드는 docxtemplater
 - **LLM 런타임**: [Unsloth Desktop](https://unsloth.ai/) (OpenAI 호환 API, `http://127.0.0.1:8888/v1`)
-- **채택 모델**: Qwen3.8 27B (`unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL`, 추론 끄기, context 32768) — [선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)
+- **채택 모델**: Qwen3.8 27B (`unsloth/Qwen3.8-27B-GGUF:Q4_K_M`, 추론 끄기, context 32768) — [선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)
 
 ---
 
@@ -36,9 +36,9 @@ docs/      모델·도구 선정 근거, 채점 방법
 ### 1) Unsloth (LLM 로컬 서버) 준비
 
 1. [Unsloth Desktop](https://unsloth.ai/) 설치 후 모델을 다운로드. 
-   - **권장: Qwen3.8 27B** (`unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL`, 추론 끄기).
+   - **권장: Qwen3.8 27B** (`unsloth/Qwen3.8-27B-GGUF:Q4_K_M`, 추론 끄기).
    - 선정 근거: [자체 32건](docs/정확도-평가.md), 하드웨어: [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-8-27b), 모델 가이드: [Unsloth Qwen3.8](https://unsloth.ai/docs/models/qwen3.8)
-   - **로드 시 추론 끄기**: `unsloth run --model unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL --reasoning off -c 32768 -p 8888`
+   - **로드 시 추론 끄기**: `unsloth run --model unsloth/Qwen3.8-27B-GGUF:Q4_K_M --reasoning off -c 32768 -p 8888`
    - **추론 차단**: 백엔드는 요청마다 `reasoning_effort: "none"`을 명시적으로 전송.
      Qwen3.8 27B는 이 필드를 생략하면 기본적으로 추론을 켜므로, 필드 생략 대신 `none`이 반드시 필요.
 
@@ -56,7 +56,7 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 | 변수                | 기본값                     | 설명                                                                                                                                                                                                                                                                                 |
 | ------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `REPORT_MODEL_NAME` | `unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL` | Unsloth에 로드한 모델명. **Qwen3.8 27B `UD-Q4_K_XL`(기본)** — context 32768 ([선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)) |
+| `REPORT_MODEL_NAME` | `unsloth/Qwen3.8-27B-GGUF:Q4_K_M` | Unsloth에 로드한 모델명. **Qwen3.8 27B `Q4_K_M`(기본)** — context 32768 ([선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)) |
 | `LM_BASE_URL`       | `http://127.0.0.1` |  |
 | `LM_API_KEY`        | `sk-unsloth-…`            |  |
 | `DAILY_MAX_TOKENS`  | `32768`| 일일 구조화 출력 상한|
@@ -93,7 +93,7 @@ bun run dev        # http://localhost:5173
 
 ## 벤치마크 · 정확도
 
-자체 32건 (`UD-Q4_K_XL`, context 32768, 추론 끄기):
+자체 32건 (`Q4_K_M`, context 32768, 추론 끄기):
 
 | 모델 | micro F1 | 평균 지연 |
 | --- | ---: | ---: |

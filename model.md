@@ -6,7 +6,7 @@
 
 ## 결론
 
-현재 기본 모델은 **Qwen3.8 27B** (`unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL`)이다.
+현재 기본 모델은 **Qwen3.8 27B** (`unsloth/Qwen3.8-27B-GGUF:Q4_K_M`)이다.
 
 운영 전제: **추론 끄기** (`reasoning_effort: none`) + JSON 스키마 강제 + context **32768**.
 기본 thinking은 짧은 추출에서 불필요하게 길어진다.
@@ -20,7 +20,7 @@ Qwen3.8은 평균 **0.85s**(Gemma 5.66s, Muse 8.63s)이고 빈 보고 2건을 �
 - 측정일: 2026-09-14
 - 데이터: `test-data/daily-reports.md` 32건
 - 런타임: Unsloth  `http://127.0.0.1`
-- 퀀트: `UD-Q4_K_XL`, context 32768, temperature 0.1, max_tokens 6144
+- 퀀트: `Q4_K_M`, context 32768, temperature 0.1, max_tokens 6144
 - 비교: Qwen3.8-27B, Gemma 4 31B-it, Muse Glimmer-30B
 - 추론: `none`
 
@@ -68,7 +68,7 @@ Qwen3.8은 평균 **0.85s**(Gemma 5.66s, Muse 8.63s)이고 빈 보고 2건을 �
 1. thinking **off**
 2. `response_format` / JSON 스키마로 출력 고정
 3. 없는 필드는 `[]`. 발명 금지
-4. 로드: `unsloth run --model unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL --reasoning off -c 32768 -p 8888`
+4. 로드: `unsloth run --model unsloth/Qwen3.8-27B-GGUF:Q4_K_M --reasoning off -c 32768 -p 8888`
 
 ---
 

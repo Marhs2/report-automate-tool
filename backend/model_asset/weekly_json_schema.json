@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "WeeklyReportResult",
-  "description": "주간보고 병합 결과. 여러 일일보고 JSON을 프로젝트별로 병합하고, 상태 승격 및 중복 제거를 적용한 결과물. 원문에 없는 업무를 생성하지 않는다. 입력이 비어있으면 projects는 빈 배열이다.",
+  "description": "주간보고 병합 결과. 여러 일일보고 JSON을 프로젝트별로 병합하고, 상태 승격 및 중복 제거를 적용한 결과물. 입력에 없는 업무를 생성하지 않는다. 내용이 다른 항목은 합치지 않는다. 입력이 비어있으면 projects는 빈 배열이다.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -21,30 +21,30 @@
           },
           "completedTasks": {
             "type": "array",
-            "description": "주간 기간 중 완료된 업무. 일일보고의 completedTasks를 모아 같은 사건은 1개만 남긴다. 재실행·전체 통과·어제 실패분 통과처럼 한 테스트의 반복 문장은 합친다. 대상·산출물이 다른 완료(프로필 리사이즈와 썸네일 생성)는 둘 다 남긴다. 주간 중 inProgressTasks/nextPlans에서 completedTasks로 승격된 업무도 여기에 넣고 다른 필드에서는 제거한다.",
+            "description": "주간 기간 중 완료된 업무. 일일보고의 completedTasks를 모아 같은 사건은 1개만 남긴다. 재실행·전체 통과·어제 실패분 통과처럼 한 테스트의 반복 문장은 합친다. 대상·산출물이 다른 완료(프로필 리사이즈와 썸네일 생성)와 번호 목록 항목은 둘 다 남긴다. 이미 정한 발표 형식은 완료가 아니다. 주간 중 inProgressTasks/nextPlans에서 completedTasks로 승격된 업무도 여기에 넣고 다른 필드에서는 제거한다.",
             "uniqueItems": true,
             "maxItems": 30,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           },
           "inProgressTasks": {
             "type": "array",
-            "description": "주간 마지막 시점에도 진행 중인 업무. 일일보고의 inProgressTasks를 모아 중복을 제거한다. 이미 같은 대상이 completedTasks로 승격된 업무만 여기서 뺀다. 대상이 다른 진행은 다른 화면 완료가 있어도 남긴다.",
+            "description": "주간 마지막 시점에도 진행 중인 업무. 일일보고의 inProgressTasks를 모아 중복을 제거한다. 이미 정한 발표 형식(시간 배분, 소감 분리, 슬라이드 vs 영상)은 여기 유지하고 nextWeekPlans로 옮기지 않는다. 이미 같은 대상이 completedTasks로 승격된 업무만 여기서 뺀다. 대상이 다른 진행은 다른 화면 완료가 있어도 남긴다.",
             "uniqueItems": true,
-            "maxItems": 20,
+            "maxItems": 30,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           },
           "issues": {
             "type": "array",
-            "description": "주간 마지막 시점에 남아 있는 문제·미결 사항. 동일 이슈가 여러 일에 반복되면 최신 1개만 유지한다. 주간에 해결된 문제는 completedTasks에만 넣고 여기에는 넣지 않는다. '개선'만 있고 재확인 계획이 있으면 여기 남긴다. 같은 문제를 completedTasks와 issues에 동시에 넣지 않는다. 해결/미해결 status 필드는 쓰지 않는다.",
+            "description": "주간 마지막 시점에 남아 있는 문제·미결 사항. 동일 이슈가 여러 일에 반복되면 최신 1개만 유지한다. 주간에 해결된 문제는 completedTasks에만 넣고 여기에는 넣지 않는다. '개선'만 있고 재확인 계획이 있으면 여기 남긴다. 사람별 원인(연가 vs 출장)을 섞지 않는다. 단순 출장 일정은 넣지 않는다. 같은 문제를 completedTasks와 issues에 동시에 넣지 않는다. 해결/미해결 status 필드는 쓰지 않는다.",
             "uniqueItems": true,
-            "maxItems": 20,
+            "maxItems": 30,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           },
           "nextWeekPlans": {
             "type": "array",
-            "description": "다음 주 예정 업무. 일일보고의 requests와 nextPlans를 모두 여기로 병합한다. 주간 중 이미 inProgressTasks나 completedTasks로 승격된 업무는 여기에 넣지 않는다. 같은 계획은 날짜·요일이 있는 문장 1개만 남기고 원문 문장을 그대로 복사한다.",
+            "description": "다음 주 예정 업무. 일일보고의 requests(확인 목록 포함)와 nextPlans를 모두 여기로 병합하고 빠뜨리지 않는다. 이미 정한 발표 형식은 여기로 올리지 않는다. 아직 안 한 후속(타이밍 표시)과 디데이를 할 일로 적은 문장은 남긴다. 주간 중 이미 inProgressTasks나 completedTasks로 승격된 업무는 여기에 넣지 않는다. 같은 계획은 날짜·요일이 있는 문장 1개만 남기고 원문 문장을 그대로 복사한다. 다른 문장의 날짜와 요일을 합치지 않는다.",
             "uniqueItems": true,
-            "maxItems": 20,
+            "maxItems": 30,
             "items": { "type": "string", "minLength": 1, "maxLength": 300 }
           }
         },

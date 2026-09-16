@@ -109,7 +109,7 @@ with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
 with open("./model_asset/keyword_json_schema.json", "r", encoding="utf-8") as f:
     keyword_schema = json.load(f)
 
-MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL")
+MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "unsloth/Qwen3.8-27B-GGUF:Q4_K_M")
 LM_BASE_URL = os.environ.get("LM_BASE_URL", "http://127.0.0.1")
 LM_API_KEY = os.environ.get("LM_API_KEY", "")
 LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
@@ -120,6 +120,27 @@ KEYWORD_MAX_TOKENS = int(os.environ.get("KEYWORD_MAX_TOKENS", "32768"))
 DAILY_REASONING = os.environ.get("DAILY_REASONING", "none")
 WEEKLY_REASONING = os.environ.get("WEEKLY_REASONING", "none")
 KEYWORD_REASONING = os.environ.get("KEYWORD_REASONING", "none")
+THINKING_EFFORTS = {"xhigh", "medium", "low"}
+
+
+def apply_reasoning(kwargs, effort):
+    """Match qwen3_report_chat_template.jinja: thinking off unless effort is xhigh|medium|low.
+
+    The stock Qwen template treats unset enable_thinking as xhigh thinking, and
+    rejects reasoning_effort=none. This app's .env default is none, so we send
+    enable_thinking=false instead of passing "none" through.
+    """
+    value = (effort or "").strip().lower()
+    thinking = value in THINKING_EFFORTS
+    extra = dict(kwargs.get("extra_body") or {})
+    chat_kwargs = dict(extra.get("chat_template_kwargs") or {})
+    chat_kwargs["enable_thinking"] = thinking
+    if thinking:
+        kwargs["reasoning_effort"] = value
+        chat_kwargs["reasoning_effort"] = value
+    extra["chat_template_kwargs"] = chat_kwargs
+    kwargs["extra_body"] = extra
+    return kwargs
 
 def _is_allowed_lm_host(hostname: str | None) -> bool:
     if not hostname:
@@ -1093,8 +1114,7 @@ def ask_weekly_confirm_questions(client, report_data, dated_reports, selects):
             },
         },
     )
-    if WEEKLY_REASONING:
-        kwargs["reasoning_effort"] = WEEKLY_REASONING
+    apply_reasoning(kwargs, WEEKLY_REASONING)
     completion = client.chat.completions.create(**kwargs)
     parsed = json.loads(read_completion(completion, "weekly-confirm"))
     return parsed.get("confirmQuestions") or []
@@ -1421,8 +1441,7 @@ def call_keyword_model(report):
             },
         },
     )
-    if KEYWORD_REASONING:
-        kwargs["reasoning_effort"] = KEYWORD_REASONING
+    apply_reasoning(kwargs, KEYWORD_REASONING)
     completion = client.chat.completions.create(**kwargs)
     return read_completion(completion, "recommend-keywords")
 
@@ -1543,8 +1562,7 @@ def generate_weekly_report(member_id, selects):
                     },
                 },
             )
-            if WEEKLY_REASONING:
-                kwargs["reasoning_effort"] = WEEKLY_REASONING
+            apply_reasoning(kwargs, WEEKLY_REASONING)
             completion = client.chat.completions.create(**kwargs)
 
             report_data = drop_empty_projects(
@@ -1627,6 +1645,10 @@ def process_daily_report(report: str, report_date: str, member_id: int):
 
     with get_db() as conn:
         validate_member(conn, member_id)
+        member_name = conn.execute(
+            "SELECT name FROM members WHERE id = ?",
+            (member_id,),
+        ).fetchone()["name"]
         conn.execute(
             """
             INSERT INTO report_drafts (member_id, report_date, raw_text, updated_at)
@@ -1650,7 +1672,14 @@ def process_daily_report(report: str, report_date: str, member_id: int):
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": load_daily_prompt()},
-                {"role": "user", "content": report},
+                {
+                    "role": "user",
+                    "content": (
+                        f"작성자: {member_name}\n"
+                        f"보고일: {report_date}\n\n"
+                        f"{report}"
+                    ),
+                },
             ],
             temperature=0.1,
             max_tokens=max_tokens,
@@ -1665,8 +1694,7 @@ def process_daily_report(report: str, report_date: str, member_id: int):
                 },
             },
         )
-        if DAILY_REASONING:
-            kwargs["reasoning_effort"] = DAILY_REASONING
+        apply_reasoning(kwargs, DAILY_REASONING)
         completion = client.chat.completions.create(**kwargs)
 
         content = read_completion(completion, "send-report")

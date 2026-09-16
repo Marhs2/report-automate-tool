@@ -302,7 +302,7 @@ const onProjectChange = () => {
 
 const openEntry = (entry) => {
   if (!entry?.report_id) return;
-  router.push(`/report/${entry.report_id}`);
+  router.push(`/report-result/${entry.report_id}`);
 };
 
 const clearMemberFilter = () => {
@@ -577,6 +577,14 @@ onMounted(() => {
   text-align: left;
   cursor: pointer;
 }
+
+
+.issue-row:hover {
+  background: var(--bg-soft);
+  border-radius: var(--radius-sm);
+  transition: background 0.2s ease-in-out;
+}
+
 
 .issue-group .issue-row:first-of-type {
   border-top: 0;

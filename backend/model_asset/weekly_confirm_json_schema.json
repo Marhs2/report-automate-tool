@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "WeeklyConfirmQuestions",
-  "description": "확정된 주간 초안만 보고 만드는 저장 전 확인 질문. 실제 모순만 넣으며 0~3개. 주간 초안에 없는 문장을 있다고 말하면 안 된다.",
+  "description": "확정된 주간 초안만 보고 만드는 저장 전 확인 질문. 실제 모순만 넣으며 0~3개. 주간 초안에 없는 문장을 있다고 말하면 안 된다. 발표 형식이 진행이고 후속만 다음 주인 배치, 확인 목록이 nextWeekPlans에 있는 것은 정상이다.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

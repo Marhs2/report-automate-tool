@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "KeywordRecommendationResult",
-  "description": "일일보고 원문에서 기존 프로젝트 키워드와 신규 프로젝트 후보를 추출한 결과.",
+  "description": "일일보고 원문에서 기존 프로젝트 키워드와 신규 프로젝트 후보를 추출한 결과. 메신저면 대화 전체에서 이름을 찾는다. 사람·날짜·발표 형식·확인 목록·도구/일정 이름은 프로젝트가 아니다.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -46,7 +46,7 @@
         "properties": {
           "projectName": {
             "type": "string",
-            "description": "원문에 나온 새 프로젝트 명. 업무명·사람명·부서명은 쓰지 않는다.",
+            "description": "원문에 나온 새 프로젝트 명. 업무명·사람명·부서명·날짜·발표 형식·확인 목록·앱스토어/모의IR/PPT 같은 일정·도구 이름은 쓰지 않는다.",
             "minLength": 1,
             "maxLength": 100
           },

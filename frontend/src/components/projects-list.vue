@@ -4,9 +4,11 @@ import { Search, Trash2 } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useRouter } from "vue-router";
 import { useToast } from "../composables/useToast";
+import { useDialog } from "../composables/useDialog";
 
 const router = useRouter();
 const { success: toastSuccess, error: toastError } = useToast();
+const { confirm: askConfirm } = useDialog();
 const { getReports, deleteReport, getTeams } = useApi();
 
 const reports = ref([]);
@@ -50,7 +52,7 @@ const fetchTeams = async () => {
 const deleteProjectReport = async (reportId, event) => {
     event?.stopPropagation();
     event?.preventDefault();
-    if (!window.confirm("이 보고서를 삭제할까요?")) return;
+    if (!(await askConfirm("이 보고서를 삭제할까요?"))) return;
     try {
         await deleteReport(reportId);
         await fetchReports();
@@ -259,7 +261,7 @@ const reportsByDate = computed(() => {
 });
 
 const openDetail = (reportId) => {
-    router.push(`/report/${reportId}`);
+    router.push(`/report-result/${reportId}`);
 };
 
 const onCardKeydown = (event, reportId) => {

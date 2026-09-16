@@ -757,6 +757,7 @@ input[type="file"]::file-selector-button:hover {
     resize: vertical;
     line-height: 1.55;
     border-radius: var(--radius);
+    min-height: 200px;
 }
 
 .btn {
@@ -993,6 +994,49 @@ input[type="file"]::file-selector-button:hover {
 .toast-success {
     border-color: color-mix(in srgb, var(--success) 40%, var(--border));
     background: color-mix(in srgb, var(--success) 12%, var(--bg-elevated));
+}
+
+.app-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(38, 37, 30, 0.28);
+}
+
+.app-dialog {
+    width: min(440px, 100%);
+}
+
+.app-dialog-kicker {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--accent);
+}
+
+.app-dialog-message {
+    margin: 0 0 16px;
+    font-size: 16px;
+    line-height: 1.45;
+    color: var(--text-h);
+    white-space: pre-wrap;
+}
+
+.app-dialog-help {
+    margin: -8px 0 16px;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.app-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .toast-error {

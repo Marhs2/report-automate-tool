@@ -6,10 +6,12 @@ import { selectedTeamId } from "../composables/useSelectedTeam.js";
 import { selectedUserId } from "../composables/useSelectedUser.js";
 
 import { useRouter } from "vue-router";
+import { useDialog } from "../composables/useDialog";
 
 const router = useRouter();
 
 const { getTeams, postTeams, setTeam } = useApi();
+const { alert: showAlert } = useDialog();
 
 const teams = ref([]);
 const newTeam = ref("");
@@ -37,7 +39,7 @@ const isSelected = (id) => String(selectedTeam.value) === String(id);
 
 const assignTeam = async (teamId) => {
     if (selectedUserId.value == null || selectedUserId.value === "") {
-        alert("사용자를 먼저 선택해주세요.");
+        showAlert("사용자를 먼저 선택해주세요.");
         return;
     }
     try {
@@ -46,22 +48,25 @@ const assignTeam = async (teamId) => {
         selectedTeamId.value = teamId;
     } catch (error) {
         console.error("팀 지정 실패:", error);
-        alert("팀 지정에 실패했습니다.");
+        showAlert("팀 지정에 실패했습니다.");
     }
 };
 
 const saveTeam = async () => {
     const name = newTeam.value.trim();
-    if (!name) return alert("팀 이름을 입력해주세요");
+    if (!name) {
+        showAlert("팀 이름을 입력해주세요");
+        return;
+    }
     isSaving.value = true;
     try {
         await postTeams(name);
         newTeam.value = "";
         teams.value = await getTeams();
-        alert(`'${name}' 팀을 생성했습니다.`);
+        showAlert(`'${name}' 팀을 생성했습니다.`);
     } catch (error) {
         console.error("팀 생성 실패:", error);
-        alert("팀 생성에 실패했습니다. 중복된 이름인지 확인해주세요.");
+        showAlert("팀 생성에 실패했습니다. 중복된 이름인지 확인해주세요.");
     } finally {
         isSaving.value = false;
     }

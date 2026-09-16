@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { useToast } from "../composables/useToast";
+import { useDialog } from "../composables/useDialog";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
@@ -14,6 +15,7 @@ const router = useRouter();
 
 const { postWeeklyReport, getWeeklyReport, deleteWeeklyReport, getUserActivities, getTeams } = useApi();
 const { success: toastSuccess, error: toastError } = useToast();
+const { confirm: askConfirm } = useDialog();
 
 const selects = ref([]);
 const weekDays = ref([]);
@@ -79,7 +81,7 @@ weekDays.value = getWeekDays(0);
 selects.value = [...weekDays.value];
 
 const deleteWeekly = async (reportId) => {
-    if (!window.confirm("이 주간 보고서를 삭제할까요?")) return;
+    if (!(await askConfirm("이 주간 보고서를 삭제할까요?"))) return;
     isLoading.value = true;
     try {
         await deleteWeeklyReport(reportId);
@@ -443,7 +445,7 @@ onMounted(async () => {
                         </div>
 
                         <div class="report-list-actions">
-                            <button class="btn" @click="() => deleteWeekly(report.id)" :disabled="isLoading">
+                            <button type="button" class="btn" @click="() => deleteWeekly(report.id)" :disabled="isLoading">
                                 삭제
                             </button>
                             <button class="btn" :disabled="isLoading" @click="viewReport(report)">

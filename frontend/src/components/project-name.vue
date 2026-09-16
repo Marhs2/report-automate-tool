@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, nextTick } from "vue";
 import { Trash2, Check, Sparkles, Plus, X, ChevronDown } from "lucide-vue-next";
 import useApi from "../composables/useApi";
+import { useDialog } from "../composables/useDialog";
 
 const {
     getRegisteredProjectNames,
@@ -10,6 +11,7 @@ const {
     updateProjectNameKeywords,
     recommendKeywords,
 } = useApi();
+const { alert: showAlert, confirm: askConfirm } = useDialog();
 
 const projectNames = ref([]);
 const newName = ref("");
@@ -94,7 +96,7 @@ const fetchProjectNames = async () => {
 const addProjectName = async () => {
     const name = newName.value.trim();
     if (!name) {
-        alert("프로젝트 명을 입력해주세요.");
+        showAlert("프로젝트 명을 입력해주세요.");
         return;
     }
     try {
@@ -105,18 +107,18 @@ const addProjectName = async () => {
         await fetchProjectNames();
     } catch (error) {
         const detail = error.response?.data?.detail;
-        alert(detail || "프로젝트 명 등록에 실패했습니다.");
+        showAlert(detail || "프로젝트 명 등록에 실패했습니다.");
     }
 };
 
 const removeProjectName = async (name) => {
-    if (confirm(`'${name}' 프로젝트 명을 삭제하시겠습니까?`)) {
+    if (await askConfirm(`'${name}' 프로젝트 명을 삭제하시겠습니까?`)) {
         try {
             await deleteProjectName(name);
             await fetchProjectNames();
         } catch (error) {
             const detail = error.response?.data?.detail;
-            alert(detail || "삭제에 실패했습니다.");
+            showAlert(detail || "삭제에 실패했습니다.");
         }
     }
     if (editingName.value === name) cancelEdit();
@@ -160,10 +162,10 @@ const saveKeywords = async (item) => {
         item.keywords = editingKeywords.value.trim();
         editingName.value = "";
         chipDraft.value = "";
-        alert(`'${item.name}' 키워드가 저장되었습니다.`);
+        showAlert(`'${item.name}' 키워드가 저장되었습니다.`);
     } catch (error) {
         const detail = error.response?.data?.detail;
-        alert(detail || "키워드 저장에 실패했습니다.");
+        showAlert(detail || "키워드 저장에 실패했습니다.");
     } finally {
         savingName.value = "";
     }
@@ -204,7 +206,7 @@ const markApplied = (name) => {
 const applyKeywordAddition = async (item) => {
     const target = projectNames.value.find((row) => row.name === item.projectName);
     if (!target) {
-        alert(`'${item.projectName}'은 등록된 프로젝트가 아닙니다.`);
+        showAlert(`'${item.projectName}'은 등록된 프로젝트가 아닙니다.`);
         return;
     }
     applyingName.value = item.projectName;
@@ -213,10 +215,10 @@ const applyKeywordAddition = async (item) => {
         await updateProjectNameKeywords(item.projectName, keywords);
         target.keywords = keywords;
         markApplied(item.projectName);
-        alert(`'${item.projectName}' 키워드를 반영했습니다.`);
+        showAlert(`'${item.projectName}' 키워드를 반영했습니다.`);
     } catch (error) {
         const detail = error.response?.data?.detail;
-        alert(detail || "키워드 반영에 실패했습니다.");
+        showAlert(detail || "키워드 반영에 실패했습니다.");
     } finally {
         applyingName.value = "";
     }
@@ -231,10 +233,10 @@ const applyNewProject = async (item) => {
         );
         markApplied(item.projectName);
         await fetchProjectNames();
-        alert(`'${item.projectName}' 프로젝트를 등록했습니다.`);
+        showAlert(`'${item.projectName}' 프로젝트를 등록했습니다.`);
     } catch (error) {
         const detail = error.response?.data?.detail;
-        alert(detail || "프로젝트 등록에 실패했습니다.");
+        showAlert(detail || "프로젝트 등록에 실패했습니다.");
     } finally {
         applyingName.value = "";
     }
@@ -340,6 +342,7 @@ onMounted(() => {
                         </div>
                         <div class="card-actions">
                             <button
+                                type="button"
                                 class="btn btn-icon danger"
                                 title="삭제"
                                 @click.stop="removeProjectName(item.name)"

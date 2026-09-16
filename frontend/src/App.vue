@@ -10,17 +10,31 @@ import {
     UsersRound,
     ChevronDown,
 } from "lucide-vue-next";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import useApi from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
 import { selectedTeamId } from "./composables/useSelectedTeam";
 import { useToast } from "./composables/useToast";
+import { useDialog } from "./composables/useDialog";
 
 const router = useRouter();
 const route = useRoute();
 const { getUsers, getTeams, getReports } = useApi();
 const { toasts } = useToast();
+const {
+    open: dialogOpen,
+    locked: dialogLocked,
+    mode: dialogMode,
+    title: dialogTitle,
+    message: dialogMessage,
+    help: dialogHelp,
+    confirmLabel: dialogConfirmLabel,
+    cancelLabel: dialogCancelLabel,
+    confirm: askConfirm,
+    accept: acceptDialog,
+    reject: rejectDialog,
+} = useDialog();
 
 const navGroups = [
     {
@@ -50,8 +64,10 @@ const navGroups = [
 
 const pageMeta = computed(() => {
     const path = route.path;
+    if (/^\/report-result\/\d+/.test(path) || /^\/report\/\d+/.test(path)) {
+        return { title: "일일보고", action: { to: "/", label: "목록" } };
+    }
     if (path === "/report-result") return { title: "분석 결과", action: null };
-    if (/^\/report\/\d+/.test(path)) return { title: "일일보고", action: { to: "/", label: "목록" } };
     if (path === "/report") return { title: "보고서 작성", action: null };
     if (path.startsWith("/weekly-detail")) return { title: "주간 보고서", action: { to: "/weekly", label: "목록" } };
     if (path === "/weekly") return { title: "주간 보고서", action: null };
@@ -65,7 +81,9 @@ const pageMeta = computed(() => {
 
 const isNavActive = (to) => {
     const path = route.path;
-    if (to === "/") return path === "/" || /^\/report\/\d+/.test(path);
+    if (to === "/") {
+        return path === "/" || /^\/report\/\d+/.test(path) || /^\/report-result\/\d+/.test(path);
+    }
     if (to === "/report") return path === "/report" || path === "/report-result";
     return path === to || path.startsWith(`${to}/`);
 };
@@ -238,22 +256,39 @@ const userInitial = () => {
     return name.slice(0, 1) || "?";
 };
 
-const logout = () => {
-    if (window.confirm("사용자를 변경하시겠습니까?")) {
-        selectedUserId.value = null;
-        sessionStorage.removeItem("selectedUser");
-        sessionStorage.removeItem("reportData");
-        sessionStorage.removeItem("reportRaw");
-        sessionStorage.removeItem("reportDate");
-        router.push("/users");
+const logout = async () => {
+    if (!(await askConfirm("사용자를 변경하시겠습니까?"))) return;
+    selectedUserId.value = null;
+    sessionStorage.removeItem("selectedUser");
+    sessionStorage.removeItem("reportData");
+    sessionStorage.removeItem("reportRaw");
+    sessionStorage.removeItem("reportDate");
+    router.push("/users");
+};
+
+const onDialogKeydown = (event) => {
+    if (!dialogOpen.value || dialogLocked.value) return;
+    if (event.key === "Escape") {
+        event.preventDefault();
+        if (dialogMode.value === "confirm") rejectDialog();
+        else acceptDialog();
+        return;
+    }
+    if (event.key === "Enter") {
+        event.preventDefault();
+        acceptDialog();
     }
 };
 
-
 onMounted(() => {
+    window.addEventListener("keydown", onDialogKeydown);
     if (selectedUserId.value == null) {
         router.push("/users");
     }
+});
+
+onUnmounted(() => {
+    window.removeEventListener("keydown", onDialogKeydown);
 });
 </script>
 
@@ -332,7 +367,7 @@ onMounted(() => {
                     <span class="sidebar-user-team">{{ currentTeam || "팀 미선택" }}</span>
                 </span>
             </div>
-            <button class="sidebar-logout" @click="logout">
+            <button type="button" class="sidebar-logout" @click="logout">
                 <ArrowLeftRight :size="14" />
                 사용자 변경
             </button>
@@ -353,6 +388,39 @@ onMounted(() => {
     <div class="toast-stack" aria-live="polite">
         <div v-for="item in toasts" :key="item.id" class="toast" :class="'toast-' + item.type">
             {{ item.message }}
+        </div>
+    </div>
+    <div
+        v-if="dialogOpen"
+        class="app-dialog-overlay"
+        :class="{ 'is-locked': dialogLocked }"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="app-dialog-message"
+    >
+        <div class="card app-dialog" @click.stop>
+            <p v-if="dialogTitle" class="app-dialog-kicker">{{ dialogTitle }}</p>
+            <p id="app-dialog-message" class="app-dialog-message">{{ dialogMessage }}</p>
+            <p v-if="dialogHelp" class="app-dialog-help">{{ dialogHelp }}</p>
+            <div class="app-dialog-actions">
+                <button
+                    v-if="dialogMode === 'confirm'"
+                    type="button"
+                    class="btn"
+                    :disabled="dialogLocked"
+                    @click="rejectDialog"
+                >
+                    {{ dialogCancelLabel }}
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    :disabled="dialogLocked"
+                    @click="acceptDialog"
+                >
+                    {{ dialogConfirmLabel }}
+                </button>
+            </div>
         </div>
     </div>
 </template>

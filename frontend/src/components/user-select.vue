@@ -4,10 +4,12 @@ import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser.js";
 import { useRouter } from "vue-router";
 import { Plus } from "lucide-vue-next";
+import { useDialog } from "../composables/useDialog";
 
 const router = useRouter();
 
 const { getUsers, postUsers } = useApi();
+const { alert: showAlert } = useDialog();
 
 const users = ref([]);
 const newUser = ref("");
@@ -27,7 +29,7 @@ const isSelected = (id) => String(selectedUser.value) === String(id);
 
 const setUser = (id) => {
     if (id === undefined || id === null || id === "" || id === "선택") {
-        alert("유저를 선택해주세요");
+        showAlert("유저를 선택해주세요");
         return;
     }
     selectedUser.value = id;
@@ -37,13 +39,16 @@ const setUser = (id) => {
 
 const saveUser = async () => {
     const name = newUser.value.trim();
-    if (!name) return alert("이름을 입력해주세요");
+    if (!name) {
+        showAlert("이름을 입력해주세요");
+        return;
+    }
     isSaving.value = true;
     try {
         await postUsers(name);
         newUser.value = "";
         users.value = await getUsers();
-        alert(`'${name}' 사용자를 생성했습니다.`);
+        showAlert(`'${name}' 사용자를 생성했습니다.`);
     } catch (error) {
         console.error("사용자 생성 실패:", error);
         const detail = error?.response?.data?.detail;
@@ -51,7 +56,7 @@ const saveUser = async () => {
             typeof detail === "string" && detail.trim()
                 ? detail
                 : "사용자 생성에 실패했습니다.";
-        alert(message);
+        showAlert(message);
     } finally {
         isSaving.value = false;
     }

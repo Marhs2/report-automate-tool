@@ -113,18 +113,6 @@
         </div>
 
         <div v-else class="empty-state">보고서 데이터가 없습니다.</div>
-
-        <div v-if="askOpen" class="confirm-overlay" role="dialog" aria-modal="true">
-            <div class="card confirm-dialog">
-                <p class="confirm-kicker">저장 전 확인 {{ askIndex + 1 }}/{{ confirmQuestions.length }}</p>
-                <h2 class="confirm-title">{{ confirmQuestions[askIndex]?.text }}</h2>
-                <p class="confirm-help">아니요면 해당 항목을 고친 뒤 다시 저장하세요.</p>
-                <div class="confirm-actions">
-                    <button class="btn" type="button" @click="rejectConfirm">아니요</button>
-                    <button class="btn btn-primary" type="button" @click="acceptConfirm">네</button>
-                </div>
-            </div>
-        </div>
     </div>
 </template>
 
@@ -133,6 +121,7 @@ import { computed, ref, onMounted, watch } from "vue";
 import { ArrowLeft } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
+import { useDialog } from "../composables/useDialog";
 
 const route = useRoute();
 const router = useRouter();
@@ -145,9 +134,8 @@ const removeProject = (project) => {
 const reportData = ref(null);
 const userName = ref("");
 const isSaving = ref(false);
-const askOpen = ref(false);
-const askIndex = ref(0);
 const { getUsers, getWeeklyReportById, updateWeeklyReport } = useApi();
+const { alert: showAlert, confirm: askConfirm } = useDialog();
 
 const confirmQuestions = computed(() => {
     const items = reportData.value?.confirmQuestions;
@@ -230,7 +218,7 @@ onMounted(async () => {
             }
         } catch (error) {
             console.error("보고서 불러오기 실패:", error);
-            alert("보고서를 불러오는데 실패했습니다.");
+            showAlert("보고서를 불러오는데 실패했습니다.");
         }
         return;
     }
@@ -321,10 +309,10 @@ const copyReport = async () => {
     try {
         const text = formatReport(reportData.value);
         await navigator.clipboard.writeText(text);
-        alert("보고서가 클립보드에 복사되었습니다.");
+        showAlert("보고서가 클립보드에 복사되었습니다.");
     } catch (error) {
         console.error("복사 실패:", error);
-        alert("복사에 실패했습니다.");
+        showAlert("복사에 실패했습니다.");
     }
 };
 
@@ -333,10 +321,10 @@ const persistReport = async () => {
     isSaving.value = true;
     try {
         await updateWeeklyReport(reportId, JSON.stringify(reportData.value));
-        alert("주간 보고서가 저장되었습니다.");
+        showAlert("주간 보고서가 저장되었습니다.");
     } catch (error) {
         console.error("저장 실패:", error);
-        alert("주간 보고서 저장에 실패했습니다.");
+        showAlert("주간 보고서 저장에 실패했습니다.");
     } finally {
         isSaving.value = false;
     }
@@ -346,69 +334,24 @@ const saveReport = async () => {
     if (!reportData.value) return;
     const reportId = route.params.id;
     if (!reportId) {
-        alert("저장할 주간 보고서 ID가 없습니다.");
+        showAlert("저장할 주간 보고서 ID가 없습니다.");
         return;
     }
-    if (confirmQuestions.value.length) {
-        askIndex.value = 0;
-        askOpen.value = true;
-        return;
+    const questions = confirmQuestions.value;
+    for (const [index, question] of questions.entries()) {
+        const ok = await askConfirm(question.text, {
+            title: `저장 전 확인 ${index + 1}/${questions.length}`,
+            help: "아니요면 해당 항목을 고친 뒤 다시 저장하세요.",
+            confirmLabel: "네",
+            cancelLabel: "아니요",
+        });
+        if (!ok) return;
     }
-    await persistReport();
-};
-
-const rejectConfirm = () => {
-    askOpen.value = false;
-    askIndex.value = 0;
-};
-
-const acceptConfirm = async () => {
-    if (askIndex.value < confirmQuestions.value.length - 1) {
-        askIndex.value += 1;
-        return;
-    }
-    askOpen.value = false;
     await persistReport();
 };
 </script>
 
 <style scoped>
-.confirm-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background: rgba(38, 37, 30, 0.28);
-}
-.confirm-dialog {
-    width: min(520px, 100%);
-}
-.confirm-kicker {
-    margin: 0 0 6px;
-    font-size: 12px;
-    font-weight: 650;
-    color: var(--accent);
-}
-.confirm-title {
-    margin: 0 0 8px;
-    font-size: 18px;
-    line-height: 1.4;
-}
-
-.confirm-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-}
-.confirm-help {
-    margin: 0 0 16px;
-    color: var(--text);
-    font-size: 13px;
-    line-height: 1.45;
-}
 .save-actions {
     display: flex;
     flex-wrap: wrap;

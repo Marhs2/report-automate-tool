@@ -6,7 +6,6 @@ import activities from "../components/user-activities.vue";
 import weekly from "../components/weekly-report.vue";
 import users from "../components/user-select.vue";
 import weeklyDetail from "../components/weekly-detail.vue";
-import reportDetail from "../components/report-detail.vue";
 import projectTimeline from "../components/project-timeline.vue";
 import projectName from "../components/project-name.vue";
 import teamSelect from "../components/team-select.vue";
@@ -23,7 +22,7 @@ const routes = [
     component: report,
   },
   {
-    path: "/report-result",
+    path: "/report-result/:id?",
     name: "report-result",
     component: reportResult,
   },
@@ -53,8 +52,7 @@ const routes = [
   },
   {
     path: "/report/:id",
-    name: "report-detail",
-    component: reportDetail,
+    redirect: (to) => ({ name: "report-result", params: { id: to.params.id } }),
   },
 
   {

@@ -114,7 +114,7 @@ const openCell = async (activity, item) => {
         }
     }
     if (!reportId) return;
-    router.push(`/report/${reportId}`);
+    router.push(`/report-result/${reportId}`);
 };
 
 const cellLabel = (name, item) => {

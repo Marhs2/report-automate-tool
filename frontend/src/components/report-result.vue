@@ -9,18 +9,21 @@
         <div class="status-banner">
             <span>작성자 <strong>{{ userName || "미선택" }}</strong></span>
             <span>날짜 <strong>{{ reportDate }}</strong></span>
-            <span class="status-chip is-draft">아직 저장 전</span>
+            <span v-if="savedReportId" class="status-chip">저장됨</span>
+            <span v-else class="status-chip is-draft">아직 저장 전</span>
             <div class="save-actions">
                 <button class="btn" @click="retryExtract" :disabled="aiLoading">
                     {{ aiLoading ? "재추출 중..." : "재추출" }}
                 </button>
                 <button class="btn btn-primary" @click="saveReport" :disabled="aiLoading || saving">
-                    {{ saving ? "저장 중..." : "저장하기" }}
+                    {{ saving ? "저장 중..." : savedReportId ? "수정 저장" : "저장하기" }}
                 </button>
             </div>
         </div>
 
-        <div v-if="reportData" class="content-container">
+        <div v-if="isLoading" class="empty-state">불러오는 중...</div>
+
+        <div v-else-if="reportData" class="content-container">
             <div class="json-container">
                 <div
                     v-for="(project, projectIndex) in reportData.projects"
@@ -202,7 +205,7 @@
                             @click="saveReport"
                             :disabled="aiLoading || saving"
                         >
-                            {{ saving ? "저장 중..." : "저장하기" }}
+                            {{ saving ? "저장 중..." : savedReportId ? "수정 저장" : "저장하기" }}
                         </button>
                     </div>
                 </div>
@@ -221,11 +224,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { ref, watch } from "vue";
 import useApi from "../composables/useApi";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useToast } from "../composables/useToast";
 
+const route = useRoute();
 const router = useRouter();
 const { success: toastSuccess, error: toastError } = useToast();
 
@@ -235,7 +239,10 @@ const userName = ref("");
 const reportDate = ref("");
 const aiLoading = ref(false);
 const saving = ref(false);
-const { postSaveReport, postReport, getUsers } = useApi();
+const isLoading = ref(false);
+const savedReportId = ref(null);
+const savedMemberId = ref(null);
+const { postSaveReport, postReport, getUsers, getReportById } = useApi();
 
 const issueText = (issue) =>
     typeof issue === "string"
@@ -272,42 +279,90 @@ const normalizeReportIssues = (report) => {
 watch(
     reportData,
     (newVal) => {
-        if (newVal) {
-            sessionStorage.setItem("reportData", JSON.stringify(newVal));
-        }
+        if (savedReportId.value || !newVal) return;
+        sessionStorage.setItem("reportData", JSON.stringify(newVal));
     },
     { deep: true },
 );
 
-onMounted(() => {
+const asText = (value) =>
+    value && typeof value === "object"
+        ? String(value.content ?? "").trim()
+        : String(value ?? "");
+
+const asTexts = (list) =>
+    (Array.isArray(list) ? list : []).map(asText);
+
+const toEditable = (parsed) => {
+    if (!parsed) return null;
+    const data =
+        typeof parsed === "string" ? JSON.parse(parsed) : { ...parsed };
+    data.projects = (data.projects || []).map((project) => ({
+        projectName: project.projectName || "",
+        completedTasks: asTexts(project.completedTasks),
+        inProgressTasks: asTexts(project.inProgressTasks),
+        issues: asTexts(project.issues),
+        requests: asTexts(project.requests),
+        nextPlans: asTexts(project.nextPlans),
+    }));
+    return data;
+};
+
+const resolveUserName = async (userId) => {
+    if (!userId) {
+        userName.value = "";
+        return;
+    }
+    try {
+        const users = await getUsers();
+        const found = users.find((user) => String(user.id) === String(userId));
+        userName.value = found ? found.name : `사용자 ${userId}`;
+    } catch {
+        userName.value = `사용자 ${userId}`;
+    }
+};
+
+const loadDraft = () => {
+    savedReportId.value = null;
+    savedMemberId.value = null;
     const stored = sessionStorage.getItem("reportData");
-
-    if (stored) {
-        reportData.value = normalizeReportIssues(JSON.parse(stored));
-    }
-
-    const storedRaw = sessionStorage.getItem("reportRaw");
-
-    if (storedRaw) {
-        rawData.value = storedRaw;
-    }
-
+    reportData.value = stored
+        ? normalizeReportIssues(toEditable(JSON.parse(stored)))
+        : null;
+    rawData.value = sessionStorage.getItem("reportRaw") || "";
     reportDate.value = sessionStorage.getItem("reportDate") || "";
+    resolveUserName(localStorage.getItem("report-selectedUser") || "");
+};
 
-    const userId = localStorage.getItem("report-selectedUser") || "";
-    if (userId) {
-        getUsers()
-            .then((users) => {
-                const found = users.find(
-                    (u) => String(u.id) === String(userId),
-                );
-                userName.value = found ? found.name : `사용자 ${userId}`;
-            })
-            .catch(() => {
-                userName.value = `사용자 ${userId}`;
-            });
+const loadSaved = async (id) => {
+    isLoading.value = true;
+    savedReportId.value = id;
+    reportData.value = null;
+    try {
+        const data = await getReportById(id);
+        savedMemberId.value = data.member_id;
+        reportData.value = normalizeReportIssues(toEditable(data.parsed_json));
+        rawData.value = data.raw_text || "";
+        reportDate.value = data.report_date || "";
+        await resolveUserName(data.member_id);
+        document.title = `${userName.value || "일일보고"} · 일일보고`;
+    } catch (error) {
+        console.error("보고서 불러오기 실패:", error);
+        toastError("보고서를 불러오지 못했습니다.");
+        reportData.value = null;
+    } finally {
+        isLoading.value = false;
     }
-});
+};
+
+watch(
+    () => route.params.id,
+    (id) => {
+        if (id) loadSaved(id);
+        else loadDraft();
+    },
+    { immediate: true },
+);
 
 const addProject = () => {
     reportData.value.projects.push({
@@ -376,17 +431,19 @@ const saveReport = async () => {
         })();
     saving.value = true;
     try {
-        await postSaveReport(
-            jsonData,
-            rawData.value,
-            parseInt(localStorage.getItem("report-selectedUser") || "0"),
-            dateValue,
-        );
-        sessionStorage.removeItem("reportData");
-        sessionStorage.removeItem("reportRaw");
-        sessionStorage.removeItem("reportDate");
-        toastSuccess("보고서를 저장했습니다.");
-        router.push("/");
+        const memberId =
+            savedMemberId.value ??
+            parseInt(localStorage.getItem("report-selectedUser") || "0", 10);
+        await postSaveReport(jsonData, rawData.value, memberId, dateValue);
+        if (savedReportId.value) {
+            toastSuccess("보고서를 수정했습니다.");
+        } else {
+            sessionStorage.removeItem("reportData");
+            sessionStorage.removeItem("reportRaw");
+            sessionStorage.removeItem("reportDate");
+            toastSuccess("보고서를 저장했습니다.");
+            router.push("/");
+        }
     } catch (error) {
         console.error("보고서 저장 실패:", error);
         toastError("보고서 저장에 실패했습니다. 다시 시도해주세요.");
@@ -400,14 +457,15 @@ const retryExtract = async () => {
         toastError("원문이 없어 재추출할 수 없습니다.");
         return;
     }
-    const userId = getSelectedMemberId();
+    const userId = savedMemberId.value ?? getSelectedMemberId();
     if (userId === null) {
         toastError("사용자 정보가 없습니다.");
         return;
     }
     try {
         aiLoading.value = true;
-        const reportDate =
+        const extractDate =
+            reportDate.value ||
             sessionStorage.getItem("reportDate") ||
             (() => {
                 const d = new Date();
@@ -415,7 +473,7 @@ const retryExtract = async () => {
             })();
         const res = await postReport(
             { content: rawData.value },
-            reportDate,
+            extractDate,
             userId,
         );
         reportData.value = normalizeReportIssues(res);
