@@ -1,0 +1,98 @@
+:root {
+    /* 표면 */
+    --bg: #f7f2eb;
+    --surface: #fffdf8;
+    --surface-soft: #f2ece3;
+
+    /* 테두리 */
+    --border: #e6ddcf;
+    --border-strong: #d6c9b4;
+
+    /* 텍스트 */
+    --text-strong: #1f1d18;
+    --text: #6b655a;
+    --text-muted: #8f887b;
+
+    /* 액센트 */
+    --accent: #8b9a6e;
+    --accent-hover: #738056;
+    --accent-soft: #eef1e5;
+    --accent-border: #c3ccae;
+
+    /* 상태 */
+    --success-fg: #5f7a3f;
+    --success-bg: #eef2e4;
+    --success-border: #c9d5ad;
+    --warning-fg: #9a6a1b;
+    --warning-bg: #faf0dd;
+    --warning-border: #e6cfa3;
+    --danger-fg: #b3382f;
+    --danger-bg: #fbeae8;
+    --danger-border: #eec4bf;
+    --info-fg: #4a6b7c;
+    --info-bg: #e9f0f3;
+    --info-border: #bdd2db;
+
+    /* 간격 */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-7: 32px;
+    --space-8: 48px;
+
+    /* 타이포 */
+    --sans: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
+    --heading: "SF Pro Rounded", ui-rounded, "Hiragino Sans", var(--sans);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --fs-11: 11px;
+    --fs-12: 12px;
+    --fs-13: 13px;
+    --fs-14: 14px;
+    --fs-16: 16px;
+    --fs-20: 20px;
+    --fs-24: 24px;
+    --fs-30: 30px;
+    --lh-tight: 1.25;
+    --lh-base: 1.5;
+    --lh-relaxed: 1.65;
+    --fw-medium: 500;
+    --fw-semibold: 600;
+    --fw-bold: 700;
+
+    /* 형태 */
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --radius-pill: 9999px;
+
+    /* 모션 */
+    --dur-fast: 0.12s;
+    --dur: 0.2s;
+    --ease: cubic-bezier(0.2, 0.6, 0.3, 1);
+
+    /* 레이아웃 */
+    --sidebar-width: 272px;
+    --sidebar-width-collapsed: 64px;
+    --topbar-height: 56px;
+    --content-max: 1120px;
+    --content-max-wide: 1280px;
+
+    /* 스크롤바 */
+    --scrollbar-thumb: rgba(139, 154, 110, 0.35);
+
+    /* --- 마이그레이션 별칭: Task 7에서 제거한다 --- */
+    --text-h: var(--text-strong);
+    --bg-elevated: var(--surface);
+    --bg-soft: var(--surface-soft);
+    --code-bg: var(--surface-soft);
+    --social-bg: var(--surface-soft);
+    --accent-bg: var(--accent-soft);
+    --danger: var(--danger-fg);
+    --success: var(--success-fg);
+    --warning: var(--warning-fg);
+    --shadow: none;
+    --shadow-raised: none;
+}

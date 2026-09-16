@@ -1,0 +1,163 @@
+/* Shared report document (daily detail, weekly detail, AI result) */
+.report-doc .content-container {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.85fr);
+    gap: 20px;
+    align-items: start;
+}
+
+.report-doc .content-container.single {
+    grid-template-columns: 1fr;
+}
+
+.report-doc .json-container {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.report-doc .raw-container {
+    min-width: 0;
+    position: sticky;
+    top: 16px;
+}
+
+.report-doc .raw-container h2 {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.report-doc .raw-container pre,
+.report-doc .raw-content {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.7;
+    max-height: 80vh;
+    overflow-y: auto;
+    color: var(--text-h);
+}
+
+.report-doc .projects-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.report-doc .project-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.report-doc .project-title,
+.report-doc .project-name-input {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    border-radius: var(--radius);
+    color: var(--text-h);
+}
+
+.report-doc .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    padding: 14px 16px;
+    border-radius: var(--radius);
+}
+
+.report-doc .field-group:last-of-type {
+    margin-bottom: 0;
+}
+
+.report-doc .field-group h2,
+.report-doc .field-group h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.report-doc .item-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text-h);
+}
+
+.report-doc .item-list li + li {
+    margin-top: 4px;
+}
+
+.report-doc .empty-msg {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text);
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.report-doc .task-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.report-doc .task-row .input {
+    flex: 1;
+    min-width: 0;
+}
+
+.report-doc .remove-btn,
+.report-doc .add-btn {
+    flex-shrink: 0;
+    width: 36px;
+    padding: 0;
+}
+
+.report-doc .add-btn {
+    align-self: flex-start;
+}
+
+.report-doc .save-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.report-doc .save-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.report-doc .back-btn {
+    margin-bottom: 10px;
+}
+
+.report-doc .detail-title {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.2;
+}
+
+@media (max-width: 860px) {
+    .report-doc .content-container {
+        grid-template-columns: 1fr;
+    }
+    .report-doc .raw-container {
+        position: static;
+    }
+}
