@@ -27,7 +27,7 @@ const route = useRoute();
 const { getUsers, getTeams, getReports } = useApi();
 const { toasts } = useToast();
 // collapsedEffective: 좁은 화면(드로어)에서는 접힘 설정을 무시하고 항상 전체 메뉴를 보여준다.
-const { collapsedEffective, toggleCollapsed, drawerOpen, openDrawer, closeDrawer } = useSidebar();
+const { collapsedEffective, isNarrow, toggleCollapsed, drawerOpen, openDrawer, closeDrawer } = useSidebar();
 const {
     open: dialogOpen,
     locked: dialogLocked,
@@ -242,6 +242,12 @@ watch(
     },
 );
 
+watch(isNarrow, (narrow) => {
+    if (!narrow) {
+        closeDrawer();
+    }
+});
+
 const userInitial = () => {
     const name = currentUser.value || "";
     return name.slice(0, 1) || "?";
@@ -290,6 +296,7 @@ onUnmounted(() => {
 
 <template>
     <aside
+        id="app-sidebar"
         class="sidebar"
         :class="{ 'is-collapsed': collapsedEffective, 'is-drawer-open': drawerOpen }"
     >
@@ -298,6 +305,7 @@ onUnmounted(() => {
             <button
                 type="button"
                 class="sidebar-collapse-btn"
+                :aria-expanded="!collapsedEffective"
                 :aria-label="collapsedEffective ? '사이드바 펼치기' : '사이드바 접기'"
                 :title="collapsedEffective ? '사이드바 펼치기' : '사이드바 접기'"
                 @click="toggleCollapsed"
@@ -402,6 +410,8 @@ onUnmounted(() => {
                 type="button"
                 class="topbar-drawer-btn"
                 aria-label="메뉴 열기"
+                :aria-expanded="drawerOpen"
+                aria-controls="app-sidebar"
                 @click="openDrawer"
             >
                 <Menu :size="18" />

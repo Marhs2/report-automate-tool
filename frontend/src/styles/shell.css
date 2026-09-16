@@ -613,11 +613,15 @@
         flex-basis: auto;
         overflow-y: auto;
         border-right: 1px solid var(--border);
+        visibility: hidden;
         transform: translateX(-100%);
-        transition: transform var(--dur) var(--ease);
+        transition:
+            transform var(--dur) var(--ease),
+            visibility var(--dur) var(--ease);
     }
 
     .sidebar.is-drawer-open {
+        visibility: visible;
         transform: translateX(0);
     }
 

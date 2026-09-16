@@ -22,25 +22,42 @@ const getNarrowQuery = () => {
     }
 };
 
+const readIsNarrow = () => {
+    const query = getNarrowQuery();
+    return query ? query.matches : false;
+};
+
 const narrowQuery = getNarrowQuery();
 
 const collapsed = ref(readCollapsed());
 const drawerOpen = ref(false);
-const isNarrow = ref(narrowQuery ? narrowQuery.matches : false);
+const isNarrow = ref(readIsNarrow());
 
 // 좁은 화면(드로어 상태)에서는 사용자의 접힘 설정을 무시하고 항상 전체 메뉴를 보여준다.
 // `collapsed`는 설정값 그대로 유지하고, 화면 표시에는 `collapsedEffective`를 쓴다.
 const collapsedEffective = computed(() => collapsed.value && !isNarrow.value);
 
+const syncIsNarrow = () => {
+    isNarrow.value = readIsNarrow();
+};
+
 if (narrowQuery) {
-    const onNarrowChange = (event) => {
-        isNarrow.value = event.matches;
+    const onNarrowChange = () => {
+        syncIsNarrow();
     };
     if (typeof narrowQuery.addEventListener === "function") {
         narrowQuery.addEventListener("change", onNarrowChange);
     } else if (typeof narrowQuery.addListener === "function") {
         narrowQuery.addListener(onNarrowChange);
     }
+}
+
+try {
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+        window.addEventListener("resize", syncIsNarrow);
+    }
+} catch {
+    /* resize 리스너 등록 실패는 무시한다 */
 }
 
 watch(collapsed, (value) => {
