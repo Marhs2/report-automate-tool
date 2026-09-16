@@ -82,17 +82,4 @@
 
     /* 스크롤바 */
     --scrollbar-thumb: rgba(139, 154, 110, 0.35);
-
-    /* --- 마이그레이션 별칭: Task 7에서 제거한다 --- */
-    --text-h: var(--text-strong);
-    --bg-elevated: var(--surface);
-    --bg-soft: var(--surface-soft);
-    --code-bg: var(--surface-soft);
-    --social-bg: var(--surface-soft);
-    --accent-bg: var(--accent-soft);
-    --danger: var(--danger-fg);
-    --success: var(--success-fg);
-    --warning: var(--warning-fg);
-    --shadow: none;
-    --shadow-raised: none;
 }

@@ -40,7 +40,7 @@
     line-height: 1.7;
     max-height: 80vh;
     overflow-y: auto;
-    color: var(--text-h);
+    color: var(--text-strong);
 }
 
 .report-doc .projects-container {
@@ -63,7 +63,7 @@
     font-size: 16px;
     font-weight: 500;
     border-radius: var(--radius);
-    color: var(--text-h);
+    color: var(--text-strong);
 }
 
 .report-doc .field-group {
@@ -94,7 +94,7 @@
     padding-left: 18px;
     font-size: 14px;
     line-height: 1.65;
-    color: var(--text-h);
+    color: var(--text-strong);
 }
 
 .report-doc .item-list li + li {

@@ -22,8 +22,8 @@ body {
 }
 
 ::selection {
-    background: var(--accent-bg);
-    color: var(--text-h);
+    background: var(--accent-soft);
+    color: var(--text-strong);
 }
 
 :focus-visible {
@@ -75,7 +75,7 @@ h3,
 h4 {
     font-family: var(--heading);
     font-weight: var(--fw-medium);
-    color: var(--text-h);
+    color: var(--text-strong);
     margin: 0 0 6px;
 }
 
@@ -108,5 +108,5 @@ code {
     padding: 2px 6px;
     border-radius: 4px;
     background: var(--surface-soft);
-    color: var(--text-h);
+    color: var(--text-strong);
 }
