@@ -347,18 +347,18 @@ const saveReport = async () => {
 </script>
 
 <style scoped>
+/* display/gap/margin-left은 report-doc.css의 .report-doc .save-actions가 제공한다 */
 .save-actions {
-    display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
 }
+
 .confirm-hint {
     margin: 0;
     margin-right: auto;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
     color: var(--accent);
 }
 </style>

@@ -264,37 +264,37 @@ const sendReport = async () => {
 .form-actions {
     display: flex;
     justify-content: flex-end;
-    margin-top: 16px;
+    margin-top: var(--space-4);
 }
 
 .form-error {
-    margin-top: 12px;
-    color: var(--danger);
-    font-size: 13px;
+    margin-top: var(--space-3);
+    color: var(--danger-fg);
+    font-size: var(--fs-13);
 }
 
 .form-hint {
-    margin-top: 12px;
-    font-size: 13px;
+    margin-top: var(--space-3);
+    font-size: var(--fs-13);
     color: var(--text);
 }
 
 .select-type-buttons {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .file-drop-area {
     border: 1px dashed var(--border);
-    padding: 20px;
+    padding: var(--space-5);
     border-radius: var(--radius-sm);
     background: var(--bg);
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
     transition:
-        border-color 0.15s,
-        background 0.15s;
+        border-color var(--dur-fast) var(--ease),
+        background var(--dur-fast) var(--ease);
 }
 
 .file-drop-area:hover,
@@ -310,19 +310,15 @@ const sendReport = async () => {
 
 .file-name {
     margin: 0;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-h);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
 }
 
-.select-type-btn.active {
-    background: var(--accent-bg);
+.select-type-btn.active,
+.select-type-btn.active:hover {
+    background: var(--accent-soft);
     border-color: var(--accent-border);
     color: var(--accent);
-}
-
-.select-type-btn.active:hover {
-    background: var(--accent-bg);
-    border-color: var(--accent-border);
 }
 </style>

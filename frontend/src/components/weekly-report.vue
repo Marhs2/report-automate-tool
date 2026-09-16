@@ -472,61 +472,63 @@ onMounted(async () => {
 .day-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin: 16px 0;
+    gap: var(--space-2);
+    margin: var(--space-4) 0;
 }
 
 .week-nav {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin: 16px 0 4px;
+    gap: var(--space-2);
+    margin: var(--space-4) 0 var(--space-1);
     flex-wrap: wrap;
 }
 
 .week-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-h);
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
 }
 
 .day-chip {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-soft);
-    font-size: 13px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+    font-size: var(--fs-13);
     cursor: pointer;
 }
 
 .day-chip:has(input:checked) {
     border-color: var(--accent-border);
-    background: var(--accent-bg);
-    color: var(--text-h);
+    background: var(--accent-soft);
+    color: var(--text-strong);
 }
 
 .day-status {
-    margin-left: 4px;
-    font-size: 11px;
-    font-weight: 650;
+    margin-left: var(--space-1);
+    font-size: var(--fs-11);
+    font-weight: var(--fw-semibold);
 }
 
+/* 보고 있음 */
 .day-status.has-report {
-    color: var(--success);
+    color: var(--success-fg);
 }
 
+/* 보고 없음 */
 .day-status.no-report {
-    color: var(--warning);
+    color: var(--warning-fg);
 }
 
 .generate-bar {
     display: flex;
-    gap: 10px;
+    gap: var(--space-2);
     align-items: center;
-    padding-top: 16px;
+    padding-top: var(--space-4);
     border-top: 1px solid var(--border);
 }
 
@@ -536,19 +538,19 @@ onMounted(async () => {
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
 }
 
 .week-status {
-    margin: 24px 0;
+    margin: var(--space-6) 0;
 }
 
 .week-status-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
 }
 
 .week-status-head h2 {
@@ -561,14 +563,14 @@ onMounted(async () => {
     min-width: 108px;
     max-width: 180px;
     margin-left: auto;
-    padding: 0 28px 0 12px;
+    padding: 0 var(--space-6) 0 var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     background: var(--bg);
-    color: var(--text-h);
+    color: var(--text-strong);
     font: inherit;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
     cursor: pointer;
 }
 
@@ -578,46 +580,45 @@ onMounted(async () => {
 
 .team-filter:focus {
     outline: none;
-    border-color: var(--text-h);
+    border-color: var(--text-strong);
 }
+
 .report-list-item {
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 14px 16px;
+    padding: var(--space-3) var(--space-4);
     background: var(--bg);
 }
+
 .report-list-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-}
-.day-chip {
-    border-radius: var(--radius-pill);
+    gap: var(--space-2);
 }
 
 .report-list-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
 }
 
 .report-user {
-    font-weight: 600;
-    color: var(--text-h);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
 }
 
 .report-dates {
-    font-size: 13px;
+    font-size: var(--fs-13);
     color: var(--text);
     margin-top: 2px;
 }
 
 .report-projects {
     list-style: disc;
-    margin: 10px 0 0;
-    padding-left: 20px;
-    font-size: 13px;
+    margin: var(--space-2) 0 0;
+    padding-left: var(--space-5);
+    font-size: var(--fs-13);
     color: var(--text);
 }
 </style>

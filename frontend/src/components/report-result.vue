@@ -489,9 +489,3 @@ const getSelectedMemberId = () => {
     return memberId > 0 ? memberId : null;
 };
 </script>
-
-<style scoped>
-.status-banner .save-actions {
-    margin-left: auto;
-}
-</style>

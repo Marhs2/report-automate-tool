@@ -472,31 +472,22 @@ onMounted(() => {
 </template>
 
 <style scoped>
-
-
-.count-inline {
-    flex-shrink: 0;
-    font-size: 12px;
-    font-weight: 650;
-    color: var(--accent);
-}
-
 .stat-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
-    margin-bottom: 20px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
 }
 
 .stat-card {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
-    padding: 20px 20px 16px;
+    gap: var(--space-2);
+    padding: var(--space-5) var(--space-5) var(--space-4);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--bg-elevated);
+    background: var(--surface);
     text-align: left;
     cursor: default;
     font: inherit;
@@ -507,19 +498,15 @@ button.stat-card {
     cursor: pointer;
 }
 
-button.stat-card:hover {
-    border-color: var(--accent-border);
-    background: var(--accent-bg);
-}
-
+button.stat-card:hover,
 .stat-card.is-active {
     border-color: var(--accent-border);
-    background: var(--accent-bg);
+    background: var(--accent-soft);
 }
 
 .stat-label {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: var(--fs-11);
+    font-weight: var(--fw-semibold);
     letter-spacing: 0.88px;
     text-transform: uppercase;
     color: var(--text);
@@ -527,42 +514,29 @@ button.stat-card:hover {
 
 .stat-value {
     font-size: 28px;
-    font-weight: 400;
     letter-spacing: -0.5px;
     line-height: 1.1;
-    color: var(--text-h);
+    color: var(--text-strong);
     font-family: var(--heading);
-}
-
-.count-chip {
-    display: inline-flex;
-    align-items: center;
-    height: 32px;
-    padding: 0 12px;
-    border-radius: 999px;
-    background: var(--accent-bg);
-    color: var(--accent);
-    font-size: 13px;
-    font-weight: 700;
 }
 
 .filter-presets {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
 }
 
 .filter-presets .btn.is-active {
     border-color: var(--accent-border);
-    background: var(--accent-bg);
+    background: var(--accent-soft);
 }
 
 .list-count {
     margin-left: auto;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
     color: var(--text);
 }
 
@@ -570,9 +544,9 @@ button.stat-card:hover {
     display: flex;
     align-items: center;
     gap: 0;
-    margin-bottom: 20px;
-    padding: 4px 8px;
-    background: var(--bg-elevated);
+    margin-bottom: var(--space-5);
+    padding: var(--space-1) var(--space-2);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
 }
@@ -581,7 +555,7 @@ button.stat-card:hover {
     flex: 1;
     min-width: 0;
     height: 32px;
-    padding: 4px 12px;
+    padding: var(--space-1) var(--space-3);
     border: none;
     background: transparent;
     border-radius: 0;
@@ -591,7 +565,6 @@ button.stat-card:hover {
 .filter-toolbar .input:focus,
 .filter-toolbar .input:focus-visible {
     border-color: transparent;
-    box-shadow: none;
 }
 
 .filter-divider {
@@ -604,7 +577,7 @@ button.stat-card:hover {
 .reports-container {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-3);
 }
 
 .date-group {
@@ -615,25 +588,25 @@ button.stat-card:hover {
 .date-head {
     display: flex;
     align-items: baseline;
-    gap: 10px;
-    padding: 14px 16px 10px;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-2);
 }
 
 .date-head strong {
-    color: var(--text-h);
+    color: var(--text-strong);
     font-size: 15px;
-    font-weight: 600;
+    font-weight: var(--fw-semibold);
     letter-spacing: -0.2px;
 }
 
 .date-head b {
-    font-weight: 600;
-    margin-left: 4px;
+    font-weight: var(--fw-semibold);
+    margin-left: var(--space-1);
 }
 
 .date-head em {
     font-style: normal;
-    font-size: 12px;
+    font-size: var(--fs-12);
     margin-left: auto;
     color: var(--text);
 }
@@ -641,15 +614,15 @@ button.stat-card:hover {
 .person-row {
     display: grid;
     grid-template-columns: 148px minmax(0, 1fr) auto;
-    gap: 12px;
+    gap: var(--space-3);
     align-items: center;
-    padding: 10px 16px;
+    padding: var(--space-2) var(--space-4);
     border-top: 1px solid var(--border);
     cursor: pointer;
 }
 
 .person-row:hover {
-    background: var(--accent-bg);
+    background: var(--accent-soft);
 }
 
 .person-row:focus-visible {
@@ -660,7 +633,7 @@ button.stat-card:hover {
 .report-identity {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     min-width: 0;
 }
 
@@ -672,45 +645,45 @@ button.stat-card:hover {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: var(--bg-soft);
-    color: var(--text-h);
+    background: var(--surface-soft);
+    color: var(--text-strong);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
     flex-shrink: 0;
 }
 
 .report-name {
     margin: 0;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-medium);
 }
 
 .report-sub {
     margin-top: 1px;
-    font-size: 11px;
+    font-size: var(--fs-11);
     color: var(--text);
 }
 
 .report-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-2);
     min-width: 0;
 }
 
 .empty-copy {
-    font-size: 12px;
+    font-size: var(--fs-12);
     color: var(--text);
     opacity: 0.75;
 }
 
 .missing-row {
     margin: 0;
-    padding: 8px 16px 12px;
-    font-size: 12px;
+    padding: var(--space-2) var(--space-4) var(--space-3);
+    font-size: var(--fs-12);
     color: var(--text);
     border-top: 1px dashed var(--border);
 }
@@ -719,12 +692,12 @@ button.stat-card:hover {
     display: inline-flex;
     align-items: center;
     max-width: 220px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: var(--bg-soft);
-    color: var(--text-h);
-    font-size: 12px;
-    font-weight: 600;
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+    color: var(--text-strong);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -732,33 +705,33 @@ button.stat-card:hover {
 
 .issue-chip {
     background: var(--danger-bg);
-    color: var(--danger);
+    color: var(--danger-fg);
 }
 
 .report-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-2);
     flex-shrink: 0;
 }
 
 .btn-icon {
-    padding: 8px;
+    padding: var(--space-2);
 }
 
 .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 @media (max-width: 1100px) {
     .filter-toolbar {
         flex-wrap: wrap;
-        gap: 4px;
+        gap: var(--space-1);
         border-radius: var(--radius);
-        padding: 8px 10px;
+        padding: var(--space-2);
     }
 
     .filter-toolbar .input {
