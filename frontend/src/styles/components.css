@@ -2,11 +2,10 @@
 /* Shared components                  */
 /* ---------------------------------- */
 .card {
-    background: var(--bg);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px;
-    box-shadow: none;
+    padding: var(--space-5);
 }
 
 .toolbar {
@@ -42,13 +41,13 @@
 .field>textarea {
     width: 100%;
     font: inherit;
-    padding: 8px 16px;
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--bg);
-    color: var(--text-h);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text-strong);
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color var(--dur-fast) var(--ease);
 }
 
 .input:hover,
@@ -56,7 +55,7 @@
 .field>input:not([type="checkbox"]):not([type="radio"]):hover,
 .field>select:hover,
 .field>textarea:hover {
-    border-color: var(--text);
+    border-color: var(--border-strong);
 }
 
 .input:focus,
@@ -64,8 +63,7 @@
 .field>input:not([type="checkbox"]):not([type="radio"]):focus,
 .field>select:focus,
 .field>textarea:focus {
-    border-color: var(--text-h);
-    box-shadow: none;
+    border-color: var(--accent);
 }
 
 .input:focus-visible,
@@ -132,8 +130,7 @@ input[type="file"]::file-selector-button:hover {
 .textarea,
 .field>textarea {
     resize: vertical;
-    line-height: 1.55;
-    border-radius: var(--radius);
+    line-height: var(--lh-relaxed);
     min-height: 200px;
 }
 
@@ -142,27 +139,26 @@ input[type="file"]::file-selector-button:hover {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 8px 20px;
+    padding: var(--space-2) var(--space-5);
     height: 36px;
     font: inherit;
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     font-size: 14px;
     border-radius: var(--radius-pill);
     border: 1px solid var(--border);
-    background: var(--bg);
+    background: var(--surface);
     color: var(--text-h);
     cursor: pointer;
     white-space: nowrap;
-    box-shadow: none;
     transition:
-        background 0.15s,
-        border-color 0.15s,
-        opacity 0.15s,
-        color 0.15s;
+        background var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease),
+        opacity var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
 }
 
 .btn:hover {
-    background: var(--bg-soft);
+    background: var(--surface-soft);
     border-color: var(--border);
 }
 
@@ -185,7 +181,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .btn-small {
-    padding: 6px 14px;
+    padding: var(--space-1) var(--space-3);
     height: 32px;
     font-size: 13px;
 }
@@ -194,7 +190,6 @@ input[type="file"]::file-selector-button:hover {
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
-    box-shadow: none;
 }
 
 .btn-primary:hover {
@@ -210,7 +205,7 @@ input[type="file"]::file-selector-button:hover {
 .btn-danger {
     background: transparent;
     border-color: transparent;
-    color: var(--danger);
+    color: var(--danger-fg);
 }
 
 .btn-danger:hover {
@@ -218,14 +213,35 @@ input[type="file"]::file-selector-button:hover {
     border-color: transparent;
 }
 
+.chip,
+.count-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+    color: var(--text);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    white-space: nowrap;
+}
+
+.chip.is-accent,
+.count-chip {
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+}
+
 .empty-state {
-    padding: 56px 24px;
+    padding: var(--space-8) var(--space-6);
     text-align: center;
     font-size: 14px;
-    color: var(--text);
+    color: var(--text-muted);
     border: 1px dashed var(--border);
     border-radius: var(--radius);
-    background: var(--bg);
+    background: var(--surface);
 }
 
 .empty-state svg {
@@ -263,17 +279,17 @@ input[type="file"]::file-selector-button:hover {
     max-width: 360px;
     padding: 10px 16px;
     border-radius: var(--radius-pill);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    box-shadow: none;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
     color: var(--text-h);
     font-size: 14px;
     font-weight: 500;
 }
 
 .toast-success {
-    border-color: color-mix(in srgb, var(--success) 40%, var(--border));
-    background: color-mix(in srgb, var(--success) 12%, var(--bg-elevated));
+    background: var(--success-bg);
+    border-color: var(--success-border);
+    color: var(--success-fg);
 }
 
 .app-dialog-overlay {
@@ -294,7 +310,7 @@ input[type="file"]::file-selector-button:hover {
 .app-dialog-kicker {
     margin: 0 0 6px;
     font-size: 12px;
-    font-weight: 650;
+    font-weight: var(--fw-semibold);
     color: var(--accent);
 }
 
@@ -320,9 +336,9 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .toast-error {
-    border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
     background: var(--danger-bg);
-    color: var(--danger);
+    border-color: var(--danger-border);
+    color: var(--danger-fg);
 }
 
 .status-banner {
@@ -348,17 +364,19 @@ input[type="file"]::file-selector-button:hover {
     padding: 2px 8px;
     border-radius: 999px;
     font-size: 12px;
-    font-weight: 650;
+    font-weight: var(--fw-semibold);
     background: var(--bg-elevated);
     color: var(--text);
 }
 
 .status-chip.is-saved {
-    background: color-mix(in srgb, var(--success) 14%, transparent);
-    color: var(--success);
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+    color: var(--success-fg);
 }
 
 .status-chip.is-draft {
-    background: color-mix(in srgb, var(--warning) 16%, transparent);
-    color: var(--warning);
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+    color: var(--warning-fg);
 }
