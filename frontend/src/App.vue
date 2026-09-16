@@ -11,6 +11,7 @@ import {
     ChevronDown,
     PanelLeftClose,
     PanelLeftOpen,
+    Menu,
 } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -25,8 +26,8 @@ const router = useRouter();
 const route = useRoute();
 const { getUsers, getTeams, getReports } = useApi();
 const { toasts } = useToast();
-// drawerOpen / openDrawer / closeDrawer는 Task 5(좁은 화면 드로어)에서 사용한다.
-const { collapsed, toggleCollapsed, drawerOpen, openDrawer, closeDrawer } = useSidebar();
+// collapsedEffective: 좁은 화면(드로어)에서는 접힘 설정을 무시하고 항상 전체 메뉴를 보여준다.
+const { collapsedEffective, toggleCollapsed, drawerOpen, openDrawer, closeDrawer } = useSidebar();
 const {
     open: dialogOpen,
     locked: dialogLocked,
@@ -235,7 +236,10 @@ watch(
 
 watch(
     () => route.path,
-    () => loadTomorrowPlans(selectedUserId.value),
+    () => {
+        loadTomorrowPlans(selectedUserId.value);
+        closeDrawer();
+    },
 );
 
 const userInitial = () => {
@@ -254,6 +258,11 @@ const logout = async () => {
 };
 
 const onDialogKeydown = (event) => {
+    if (event.key === "Escape" && drawerOpen.value) {
+        event.preventDefault();
+        closeDrawer();
+        return;
+    }
     if (!dialogOpen.value || dialogLocked.value) return;
     if (event.key === "Escape") {
         event.preventDefault();
@@ -280,17 +289,20 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <aside class="sidebar" :class="{ 'is-collapsed': collapsed }">
+    <aside
+        class="sidebar"
+        :class="{ 'is-collapsed': collapsedEffective, 'is-drawer-open': drawerOpen }"
+    >
         <div class="sidebar-brand">
-            <span v-if="!collapsed" class="sidebar-brand-name">일일보고</span>
+            <span v-if="!collapsedEffective" class="sidebar-brand-name">일일보고</span>
             <button
                 type="button"
                 class="sidebar-collapse-btn"
-                :aria-label="collapsed ? '사이드바 펼치기' : '사이드바 접기'"
-                :title="collapsed ? '사이드바 펼치기' : '사이드바 접기'"
+                :aria-label="collapsedEffective ? '사이드바 펼치기' : '사이드바 접기'"
+                :title="collapsedEffective ? '사이드바 펼치기' : '사이드바 접기'"
                 @click="toggleCollapsed"
             >
-                <PanelLeftOpen v-if="collapsed" :size="16" />
+                <PanelLeftOpen v-if="collapsedEffective" :size="16" />
                 <PanelLeftClose v-else :size="16" />
             </button>
         </div>
@@ -304,10 +316,10 @@ onUnmounted(() => {
                     :to="item.to"
                     class="nav-link"
                     :class="{ 'router-link-exact-active': isNavActive(item.to) }"
-                    :title="collapsed ? item.label : null"
+                    :title="collapsedEffective ? item.label : null"
                 >
                     <component :is="item.icon" :size="16" />
-                    <span v-if="!collapsed" class="nav-link-label">{{ item.label }}</span>
+                    <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
                 </router-link>
             </div>
         </nav>
@@ -374,7 +386,7 @@ onUnmounted(() => {
             <button
                 type="button"
                 class="sidebar-logout"
-                :title="collapsed ? '사용자 변경' : null"
+                :title="collapsedEffective ? '사용자 변경' : null"
                 @click="logout"
             >
                 <ArrowLeftRight :size="14" />
@@ -382,9 +394,18 @@ onUnmounted(() => {
             </button>
         </div>
     </aside>
+    <div v-if="drawerOpen" class="sidebar-overlay" @click="closeDrawer" />
 
     <main class="main-content">
         <header class="topbar">
+            <button
+                type="button"
+                class="topbar-drawer-btn"
+                aria-label="메뉴 열기"
+                @click="openDrawer"
+            >
+                <Menu :size="18" />
+            </button>
             <nav class="topbar-crumbs" aria-label="현재 위치">
                 <router-link v-if="pageMeta.parent" class="topbar-crumb" :to="pageMeta.parent.to">
                     {{ pageMeta.parent.label }}

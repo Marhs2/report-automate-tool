@@ -185,6 +185,27 @@
     flex-shrink: 0;
 }
 
+/* 좁은 화면에서만 보이는 드로어 열기 버튼 (미디어쿼리에서 inline-flex로 전환) */
+.topbar-drawer-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-right: var(--space-2);
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.topbar-drawer-btn:hover {
+    background: var(--surface-soft);
+    color: var(--text-strong);
+}
+
 .topbar-crumbs {
     display: flex;
     align-items: center;
@@ -573,85 +594,46 @@
     line-height: 1.43;
 }
 
+/* 좁은 화면: 사이드바를 왼쪽에서 슬라이드되는 오버레이 드로어로 전환한다.
+   접힘 상태(.is-collapsed)는 useSidebar의 collapsedEffective가 좁은 화면에서
+   false로 만들기 때문에 여기서 따로 되돌릴 필요가 없다. */
 @media (max-width: 860px) {
     #app {
-        flex-direction: column;
+        display: block;
     }
 
     .sidebar {
-        flex: 0 0 auto;
-        flex-direction: row;
-        align-items: center;
-        width: 100%;
-        height: auto;
-        position: sticky;
-        z-index: 10;
-        overflow: visible;
-        padding: 10px 12px;
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-        gap: 12px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 60;
+        width: var(--sidebar-width);
+        max-width: 84vw;
+        height: 100vh;
+        flex-basis: auto;
+        overflow-y: auto;
+        border-right: 1px solid var(--border);
+        transform: translateX(-100%);
+        transition: transform var(--dur) var(--ease);
     }
 
-    .nav-links {
-        flex-direction: row;
-        gap: 8px;
-        min-width: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 2px;
+    .sidebar.is-drawer-open {
+        transform: translateX(0);
     }
 
-    .nav-group {
-        flex-direction: row;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .nav-group-label {
+    .sidebar-collapse-btn {
         display: none;
     }
 
-    .nav-link.router-link-exact-active::before {
-        display: none;
+    .sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(38, 37, 30, 0.28);
     }
 
-    .nav-link {
-        white-space: nowrap;
-    }
-
-    .tomorrow-card {
-        display: none;
-    }
-
-    .sidebar-footer {
-        margin-top: 0;
-        margin-left: auto;
-        flex-shrink: 0;
-        padding: 0 0 0 12px;
-        border-top: none;
-        border-left: 1px solid var(--border);
-        flex-direction: row;
-        align-items: center;
-        gap: 2px;
-    }
-
-    .sidebar-user {
-        padding: 4px;
-    }
-
-    .sidebar-user-name,
-    .sidebar-user-team {
-        display: none;
-    }
-
-    .sidebar-logout {
-        white-space: nowrap;
-        padding: 8px 10px;
-    }
-
-    .sidebar-logout svg {
-        flex-shrink: 0;
+    .topbar-drawer-btn {
+        display: inline-flex;
     }
 
     .main-content {
@@ -665,5 +647,9 @@
 
     .topbar {
         padding: 0 var(--space-4);
+    }
+
+    .page {
+        padding: var(--space-5) var(--space-4) var(--space-8);
     }
 }
