@@ -725,7 +725,7 @@ onMounted(() => {
     color: var(--text);
     opacity: 0.65;
     cursor: pointer;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
 }
 
 .btn-icon:hover {

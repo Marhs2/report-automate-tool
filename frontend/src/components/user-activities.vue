@@ -534,8 +534,8 @@ const periodLabel = computed(() =>
     min-width: 108px;
     padding: 0 var(--space-6) 0 var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--bg);
+    border-radius: var(--radius);
+    background: var(--surface);
     color: var(--text-strong);
     font: inherit;
     font-size: var(--fs-13);
