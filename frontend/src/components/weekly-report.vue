@@ -360,13 +360,6 @@ onMounted(async () => {
 
 <template>
     <div class="page weekly-report-page">
-        <div class="page-header">
-            <div>
-                <h1>주간 보고서</h1>
-    
-            </div>
-        </div>
-
         <div class="card">
             <h2>이번 주 보고서 생성</h2>
             <div class="week-nav">

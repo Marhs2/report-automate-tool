@@ -1,11 +1,6 @@
 <template>
-    <div class="page report-doc">
-        <div class="page-header">
-            <div>
-                <h1 class="detail-title">{{ userName || "분석 결과" }}</h1>
-                <p class="page-subtitle">{{ reportDate || "날짜 없음" }}</p>
-            </div>
-        </div>
+    <div class="page report-doc is-wide">
+        <AppPageHeader :title="userName || '분석 결과'" :subtitle="reportDate || '날짜 없음'" />
         <div class="status-banner">
             <span>작성자 <strong>{{ userName || "미선택" }}</strong></span>
             <span>날짜 <strong>{{ reportDate }}</strong></span>
@@ -228,6 +223,7 @@ import { ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "../composables/useToast";
+import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const route = useRoute();
 const router = useRouter();

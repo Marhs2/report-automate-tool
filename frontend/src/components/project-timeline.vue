@@ -315,13 +315,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page">
-    <div class="page-header">
-      <div>
-        <h1>프로젝트 흐름</h1>
-      </div>
-    </div>
-
+  <div class="page is-wide">
     <div class="toolbar">
       <div class="field">
         <label for="timeline-project">프로젝트</label>

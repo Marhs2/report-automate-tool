@@ -1,15 +1,10 @@
 <template>
-    <div class="page report-doc">
-        <div class="page-header">
-            <div>
-                <button type="button" class="btn back-btn" @click="goBack">
-                    <ArrowLeft :size="16" />
-                    목록으로
-                </button>
-                <h1 class="detail-title">{{ userName || "주간 요약" }}</h1>
-                <p class="page-subtitle">주간 보고서</p>
-            </div>
-        </div>
+    <div class="page report-doc is-wide">
+        <AppPageHeader :title="userName || '주간 요약'" subtitle="주간 보고서">
+            <template #actions>
+                <button type="button" class="btn btn-small" @click="goBack">목록</button>
+            </template>
+        </AppPageHeader>
 
         <div v-if="reportData" class="content-container single">
             <div class="json-container">
@@ -118,10 +113,10 @@
 
 <script setup>
 import { computed, ref, onMounted, watch } from "vue";
-import { ArrowLeft } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
+import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const route = useRoute();
 const router = useRouter();

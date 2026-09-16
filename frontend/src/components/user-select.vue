@@ -5,6 +5,7 @@ import { selectedUserId } from "../composables/useSelectedUser.js";
 import { useRouter } from "vue-router";
 import { Plus } from "lucide-vue-next";
 import { useDialog } from "../composables/useDialog";
+import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const router = useRouter();
 
@@ -70,6 +71,7 @@ onMounted(async () => {
 
 <template>
     <div class="page users-page">
+        <AppPageHeader subtitle="보고서를 작성할 사용자를 선택하세요" />
 
         <div v-if="users.length > 0" class="user-toolbar">
             <input

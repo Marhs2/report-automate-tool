@@ -169,13 +169,6 @@ const sendReport = async () => {
 
 <template>
     <div class="page">
-        <div class="page-header">
-            <div>
-                <h1>보고서 작성</h1>
-    
-            </div>
-        </div>
-
         <div class="status-banner">
             <span
                 >작성자 <strong>{{ userName || "미선택" }}</strong></span

@@ -3,6 +3,7 @@ import { onMounted, ref, reactive, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { useToast } from "../composables/useToast";
+import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const router = useRouter();
 const { error: toastError } = useToast();
@@ -341,15 +342,8 @@ const periodLabel = computed(() =>
 </script>
 
 <template>
-    <div :class="embedded ? 'activity-section' : 'page calendar-page'">
-        <div v-if="!embedded" class="page-header">
-            <div>
-                <h1>
-                    {{ periodLabel }}
-                </h1>
-
-            </div>
-        </div>
+    <div :class="embedded ? 'activity-section' : 'page calendar-page is-wide'">
+        <AppPageHeader v-if="!embedded" :title="periodLabel" />
 
         <div class="view-controls">
             <div v-if="!embedded" class="month-tools">

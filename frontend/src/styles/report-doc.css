@@ -143,16 +143,6 @@
     margin-left: auto;
 }
 
-.report-doc .back-btn {
-    margin-bottom: 10px;
-}
-
-.report-doc .detail-title {
-    margin: 0;
-    font-size: 28px;
-    line-height: 1.2;
-}
-
 @media (max-width: 860px) {
     .report-doc .content-container {
         grid-template-columns: 1fr;

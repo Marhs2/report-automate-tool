@@ -560,38 +560,48 @@
 /* Page layout                        */
 /* ---------------------------------- */
 .page {
-    max-width: 1280px;
+    max-width: var(--content-max);
     margin: 0 auto;
-    padding: 24px 32px 48px;
+    padding: var(--space-6) var(--space-7) var(--space-8);
+}
+
+.page.is-wide {
+    max-width: var(--content-max-wide);
 }
 
 .page-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
     flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 20px;
+    gap: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-5);
 }
 
-.page-header h1 {
-    display: none;
+.page-header-text {
+    min-width: 0;
+    margin-right: auto;
+}
+
+.page-title {
     margin: 0;
-}
-
-.page-header h1.detail-title {
-    display: block;
-}
-
-.page-header:not(:has(.page-subtitle)):not(:has(.count-chip)):not(:has(.detail-title)):not(:has(.back-btn)) {
-    display: none;
+    font-size: var(--fs-24);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
 }
 
 .page-subtitle {
-    color: var(--text);
-    font-size: 14px;
-    margin-top: 6px;
-    line-height: 1.43;
+    margin: var(--space-1) 0 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.page-header-filters,
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
 }
 
 /* 좁은 화면: 사이드바를 왼쪽에서 슬라이드되는 오버레이 드로어로 전환한다.

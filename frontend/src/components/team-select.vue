@@ -7,6 +7,7 @@ import { selectedUserId } from "../composables/useSelectedUser.js";
 
 import { useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
+import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const router = useRouter();
 
@@ -89,6 +90,7 @@ onMounted(async () => {
 
 <template>
     <div class="page teams-page">
+        <AppPageHeader subtitle="보고서를 작성할 팀을 선택하세요" />
 
         <div v-if="teams.length > 0" class="team-toolbar">
             <input

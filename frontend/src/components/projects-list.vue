@@ -5,6 +5,7 @@ import useApi from "../composables/useApi";
 import { useRouter } from "vue-router";
 import { useToast } from "../composables/useToast";
 import { useDialog } from "../composables/useDialog";
+import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const router = useRouter();
 const { success: toastSuccess, error: toastError } = useToast();
@@ -307,7 +308,7 @@ onMounted(() => {
 
 <template>
     <div class="page">
-
+        <AppPageHeader subtitle="팀의 일일보고 제출 현황" />
 
         <div class="stat-grid">
             <button type="button" class="stat-card" :class="{ 'is-active': isTodayPreset }" @click="setPresetToday">
