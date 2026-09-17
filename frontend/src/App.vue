@@ -76,20 +76,19 @@ const isNavActive = (to) => route.meta.navKey === to;
 
 const currentUser = ref("");
 const currentTeam = ref("");
-const tomorrowPlans = ref([]);
+const todayPlans = ref([]);
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-const tomorrowLabel = computed(() => {
+const todayLabel = computed(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 1);
     return `${d.getMonth() + 1}.${d.getDate()} ${WEEKDAYS[d.getDay()]}`;
 });
 
-const groupedTomorrowPlans = computed(() => {
+const groupedTodayPlans = computed(() => {
     const groups = [];
     const indexByProject = new Map();
-    for (const item of tomorrowPlans.value) {
+    for (const item of todayPlans.value) {
         const project = item.project || "미분류 프로젝트";
         if (!indexByProject.has(project)) {
             indexByProject.set(project, groups.length);
@@ -121,7 +120,7 @@ const projectTone = (name) => {
 
 const expandedProjects = ref(new Set());
 
-watch(groupedTomorrowPlans, (groups) => {
+watch(groupedTodayPlans, (groups) => {
     if (!groups.length) {
         expandedProjects.value = new Set();
         return;
@@ -145,8 +144,8 @@ const toggleGroup = (project) => {
 
 const allExpanded = computed(
     () =>
-        groupedTomorrowPlans.value.length > 0 &&
-        groupedTomorrowPlans.value.every((group) =>
+        groupedTodayPlans.value.length > 0 &&
+        groupedTodayPlans.value.every((group) =>
             expandedProjects.value.has(group.project),
         ),
 );
@@ -157,7 +156,7 @@ const toggleAllGroups = () => {
         return;
     }
     expandedProjects.value = new Set(
-        groupedTomorrowPlans.value.map((group) => group.project),
+        groupedTodayPlans.value.map((group) => group.project),
     );
 };
 
@@ -174,8 +173,8 @@ const projectsOf = (parsedJson) => {
     return parsed.projects || [];
 };
 
-const loadTomorrowPlans = async (userId) => {
-    tomorrowPlans.value = [];
+const loadTodayPlans = async (userId) => {
+    todayPlans.value = [];
     if (!userId) return;
     try {
         const reports = await getReports();
@@ -185,10 +184,12 @@ const loadTomorrowPlans = async (userId) => {
         if (!mine.length) return;
         const today = new Date();
         const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-        const latest =
-            mine.find((row) => row.report_date === todayKey) || mine[0];
+        const source =
+            mine.find((row) => row.report_date < todayKey) ||
+            mine.find((row) => row.report_date === todayKey) ||
+            mine[0];
         const items = [];
-        for (const project of projectsOf(latest.parsed_json)) {
+        for (const project of projectsOf(source.parsed_json)) {
             for (const plan of project.nextPlans || []) {
                 const text = String(plan || "").trim();
                 if (!text) continue;
@@ -198,9 +199,9 @@ const loadTomorrowPlans = async (userId) => {
                 });
             }
         }
-        tomorrowPlans.value = items;
+        todayPlans.value = items;
     } catch {
-        tomorrowPlans.value = [];
+        todayPlans.value = [];
     }
 };
 
@@ -227,7 +228,7 @@ watch(
     [selectedUserId, selectedTeamId],
     ([id, teamId]) => {
         loadCurrent(id, teamId);
-        loadTomorrowPlans(id);
+        loadTodayPlans(id);
     },
     { immediate: true },
 );
@@ -235,7 +236,7 @@ watch(
 watch(
     () => route.path,
     () => {
-        loadTomorrowPlans(selectedUserId.value);
+        loadTodayPlans(selectedUserId.value);
         closeDrawer();
     },
 );
@@ -330,25 +331,25 @@ onUnmounted(() => {
             </div>
         </nav>
 
-        <section class="tomorrow-card" aria-label="내일 할 일">
+        <section class="tomorrow-card" aria-label="오늘 할 일">
             <div class="tomorrow-card-head">
                 <div class="tomorrow-card-heading">
-                    <p class="tomorrow-card-title">내일 할 일</p>
-                    <span v-if="tomorrowPlans.length" class="tomorrow-card-count">{{ tomorrowPlans.length }}</span>
+                    <p class="tomorrow-card-title">오늘 할 일</p>
+                    <span v-if="todayPlans.length" class="tomorrow-card-count">{{ todayPlans.length }}</span>
                 </div>
-                <span class="tomorrow-card-date">{{ tomorrowLabel }}</span>
+                <span class="tomorrow-card-date">{{ todayLabel }}</span>
             </div>
-            <div v-if="groupedTomorrowPlans.length" class="tomorrow-card-toolbar">
+            <div v-if="groupedTodayPlans.length" class="tomorrow-card-toolbar">
                 <p class="tomorrow-card-summary">
-                    {{ groupedTomorrowPlans.length }}개 프로젝트
+                    {{ groupedTodayPlans.length }}개 프로젝트
                 </p>
                 <button type="button" class="tomorrow-card-toggle-all" @click="toggleAllGroups">
                     {{ allExpanded ? "모두 접기" : "모두 펼치기" }}
                 </button>
             </div>
-            <div v-if="groupedTomorrowPlans.length" class="tomorrow-card-body">
+            <div v-if="groupedTodayPlans.length" class="tomorrow-card-body">
                 <section
-                    v-for="(group, groupIndex) in groupedTomorrowPlans"
+                    v-for="(group, groupIndex) in groupedTodayPlans"
                     :key="group.project"
                     class="tomorrow-group"
                     :class="{ 'is-open': isGroupOpen(group.project) }"
@@ -358,7 +359,7 @@ onUnmounted(() => {
                         type="button"
                         class="tomorrow-group-head"
                         :aria-expanded="isGroupOpen(group.project)"
-                        :aria-controls="`tomorrow-group-${groupIndex}`"
+                        :aria-controls="`today-group-${groupIndex}`"
                         @click="toggleGroup(group.project)"
                     >
                         <ChevronDown :size="14" class="tomorrow-group-chevron" />
@@ -367,7 +368,7 @@ onUnmounted(() => {
                     </button>
                     <div
                         class="tomorrow-group-panel"
-                        :id="`tomorrow-group-${groupIndex}`"
+                        :id="`today-group-${groupIndex}`"
                         :aria-hidden="!isGroupOpen(group.project)"
                     >
                         <ul class="tomorrow-card-list">
@@ -378,7 +379,7 @@ onUnmounted(() => {
                     </div>
                 </section>
             </div>
-            <p v-else class="tomorrow-card-empty">내일 예정 업무가 없어요</p>
+            <p v-else class="tomorrow-card-empty">오늘 예정 업무가 없어요</p>
         </section>
 
         <div class="sidebar-footer">
