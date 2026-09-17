@@ -2,7 +2,7 @@
 
 ## 요구 사양
 
-모델 **Qwen3.8 27B** Unsloth `Q4_K_M`, context 32768, 추론 끄기 기준:
+모델 **Qwen3.8 27B** Unsloth `UD-Q4_K_XL`, context 32768, 추론 medium 기준:
 
 | 항목 | 최소 | 권장 |
 | --- | --- | --- |
@@ -12,7 +12,7 @@
 | OS | Windows 10/11 , Ubuntu|  |
 | 저장공간 | 25GB 여유 | 40GB 여유 |
 
-(Q4_K_M 참고: 파일 ≈ 16.67GB, 가중치 VRAM ≈ 17.4GB, 여유 포함 권장 24+GB — [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-8-27b). 운영 퀀트는 `Q4_K_M`.)
+(UD-Q4_K_XL 참고: 파일 ≈ 16.67GB, 가중치 VRAM ≈ 17.4GB, 여유 포함 권장 24+GB — [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-8-27b). 운영 퀀트는 `UD-Q4_K_XL`.)
 
 ---
 
@@ -27,20 +27,20 @@ docs/      모델·도구 선정 근거, 채점 방법
 - **백엔드**: FastAPI (`backend/main.py`), SQLite (`backend/data/daily_reports.db`)
 - **프론트엔드**: Vue 3 + Vite, docx 다운로드는 docxtemplater
 - **LLM 런타임**: [Unsloth Desktop](https://unsloth.ai/) (OpenAI 호환 API, `http://127.0.0.1:8888/v1`)
-- **채택 모델**: Qwen3.8 27B (`unsloth/Qwen3.8-27B-GGUF:Q4_K_M`, 추론 끄기, context 32768) — [선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)
+- **채택 모델**: Qwen3.8 27B (`unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL`, 추론 medium, context 32768) — [선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)
 
 ---
 
 ## 설치·실행
 
 ### 1) Unsloth (LLM 로컬 서버) 준비
-
+ 
 1. [Unsloth Desktop](https://unsloth.ai/) 설치 후 모델을 다운로드. 
-   - **권장: Qwen3.8 27B** (`unsloth/Qwen3.8-27B-GGUF:Q4_K_M`, 추론 끄기).
+   - **권장: Qwen3.8 27B** (`unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL`, 추론 medium).
    - 선정 근거: [자체 32건](docs/정확도-평가.md), 하드웨어: [llmrun.dev](https://llmrun.dev/model/qwen-qwen3-8-27b), 모델 가이드: [Unsloth Qwen3.8](https://unsloth.ai/docs/models/qwen3.8)
-   - **로드 시 추론 끄기**: `unsloth run --model unsloth/Qwen3.8-27B-GGUF:Q4_K_M --reasoning off -c 32768 -p 8888`
-   - **추론 차단**: 백엔드는 요청마다 `reasoning_effort: "none"`을 명시적으로 전송.
-     Qwen3.8 27B는 이 필드를 생략하면 기본적으로 추론을 켜므로, 필드 생략 대신 `none`이 반드시 필요.
+   - **로드**: `unsloth run --model unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL --reasoning medium -c 32768 -p 8888`
+   - **추론**: 백엔드는 요청마다 `reasoning_effort: "medium"`을 명시적으로 전송.
+     Qwen3.8 27B는 이 필드를 생략하면 기본적으로 추론을 켜므로, 필드 생략 대신 값을 반드시 넣는다.
 
 ### 2) 백엔드
 
@@ -56,12 +56,12 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 | 변수                | 기본값                     | 설명                                                                                                                                                                                                                                                                                 |
 | ------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `REPORT_MODEL_NAME` | `unsloth/Qwen3.8-27B-GGUF:Q4_K_M` | Unsloth에 로드한 모델명. **Qwen3.8 27B `Q4_K_M`(기본)** — context 32768 ([선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)) |
+| `REPORT_MODEL_NAME` | `unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL` | Unsloth에 로드한 모델명. **Qwen3.8 27B `UD-Q4_K_XL`(기본)** — context 32768 ([선정 근거](docs/모델-도구-선정-근거.md), [자체 32건](docs/정확도-평가.md)) |
 | `LM_BASE_URL`       | `http://127.0.0.1` |  |
 | `LM_API_KEY`        | `sk-unsloth-…`            |  |
 | `DAILY_MAX_TOKENS`  | `32768`| 일일 구조화 출력 상한|
 | `WEEKLY_MAX_TOKENS` | `32768`| 주간보고 생성 출력 상한|
-| `DAILY_REASONING`   | `none`                     |   |
+| `DAILY_REASONING`   | `medium`                   |   |
 
 ### 3) 프론트엔드
 
@@ -93,15 +93,15 @@ bun run dev        # http://localhost:5173
 
 ## 벤치마크 · 정확도
 
-자체 32건 (`Q4_K_M`, context 32768, 추론 끄기):
+자체 32건 (`UD-Q4_K_XL`, context 32768, 추론 medium):
 
 | 모델 | micro F1 | 평균 지연 |
 | --- | ---: | ---: |
-| Gemma 4 31B-it | 87.9% | 5.66s |
-| Muse Glimmer-30B | 87.5% | 8.63s |
-| **Qwen3.8 27B (채택)** | 86.4% | **0.85s** |
+| **Qwen3.8 27B (채택)** | **89.4%** | **4.82s** |
+| Gemma 4 31B-it | 89.3% | 5.33s |
+| Muse Glimmer-30B | 85.0% | 7.98s |
 
-채택 이유: F1은 Gemma가 1.5%p 높지만 Qwen3.8이 약 7배 빠르고 빈 보고를 모두 맞춘다.
+채택 이유: Qwen3.8이 micro F1 1위이고 세 모델 중 가장 빠르다. Gemma는 0.1%p 차이고 더 느리다.
 
 - 채점 방법·항목별 표: [정확도 평가](docs/정확도-평가.md)
 - 요구사항·도구·운영 조건: [모델·도구 선정 근거](docs/모델-도구-선정-근거.md)

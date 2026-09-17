@@ -3,12 +3,12 @@ import { computed, ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
-import { useToast } from "../composables/useToast";
+import { useDialog } from "../composables/useDialog";
 
 const { postReport, postReportPptx, getReportDraft, getUserActivities, getUsers } =
     useApi();
 const router = useRouter();
-const { error: toastError } = useToast();
+const { alert: showAlert } = useDialog();
 
 const input = ref("");
 const file = ref(null);
@@ -160,7 +160,7 @@ const sendReport = async () => {
             detail ||
             "보고서 전송에 실패했습니다. 입력한 내용은 유지되니 다시 시도해주세요.";
         formError.value = message;
-        toastError(message);
+        showAlert(message);
     } finally {
         aiLoading.value = false;
     }

@@ -109,7 +109,7 @@ with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
 with open("./model_asset/keyword_json_schema.json", "r", encoding="utf-8") as f:
     keyword_schema = json.load(f)
 
-MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "unsloth/Qwen3.8-27B-GGUF:Q4_K_M")
+MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL")
 LM_BASE_URL = os.environ.get("LM_BASE_URL", "http://127.0.0.1")
 LM_API_KEY = os.environ.get("LM_API_KEY", "")
 LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))

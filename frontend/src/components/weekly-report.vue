@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
-import { useToast } from "../composables/useToast";
 import { useDialog } from "../composables/useDialog";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
@@ -14,8 +13,7 @@ import userActivities from "./user-activities.vue";
 const router = useRouter();
 
 const { postWeeklyReport, getWeeklyReport, deleteWeeklyReport, getUserActivities, getTeams } = useApi();
-const { success: toastSuccess, error: toastError } = useToast();
-const { confirm: askConfirm } = useDialog();
+const { alert: showAlert, confirm: askConfirm } = useDialog();
 
 const selects = ref([]);
 const weekDays = ref([]);
@@ -85,12 +83,12 @@ const deleteWeekly = async (reportId) => {
     isLoading.value = true;
     try {
         await deleteWeeklyReport(reportId);
-        toastSuccess("주간 보고서를 삭제했습니다.");
+        showAlert("주간 보고서를 삭제했습니다.");
         await fetchWeeklyReport();
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("주간 보고서 삭제 실패:", error);
-        toastError(detail || "주간 보고서 삭제에 실패했습니다. 다시 시도해주세요.");
+        showAlert(detail || "주간 보고서 삭제에 실패했습니다. 다시 시도해주세요.");
     } finally {
         isLoading.value = false;
     }
@@ -98,18 +96,18 @@ const deleteWeekly = async (reportId) => {
 
 const sendDates = async () => {
     if (!userId.value) {
-        toastError("사용자를 먼저 선택해주세요.");
+        showAlert("사용자를 먼저 선택해주세요.");
         return;
     }
     if (selects.value.length === 0) {
-        toastError("기간(날짜)을 최소 1개 선택해주세요.");
+        showAlert("기간(날짜)을 최소 1개 선택해주세요.");
         return;
     }
     isLoading.value = true;
     try {
         await postWeeklyReport(userId.value, selects.value);
         await fetchWeeklyReport();
-        toastSuccess("주간 보고서를 만들었습니다.");
+        showAlert("주간 보고서를 만들었습니다.");
         const wanted = dateKey(selects.value);
         const reports = [...(weeklyReport.value || [])];
         const created =
@@ -124,7 +122,7 @@ const sendDates = async () => {
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("주간 보고서 생성 실패:", error);
-        toastError(detail || "주간 보고서 생성에 실패했습니다. 다시 시도해주세요.");
+        showAlert(detail || "주간 보고서 생성에 실패했습니다. 다시 시도해주세요.");
     } finally {
         isLoading.value = false;
     }
@@ -270,7 +268,7 @@ const downloadReport = async (report) => {
         saveAs(out, filename);
     } catch (error) {
         console.error("보고서 다운로드 실패:", error);
-        toastError("보고서 다운로드 중 오류가 발생했습니다: " + error.message);
+        showAlert("보고서 다운로드 중 오류가 발생했습니다: " + error.message);
     } finally {
         isLoading.value = false;
     }
@@ -323,10 +321,10 @@ const copyReport = async (report) => {
     try {
         const text = formatReport(report.report);
         await navigator.clipboard.writeText(text);
-        toastSuccess("보고서를 복사했습니다.");
+        showAlert("보고서를 복사했습니다.");
     } catch (error) {
         console.error("복사 실패:", error);
-        toastError("복사에 실패했습니다.");
+        showAlert("복사에 실패했습니다.");
     }
 };
 
@@ -345,7 +343,7 @@ const fetchTeams = async () => {
         teams.value = await getTeams();
     } catch (error) {
         console.error("Error fetching teams:", error);
-        toastError("팀을 불러오지 못했습니다.");
+        showAlert("팀을 불러오지 못했습니다.");
     }
 };
 

@@ -3,13 +3,11 @@ import { onMounted, ref, computed } from "vue";
 import { Search, Trash2 } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useRouter } from "vue-router";
-import { useToast } from "../composables/useToast";
 import { useDialog } from "../composables/useDialog";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const router = useRouter();
-const { success: toastSuccess, error: toastError } = useToast();
-const { confirm: askConfirm } = useDialog();
+const { alert: showAlert, confirm: askConfirm } = useDialog();
 const { getReports, deleteReport, getTeams } = useApi();
 
 const reports = ref([]);
@@ -35,7 +33,7 @@ const fetchReports = async () => {
         reports.value = response;
     } catch (error) {
         console.error("Error fetching reports:", error);
-        toastError("보고서를 불러오지 못했습니다.");
+        showAlert("보고서를 불러오지 못했습니다.");
     } finally {
         isLoading.value = false;
     }
@@ -46,7 +44,7 @@ const fetchTeams = async () => {
         teams.value = await getTeams();
     } catch (error) {
         console.error("Error fetching teams:", error);
-        toastError("팀을 불러오지 못했습니다.");
+        showAlert("팀을 불러오지 못했습니다.");
     }
 };
 
@@ -57,10 +55,10 @@ const deleteProjectReport = async (reportId, event) => {
     try {
         await deleteReport(reportId);
         await fetchReports();
-        toastSuccess("보고서를 삭제했습니다.");
+        showAlert("보고서를 삭제했습니다.");
     } catch (error) {
         console.error("Error deleting report:", error);
-        toastError("삭제에 실패했습니다.");
+        showAlert("삭제에 실패했습니다.");
     }
 };
 

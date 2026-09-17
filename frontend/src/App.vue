@@ -18,14 +18,12 @@ import { useRoute, useRouter } from "vue-router";
 import useApi from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
 import { selectedTeamId } from "./composables/useSelectedTeam";
-import { useToast } from "./composables/useToast";
 import { useDialog } from "./composables/useDialog";
 import { useSidebar } from "./composables/useSidebar";
 
 const router = useRouter();
 const route = useRoute();
 const { getUsers, getTeams, getReports } = useApi();
-const { toasts } = useToast();
 // collapsedEffective: 좁은 화면(드로어)에서는 접힘 설정을 무시하고 항상 전체 메뉴를 보여준다.
 const { collapsedEffective, isNarrow, toggleCollapsed, drawerOpen, openDrawer, closeDrawer } = useSidebar();
 const {
@@ -431,11 +429,6 @@ onUnmounted(() => {
             <RouterView />
         </div>
     </main>
-    <div class="toast-stack" aria-live="polite">
-        <div v-for="item in toasts" :key="item.id" class="toast" :class="'toast-' + item.type">
-            {{ item.message }}
-        </div>
-    </div>
     <div
         v-if="dialogOpen"
         class="app-dialog-overlay"

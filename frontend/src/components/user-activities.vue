@@ -2,11 +2,11 @@
 import { onMounted, ref, reactive, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
-import { useToast } from "../composables/useToast";
+import { useDialog } from "../composables/useDialog";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const router = useRouter();
-const { error: toastError } = useToast();
+const { alert: showAlert } = useDialog();
 const { getUserActivities, getReports, getHolidays, getTeams } = useApi();
 
 const props = defineProps({
@@ -57,7 +57,7 @@ const fetchTeams = async () => {
         teams.value = await getTeams();
     } catch (error) {
         console.error("Error fetching teams:", error);
-        toastError("팀을 불러오지 못했습니다.");
+        showAlert("팀을 불러오지 못했습니다.");
     }
 };
 

@@ -222,12 +222,12 @@
 import { ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
-import { useToast } from "../composables/useToast";
+import { useDialog } from "../composables/useDialog";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const route = useRoute();
 const router = useRouter();
-const { success: toastSuccess, error: toastError } = useToast();
+const { alert: showAlert } = useDialog();
 
 const reportData = ref(null);
 const rawData = ref(null);
@@ -344,7 +344,7 @@ const loadSaved = async (id) => {
         document.title = `${userName.value || "일일보고"} · 일일보고`;
     } catch (error) {
         console.error("보고서 불러오기 실패:", error);
-        toastError("보고서를 불러오지 못했습니다.");
+        showAlert("보고서를 불러오지 못했습니다.");
         reportData.value = null;
     } finally {
         isLoading.value = false;
@@ -417,6 +417,10 @@ const removeNextPlan = (project, index) => {
 
 const saveReport = async () => {
     if (!reportData.value) return;
+    
+
+
+
     const jsonData = JSON.stringify(reportData.value, null, 2);
     const dateValue =
         reportDate.value ||
@@ -427,22 +431,28 @@ const saveReport = async () => {
         })();
     saving.value = true;
     try {
+        if(reportData.value.projects.some((project) => project.projectName.trim() === "")) {
+            showAlert("프로젝트 이름을 입력해주세요.");
+            return;
+        }
+
+        
         const memberId =
             savedMemberId.value ??
             parseInt(localStorage.getItem("report-selectedUser") || "0", 10);
         await postSaveReport(jsonData, rawData.value, memberId, dateValue);
         if (savedReportId.value) {
-            toastSuccess("보고서를 수정했습니다.");
+            showAlert("보고서를 수정했습니다.");
         } else {
             sessionStorage.removeItem("reportData");
             sessionStorage.removeItem("reportRaw");
             sessionStorage.removeItem("reportDate");
-            toastSuccess("보고서를 저장했습니다.");
+            showAlert("보고서를 저장했습니다.");
             router.push("/");
         }
     } catch (error) {
         console.error("보고서 저장 실패:", error);
-        toastError("보고서 저장에 실패했습니다. 다시 시도해주세요.");
+        showAlert("보고서 저장에 실패했습니다. 다시 시도해주세요.");
     } finally {
         saving.value = false;
     }
@@ -450,12 +460,12 @@ const saveReport = async () => {
 
 const retryExtract = async () => {
     if (!rawData.value) {
-        toastError("원문이 없어 재추출할 수 없습니다.");
+        showAlert("원문이 없어 재추출할 수 없습니다.");
         return;
     }
     const userId = savedMemberId.value ?? getSelectedMemberId();
     if (userId === null) {
-        toastError("사용자 정보가 없습니다.");
+        showAlert("사용자 정보가 없습니다.");
         return;
     }
     try {
@@ -476,7 +486,7 @@ const retryExtract = async () => {
         sessionStorage.setItem("reportData", JSON.stringify(res));
     } catch (error) {
         console.error("재추출 실패:", error);
-        toastError("재추출에 실패했습니다. 다시 시도해주세요.");
+        showAlert("재추출에 실패했습니다. 다시 시도해주세요.");
     } finally {
         aiLoading.value = false;
     }
