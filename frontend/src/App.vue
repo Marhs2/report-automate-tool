@@ -24,7 +24,6 @@ import { useSidebar } from "./composables/useSidebar";
 const router = useRouter();
 const route = useRoute();
 const { getUsers, getTeams, getReports } = useApi();
-// collapsedEffective: 좁은 화면(드로어)에서는 접힘 설정을 무시하고 항상 전체 메뉴를 보여준다.
 const { collapsedEffective, isNarrow, toggleCollapsed, drawerOpen, openDrawer, closeDrawer } = useSidebar();
 const {
     open: dialogOpen,
@@ -36,6 +35,7 @@ const {
     confirmLabel: dialogConfirmLabel,
     cancelLabel: dialogCancelLabel,
     confirm: askConfirm,
+    alert: showAlert,
     accept: acceptDialog,
     reject: rejectDialog,
 } = useDialog();
@@ -159,6 +159,18 @@ const toggleAllGroups = () => {
         groupedTodayPlans.value.map((group) => group.project),
     );
 };
+
+const hasSelectedUser = () => {
+    const id = selectedUserId.value;
+    return id != null && String(id).trim() !== "";
+};
+
+router.beforeEach((to, from) => {
+    if (to.path === "/users") return true;
+    if (hasSelectedUser()) return true;
+    showAlert("사용자를 선택해주세요");
+    return from.path === "/users" ? false : "/users";
+});
 
 const projectsOf = (parsedJson) => {
     if (!parsedJson) return [];
