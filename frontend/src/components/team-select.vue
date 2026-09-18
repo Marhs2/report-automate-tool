@@ -5,11 +5,12 @@ import useApi from "../composables/useApi";
 import { selectedTeamId } from "../composables/useSelectedTeam.js";
 import { selectedUserId } from "../composables/useSelectedUser.js";
 
-import { useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 
-const router = useRouter();
+defineProps({
+    embedded: { type: Boolean, default: false },
+});
 
 const { getTeams, postTeams, setTeam } = useApi();
 const { alert: showAlert } = useDialog();
@@ -89,8 +90,8 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="page teams-page">
-        <AppPageHeader subtitle="보고서를 작성할 부서을 선택하세요" />
+    <div :class="embedded ? 'settings-pane' : 'page'">
+        <AppPageHeader v-if="!embedded" subtitle="보고서를 작성할 부서를 선택하세요" />
 
         <div v-if="teams.length > 0" class="team-toolbar">
             <input
@@ -154,8 +155,8 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.teams-page {
-    max-width: 720px;
+.settings-pane {
+    min-width: 0;
 }
 
 /* 카드 그리드(.select-grid/.select-card)는 components.css 전역 규칙을 쓴다. */

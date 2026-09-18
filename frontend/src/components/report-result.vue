@@ -24,8 +24,13 @@
                     v-for="(project, projectIndex) in reportData.projects"
                     :key="project._uid || projectIndex"
                     class="card projects-container"
+                    :data-accent="projectAccentIndex(projectIndex)"
                 >
                     <div class="project-head">
+                        <span
+                            v-if="reportData.projects.length > 1"
+                            class="project-kicker"
+                        >{{ projectIndex + 1 }}/{{ reportData.projects.length }}</span>
                         <input
                             class="input project-name-input"
                             v-model="project.projectName"
@@ -208,7 +213,11 @@
 
             <div class="card raw-container">
                 <h2>원본 보고서</h2>
-                <pre class="raw-content">{{ rawData }}</pre>
+                <label class="raw-toggle">
+                    <input type="checkbox" v-model="highlightOn" />
+                    추출 항목과 겹치는 원문 표시
+                </label>
+                <pre class="raw-content" v-html="highlightedRaw"></pre>
             </div>
         </div>
 
@@ -219,10 +228,14 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
+import {
+    highlightedRawHtml,
+    projectAccentIndex,
+} from "../lib/projectAccent";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const route = useRoute();
@@ -244,6 +257,14 @@ const issueText = (issue) =>
     typeof issue === "string"
         ? issue.trim()
         : String(issue?.content || "").trim();
+
+const highlightOn = ref(true);
+
+const highlightedRaw = computed(() =>
+    highlightedRawHtml(rawData.value, reportData.value?.projects, {
+        on: highlightOn.value,
+    }),
+);
 
 const normalizeReportIssues = (report) => {
     if (!report?.projects) return report;

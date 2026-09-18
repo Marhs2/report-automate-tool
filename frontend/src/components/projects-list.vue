@@ -4,14 +4,20 @@ import { Search, Trash2 } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
+import { missingOnDate } from "../lib/dayStatus";
+import { missingBanner, sortByIssuesFirst } from "../lib/standupInsights";
 import AppPageHeader from "./ui/AppPageHeader.vue";
+import AppFilterBar from "./ui/AppFilterBar.vue";
+import AppListRow from "./ui/AppListRow.vue";
 
 const router = useRouter();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
-const { getReports, deleteReport, getTeams } = useApi();
+const { getReports, deleteReport, getTeams, getHolidays, getUsers } = useApi();
 
 const reports = ref([]);
+const members = ref([]);
 const teams = ref([]);
+const holidayNames = ref({});
 const isLoading = ref(false);
 const filterMember = ref("");
 const filterProject = ref("");
@@ -26,11 +32,32 @@ const formatLocalDate = (value) => {
     return `${year}-${month}-${day}`;
 };
 
+const fetchHolidays = async (rows) => {
+    const years = new Set([new Date().getFullYear()]);
+    for (const report of rows || []) {
+        const year = Number(String(report.report_date || "").slice(0, 4));
+        if (year) years.add(year);
+    }
+    const map = {};
+    await Promise.all(
+        [...years].map(async (year) => {
+            const rowsForYear = await getHolidays(year);
+            for (const row of rowsForYear || []) {
+                if (row?.date) map[row.date] = row.name;
+            }
+        }),
+    );
+    holidayNames.value = map;
+};
+
 const fetchReports = async () => {
     isLoading.value = true;
     try {
         const response = await getReports();
         reports.value = response;
+        fetchHolidays(response).catch((error) => {
+            console.error("Error fetching holidays:", error);
+        });
     } catch (error) {
         console.error("Error fetching reports:", error);
         showAlert("보고서를 불러오지 못했습니다.");
@@ -45,6 +72,14 @@ const fetchTeams = async () => {
     } catch (error) {
         console.error("Error fetching teams:", error);
         showAlert("팀을 불러오지 못했습니다.");
+    }
+};
+
+const fetchMembers = async () => {
+    try {
+        members.value = await getUsers();
+    } catch (error) {
+        console.error("Error fetching users:", error);
     }
 };
 
@@ -219,6 +254,14 @@ const weekdayOf = (value) => {
 };
 
 const memberRoster = computed(() => {
+    const fromMembers = members.value.filter((member) => {
+        if (!member?.name) return false;
+        if (filterTeam.value === "all") return true;
+        return String(member.team_id) === String(filterTeam.value);
+    });
+    if (fromMembers.length) {
+        return fromMembers.map((member) => member.name);
+    }
     const names = [];
     const seen = new Set();
     for (const report of filteredReportsByProject.value) {
@@ -249,12 +292,16 @@ const reportsByDate = computed(() => {
         );
         return {
             date: group.date,
-            reports: group.reports,
+            reports: sortByIssuesFirst(group.reports, issueCount),
             issueTotal: group.reports.reduce(
                 (sum, report) => sum + issueCount(report),
                 0,
             ),
-            missing: memberRoster.value.filter((name) => !submitted.has(name)),
+            missing: missingOnDate(
+                group.date,
+                memberRoster.value.filter((name) => !submitted.has(name)),
+                holidayNames.value,
+            ),
         };
     });
 });
@@ -297,16 +344,23 @@ const clearFilters = () => {
     filterTeam.value = "all";
 };
 
+const outstandingMissing = computed(() => missingBanner(reportsByDate.value));
+
 onMounted(() => {
     document.title = "일일보고";
     fetchReports();
     fetchTeams();
+    fetchMembers();
 });
 </script>
 
 <template>
     <div class="page">
-        <AppPageHeader subtitle="팀의 일일보고 제출 현황" />
+        <AppPageHeader subtitle="미제출과 이슈가 위에 옵니다" />
+
+        <p v-if="outstandingMissing.length" class="missing-banner" role="status">
+            아직 제출하지 않음 · {{ outstandingMissing.join(" · ") }}
+        </p>
 
         <div class="stat-grid">
             <button type="button" class="stat-card" :class="{ 'is-active': isTodayPreset }" @click="setPresetToday">
@@ -340,7 +394,7 @@ onMounted(() => {
             <span v-if="!isLoading" class="list-count">{{ filteredReportsByProject.length }}건</span>
         </div>
 
-        <div class="filter-toolbar" role="search">
+        <AppFilterBar>
             <input
                 type="date"
                 v-model="filterDateFrom"
@@ -400,7 +454,7 @@ onMounted(() => {
             <datalist id="project-options">
                 <option v-for="name in projectOptions" :key="name" :value="name" />
             </datalist>
-        </div>
+        </AppFilterBar>
 
         <div v-if="isLoading" class="empty-state">보고서를 불러오는 중...</div>
         <div v-else-if="filteredReportsByProject.length === 0" class="empty-state">
@@ -426,9 +480,13 @@ onMounted(() => {
                         <template v-if="group.issueTotal"> · 이슈 {{ group.issueTotal }}</template>
                     </em>
                 </header>
-                <article
+                <p v-if="group.missing.length" class="missing-row">
+                    미제출 {{ group.missing.join(" · ") }}
+                </p>
+                <AppListRow
                     v-for="report in group.reports"
                     :key="report.id"
+                    clickable
                     class="person-row"
                     tabindex="0"
                     @click="openDetail(report.id)"
@@ -443,7 +501,7 @@ onMounted(() => {
                             <p class="report-sub">{{ teamNameOf(report) }}</p>
                         </div>
                     </div>
-                    <div class="report-meta">
+                    <template #meta>
                         <span v-for="name in projectNamesOf(report)" :key="name" class="meta-chip">
                             {{ name }}
                         </span>
@@ -453,17 +511,14 @@ onMounted(() => {
                         <span v-else-if="projectNamesOf(report).length === 0" class="empty-copy">
                             내용 없음
                         </span>
-                    </div>
-                    <div class="report-actions">
+                    </template>
+                    <template #actions>
                         <button type="button" class="btn btn-danger btn-icon" aria-label="보고서 삭제"
                             @click="deleteProjectReport(report.id, $event)">
                             <Trash2 :size="15" />
                         </button>
-                    </div>
-                </article>
-                <p v-if="group.missing.length" class="missing-row">
-                    미제출 {{ group.missing.join(" · ") }}
-                </p>
+                    </template>
+                </AppListRow>
             </section>
         </div>
     </div>
@@ -609,20 +664,6 @@ button.stat-card:hover,
     color: var(--text);
 }
 
-.person-row {
-    display: grid;
-    grid-template-columns: 148px minmax(0, 1fr) auto;
-    gap: var(--space-3);
-    align-items: center;
-    padding: var(--space-2) var(--space-4);
-    border-top: 1px solid var(--border);
-    cursor: pointer;
-}
-
-.person-row:hover {
-    background: var(--accent-soft);
-}
-
 .person-row:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
@@ -753,14 +794,6 @@ button.stat-card:hover,
     .list-count {
         margin-left: 0;
         width: 100%;
-    }
-
-    .person-row {
-        grid-template-columns: 1fr auto;
-    }
-
-    .report-meta {
-        grid-column: 1 / -1;
     }
 }
 

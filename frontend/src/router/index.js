@@ -7,8 +7,7 @@ import weekly from "../components/weekly-report.vue";
 import users from "../components/user-select.vue";
 import weeklyDetail from "../components/weekly-detail.vue";
 import projectTimeline from "../components/project-timeline.vue";
-import projectName from "../components/project-name.vue";
-import teamSelect from "../components/team-select.vue";
+import settings from "../components/settings.vue";
 
 const routes = [
   {
@@ -61,7 +60,17 @@ const routes = [
     path: "/users",
     name: "users",
     component: users,
-    meta: { title: "사용자 선택", navKey: "/users" },
+    meta: { title: "사용자 선택", navKey: "/settings" },
+  },
+  {
+    path: "/settings",
+    redirect: "/settings/users",
+  },
+  {
+    path: "/settings/:tab",
+    name: "settings",
+    component: settings,
+    meta: { title: "설정", navKey: "/settings" },
   },
   {
     path: "/weekly-detail/:id",
@@ -87,14 +96,12 @@ const routes = [
   {
     path: "/project-name",
     name: "project-name",
-    component: projectName,
-    meta: { title: "프로젝트명 관리", navKey: "/project-name" },
+    redirect: "/settings/projects",
   },
   {
     path: "/team-select",
     name: "team-select",
-    component: teamSelect,
-    meta: { title: "부서 선택", navKey: "/team-select" },
+    redirect: "/settings/teams",
   },
 ];
 const router = createRouter({

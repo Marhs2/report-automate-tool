@@ -3,6 +3,7 @@
     --bg: #f7f2eb;
     --surface: #fffdf8;
     --surface-soft: #f2ece3;
+    --sidebar-bg: #efe8dc;
 
     /* 테두리 */
     --border: #e6ddcf;
@@ -32,6 +33,12 @@
     --info-fg: #4a6b7c;
     --info-bg: #e9f0f3;
     --info-border: #bdd2db;
+    --project-4-fg: #5c5470;
+    --project-4-bg: #eeeaf3;
+    --project-4-border: #c9c1d8;
+    --project-5-fg: #3f6f68;
+    --project-5-bg: #e6f0ee;
+    --project-5-border: #b7d0cb;
 
     /* 간격 */
     --space-1: 4px;

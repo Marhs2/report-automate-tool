@@ -15,7 +15,7 @@
     gap: 12px;
     padding: 16px 14px 12px;
     border-right: 1px solid var(--border);
-    background: var(--bg);
+    background: var(--sidebar-bg, var(--surface-soft));
     position: sticky;
     top: 0;
     height: 100vh;
@@ -581,6 +581,15 @@
 .page-header-text {
     min-width: 0;
     margin-right: auto;
+}
+
+.page-title,
+.topbar-title,
+.nav-link-label,
+.chip,
+.count-chip,
+.meta-chip {
+    word-break: keep-all;
 }
 
 .page-title {

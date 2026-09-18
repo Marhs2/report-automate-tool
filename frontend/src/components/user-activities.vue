@@ -3,6 +3,16 @@ import { onMounted, ref, reactive, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
+import {
+    dayCounts,
+    cellEventBars,
+    overflowTooltip,
+} from "../lib/dayStatus";
+import {
+    peakDayLabel,
+    peakSubmissionDay,
+    weekdaySubmitted,
+} from "../lib/standupInsights";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const router = useRouter();
@@ -31,6 +41,7 @@ const tooltip = reactive({
     y: 0,
     content: "",
 });
+const selectedDate = ref("");
 
 let hideTimer = null;
 
@@ -72,6 +83,7 @@ function metaFor(dateStr) {
     return {
         date: dateStr,
         day: date.getDate(),
+        weekday: weekDay,
         weekLabel: WEEKDAY_LABELS[weekDay],
         holidayName,
         isWeekend,
@@ -123,13 +135,30 @@ const cellLabel = (name, item) => {
     return `${name} ${formatDotDate(item.report_date)} (${meta.weekLabel}) ${cellStatus(item.report_date, item.count)}`;
 };
 
-function showTooltip(e, name, item) {
+function placeTooltip(e, content) {
     clearTimeout(hideTimer);
-    const meta = metaFor(item.report_date);
-    tooltip.content = `${name} · ${meta.weekLabel} ${formatDotDate(item.report_date)} · ${cellStatus(item.report_date, item.count)}`;
+    tooltip.content = content;
     tooltip.x = e.clientX + 16;
     tooltip.y = e.clientY - 16;
     tooltip.visible = true;
+}
+
+function showTooltip(e, name, item) {
+    const meta = metaFor(item.report_date);
+    placeTooltip(
+        e,
+        `${name} · ${meta.weekLabel} ${formatDotDate(item.report_date)} · ${cellStatus(item.report_date, item.count)}`,
+    );
+}
+
+function showOverflowTooltip(e, cell) {
+    const leftover = overflowTooltip(barsOf(cell).hidden);
+    placeTooltip(
+        e,
+        leftover
+            ? `${formatDotDate(cell.date)} · ${leftover}`
+            : `${formatDotDate(cell.date)} · +${barsOf(cell).overflow}명 더보기`,
+    );
 }
 
 function moveTooltip(e) {
@@ -173,6 +202,24 @@ async function fetchUserActivities() {
         props.endDate,
     );
     userActivities.value = activities;
+    selectDefaultDay();
+}
+
+function selectDefaultDay() {
+    const today = formatDate(startOfToday());
+    const { start, end } = rangeBounds.value;
+    const todayTime = parseDate(today).getTime();
+    const todayInView =
+        todayTime >= start.getTime() && todayTime <= end.getTime();
+    if (!selectedDate.value && todayInView) {
+        selectedDate.value = today;
+        return;
+    }
+    if (!selectedDate.value) return;
+    const selectedTime = parseDate(selectedDate.value).getTime();
+    if (selectedTime < start.getTime() || selectedTime > end.getTime()) {
+        selectedDate.value = todayInView ? today : "";
+    }
 }
 
 function prevMonth() {
@@ -269,6 +316,22 @@ const visibleEntries = (cell) =>
         ? cell.entries.filter((entry) => entry.submitted)
         : cell.entries;
 
+const barsOf = (cell) => cellEventBars(visibleEntries(cell));
+
+const detailEntries = (cell) => {
+    const entries = visibleEntries(cell);
+    return [
+        ...entries.filter((entry) => entry.submitted),
+        ...entries.filter((entry) => !entry.submitted),
+    ];
+};
+
+const countsOf = (cell) => dayCounts(cell.entries || [], cell.isOffday);
+
+const toggleDay = (dateStr) => {
+    selectedDate.value = selectedDate.value === dateStr ? "" : dateStr;
+};
+
 const rangeBounds = computed(() => {
     if (props.startDate && props.endDate) {
         return {
@@ -314,6 +377,12 @@ const inRangeDays = computed(() =>
     calendarWeeks.value.flat().filter((cell) => !cell.outside),
 );
 
+const selectedCell = computed(
+    () =>
+        inRangeDays.value.find((cell) => cell.date === selectedDate.value) ||
+        null,
+);
+
 const hasToday = computed(() =>
     inRangeDays.value.some((cell) => cell.isToday),
 );
@@ -337,21 +406,51 @@ const progressOf = (activity) => {
 const periodLabel = computed(() =>
     props.startDate && props.endDate
         ? `${props.startDate} ~ ${props.endDate} 제출 현황`
-        : `${selectedYear.value}년 ${selectedMonth.value}월 활동 기록`,
+        : `${selectedYear.value}년 ${selectedMonth.value}월`,
 );
+
+const pulseLabel = computed(() => {
+    const today = inRangeDays.value.find((cell) => cell.isToday);
+    if (today && !today.isOffday) {
+        const counts = countsOf(today);
+        return `오늘 ${counts.submitted}/${counts.submitted + counts.missed} 제출`;
+    }
+    if (today?.isOffday) return `오늘 · ${today.holidayName || "휴일"}`;
+    return `${members.value.length}명 · 평일 ${weekdayCount.value}일`;
+});
+
+const insightDays = computed(() =>
+    inRangeDays.value.map((cell) => ({
+        date: cell.date,
+        weekday: cell.weekday,
+        submitted: countsOf(cell).submitted,
+        isOffday: cell.isOffday,
+    })),
+);
+
+const peakLabel = computed(() =>
+    peakDayLabel(peakSubmissionDay(insightDays.value)),
+);
+
+const weekdayStrip = computed(() => weekdaySubmitted(insightDays.value));
+
+const progressByMember = computed(() => {
+    const map = {};
+    for (const activity of orderedActivities.value) {
+        map[String(activity.member_id)] = progressOf(activity);
+    }
+    return map;
+});
 </script>
 
 <template>
     <div :class="embedded ? 'activity-section' : 'page calendar-page is-wide'">
-        <AppPageHeader v-if="!embedded" :title="periodLabel" />
-
-        <div class="view-controls">
-            <div v-if="!embedded" class="month-tools">
+        <AppPageHeader v-if="!embedded" :title="periodLabel">
+            <template #filters>
                 <div class="month-nav">
                     <button class="btn btn-small" aria-label="이전 달" @click="prevMonth">
                         &lt;
                     </button>
-                    <span class="current-period">{{ selectedYear }}년 {{ selectedMonth }}월</span>
                     <button class="btn btn-small" aria-label="다음 달" @click="nextMonth">
                         &gt;
                     </button>
@@ -368,49 +467,44 @@ const periodLabel = computed(() =>
                         {{ team.team_name }}
                     </option>
                 </select>
-            </div>
-            <div v-if="orderedActivities.length" class="legend">
-                <span class="legend-item">
-                    <span class="swatch submitted"></span> 제출
-                </span>
-                <span class="legend-item">
-                    <span class="swatch missed"></span> 미제출
-                </span>
-                <span class="legend-item">
-                    <span class="swatch weekend"></span> 주말
-                </span>
-                <span class="legend-item">
-                    <span class="swatch holiday"></span> 공휴일
-                </span>
-                <span v-if="hasToday" class="legend-item">
-                    <span class="swatch today"></span> 오늘
-                </span>
-            </div>
-        </div>
+            </template>
+        </AppPageHeader>
 
         <div v-if="orderedActivities.length === 0" class="empty-state">
             표시할 활동 기록이 없습니다
         </div>
-        <template v-else>
-            <div class="member-summary">
-                <div v-for="activity in orderedActivities" :key="activity.member_id" class="summary-item">
-                    <div class="summary-top">
-                        <span class="summary-name">{{ activity.name }}</span>
-                        <span class="summary-count">{{ progressOf(activity).submitted }}/{{
-                            progressOf(activity).total
-                        }}
-                            평일</span>
+        <div v-else class="calendar-workspace" :class="{ 'has-rail': Boolean(selectedCell) }">
+            <div class="card calendar-card">
+                <div class="cal-toolbar">
+                    <div class="cal-toolbar-copy">
+                        <p class="cal-pulse">{{ pulseLabel }}</p>
+                        <p v-if="peakLabel" class="cal-peak">{{ peakLabel }}</p>
                     </div>
-                    <div class="progress-track"
-                        :title="`${progressOf(activity).submitted}/${progressOf(activity).total} 평일`">
-                        <span class="progress-fill" :style="{
-                            width: progressOf(activity).pct + '%',
-                        }"></span>
+                    <div class="legend">
+                        <span class="legend-item">
+                            <span class="swatch submitted"></span> 제출
+                        </span>
+                        <span class="legend-item">
+                            <span class="swatch weekend"></span> 주말
+                        </span>
+                        <span class="legend-item">
+                            <span class="swatch holiday"></span> 공휴일
+                        </span>
+                        <span v-if="hasToday" class="legend-item">
+                            <span class="swatch today"></span> 오늘
+                        </span>
                     </div>
                 </div>
-            </div>
-
-            <div class="card calendar-card">
+                <div
+                    v-if="weekdayStrip.length"
+                    class="weekday-strip"
+                    aria-label="요일별 제출"
+                >
+                    <span v-for="row in weekdayStrip" :key="row.label">
+                        <em>{{ row.label }}</em>
+                        {{ row.submitted }}
+                    </span>
+                </div>
                 <div class="cal-weekdays">
                     <span v-for="label in WEEKDAY_LABELS" :key="label" :class="{
                         weekend: label === '일' || label === '토',
@@ -425,43 +519,125 @@ const periodLabel = computed(() =>
                             weekend: cell.isWeekend,
                             holiday: cell.isHoliday,
                             today: cell.isToday && !cell.outside,
+                            selected: selectedDate === cell.date,
                         }">
-                            <div class="cal-day-head">
+                            <button
+                                v-if="!cell.outside"
+                                type="button"
+                                class="cal-day-head"
+                                :aria-pressed="selectedDate === cell.date"
+                                :aria-label="`${formatDotDate(cell.date)} 제출 ${countsOf(cell).submitted}${cell.isOffday ? '' : `, 미제출 ${countsOf(cell).missed}`}`"
+                                title="이 날짜 목록 보기"
+                                @click="toggleDay(cell.date)"
+                            >
                                 <span class="cal-day-num">{{ cell.day }}</span>
-                                <span v-if="cell.holidayName && !cell.outside" class="cal-holiday"
-                                    :title="cell.holidayName">{{ cell.holidayName }}</span>
+                                <span v-if="cell.holidayName" class="cal-holiday" :title="cell.holidayName">{{ cell.holidayName }}</span>
+                                <span v-else-if="!cell.isOffday" class="cal-day-ratio">{{ countsOf(cell).submitted }}/{{ countsOf(cell).submitted + countsOf(cell).missed }}</span>
+                                <span v-else-if="countsOf(cell).submitted" class="cal-day-ratio">제출 {{ countsOf(cell).submitted }}</span>
+                            </button>
+                            <div v-else class="cal-day-head">
+                                <span class="cal-day-num">{{ cell.day }}</span>
                             </div>
-                            <div v-if="!cell.outside" class="cal-entries">
-                                <button v-for="entry in visibleEntries(cell)" :key="entry.member_id" class="cal-chip"
-                                    :class="{
-                                        submitted: entry.submitted,
-                                        missed:
-                                            !entry.submitted &&
-                                            !cell.isOffday,
-                                    }" :disabled="!entry.submitted" :aria-label="cellLabel(entry.name, entry.item)
-                                        " @click="
-                                            openCell(
-                                                {
-                                                    member_id: entry.member_id,
-                                                    name: entry.name,
-                                                },
-                                                entry.item,
-                                            )
-                                            " @mouseenter="
-                                                showTooltip(
-                                                    $event,
-                                                    entry.name,
-                                                    entry.item,
-                                                )
-                                                " @mousemove="moveTooltip" @mouseleave="hideTooltip">
+                            <div v-if="!cell.outside && (barsOf(cell).shown.length || barsOf(cell).overflow)" class="cal-entries">
+                                <button
+                                    v-for="entry in barsOf(cell).shown"
+                                    :key="entry.member_id"
+                                    type="button"
+                                    class="cal-event"
+                                    :aria-label="cellLabel(entry.name, entry.item)"
+                                    @click="
+                                        openCell(
+                                            {
+                                                member_id: entry.member_id,
+                                                name: entry.name,
+                                            },
+                                            entry.item,
+                                        )
+                                    "
+                                    @mouseenter="
+                                        showTooltip(
+                                            $event,
+                                            entry.name,
+                                            entry.item,
+                                        )
+                                    "
+                                    @mousemove="moveTooltip"
+                                    @mouseleave="hideTooltip"
+                                >
                                     {{ entry.name }}
+                                </button>
+                                <button
+                                    v-if="barsOf(cell).overflow"
+                                    type="button"
+                                    class="cal-more"
+                                    :aria-label="`${formatDotDate(cell.date)} +${barsOf(cell).overflow}명 더보기`"
+                                    @click="toggleDay(cell.date)"
+                                    @mouseenter="showOverflowTooltip($event, cell)"
+                                    @mousemove="moveTooltip"
+                                    @mouseleave="hideTooltip"
+                                >
+                                    +{{ barsOf(cell).overflow }}명 더보기
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </template>
+
+            <section
+                v-if="selectedCell"
+                class="day-rail"
+                :class="{ embedded: embedded }"
+                :aria-label="`${formatDotDate(selectedCell.date)} 제출 목록`"
+            >
+                    <div class="day-detail-head">
+                        <p class="day-detail-title">
+                            <strong>{{ formatDotDate(selectedCell.date) }} ({{ selectedCell.weekLabel }})</strong>
+                            <span v-if="selectedCell.holidayName">{{ selectedCell.holidayName }}</span>
+                        </p>
+                        <button type="button" class="btn btn-small" @click="selectedDate = ''">닫기</button>
+                    </div>
+                    <p class="day-rail-pulse">
+                        제출 {{ countsOf(selectedCell).submitted }}
+                        <template v-if="!selectedCell.isOffday"> · 미제출 {{ countsOf(selectedCell).missed }}</template>
+                    </p>
+                    <ul v-if="detailEntries(selectedCell).length" class="day-detail-list">
+                        <li v-for="entry in detailEntries(selectedCell)" :key="entry.member_id">
+                            <button
+                                type="button"
+                                class="day-detail-row"
+                                :class="{
+                                    submitted: entry.submitted,
+                                    missed: !entry.submitted && !selectedCell.isOffday,
+                                }"
+                                :disabled="!entry.submitted"
+                                @click="
+                                    openCell(
+                                        {
+                                            member_id: entry.member_id,
+                                            name: entry.name,
+                                        },
+                                        entry.item,
+                                    )
+                                "
+                            >
+                                <span>{{ entry.name }}</span>
+                                <span class="day-detail-meta">
+                                    {{
+                                        entry.submitted
+                                            ? "제출"
+                                            : selectedCell.isOffday
+                                                ? ""
+                                                : "미제출"
+                                    }}
+                                    <em>{{ progressByMember[String(entry.member_id)]?.submitted || 0 }}/{{ progressByMember[String(entry.member_id)]?.total || 0 }}</em>
+                                </span>
+                            </button>
+                        </li>
+                    </ul>
+                    <p v-if="!detailEntries(selectedCell).length" class="day-detail-empty">이 날 제출한 보고가 없습니다</p>
+            </section>
+        </div>
 
         <transition name="tooltip-fade">
             <div v-if="tooltip.visible" class="tooltip" :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }">
@@ -477,42 +653,27 @@ const periodLabel = computed(() =>
 }
 
 .activity-section .cal-day {
-    min-height: 96px;
+    min-height: 88px;
     padding: var(--space-2);
 }
 
-.activity-section .cal-chip {
-    font-size: var(--fs-11);
-    padding: 2px var(--space-2);
-}
-
-.activity-section .member-summary {
-    margin-bottom: var(--space-2);
-}
-
-.activity-section .view-controls {
-    margin-bottom: var(--space-2);
+.activity-section .calendar-workspace {
+    grid-template-columns: 1fr;
 }
 
 .calendar-page {
-    max-width: 1200px;
+    max-width: none;
 }
 
-.view-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.calendar-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
-    flex-wrap: wrap;
-    margin-bottom: var(--space-3);
+    align-items: start;
 }
 
-.month-tools {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    flex-wrap: wrap;
-    min-width: 0;
+.calendar-workspace.has-rail {
+    grid-template-columns: minmax(0, 1fr) 300px;
 }
 
 .month-nav {
@@ -578,10 +739,6 @@ const periodLabel = computed(() =>
     background: var(--success-fg);
 }
 
-.swatch.missed {
-    background: var(--border-strong);
-}
-
 .swatch.weekend {
     background: var(--surface-soft);
     border: 1px solid var(--border);
@@ -597,59 +754,65 @@ const periodLabel = computed(() =>
     outline: 2px solid var(--accent);
 }
 
-.member-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+.calendar-card {
+    padding: var(--space-4);
+    min-width: 0;
+}
+
+.cal-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-3);
+}
+
+.cal-toolbar-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.cal-pulse {
+    margin: 0;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.cal-peak {
+    margin: 0;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
+    color: var(--text);
+    word-break: keep-all;
+}
+
+.weekday-strip {
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
     margin-bottom: var(--space-3);
 }
 
-.summary-item {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-}
-
-.summary-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: var(--space-2);
-}
-
-.summary-name {
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    font-size: var(--fs-13);
-}
-
-.summary-count {
-    color: var(--text);
-    font-size: var(--fs-11);
-    font-weight: var(--fw-medium);
-    white-space: nowrap;
-}
-
-.progress-track {
-    height: 4px;
+.weekday-strip span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
     border-radius: var(--radius-pill);
-    background: var(--border);
-    overflow: hidden;
+    background: var(--surface-soft);
+    color: var(--text-strong);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    word-break: keep-all;
 }
 
-.progress-fill {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--success-fg);
-}
-
-.calendar-card {
-    padding: var(--space-4);
+.weekday-strip em {
+    font-style: normal;
+    color: var(--text);
 }
 
 .cal-weekdays {
@@ -684,7 +847,7 @@ const periodLabel = computed(() =>
 }
 
 .cal-day {
-    min-height: 128px;
+    min-height: 112px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     padding: var(--space-2);
@@ -715,15 +878,73 @@ const periodLabel = computed(() =>
     outline: 1px solid var(--accent);
 }
 
+.cal-day:not(.outside):hover {
+    border-color: var(--text);
+}
+
+.cal-day.selected {
+    border-color: var(--accent);
+    outline: 1px solid var(--accent);
+}
+
+button.cal-day-head:hover .cal-day-num,
+button.cal-day-head:focus-visible .cal-day-num {
+    background: var(--accent-soft);
+    border-color: var(--accent-border);
+    color: var(--accent-hover);
+}
+
+.cal-day.selected .cal-day-num,
+.cal-day.selected button.cal-day-head:hover .cal-day-num {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--surface);
+}
+
+.cal-day.today.selected .cal-day-num {
+    color: var(--surface);
+}
+
+button.cal-day-head,
 .cal-day-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-1);
+    gap: var(--space-2);
+    width: 100%;
     min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.cal-day.outside .cal-day-head {
+    cursor: default;
+}
+
+.cal-day-ratio {
+    font-size: 10px;
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+    white-space: nowrap;
 }
 
 .cal-day-num {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
     font-size: var(--fs-13);
     font-weight: var(--fw-bold);
     color: var(--text-strong);
@@ -733,6 +954,11 @@ const periodLabel = computed(() =>
 .cal-day.weekend .cal-day-num,
 .cal-day.outside .cal-day-num {
     color: var(--text);
+}
+
+.cal-day.outside .cal-day-num {
+    background: transparent;
+    border-color: transparent;
 }
 
 .cal-day.holiday .cal-day-num,
@@ -752,50 +978,160 @@ const periodLabel = computed(() =>
 }
 
 .cal-day.today .cal-day-num {
+    border-color: var(--accent);
     color: var(--accent);
 }
 
 .cal-entries {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: 2px;
+    min-width: 0;
 }
 
-.cal-chip {
+.cal-event {
     display: block;
     width: 100%;
-    text-align: left;
+    min-width: 0;
+    margin: 0;
+    padding: 2px 6px;
     border: none;
-    border-radius: var(--radius-sm);
-    padding: 3px var(--space-2);
+    border-radius: 4px;
+    background: var(--success-bg);
+    color: var(--success-fg);
     font: inherit;
     font-size: var(--fs-11);
     font-weight: var(--fw-semibold);
-    background: transparent;
-    color: var(--text-muted);
-    cursor: default;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    word-break: keep-all;
 }
 
-.cal-chip.submitted {
+.cal-event:hover,
+.cal-event:focus-visible {
+    background: var(--success-border);
+}
+
+.cal-more {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 1px 6px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 10px;
+    font-weight: var(--fw-semibold);
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
+}
+
+.day-rail {
+    position: sticky;
+    top: calc(var(--topbar-height) + var(--space-3));
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    min-width: 0;
+    max-height: calc(100vh - var(--topbar-height) - var(--space-6));
+    overflow: auto;
+}
+
+.day-rail.embedded {
+    position: static;
+    max-height: none;
+    grid-column: 1 / -1;
+}
+
+.day-rail-pulse {
+    margin: 0 0 var(--space-2);
+    font-size: var(--fs-12);
+    color: var(--text);
+}
+
+.day-detail-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+}
+
+.day-detail-title {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    font-size: var(--fs-13);
+    color: var(--text);
+    word-break: keep-all;
+}
+
+.day-detail-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.day-detail-meta {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: var(--fs-11);
+    font-style: normal;
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+}
+
+.day-detail-meta em {
+    font-style: normal;
+    color: var(--text-muted);
+}
+
+.day-detail-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: 4px var(--space-2);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    text-align: left;
+    word-break: keep-all;
+}
+
+.day-detail-row.submitted {
     background: var(--success-bg);
     color: var(--success-fg);
     cursor: pointer;
 }
 
-.cal-chip.submitted:hover {
-    background: var(--success-border);
-}
-
-.cal-chip.missed {
+.day-detail-row.missed {
     background: var(--surface-soft);
     color: var(--text);
 }
 
-.cal-chip:disabled {
-    cursor: default;
+.day-detail-empty {
+    margin: 0;
+    font-size: var(--fs-12);
+    color: var(--text);
 }
 
 .tooltip {
@@ -825,15 +1161,26 @@ const periodLabel = computed(() =>
     transform: translate(-50%, -60%) scale(0.9);
 }
 
+@media (max-width: 960px) {
+    .calendar-workspace,
+    .calendar-workspace.has-rail {
+        grid-template-columns: 1fr;
+    }
+
+    .day-rail {
+        position: static;
+        max-height: none;
+    }
+}
+
 @media (max-width: 860px) {
     .cal-day {
-        min-height: 96px;
+        min-height: 64px;
         padding: var(--space-2);
     }
 
-    .cal-chip {
-        font-size: 10px;
-        padding: 2px var(--space-1);
+    .cal-entries {
+        display: none;
     }
 }
 </style>

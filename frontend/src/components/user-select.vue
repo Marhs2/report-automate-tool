@@ -7,6 +7,10 @@ import { Plus } from "lucide-vue-next";
 import { useDialog } from "../composables/useDialog";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 
+const props = defineProps({
+    embedded: { type: Boolean, default: false },
+});
+
 const router = useRouter();
 
 const { getUsers, postUsers } = useApi();
@@ -35,7 +39,7 @@ const setUser = (id) => {
     }
     selectedUser.value = id;
     selectedUserId.value = id;
-    router.push("/");
+    if (!props.embedded) router.push("/");
 };
 
 const saveUser = async () => {
@@ -70,8 +74,8 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="page users-page">
-        <AppPageHeader subtitle="보고서를 작성할 사용자를 선택하세요" />
+    <div :class="embedded ? 'settings-pane' : 'page'">
+        <AppPageHeader v-if="!embedded" subtitle="보고서를 작성할 사용자를 선택하세요" />
 
         <div v-if="users.length > 0" class="user-toolbar">
             <input
@@ -133,8 +137,8 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.users-page {
-    max-width: 720px;
+.settings-pane {
+    min-width: 0;
 }
 
 /* 카드 그리드(.select-grid/.select-card)는 components.css 전역 규칙을 쓴다. */

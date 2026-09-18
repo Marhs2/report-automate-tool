@@ -1,6 +1,6 @@
 <template>
     <div class="page report-doc is-wide">
-        <AppPageHeader :title="userName || '주간 요약'" subtitle="주간 보고서">
+        <AppPageHeader :title="userName || '주간 보고서'" :subtitle="reportData?.report_date || '주간 상세'">
             <template #actions>
                 <button type="button" class="btn btn-small" @click="goBack">목록</button>
             </template>
@@ -8,87 +8,69 @@
 
         <div v-if="reportData" class="content-container single">
             <div class="json-container">
-                <div v-for="(project, projectIndex) in reportData.projects" :key="project._uid || projectIndex"
-                    class="card projects-container">
-                    <div class="project-head">
-                        <input class="input project-name-input" v-model="project.projectName" />
-                        <button class="btn btn-danger" @click="removeProject(project)">
-                            삭제
-                        </button>
+                <div class="card">
+                    <div class="meta-grid">
+                        <AppField label="보고일자">
+                            <input class="input" v-model="reportData.report_date" />
+                        </AppField>
+                        <AppField label="작성자">
+                            <input class="input" v-model="reportData.author" />
+                        </AppField>
+                        <AppField label="센터">
+                            <input class="input" v-model="reportData.center" />
+                        </AppField>
+                        <AppField label="진행 주차">
+                            <input class="input" v-model="reportData.week_label_done" />
+                        </AppField>
+                        <AppField label="향후 주차">
+                            <input class="input" :value="nextWeek" readonly tabindex="-1" />
+                        </AppField>
                     </div>
-
-
-
-                    <div class="field-group completedTasks">
-                        <h2>완료된 업무</h2>
-                        <div v-if="project.completedTasks.length > 0"
-                            v-for="(task, taskIndex) in project.completedTasks" :key="`completed-${taskIndex}`"
-                            class="task-row">
-                            <input class="input" v-model="project.completedTasks[taskIndex]" />
-                            <button class="btn remove-btn" @click="
-                                removeItem(project, 'completedTasks', taskIndex)
-                                ">
-                                -
-                            </button>
-                        </div>
-                        <div v-else class="empty-msg">완료된 업무가 없습니다</div>
-                        <button class="btn add-btn" @click="addItem(project, 'completedTasks')">
-                            +
-                        </button>
-                    </div>
-
-                    <div class="field-group inProgressTasks">
-                        <h2>진행 중인 업무</h2>
-                        <div v-if="project.inProgressTasks.length > 0"
-                            v-for="(task, taskIndex) in project.inProgressTasks" :key="`progress-${taskIndex}`"
-                            class="task-row">
-                            <input class="input" v-model="project.inProgressTasks[taskIndex]" />
-                            <button class="btn remove-btn" @click="
-                                removeItem(project, 'inProgressTasks', taskIndex)
-                                ">
-                                -
-                            </button>
-                        </div>
-                        <div v-else class="empty-msg">진행 중인 업무가 없습니다</div>
-                        <button class="btn add-btn" @click="addItem(project, 'inProgressTasks')">
-                            +
-                        </button>
-                    </div>
-
-                    <div class="field-group issues">
-                        <h2>이슈</h2>
-                        <div v-if="project.issues.length > 0" v-for="(issue, issueIndex) in project.issues"
-                            :key="`issue-${issueIndex}`" class="task-row">
-                            <input class="input" v-model="project.issues[issueIndex]" />
-                            <button class="btn remove-btn" @click="removeItem(project, 'issues', issueIndex)">
-                                -
-                            </button>
-                        </div>
-                        <div v-else class="empty-msg">이슈가 없습니다</div>
-                        <button class="btn add-btn" @click="addItem(project, 'issues')">
-                            +
-                        </button>
-                    </div>
-
-                    <div class="field-group nextPlans">
-                        <h2>다음 주 계획</h2>
-                        <div v-if="project.nextPlans.length > 0" v-for="(plan, planIndex) in project.nextPlans"
-                            :key="`plan-${planIndex}`" class="task-row">
-                            <input class="input" v-model="project.nextPlans[planIndex]" />
-                            <button class="btn remove-btn" @click="removeItem(project, 'nextPlans', planIndex)">
-                                -
-                            </button>
-                        </div>
-                        <div v-else class="empty-msg">다음 주 계획이 없습니다</div>
-                        <button class="btn add-btn" @click="addItem(project, 'nextPlans')">
-                            +
-                        </button>
-                    </div>
-
-
                 </div>
-                <button class="btn" @click="addProject">추가</button>
 
+                <div
+                    class="card project-block"
+                    v-for="(block, index) in projectBlocks"
+                    :key="block.key"
+                    :data-accent="projectAccentIndex(index)"
+                >
+                    <div class="project-head">
+                        <input
+                            class="input project-name-input"
+                            :value="blockTitle(block)"
+                            placeholder="프로젝트"
+                            @input="setBlockTitle(block, $event.target.value)"
+                        />
+                        <button type="button" class="btn btn-danger" @click="removeProject(block)">삭제</button>
+                    </div>
+                    <div class="split">
+                        <div class="field-group">
+                            <h2>진행</h2>
+                            <div
+                                v-for="(_, itemIndex) in (block.done?.items || [])"
+                                :key="`done-${block.key}-${itemIndex}`"
+                                class="task-row"
+                            >
+                                <input class="input" v-model="block.done.items[itemIndex]" />
+                                <button type="button" class="btn remove-btn" @click="removeAt(block.done.items, itemIndex)">-</button>
+                            </div>
+                            <button type="button" class="btn add-btn" @click="addItem(block, 'done')">+</button>
+                        </div>
+                        <div class="field-group">
+                            <h2>다음</h2>
+                            <div
+                                v-for="(_, itemIndex) in (block.next?.items || [])"
+                                :key="`next-${block.key}-${itemIndex}`"
+                                class="task-row"
+                            >
+                                <input class="input" v-model="block.next.items[itemIndex]" />
+                                <button type="button" class="btn remove-btn" @click="removeAt(block.next.items, itemIndex)">-</button>
+                            </div>
+                            <button type="button" class="btn add-btn" @click="addItem(block, 'next')">+</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn" @click="addProject">프로젝트 추가</button>
 
                 <div class="card save-bar">
                     <span class="member-id-display">사용자: {{ userName }}</span>
@@ -96,9 +78,7 @@
                         <p v-if="confirmQuestions.length" class="confirm-hint">
                             저장 시 확인 질문 {{ confirmQuestions.length }}개
                         </p>
-                        <button class="btn" @click="copyReport" :disabled="isSaving">
-                            복사
-                        </button>
+                        <button class="btn" @click="copyReport" :disabled="isSaving">복사</button>
                         <button class="btn btn-primary" @click="saveReport" :disabled="isSaving">
                             {{ isSaving ? "저장 중..." : "저장" }}
                         </button>
@@ -116,21 +96,43 @@ import { computed, ref, onMounted, watch } from "vue";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
+import { projectAccentIndex } from "../lib/projectAccent";
+import {
+    emptySection,
+    formatDeck,
+    nextWeekLabel,
+    toWeeklyDeck,
+} from "../lib/weeklyDeck";
 import AppPageHeader from "./ui/AppPageHeader.vue";
+import AppField from "./ui/AppField.vue";
 
 const route = useRoute();
 const router = useRouter();
 const goBack = () => router.push("/weekly");
-const removeProject = (project) => {
-    if (!reportData.value?.projects) return;
-    reportData.value.projects = reportData.value.projects.filter((p) => p !== project);
-};
 
 const reportData = ref(null);
 const userName = ref("");
 const isSaving = ref(false);
 const { getUsers, getWeeklyReportById, updateWeeklyReport } = useApi();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
+
+const nextWeek = computed(() => {
+    if (!reportData.value) return "";
+    return (
+        nextWeekLabel(
+            reportData.value.week_label_done,
+            reportData.value.report_date,
+        ) ||
+        reportData.value.week_label_next ||
+        ""
+    );
+});
+
+watch(nextWeek, (label) => {
+    if (reportData.value && label) {
+        reportData.value.week_label_next = label;
+    }
+});
 
 const confirmQuestions = computed(() => {
     const items = reportData.value?.confirmQuestions;
@@ -145,92 +147,100 @@ const confirmQuestions = computed(() => {
         .slice(0, 3);
 });
 
-const issueText = (issue) =>
-    typeof issue === "string"
-        ? issue.trim()
-        : String(issue?.content || "").trim();
-
-const normalizeReportIssues = (report) => {
-    if (!report?.projects) return report;
-    for (const project of report.projects) {
-        if (!Array.isArray(project.nextPlans) || project.nextPlans.length === 0) {
-            const weeklyPlans = (project.nextWeekPlans || []).filter((plan) =>
-                String(plan || "").trim(),
-            );
-            if (weeklyPlans.length) project.nextPlans = weeklyPlans;
-            else project.nextPlans = [];
-        }
-        const completed = [...(project.completedTasks || [])].filter((task) =>
-            String(task || "").trim(),
-        );
-        const remaining = [];
-        const seen = new Set();
-        for (const issue of project.issues || []) {
-            const content = issueText(issue);
-            if (!content) continue;
-            const status =
-                issue && typeof issue === "object" ? issue.status : "";
-            if (status === "해결") {
-                if (!completed.includes(content)) completed.push(content);
-                continue;
-            }
-            if (completed.includes(content) || seen.has(content)) continue;
-            remaining.push(content);
-            seen.add(content);
-        }
-        project.completedTasks = completed;
-        project.issues = remaining;
-    }
-    return report;
+const removeAt = (list, index) => {
+    list.splice(index, 1);
 };
+
+const projectBlocks = computed(() => {
+    const data = reportData.value;
+    if (!data) return [];
+    const order = [];
+    const seen = new Map();
+    const add = (section, kind, index) => {
+        const key = section.title || `__blank_${kind}_${index}`;
+        if (!seen.has(key)) {
+            const block = { key, done: null, next: null };
+            seen.set(key, block);
+            order.push(block);
+        }
+        seen.get(key)[kind] = section;
+    };
+    (data.done || []).forEach((section, index) => add(section, "done", index));
+    (data.next || []).forEach((section, index) => add(section, "next", index));
+    return order;
+});
+
+const blockTitle = (block) => block.done?.title || block.next?.title || "";
+
+const setBlockTitle = (block, title) => {
+    if (block.done) block.done.title = title;
+    if (block.next) block.next.title = title;
+};
+
+const addItem = (block, kind) => {
+    if (!reportData.value) return;
+    const list = kind === "done" ? reportData.value.done : reportData.value.next;
+    if (!block[kind]) {
+        const section = emptySection();
+        section.title = blockTitle(block);
+        list.push(section);
+        return;
+    }
+    block[kind].items.push("");
+};
+
+const removeProject = (block) => {
+    if (!reportData.value) return;
+    if (block.done) {
+        const index = reportData.value.done.indexOf(block.done);
+        if (index >= 0) reportData.value.done.splice(index, 1);
+    }
+    if (block.next) {
+        const index = reportData.value.next.indexOf(block.next);
+        if (index >= 0) reportData.value.next.splice(index, 1);
+    }
+};
+
+const addProject = () => {
+    if (!reportData.value) return;
+    reportData.value.done.push(emptySection());
+};
+
+
 
 watch(
     reportData,
     (newVal) => {
-        if (newVal) {
-            sessionStorage.setItem("reportData", JSON.stringify(newVal));
-        }
+        if (newVal) sessionStorage.setItem("reportData", JSON.stringify(newVal));
     },
     { deep: true },
 );
 
 onMounted(async () => {
     const reportId = route.params.id;
-
     if (reportId) {
         try {
             const data = await getWeeklyReportById(reportId);
-            reportData.value = normalizeReportIssues(data.report);
+            reportData.value = toWeeklyDeck(data.report);
+            if (!reportData.value.author) {
+                reportData.value.author = data.memberName || "";
+            }
             userName.value = data.memberName || `사용자 ${data.memberId}`;
-
             sessionStorage.setItem("reportData", JSON.stringify(reportData.value));
             sessionStorage.setItem("selectedUser", String(data.memberId));
-            if (data.createdAt) {
-                sessionStorage.setItem(
-                    "reportDate",
-                    new Date(data.createdAt).toISOString().split("T")[0],
-                );
-            }
         } catch (error) {
             console.error("보고서 불러오기 실패:", error);
             showAlert("보고서를 불러오는데 실패했습니다.");
         }
         return;
     }
-
     const stored = sessionStorage.getItem("reportData");
-
-    if (stored) {
-        reportData.value = normalizeReportIssues(JSON.parse(stored));
-    }
-
+    if (stored) reportData.value = toWeeklyDeck(JSON.parse(stored));
     const userId = localStorage.getItem("report-selectedUser") || "";
     if (userId) {
         getUsers()
             .then((users) => {
-                const found = users.find(
-                    (u) => String(u.id) === String(userId),
-                );
+                const found = users.find((u) => String(u.id) === String(userId));
                 userName.value = found ? found.name : `사용자 ${userId}`;
             })
             .catch(() => {
@@ -239,71 +249,10 @@ onMounted(async () => {
     }
 });
 
-
-const addProject = () => {
-    reportData.value.projects.push({
-        projectName: "",
-        completedTasks: [],
-        inProgressTasks: [],
-        issues: [],
-        nextPlans: [],
-    });
-};
-
-const addItem = (project, field) => {
-    project[field].push("");
-};
-
-const removeItem = (project, field, index) => {
-    project[field].splice(index, 1);
-};
-
-const formatReport = (report) => {
-    if (!report?.projects) return "";
-    const lines = [];
-    for (const project of report.projects) {
-        lines.push(`[${project.projectName}]`);
-
-        if (project.completedTasks?.length) {
-            lines.push("완료된 업무:");
-            for (const task of project.completedTasks) {
-                lines.push(`- ${task}`);
-            }
-        }
-
-        if (project.inProgressTasks?.length) {
-            lines.push("진행 중인 업무:");
-            for (const task of project.inProgressTasks) {
-                lines.push(`- ${task}`);
-            }
-        }
-
-        if (project.issues?.length) {
-            lines.push("이슈:");
-            for (const issue of project.issues) {
-                const content =
-                    typeof issue === "string" ? issue : issue.content || "";
-                lines.push(`- ${content}`);
-            }
-        }
-
-        if (project.nextPlans?.length) {
-            lines.push("다음 계획:");
-            for (const plan of project.nextPlans) {
-                lines.push(`- ${plan}`);
-            }
-        }
-
-        lines.push("");
-    }
-    return lines.join("\n").trim();
-};
-
 const copyReport = async () => {
     if (!reportData.value) return;
     try {
-        const text = formatReport(reportData.value);
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(formatDeck(reportData.value));
         showAlert("보고서가 클립보드에 복사되었습니다.");
     } catch (error) {
         console.error("복사 실패:", error);
@@ -347,7 +296,6 @@ const saveReport = async () => {
 </script>
 
 <style scoped>
-/* display/gap/margin-left은 report-doc.css의 .report-doc .save-actions가 제공한다 */
 .save-actions {
     flex-wrap: wrap;
     align-items: center;
@@ -360,5 +308,71 @@ const saveReport = async () => {
     font-size: var(--fs-12);
     font-weight: var(--fw-semibold);
     color: var(--accent);
+}
+
+.json-container,
+.project-block,
+.split,
+.field-group,
+.meta-grid {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+
+.meta-grid :deep(.input) {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.project-head {
+    min-width: 0;
+}
+
+.project-head :deep(.project-name-input) {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+}
+
+.project-head :deep(.btn) {
+    flex-shrink: 0;
+}
+
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+}
+
+.split h2 {
+    margin: 0 0 var(--space-2);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+}
+
+.task-row :deep(.input) {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+}
+
+.project-block {
+    margin-bottom: var(--space-3);
+    overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+    .meta-grid,
+    .split {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 </style>

@@ -92,6 +92,19 @@ export default function useApi() {
     }
   };
 
+  const downloadWeeklyPptx = async (weeklyId) => {
+    try {
+      const response = await axios.get(
+        `${baseURL}/weeklyById/${weeklyId}/pptx`,
+        { responseType: "blob" },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error downloading weekly pptx:", error);
+      throw error;
+    }
+  };
+
   const updateWeeklyReport = async (weeklyId, reportJson) => {
     try {
       const response = await axios.put(`${baseURL}/weekly/${weeklyId}`, {
@@ -341,6 +354,7 @@ export default function useApi() {
     postWeeklyReport,
     getWeeklyReport,
     getWeeklyReportById,
+    downloadWeeklyPptx,
     updateWeeklyReport,
     postUsers,
     getUsers,

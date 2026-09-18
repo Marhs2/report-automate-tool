@@ -5,15 +5,18 @@ import re
 import sqlite3
 from collections import defaultdict
 from datetime import date, timedelta
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from db import get_db
 from dotenv import load_dotenv
 from kr_holidays import kr_holiday_map
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from openai import OpenAI
+from pptx_fill import fill_weekly_pptx
 from pptx_to_text import extract_all_text_from_pptx
+from weekly_deck import from_legacy
 from pydantic import BaseModel
 
 load_dotenv()
@@ -1593,6 +1596,21 @@ def generate_weekly_report(member_id, selects):
             report_data = attach_confirm_questions(
                 report_data, dated_reports, selects, model_questions
             )
+            member_row = db.execute(
+                """
+                SELECT m.name, t.team_name
+                FROM members m
+                LEFT JOIN teams t ON m.team_id = t.id
+                WHERE m.id = ?
+                """,
+                (member_id,),
+            ).fetchone()
+            report_data = from_legacy(
+                report_data,
+                selected_dates=selects,
+                member_name=(member_row["name"] if member_row else ""),
+                team_name=(member_row["team_name"] if member_row else "") or "",
+            )
         except HTTPException:
             raise
         except Exception as exc:
@@ -1922,9 +1940,11 @@ def get_weekly(user_id: int):
     with get_db() as db:
         rows = db.execute(
             """
-            SELECT w.id, w.member_id, m.name, w.selected_date, w.report_json, w.created_at
+            SELECT w.id, w.member_id, m.name, t.team_name,
+                   w.selected_date, w.report_json, w.created_at
             FROM weekly_reports w
             LEFT JOIN members m ON w.member_id = m.id
+            LEFT JOIN teams t ON m.team_id = t.id
             WHERE w.member_id = ?
         """,
             (user_id,),
@@ -1935,9 +1955,14 @@ def get_weekly(user_id: int):
             "id": row[0],
             "memberId": row[1],
             "memberName": row[2],
-            "selectedDate": json.loads(row[3]),
-            "report": normalize_issues(json.loads(row[4])),
-            "createdAt": row[5],
+            "selectedDate": json.loads(row[4]),
+            "report": from_legacy(
+                normalize_issues(json.loads(row[5])),
+                selected_dates=json.loads(row[4]),
+                member_name=row[2] or "",
+                team_name=row[3] or "",
+            ),
+            "createdAt": row[6],
         }
         for row in rows
     ]
@@ -1948,9 +1973,11 @@ def get_weekly_by_id(weekly_id: int):
     with get_db() as db:
         row = db.execute(
             """
-            SELECT w.id, w.member_id, m.name, w.selected_date, w.report_json, w.created_at
+            SELECT w.id, w.member_id, m.name, t.team_name,
+                   w.selected_date, w.report_json, w.created_at
             FROM weekly_reports w
             LEFT JOIN members m ON w.member_id = m.id
+            LEFT JOIN teams t ON m.team_id = t.id
             WHERE w.id = ?
         """,
             (weekly_id,),
@@ -1959,14 +1986,65 @@ def get_weekly_by_id(weekly_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Weekly report not found")
 
+    selected = json.loads(row[4])
     return {
         "id": row[0],
         "memberId": row[1],
         "memberName": row[2],
-        "selectedDate": json.loads(row[3]),
-        "report": normalize_issues(json.loads(row[4])),
-        "createdAt": row[5],
+        "selectedDate": selected,
+        "report": from_legacy(
+            normalize_issues(json.loads(row[5])),
+            selected_dates=selected,
+            member_name=row[2] or "",
+            team_name=row[3] or "",
+        ),
+        "createdAt": row[6],
     }
+
+
+@app.get("/weeklyById/{weekly_id}/pptx")
+def export_weekly_pptx(weekly_id: int):
+    with get_db() as db:
+        row = db.execute(
+            """
+            SELECT w.id, w.member_id, m.name, t.team_name,
+                   w.selected_date, w.report_json, w.created_at
+            FROM weekly_reports w
+            LEFT JOIN members m ON w.member_id = m.id
+            LEFT JOIN teams t ON m.team_id = t.id
+            WHERE w.id = ?
+            """,
+            (weekly_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Weekly report not found")
+    selected = json.loads(row[4])
+    payload = fill_weekly_pptx(
+        {
+            "memberName": row[2] or f"사용자_{row[1]}",
+            "teamName": row[3] or "",
+            "selectedDate": selected,
+            "report": from_legacy(
+                normalize_issues(json.loads(row[5])),
+                selected_dates=selected,
+                member_name=row[2] or "",
+                team_name=row[3] or "",
+            ),
+        }
+    )
+    days = sorted(str(d)[:10] for d in selected or [])
+    period = days[-1] if days else "week"
+    member_name = row[2] or f"사용자_{row[1]}"
+    filename = f"주간_보고서_{member_name}_{period}.pptx"
+    return Response(
+        content=payload,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename*=UTF-8''{quote(filename)}"
+            )
+        },
+    )
 
 
 @app.put("/weekly/{weekly_id}")

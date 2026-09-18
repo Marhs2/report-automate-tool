@@ -57,6 +57,7 @@ yarn-error.log*
 pnpm-debug.log*
 bun-debug.log*
 frontend/.vscode
+frontend/src/lib/*.test.js
 
 # ── Env / secrets ───────────────────────────────────────
 .env

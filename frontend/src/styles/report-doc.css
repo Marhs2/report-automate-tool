@@ -43,9 +43,72 @@
     color: var(--text-strong);
 }
 
+.report-doc .raw-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.report-doc .raw-content .raw-hit {
+    background: var(--project-accent-bg, var(--accent-soft));
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 1px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+.report-doc .projects-container,
+.report-doc .raw-hit {
+    --project-accent: var(--accent);
+    --project-accent-fg: var(--accent-hover);
+    --project-accent-bg: var(--accent-soft);
+}
+
+.report-doc .projects-container[data-accent="1"],
+.report-doc .raw-hit[data-accent="1"] {
+    --project-accent: var(--info-fg);
+    --project-accent-fg: var(--info-fg);
+    --project-accent-bg: var(--info-bg);
+}
+
+.report-doc .projects-container[data-accent="2"],
+.report-doc .raw-hit[data-accent="2"] {
+    --project-accent: var(--warning-fg);
+    --project-accent-fg: var(--warning-fg);
+    --project-accent-bg: var(--warning-bg);
+}
+
+.report-doc .projects-container[data-accent="3"],
+.report-doc .raw-hit[data-accent="3"] {
+    --project-accent: var(--success-fg);
+    --project-accent-fg: var(--success-fg);
+    --project-accent-bg: var(--success-bg);
+}
+
+.report-doc .projects-container[data-accent="4"],
+.report-doc .raw-hit[data-accent="4"] {
+    --project-accent: var(--project-4-fg);
+    --project-accent-fg: var(--project-4-fg);
+    --project-accent-bg: var(--project-4-bg);
+}
+
+.report-doc .projects-container[data-accent="5"],
+.report-doc .raw-hit[data-accent="5"] {
+    --project-accent: var(--project-5-fg);
+    --project-accent-fg: var(--project-5-fg);
+    --project-accent-bg: var(--project-5-bg);
+}
+
 .report-doc .projects-container {
     display: flex;
     flex-direction: column;
+    border-left-width: 4px;
+    border-left-color: var(--project-accent);
 }
 
 .report-doc .project-head {
@@ -53,6 +116,14 @@
     align-items: center;
     gap: 8px;
     margin-bottom: 16px;
+}
+
+.report-doc .project-kicker {
+    flex-shrink: 0;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--project-accent-fg);
+    word-break: keep-all;
 }
 
 .report-doc .project-title,

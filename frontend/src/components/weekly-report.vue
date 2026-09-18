@@ -8,11 +8,20 @@ import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
 import { Download } from "lucide-vue-next";
 import { useRouter } from "vue-router";
-import userActivities from "./user-activities.vue";
+import AppPageHeader from "./ui/AppPageHeader.vue";
+import AppListRow from "./ui/AppListRow.vue";
+import { formatDeck, projectsFromDeck, toWeeklyDeck } from "../lib/weeklyDeck";
+import {
+    fromDailyReport,
+    weeklyHighlights,
+    weeklyRollup,
+    weeklyRollupLabel,
+} from "../lib/standupInsights";
+
 
 const router = useRouter();
 
-const { postWeeklyReport, getWeeklyReport, deleteWeeklyReport, getUserActivities, getTeams } = useApi();
+const { postWeeklyReport, getWeeklyReport, deleteWeeklyReport, downloadWeeklyPptx, getUserActivities, getReports, getTeams } = useApi();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
 
 const selects = ref([]);
@@ -21,6 +30,8 @@ const userId = ref(selectedUserId.value || "");
 const weeklyReport = ref(null);
 const isLoading = ref(false);
 const dayCounts = ref({});
+const weekMembers = ref([]);
+const weekDailyReports = ref([]);
 const weekdayLabels = ["월", "화", "수", "목", "금"];
 const teams = ref([]);
 const filterTeam = ref("all");
@@ -72,8 +83,154 @@ const weekLabel = computed(() => {
     return `${start} ~ ${end}${suffix}`;
 });
 
+const shortDay = (dateStr) => {
+    const parts = String(dateStr).split("-");
+    if (parts.length < 3) return dateStr;
+    return `${Number(parts[1])}.${Number(parts[2])}`;
+};
+
+const headerTitle = computed(() => {
+    if (weekDays.value.length < 5) return "주간 보고서";
+    return `${shortDay(weekDays.value[0])} ~ ${shortDay(weekDays.value[4])}`;
+});
+
+const isDayOn = (dayDate) => selects.value.includes(dayDate);
+
+const toggleSelectDay = (dayDate) => {
+    if (selects.value.includes(dayDate)) {
+        selects.value = selects.value.filter((day) => day !== dayDate);
+        return;
+    }
+    selects.value = weekDays.value.filter(
+        (day) => day === dayDate || selects.value.includes(day),
+    );
+};
+
+const reportRange = (report) => {
+    const days = [...(report?.selectedDate || [])]
+        .map(normalizeDay)
+        .filter(Boolean)
+        .sort();
+    if (!days.length) return "";
+    if (days.length === 1) return days[0];
+    return `${days[0]} ~ ${days[days.length - 1]}`;
+};
+
+
 const prevWeek = () => loadWeek(weekOffset.value - 1);
 const nextWeek = () => loadWeek(weekOffset.value + 1);
+
+const statusRows = computed(() =>
+    weekMembers.value
+        .filter(
+            (member) =>
+                filterTeam.value === "all" ||
+                String(member.team_id) === String(filterTeam.value),
+        )
+        .map((member) => {
+            const byDate = new Map(
+                (member.activities || []).map((item) => [
+                    item.report_date,
+                    item,
+                ]),
+            );
+            const cells = weekDays.value.map((date) => {
+                const item = byDate.get(date);
+                return {
+                    date,
+                    submitted: Boolean(item?.count > 0),
+                    report_id: item?.report_id,
+                };
+            });
+            const submitted = cells.filter((cell) => cell.submitted).length;
+            return {
+                member_id: member.member_id,
+                name: member.name,
+                cells,
+                submitted,
+                total: cells.length,
+            };
+        }),
+);
+
+const weekPulse = computed(() => {
+    const total = statusRows.value.length;
+    const submitted = statusRows.value.filter((row) => row.submitted > 0).length;
+    if (!total) return "표시할 팀원이 없습니다";
+    return `이번 주 ${submitted}/${total}명 제출`;
+});
+
+const submittedRows = computed(() =>
+    statusRows.value.filter((row) => row.submitted > 0),
+);
+const missedRows = computed(() =>
+    statusRows.value.filter((row) => row.submitted === 0),
+);
+const missedNames = computed(() => missedRows.value.map((row) => row.name));
+
+const teamDayCounts = computed(() => {
+    const counts = {};
+    for (const day of weekDays.value) counts[day] = 0;
+    for (const row of statusRows.value) {
+        for (const cell of row.cells) {
+            if (cell.submitted) counts[cell.date] = (counts[cell.date] || 0) + 1;
+        }
+    }
+    return counts;
+});
+
+const weekHighlightSource = computed(() =>
+    weekDailyReports.value
+        .filter(
+            (row) =>
+                filterTeam.value === "all" ||
+                String(row.member_team_id) === String(filterTeam.value),
+        )
+        .map(fromDailyReport),
+);
+
+const weekHighlights = computed(() =>
+    weeklyHighlights(weekHighlightSource.value),
+);
+
+const weekRollup = computed(() =>
+    weeklyRollup({
+        days: weekDays.value,
+        dayCounts: teamDayCounts.value,
+        submittedNames: submittedRows.value.map((row) => row.name),
+        blockerCount: weekHighlights.value.blockers.length,
+    }),
+);
+
+const rollupLabel = computed(() => weeklyRollupLabel(weekRollup.value));
+
+const headerSubtitle = computed(() =>
+    weekOffset.value === 0 ? "이번 주" : weekLabel.value,
+);
+
+const weekdayOf = (dateStr) => {
+    const index = weekDays.value.indexOf(dateStr);
+    return index >= 0 ? weekdayLabels[index] : dateStr;
+};
+
+const openDaily = async (row, cell) => {
+    if (!cell?.submitted) return;
+    let reportId = cell.report_id;
+    if (!reportId) {
+        try {
+            const reports = await getReports();
+            const found = (reports || []).find(
+                (report) =>
+                    String(report.member_id) === String(row.member_id) &&
+                    report.report_date === cell.date,
+            );
+            reportId = found?.id;
+        } catch (error) {
+            console.error("보고서 찾기 실패:", error);
+        }
+    }
+    if (reportId) router.push(`/report-result/${reportId}`);
+};
 
 weekDays.value = getWeekDays(0);
 selects.value = [...weekDays.value];
@@ -130,7 +287,8 @@ const sendDates = async () => {
 
 const loadDayCounts = async () => {
     dayCounts.value = {};
-    if (!userId.value || weekDays.value.length < 5) return;
+    weekMembers.value = [];
+    if (weekDays.value.length < 5) return;
     try {
         const rows = await getUserActivities(
             Number(weekDays.value[0].slice(0, 4)),
@@ -138,6 +296,7 @@ const loadDayCounts = async () => {
             weekDays.value[0],
             weekDays.value[4],
         );
+        weekMembers.value = rows || [];
         const mine = (rows || []).find(
             (row) => String(row.member_id) === String(userId.value),
         );
@@ -146,12 +305,29 @@ const loadDayCounts = async () => {
             next[item.report_date] = item.count || 0;
         }
         dayCounts.value = next;
-        const withReports = weekDays.value.filter(
-            (day) => (next[day] || 0) > 0,
-        );
-        selects.value = withReports;
+        if (userId.value) {
+            selects.value = weekDays.value.filter(
+                (day) => (next[day] || 0) > 0,
+            );
+        }
+        loadWeekDailies();
     } catch (error) {
         console.error("날짜별 보고 수 조회 실패:", error);
+    }
+};
+
+const loadWeekDailies = async () => {
+    weekDailyReports.value = [];
+    if (weekDays.value.length < 1) return;
+    try {
+        const rows = await getReports();
+        const days = new Set(weekDays.value);
+        weekDailyReports.value = (rows || []).filter((row) =>
+            days.has(normalizeDay(row.report_date)),
+        );
+    } catch (error) {
+        console.error("주간 일일보고 조회 실패:", error);
+        weekDailyReports.value = [];
     }
 };
 
@@ -218,7 +394,8 @@ const downloadReport = async (report) => {
             return values.length > 0 ? values : ["없음"];
         };
 
-        const projectsList = (report.report?.projects || []).map((p) => {
+        const mapped = projectsFromDeck(toWeeklyDeck(report.report));
+        const projectsList = (mapped.length ? mapped : report.report?.projects || []).map((p) => {
             const nextPlans =
                 Array.isArray(p.nextWeekPlans) && p.nextWeekPlans.length > 0
                     ? p.nextWeekPlans
@@ -274,8 +451,48 @@ const downloadReport = async (report) => {
     }
 };
 
+const periodEndOf = (report) => {
+    const sortedDates = [...(report.selectedDate || [])]
+        .map((d) => formatLocalDate(new Date(d)))
+        .sort();
+    return sortedDates[sortedDates.length - 1] || "";
+};
+
+const downloadPptx = async (report) => {
+    if (!report?.id) {
+        showAlert("저장된 주간 보고서만 PPT로 받을 수 있습니다.");
+        return;
+    }
+    isLoading.value = true;
+    try {
+        const blob = await downloadWeeklyPptx(report.id);
+        const memberName = report.memberName || `사용자_${report.memberId}`;
+        const filename = `주간_보고서_${memberName}_${periodEndOf(report)}.pptx`;
+        saveAs(blob, filename);
+    } catch (error) {
+        console.error("PPT 다운로드 실패:", error);
+        showAlert("PPT 다운로드 중 오류가 발생했습니다.");
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+
+const projectNamesOf = (report) => {
+    const deck = toWeeklyDeck(report?.report);
+    const names = [...(deck.done || []), ...(deck.next || [])]
+        .map((section) => String(section.title || "").trim())
+        .filter(Boolean);
+    if (names.length) return [...new Set(names)];
+    return (report?.report?.projects || [])
+        .map((project) => project.projectName)
+        .filter(Boolean);
+};
 
 const formatReport = (report) => {
+    const deck = toWeeklyDeck(report);
+    const text = formatDeck(deck);
+    if (text) return text;
     if (!report?.projects) return "";
     const lines = [];
     for (const project of report.projects) {
@@ -358,40 +575,19 @@ onMounted(async () => {
 
 <template>
     <div class="page weekly-report-page">
-        <div class="card">
-            <h2>이번 주 보고서 생성</h2>
-            <div class="week-nav">
-                <button class="btn btn-small" @click="prevWeek" :disabled="isLoading">
-                    &lt; 이전 주
-                </button>
-                <span class="week-label">{{ weekLabel }}</span>
-                <button class="btn btn-small" @click="nextWeek" :disabled="isLoading">
-                    다음 주 &gt;
-                </button>
-                <button v-if="weekOffset !== 0" class="btn btn-small" @click="loadWeek(0)" :disabled="isLoading">
-                    이번 주로
-                </button>
-            </div>
-            <div class="day-grid">
-                <label v-for="(dayDate, index) in weekDays" :key="index" class="day-chip">
-                    <input type="checkbox" v-model="selects" :value="dayDate" />
-                    <span>{{ weekdayLabels[index] }} {{ dayDate }}</span>
-                    <span class="day-status" :class="dayCounts[dayDate] ? 'has-report' : 'no-report'">
-                        {{ dayCounts[dayDate] ? "보고 있음" : "보고 없음" }}
-                    </span>
-                </label>
-            </div>
-
-            <div class="generate-bar">
-                <button class="btn btn-primary" v-on:click="() => sendDates()" :disabled="isLoading">
-                    {{ isLoading ? "로딩 중..." : "주간 보고서 생성" }}
-                </button>
-            </div>
-        </div>
-
-        <div class="week-status">
-            <div class="week-status-head">
-                <h2>이번 주 제출 현황</h2>
+        <AppPageHeader :title="headerTitle" :subtitle="headerSubtitle">
+            <template #filters>
+                <div class="week-nav">
+                    <button class="btn btn-small" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
+                        &lt;
+                    </button>
+                    <button class="btn btn-small" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
+                        &gt;
+                    </button>
+                    <button v-if="weekOffset !== 0" class="btn btn-small" @click="loadWeek(0)" :disabled="isLoading">
+                        이번 주로
+                    </button>
+                </div>
                 <select
                     id="weekly-report-filter-team"
                     class="team-filter"
@@ -408,159 +604,98 @@ onMounted(async () => {
                         {{ team.team_name }}
                     </option>
                 </select>
+            </template>
+            <template #actions>
+                <button class="btn btn-primary" @click="sendDates()" :disabled="isLoading || selects.length === 0">
+                    {{ isLoading ? "로딩 중..." : "주간 보고서 생성" }}
+                </button>
+            </template>
+        </AppPageHeader>
+
+        <section class="card week-board" aria-label="이번 주">
+            <div class="section-head">
+                <h2>날짜 선택</h2>
+                <p>{{ selects.length }}일 · {{ weekPulse }}</p>
             </div>
+            <div class="day-chips" role="group" aria-label="넣을 날짜">
+                <button
+                    v-for="(dayDate, index) in weekDays"
+                    :key="dayDate"
+                    type="button"
+                    class="day-chip"
+                    :class="{
+                        on: isDayOn(dayDate),
+                        has: Boolean(dayCounts[dayDate]),
+                    }"
+                    :aria-pressed="isDayOn(dayDate)"
+                    @click="toggleSelectDay(dayDate)"
+                >
+                    {{ weekdayLabels[index] }} {{ shortDay(dayDate) }}
+                </button>
+            </div>
+            <div v-if="statusRows.length === 0" class="empty-state">표시할 제출 현황이 없습니다</div>
+            <ul v-else-if="submittedRows.length" class="in-list">
+                <li v-for="row in submittedRows" :key="row.member_id">
+                    <strong>{{ row.name }}</strong>
+                    <span class="in-days">
+                        <button
+                            v-for="cell in row.cells.filter((item) => item.submitted)"
+                            :key="cell.date"
+                            type="button"
+                            class="in-day"
+                            :aria-label="row.name + ' ' + cell.date + ' 제출'"
+                            @click="openDaily(row, cell)"
+                        >
+                            {{ weekdayOf(cell.date) }}
+                        </button>
+                    </span>
+                    <span class="in-sum">{{ row.submitted }}/{{ row.total }}일</span>
+                </li>
+            </ul>
+            <p v-else class="week-empty-in">이번 주 제출한 사람이 없습니다</p>
+            <p v-if="missedRows.length" class="week-missed-count">미제출 {{ missedRows.length }}명</p>
+        </section>
 
-            <userActivities
-                :embedded="true"
-                :start-date="weekDays[0] || ''"
-                :end-date="weekDays[weekDays.length - 1] || ''"
-                :filter-team="filterTeam"
-            />
-        </div>
-
-        <div class="card">
-            <h2>주간 보고서 다운로드</h2>
+        <section class="card week-files" aria-label="생성된 주간 보고서">
+            <div class="section-head">
+                <h2>생성된 보고서</h2>
+                <p>{{ weeklyReport?.length || 0 }}건</p>
+            </div>
             <div v-if="!weeklyReport || weeklyReport.length === 0" class="empty-state">
                 생성된 주간 보고서가 없습니다
             </div>
             <ul v-else class="report-list">
-                <li v-for="(report, index) in weeklyReport" :key="index" class="report-list-item">
-                    <div class="report-list-header">
-                        <div>
-                            <div class="report-user">
-                                {{ report.memberName || report.memberId }}
-                            </div>
-                            <div class="report-dates">
-                                {{ report.selectedDate?.join(", ") }}
-                            </div>
-                        </div>
-
-                        <div class="report-list-actions">
-                            <button type="button" class="btn" @click="() => deleteWeekly(report.id)" :disabled="isLoading">
-                                삭제
-                            </button>
-                            <button class="btn" :disabled="isLoading" @click="viewReport(report)">
-                                보기
-                            </button>
-
-                            <button class="btn" @click="() => copyReport(report)" :disabled="isLoading">
-                                복사
-                            </button>
-
-                            <button class="btn" v-on:click="() => downloadReport(report)" :disabled="isLoading">
-                                <Download :size="14" /> 다운로드
-                            </button>
-                        </div>
-
-
-
+                <li v-for="(report, index) in weeklyReport" :key="report.id || index" class="report-item">
+                    <button type="button" class="report-main" :disabled="isLoading" @click="viewReport(report)">
+                        <strong>{{ report.memberName || report.memberId }}</strong>
+                        <span>{{ reportRange(report) }}</span>
+                        <em v-if="projectNamesOf(report).length">{{ projectNamesOf(report).join(" · ") }}</em>
+                    </button>
+                    <div class="report-list-actions">
+                        <button type="button" class="btn btn-small btn-primary" @click="viewReport(report)" :disabled="isLoading">보기</button>
+                        <button type="button" class="btn btn-small" @click="copyReport(report)" :disabled="isLoading">복사</button>
+                        <button type="button" class="btn btn-small" @click="downloadReport(report)" :disabled="isLoading">Word</button>
+                        <button type="button" class="btn btn-small" @click="downloadPptx(report)" :disabled="isLoading">PPT</button>
+                        <button type="button" class="btn btn-small" @click="deleteWeekly(report.id)" :disabled="isLoading">삭제</button>
                     </div>
-                    <ul class="report-projects">
-                        <li v-for="data in report.report?.projects" :key="data.projectName">
-                            {{ data.projectName }}
-                        </li>
-                    </ul>
                 </li>
             </ul>
-        </div>
+        </section>
     </div>
 </template>
 
 <style scoped>
-.day-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    margin: var(--space-4) 0;
-}
-
 .week-nav {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin: var(--space-4) 0 var(--space-1);
-    flex-wrap: wrap;
-}
-
-.week-label {
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.day-chip {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-    font-size: var(--fs-13);
-    cursor: pointer;
-}
-
-.day-chip:has(input:checked) {
-    border-color: var(--accent-border);
-    background: var(--accent-soft);
-    color: var(--text-strong);
-}
-
-.day-status {
-    margin-left: var(--space-1);
-    font-size: var(--fs-11);
-    font-weight: var(--fw-semibold);
-}
-
-/* 보고 있음 */
-.day-status.has-report {
-    color: var(--success-fg);
-}
-
-/* 보고 없음 */
-.day-status.no-report {
-    color: var(--warning-fg);
-}
-
-.generate-bar {
-    display: flex;
-    gap: var(--space-2);
-    align-items: center;
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--border);
-}
-
-.report-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-}
-
-.week-status {
-    margin: var(--space-6) 0;
-}
-
-.week-status-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-}
-
-.week-status-head h2 {
-    margin: 0;
+    flex-shrink: 0;
 }
 
 .team-filter {
     height: 32px;
     width: auto;
     min-width: 108px;
-    max-width: 180px;
-    margin-left: auto;
     padding: 0 var(--space-6) 0 var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -581,42 +716,373 @@ onMounted(async () => {
     border-color: var(--text-strong);
 }
 
-.report-list-item {
+.week-compose,
+.week-status,
+.week-files {
+    margin-bottom: var(--space-4);
+}
+
+.week-status .missing-banner {
+    margin-bottom: var(--space-3);
+}
+
+.section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.section-head h2 {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.section-head p {
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text);
+}
+
+.day-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-2);
+}
+
+.day-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-height: 76px;
+    padding: var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-3) var(--space-4);
-    background: var(--bg);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.day-tile:hover {
+    border-color: var(--text);
+}
+
+.day-tile.on {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--text-strong);
+}
+
+.day-tile-name {
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+}
+
+.day-tile-date {
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
+}
+
+.day-tile-st {
+    font-size: 11px;
+    font-weight: var(--fw-semibold);
+}
+
+.day-tile.has .day-tile-st {
+    color: var(--success-fg);
+}
+
+.day-tile:not(.has) .day-tile-st {
+    color: var(--text-muted);
+}
+
+.week-table-wrap {
+    overflow-x: auto;
+}
+
+.week-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-13);
+}
+
+.week-table th,
+.week-table td {
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.week-table thead th {
+    background: var(--surface-soft);
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+}
+
+.week-table thead small {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+}
+
+.week-table tbody th {
+    text-align: left;
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    white-space: nowrap;
+}
+
+.week-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+}
+
+.week-cell.is-in {
+    border: none;
+    background: var(--success-bg);
+    color: var(--success-fg);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+}
+
+.week-cell.is-in:hover,
+.week-cell.is-in:focus-visible {
+    background: var(--success-border);
+}
+
+.week-cell.is-out {
+    color: var(--text-muted);
+}
+
+.week-sum {
+    color: var(--text);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+}
+
+.week-empty-in,
+.week-missed-count {
+    margin: var(--space-3) 0 0;
+    font-size: var(--fs-13);
+    color: var(--text);
+}
+
+.report-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.report-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+}
+
+.report-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.report-main strong {
+    color: var(--text-strong);
+}
+
+.report-main span,
+.report-main em {
+    font-size: var(--fs-12);
+    font-style: normal;
+    color: var(--text);
 }
 
 .report-list-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-1);
+    flex-shrink: 0;
 }
 
-.report-list-header {
+@media (max-width: 860px) {
+    .day-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .report-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.day-chips {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--space-3);
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
 }
 
-.report-user {
-    font-weight: var(--fw-semibold);
+.day-chip {
+    height: 32px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+}
+
+.day-chip:hover {
+    border-color: var(--text);
+}
+
+.day-chip.on {
+    border-color: var(--accent);
+    background: var(--accent-soft);
     color: var(--text-strong);
 }
 
-.report-dates {
-    font-size: var(--fs-13);
-    color: var(--text);
-    margin-top: 2px;
+.day-chip.has {
+    font-weight: var(--fw-semibold);
 }
 
-.report-projects {
-    list-style: disc;
-    margin: var(--space-2) 0 0;
-    padding-left: var(--space-5);
+.in-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.in-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+.in-list strong {
+    min-width: 4.5em;
+    color: var(--text-strong);
+    font-size: var(--fs-13);
+}
+
+.in-days {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.in-day {
+    height: 28px;
+    padding: 0 var(--space-3);
+    border: none;
+    border-radius: 4px;
+    background: var(--success-bg);
+    color: var(--success-fg);
+    font: inherit;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
+}
+
+.in-day:hover,
+.in-day:focus-visible {
+    background: var(--success-border);
+}
+
+.in-sum {
+    font-size: var(--fs-12);
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.week-missed-count,
+.week-empty-in {
+    margin: var(--space-3) 0 0;
     font-size: var(--fs-13);
     color: var(--text);
+}
+
+.report-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+}
+
+.report-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.report-main strong {
+    color: var(--text-strong);
+}
+
+.report-main span,
+.report-main em {
+    font-size: var(--fs-12);
+    font-style: normal;
+    color: var(--text);
+}
+
+.report-list-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-left: 0;
 }
 </style>

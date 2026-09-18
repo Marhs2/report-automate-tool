@@ -382,7 +382,7 @@ onMounted(() => {
         <span class="summary-badge">{{ totalDays }}일</span>
         <span class="summary-badge">{{ totalEntries }}건 보고</span>
         <span v-if="issueBoard.open.length" class="summary-badge danger">
-          열린 이슈 {{ issueBoard.open.length }}
+          막힌 일 {{ issueBoard.open.length }}
         </span>
         <span v-if="issueBoard.unmentioned.length" class="summary-badge muted">
           언급 없음 {{ issueBoard.unmentioned.length }}
@@ -396,7 +396,7 @@ onMounted(() => {
         <h2>이슈</h2>
 
         <div v-if="issueBoard.open.length" class="issue-group">
-          <h3>미해결</h3>
+          <h3>막힌 일</h3>
           <button
             v-for="(item, index) in issueBoard.open"
             :key="`open-${item.member_id}-${item.firstDate}-${index}`"
@@ -404,7 +404,7 @@ onMounted(() => {
             class="issue-row"
             @click="openIssueEntry(item)"
           >
-            <span class="issue-chip">미해결</span>
+            <span class="issue-chip">막힌 일</span>
             <span class="issue-copy">
               <span class="issue-text">{{ item.text }}</span>
               <span class="issue-meta">{{ issueMeta(item) }}</span>

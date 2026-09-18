@@ -1,13 +1,11 @@
 <script setup>
 import {
     FolderKanban,
-    PenSquare,
     CalendarDays,
     FileBarChart,
     GitGraph,
     ArrowLeftRight,
     Settings2,
-    UsersRound,
     ChevronDown,
     PanelLeftClose,
     PanelLeftOpen,
@@ -20,6 +18,7 @@ import { selectedUserId } from "./composables/useSelectedUser";
 import { selectedTeamId } from "./composables/useSelectedTeam";
 import { useDialog } from "./composables/useDialog";
 import { useSidebar } from "./composables/useSidebar";
+import { navGroupsFromPrimary } from "./lib/nav";
 
 const router = useRouter();
 const route = useRoute();
@@ -40,30 +39,21 @@ const {
     reject: rejectDialog,
 } = useDialog();
 
-const navGroups = [
-    {
-        label: "조회",
-        items: [
-            { to: "/", label: "일일보고", icon: FolderKanban },
-            { to: "/project-timeline", label: "프로젝트 흐름", icon: GitGraph },
-            { to: "/activities", label: "사용자 활동", icon: CalendarDays },
-        ],
-    },
-    {
-        label: "작성",
-        items: [
-            { to: "/report", label: "보고서 작성", icon: PenSquare },
-            { to: "/weekly", label: "주간 보고서", icon: FileBarChart },
-        ],
-    },
-    {
-        label: "관리",
-        items: [
-            { to: "/project-name", label: "프로젝트명 관리", icon: Settings2 },
-            { to: "/team-select", label: "부서 선택", icon: UsersRound },
-        ],
-    },
-];
+const NAV_ICONS = {
+    "/": FolderKanban,
+    "/weekly": FileBarChart,
+    "/activities": CalendarDays,
+    "/project-timeline": GitGraph,
+    "/settings": Settings2,
+};
+
+const navGroups = navGroupsFromPrimary().map((group) => ({
+    ...group,
+    items: group.items.map((item) => ({
+        ...item,
+        icon: NAV_ICONS[item.to] || Settings2,
+    })),
+}));
 
 
 const pageMeta = computed(() => ({
@@ -166,7 +156,7 @@ const hasSelectedUser = () => {
 };
 
 router.beforeEach((to, from) => {
-    if (to.path === "/users") return true;
+    if (to.path === "/users" || to.path.startsWith("/settings")) return true;
     if (hasSelectedUser()) return true;
     showAlert("사용자를 선택해주세요");
     return from.path === "/users" ? false : "/users";

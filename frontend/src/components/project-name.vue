@@ -13,6 +13,10 @@ const {
 } = useApi();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
 
+defineProps({
+    embedded: { type: Boolean, default: false },
+});
+
 const projectNames = ref([]);
 const newName = ref("");
 const newKeywords = ref("");
@@ -248,7 +252,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="page names-page">
+    <div :class="embedded ? 'settings-pane' : 'page'">
         <section class="list-section">
             <div class="section-head">
                 <div class="section-title">
@@ -554,6 +558,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.settings-pane {
+    min-width: 0;
+}
+
 /* .count-chip, .chip 기본 모양은 components.css 전역 규칙을 쓴다.
    전역 .chip은 중립색이므로 액센트가 필요한 키워드 칩은 템플릿에서 `chip is-accent`를 붙인다. */
 .section-head {

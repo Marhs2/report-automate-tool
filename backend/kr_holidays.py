@@ -10,6 +10,14 @@ import holidays
 
 _cache = {}
 
+# 국경일이지만 관공서·일반 근무일은 쉬는 날이 아니다.
+_SKIP_HOLIDAY_MARKERS = ("제헌절",)
+
+
+def _is_rest_day_name(name):
+    text = str(name or "")
+    return bool(text) and not any(marker in text for marker in _SKIP_HOLIDAY_MARKERS)
+
 
 def kr_holiday_map(*years):
     years = tuple(sorted({int(year) for year in years if year is not None}))
@@ -19,7 +27,9 @@ def kr_holiday_map(*years):
     if cached is None:
         calendar = holidays.KR(years=list(years), language="ko")
         cached = {
-            day.isoformat(): name for day, name in sorted(calendar.items())
+            day.isoformat(): name
+            for day, name in sorted(calendar.items())
+            if _is_rest_day_name(name)
         }
         _cache[years] = cached
     return cached
