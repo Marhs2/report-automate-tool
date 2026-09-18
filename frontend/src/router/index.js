@@ -94,7 +94,7 @@ const routes = [
     path: "/team-select",
     name: "team-select",
     component: teamSelect,
-    meta: { title: "팀 선택", navKey: "/team-select" },
+    meta: { title: "부서 선택", navKey: "/team-select" },
   },
 ];
 const router = createRouter({

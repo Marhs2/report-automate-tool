@@ -60,7 +60,7 @@ const navGroups = [
         label: "관리",
         items: [
             { to: "/project-name", label: "프로젝트명 관리", icon: Settings2 },
-            { to: "/team-select", label: "팀 선택", icon: UsersRound },
+            { to: "/team-select", label: "부서 선택", icon: UsersRound },
         ],
     },
 ];
@@ -229,10 +229,10 @@ const loadCurrent = async (storedId, storedTeamId) => {
         currentUser.value = found ? found.name : `사용자 ${storedId}`;
         const teams = await getTeams();
         const foundTeam = teams.find((t) => String(t.id) === String(storedTeamId));
-        currentTeam.value = foundTeam ? foundTeam.team_name : `팀 ${storedTeamId}`;
+        currentTeam.value = foundTeam ? foundTeam.team_name : `부서 ${storedTeamId}`;
     } catch {
         currentUser.value = `사용자 ${storedId}`;
-        currentTeam.value = `팀 ${storedTeamId}`;
+        currentTeam.value = `부서 ${storedTeamId}`;
     }
 };
 
@@ -399,7 +399,7 @@ onUnmounted(() => {
                 <span class="sidebar-avatar">{{ userInitial() }}</span>
                 <span class="sidebar-user-meta">
                     <span class="sidebar-user-name">{{ currentUser || "사용자 미선택" }}</span>
-                    <span class="sidebar-user-team">{{ currentTeam || "팀 미선택" }}</span>
+                    <span class="sidebar-user-team">{{ currentTeam || "부서 미선택" }}</span>
                 </span>
             </div>
             <button

@@ -48,15 +48,15 @@ const assignTeam = async (teamId) => {
         selectedTeam.value = teamId;
         selectedTeamId.value = teamId;
     } catch (error) {
-        console.error("팀 지정 실패:", error);
-        showAlert("팀 지정에 실패했습니다.");
+        console.error("부서 지정 실패:", error);
+        showAlert("부서 지정에 실패했습니다.");
     }
 };
 
 const saveTeam = async () => {
     const name = newTeam.value.trim();
     if (!name) {
-        showAlert("팀 이름을 입력해주세요");
+        showAlert("부서 이름을 입력해주세요");
         return;
     }
     isSaving.value = true;
@@ -64,10 +64,10 @@ const saveTeam = async () => {
         await postTeams(name);
         newTeam.value = "";
         teams.value = await getTeams();
-        showAlert(`'${name}' 팀을 생성했습니다.`);
+        showAlert(`'${name}' 부서을 생성했습니다.`);
     } catch (error) {
-        console.error("팀 생성 실패:", error);
-        showAlert("팀 생성에 실패했습니다. 중복된 이름인지 확인해주세요.");
+        console.error("부서 생성 실패:", error);
+        showAlert("부서 생성에 실패했습니다. 중복된 이름인지 확인해주세요.");
     } finally {
         isSaving.value = false;
     }
@@ -79,9 +79,9 @@ onMounted(async () => {
     try {
         teams.value = await getTeams();
     } catch (error) {
-        console.error("팀 목록 조회 실패:", error);
+        console.error("부서 목록 조회 실패:", error);
         teams.value = [];
-        loadError.value = "팀을 불러오지 못했습니다. 잠시 후 다시 시도하세요.";
+        loadError.value = "부서을 불러오지 못했습니다. 잠시 후 다시 시도하세요.";
     } finally {
         isLoading.value = false;
     }
@@ -90,28 +90,28 @@ onMounted(async () => {
 
 <template>
     <div class="page teams-page">
-        <AppPageHeader subtitle="보고서를 작성할 팀을 선택하세요" />
+        <AppPageHeader subtitle="보고서를 작성할 부서을 선택하세요" />
 
         <div v-if="teams.length > 0" class="team-toolbar">
             <input
                 v-model="query"
                 class="input"
                 type="search"
-                placeholder="팀 이름 검색"
-                aria-label="팀 이름 검색"
+                placeholder="부서 이름 검색"
+                aria-label="부서 이름 검색"
             />
             <span class="team-count"
                 >{{ filteredTeams.length }}/{{ teams.length }}개</span
             >
         </div>
 
-        <div v-if="isLoading" class="empty-state">팀을 불러오는 중...</div>
+        <div v-if="isLoading" class="empty-state">부서을 불러오는 중...</div>
         <div v-else-if="loadError" class="empty-state">{{ loadError }}</div>
         <div v-else-if="teams.length === 0" class="empty-state">
-            등록된 팀이 없습니다. 아래에서 생성하세요.
+            등록된 부서이 없습니다. 아래에서 생성하세요.
         </div>
         <div v-else-if="filteredTeams.length === 0" class="empty-state">
-            '{{ query.trim() }}'에 해당하는 팀이 없습니다
+            '{{ query.trim() }}'에 해당하는 부서이 없습니다
         </div>
         <div v-else class="select-grid">
             <button
@@ -130,14 +130,14 @@ onMounted(async () => {
         </div>
 
         <form class="card add-card" @submit.prevent="saveTeam">
-            <h2>새 팀</h2>
+            <h2>새 부서</h2>
             <div class="add-row">
                 <input
                     id="new-team"
                     type="text"
                     v-model="newTeam"
                     class="input"
-                    placeholder="팀 이름을 입력하세요"
+                    placeholder="부서 이름을 입력하세요"
                     required
                 />
                 <button
