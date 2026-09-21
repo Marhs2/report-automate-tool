@@ -107,8 +107,6 @@
 .report-doc .projects-container {
     display: flex;
     flex-direction: column;
-    border-left-width: 4px;
-    border-left-color: var(--project-accent);
 }
 
 .report-doc .project-head {

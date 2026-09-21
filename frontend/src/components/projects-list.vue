@@ -1,14 +1,13 @@
 <script setup>
-import { onMounted, ref, computed } from "vue";
-import { Search, Trash2 } from "lucide-vue-next";
+import { onMounted, ref, computed, watch } from "vue";
+import { ChevronDown, ChevronRight, Search, X } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
 import { missingOnDate } from "../lib/dayStatus";
-import { missingBanner, sortByIssuesFirst } from "../lib/standupInsights";
+import { missingBanner } from "../lib/standupInsights";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 import AppFilterBar from "./ui/AppFilterBar.vue";
-import AppListRow from "./ui/AppListRow.vue";
 
 const router = useRouter();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
@@ -237,13 +236,6 @@ const projectNamesOf = (report) =>
         .map((project) => project.projectName)
         .filter(Boolean);
 
-const teamNameOf = (report) => {
-    const found = teams.value.find(
-        (team) => String(team.id) === String(report.member_team_id),
-    );
-    return found?.team_name || "미지정";
-};
-
 const weekdayOf = (value) => {
     if (!value) return "";
     const [year, month, day] = String(value).split("-").map(Number);
@@ -273,6 +265,44 @@ const memberRoster = computed(() => {
     return names;
 });
 
+const NO_PROJECT = "내용 없음";
+
+const byKoreanName = (a, b) =>
+    String(a.name).localeCompare(String(b.name), "ko");
+
+const peopleOf = (reports) =>
+    reports
+        .map((report) => ({
+            id: report.id,
+            name: report.member_name,
+            projects: projectNamesOf(report),
+            issues: issueCount(report),
+        }))
+        .sort(byKoreanName);
+
+const bucketsByProject = (people) => {
+    const buckets = [];
+    const index = new Map();
+    for (const person of people) {
+        for (const name of person.projects.length
+            ? person.projects
+            : [NO_PROJECT]) {
+            let bucket = index.get(name);
+            if (!bucket) {
+                bucket = { name, people: [] };
+                index.set(name, bucket);
+                buckets.push(bucket);
+            }
+            bucket.people.push(person);
+        }
+    }
+    return buckets.sort((a, b) => {
+        if (a.name === NO_PROJECT) return 1;
+        if (b.name === NO_PROJECT) return -1;
+        return b.people.length - a.people.length;
+    });
+};
+
 const reportsByDate = computed(() => {
     const groups = [];
     const index = new Map();
@@ -290,9 +320,12 @@ const reportsByDate = computed(() => {
         const submitted = new Set(
             group.reports.map((report) => report.member_name),
         );
+        const people = peopleOf(group.reports);
         return {
             date: group.date,
-            reports: sortByIssuesFirst(group.reports, issueCount),
+            reports: group.reports,
+            people,
+            buckets: bucketsByProject(people),
             issueTotal: group.reports.reduce(
                 (sum, report) => sum + issueCount(report),
                 0,
@@ -306,15 +339,57 @@ const reportsByDate = computed(() => {
     });
 });
 
-const openDetail = (reportId) => {
-    router.push(`/report-result/${reportId}`);
+const openDates = ref(new Set());
+const hasManualToggle = ref(false);
+
+watch(
+    reportsByDate,
+    (groups) => {
+        if (hasManualToggle.value) return;
+        openDates.value = new Set(groups.slice(0, 1).map((group) => group.date));
+    },
+    { immediate: true },
+);
+
+const isDateOpen = (date) => openDates.value.has(date);
+
+const toggleDate = (date) => {
+    hasManualToggle.value = true;
+    const next = new Set(openDates.value);
+    if (next.has(date)) next.delete(date);
+    else next.add(date);
+    openDates.value = next;
 };
 
-const onCardKeydown = (event, reportId) => {
-    if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openDetail(reportId);
-    }
+const allOpen = computed(
+    () =>
+        reportsByDate.value.length > 0 &&
+        reportsByDate.value.every((group) => openDates.value.has(group.date)),
+);
+
+const toggleAllDates = () => {
+    hasManualToggle.value = true;
+    openDates.value = allOpen.value
+        ? new Set()
+        : new Set(reportsByDate.value.map((group) => group.date));
+};
+
+const GROUP_MODE_KEY = "dxel.reports.groupBy";
+
+const groupMode = ref(
+    localStorage.getItem(GROUP_MODE_KEY) === "project" ? "project" : "person",
+);
+
+watch(groupMode, (mode) => localStorage.setItem(GROUP_MODE_KEY, mode));
+
+const MISSING_PREVIEW = 6;
+
+const missingPreview = (names) => names.slice(0, MISSING_PREVIEW).join(" · ");
+
+const missingRest = (names) => Math.max(0, names.length - MISSING_PREVIEW);
+
+const openDetail = (reportId) => {
+    router.push(`/report-result/${reportId}`);
 };
 
 const formatDate = (value) => {
@@ -356,7 +431,7 @@ onMounted(() => {
 
 <template>
     <div class="page">
-        <AppPageHeader subtitle="미제출과 이슈가 위에 옵니다" />
+        <AppPageHeader subtitle="이름순으로 나열하고 이슈는 빨갛게 표시합니다" />
 
         <p v-if="outstandingMissing.length" class="missing-banner" role="status">
             아직 제출하지 않음 · {{ outstandingMissing.join(" · ") }}
@@ -391,6 +466,34 @@ onMounted(() => {
             <button type="button" class="btn btn-small" :disabled="!hasActiveFilter" @click="clearFilters">
                 초기화
             </button>
+            <button
+                type="button"
+                class="btn btn-small"
+                :disabled="reportsByDate.length === 0"
+                @click="toggleAllDates"
+            >
+                {{ allOpen ? "모두 접기" : "모두 펼치기" }}
+            </button>
+            <span class="group-switch" role="group" aria-label="묶는 기준">
+                <button
+                    type="button"
+                    class="btn btn-small"
+                    :class="{ 'is-active': groupMode === 'person' }"
+                    :aria-pressed="groupMode === 'person'"
+                    @click="groupMode = 'person'"
+                >
+                    사람별
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-small"
+                    :class="{ 'is-active': groupMode === 'project' }"
+                    :aria-pressed="groupMode === 'project'"
+                    @click="groupMode = 'project'"
+                >
+                    프로젝트별
+                </button>
+            </span>
             <span v-if="!isLoading" class="list-count">{{ filteredReportsByProject.length }}건</span>
         </div>
 
@@ -470,7 +573,14 @@ onMounted(() => {
                 :key="group.date"
                 class="card date-group"
             >
-                <header class="date-head">
+                <button
+                    type="button"
+                    class="date-head"
+                    :aria-expanded="isDateOpen(group.date)"
+                    @click="toggleDate(group.date)"
+                >
+                    <ChevronDown v-if="isDateOpen(group.date)" :size="16" />
+                    <ChevronRight v-else :size="16" />
                     <strong>
                         {{ formatDate(group.date) }}
                         <b>{{ weekdayOf(group.date) }}</b>
@@ -478,47 +588,79 @@ onMounted(() => {
                     <em>
                         {{ group.reports.length }}명
                         <template v-if="group.issueTotal"> · 이슈 {{ group.issueTotal }}</template>
+                        <template v-if="group.missing.length"> · 미제출 {{ group.missing.length }}</template>
                     </em>
-                </header>
-                <p v-if="group.missing.length" class="missing-row">
-                    미제출 {{ group.missing.join(" · ") }}
-                </p>
-                <AppListRow
-                    v-for="report in group.reports"
-                    :key="report.id"
-                    clickable
-                    class="person-row"
-                    tabindex="0"
-                    @click="openDetail(report.id)"
-                    @keydown="onCardKeydown($event, report.id)"
-                >
-                    <div class="report-identity">
-                        <span class="avatar">{{
-                            String(report.member_name || "?").slice(0, 1)
-                        }}</span>
-                        <div class="report-copy">
-                            <h3 class="report-name">{{ report.member_name }}</h3>
-                            <p class="report-sub">{{ teamNameOf(report) }}</p>
+                </button>
+                <div v-if="isDateOpen(group.date)" class="date-body">
+                    <p v-if="group.missing.length" class="missing-row">
+                        미제출 {{ missingPreview(group.missing) }}
+                        <template v-if="missingRest(group.missing)">
+                            외 {{ missingRest(group.missing) }}명
+                        </template>
+                    </p>
+                    <div v-if="groupMode === 'person'" class="people-rows">
+                        <span
+                            v-for="person in group.people"
+                            :key="person.id"
+                            class="person-line"
+                            :class="{ 'has-issue': person.issues > 0 }"
+                        >
+                            <button
+                                type="button"
+                                class="person-open"
+                                @click="openDetail(person.id)"
+                            >
+                                <strong class="person-name">{{ person.name }}</strong>
+                                <span class="person-tags">
+                                    <em
+                                        v-for="project in person.projects"
+                                        :key="project"
+                                        class="tag"
+                                    >
+                                        {{ project }}
+                                    </em>
+                                    <em v-if="!person.projects.length" class="tag is-empty">
+                                        내용 없음
+                                    </em>
+                                </span>
+                                <b v-if="person.issues" class="person-issue">
+                                    이슈 {{ person.issues }}
+                                </b>
+                            </button>
+                            <button
+                                type="button"
+                                class="person-del"
+                                :aria-label="person.name + ' 보고서 삭제'"
+                                @click="deleteProjectReport(person.id, $event)"
+                            >
+                                <X :size="13" />
+                            </button>
+                        </span>
+                    </div>
+                    <div
+                        v-for="bucket in groupMode === 'project' ? group.buckets : []"
+                        :key="bucket.name"
+                        class="project-bucket"
+                    >
+                        <h3 class="bucket-head">
+                            {{ bucket.name }}
+                            <span class="bucket-count">{{ bucket.people.length }}</span>
+                        </h3>
+                        <div class="people-chips">
+                            <button
+                                v-for="person in bucket.people"
+                                :key="person.id"
+                                type="button"
+                                class="person-chip"
+                                :class="{ 'has-issue': person.issues > 0 }"
+                                @click="openDetail(person.id)"
+                            >
+                                {{ person.name }}
+                                <em v-if="person.issues">이슈 {{ person.issues }}</em>
+                            </button>
                         </div>
                     </div>
-                    <template #meta>
-                        <span v-for="name in projectNamesOf(report)" :key="name" class="meta-chip">
-                            {{ name }}
-                        </span>
-                        <span v-if="issueCount(report) > 0" class="meta-chip issue-chip">
-                            이슈 {{ issueCount(report) }}
-                        </span>
-                        <span v-else-if="projectNamesOf(report).length === 0" class="empty-copy">
-                            내용 없음
-                        </span>
-                    </template>
-                    <template #actions>
-                        <button type="button" class="btn btn-danger btn-icon" aria-label="보고서 삭제"
-                            @click="deleteProjectReport(report.id, $event)">
-                            <Trash2 :size="15" />
-                        </button>
-                    </template>
-                </AppListRow>
+                </div>
             </section>
         </div>
     </div>
@@ -640,9 +782,20 @@ button.stat-card:hover,
 
 .date-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--space-2);
-    padding: var(--space-3) var(--space-4) var(--space-2);
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.date-head:hover {
+    background: var(--surface-soft);
 }
 
 .date-head strong {
@@ -664,98 +817,174 @@ button.stat-card:hover,
     color: var(--text);
 }
 
-.person-row:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+.date-body {
+    border-top: 1px solid var(--border);
+    padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
-.report-identity {
+.project-bucket + .project-bucket {
+    margin-top: var(--space-4);
+}
+
+.bucket-head {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    min-width: 0;
-}
-
-.report-copy {
-    min-width: 0;
-}
-
-.avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--surface-soft);
-    color: var(--text-strong);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    margin: 0 0 var(--space-2);
+    font-family: var(--sans);
     font-size: var(--fs-12);
     font-weight: var(--fw-semibold);
-    flex-shrink: 0;
+    letter-spacing: 0.04em;
+    color: var(--text);
 }
 
-.report-name {
-    margin: 0;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-medium);
-}
-
-.report-sub {
-    margin-top: 1px;
+.bucket-count {
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
     font-size: var(--fs-11);
     color: var(--text);
 }
 
-.report-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    min-width: 0;
-}
-
-.empty-copy {
-    font-size: var(--fs-12);
-    color: var(--text);
-    opacity: 0.75;
-}
-
-.missing-row {
-    margin: 0;
-    padding: var(--space-2) var(--space-4) var(--space-3);
-    font-size: var(--fs-12);
-    color: var(--text);
-    border-top: 1px dashed var(--border);
-}
-
-.meta-chip {
+.group-switch {
     display: inline-flex;
+    gap: var(--space-1);
+    margin-left: var(--space-2);
+}
+
+.people-rows {
+    columns: 330px;
+    column-gap: var(--space-6);
+}
+
+.person-line {
+    display: flex;
     align-items: center;
-    max-width: 220px;
-    padding: 2px var(--space-2);
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-    color: var(--text-strong);
-    font-size: var(--fs-12);
+    border-bottom: 1px solid var(--border);
+    break-inside: avoid;
+}
+
+.person-line:hover {
+    background: var(--accent-soft);
+}
+
+.person-open {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 1;
+    min-width: 0;
+    padding: 5px 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.person-name {
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.person-tags {
+    display: flex;
+    gap: var(--space-1);
+    min-width: 0;
+    overflow: hidden;
+}
+
+.tag {
+    padding: 1px 6px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+    font-style: normal;
+    font-size: var(--fs-11);
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tag.is-empty {
+    background: transparent;
+    color: var(--text-muted);
+}
+
+.person-issue {
+    font-size: var(--fs-11);
+    font-weight: var(--fw-semibold);
+    color: var(--danger-fg);
     white-space: nowrap;
 }
 
-.issue-chip {
-    background: var(--danger-bg);
+.person-del {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+}
+
+.person-line:hover .person-del,
+.person-del:focus-visible {
+    opacity: 1;
+}
+
+.person-del:hover {
     color: var(--danger-fg);
 }
 
-.report-actions {
+.people-chips {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
     gap: var(--space-2);
-    flex-shrink: 0;
 }
 
-.btn-icon {
-    padding: var(--space-2);
+.person-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 3px var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    font: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    cursor: pointer;
+}
+
+.person-chip:hover {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+}
+
+.person-chip.has-issue {
+    border-color: var(--danger-border);
+    background: var(--danger-bg);
+}
+
+.person-chip em {
+    font-style: normal;
+    font-size: var(--fs-11);
+    font-weight: var(--fw-semibold);
+    color: var(--danger-fg);
+}
+
+.missing-row {
+    margin: 0 0 var(--space-3);
+    font-size: var(--fs-12);
+    color: var(--text);
 }
 
 .empty-state {

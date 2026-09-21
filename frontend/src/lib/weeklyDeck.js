@@ -18,6 +18,52 @@ const texts = (values) => {
 export const emptySection = () => ({ title: "", items: [""] });
 export const emptyEvent = () => ({ when: "", title: "" });
 export const emptyNotice = () => ({ title: "", body: [""] });
+export const COLLAB_CENTERS = ["AC", "BC", "DC", "TC", "CSC"];
+export const emptyCollab = () => ({ supports: [], done: [""], next: [""] });
+
+const asNotices = (raw) => {
+    const out = [];
+    for (const item of raw || []) {
+        if (!item || typeof item !== "object") continue;
+        const title = String(item.title || "").trim();
+        const body = (item.body || [])
+            .map((line) => String(line || "").trim())
+            .filter(Boolean);
+        if (title || body.length) out.push({ title, body: body.length ? body : [""] });
+    }
+    return out;
+};
+
+const asEvents = (raw) => {
+    const out = [];
+    for (const item of raw || []) {
+        if (!item || typeof item !== "object") continue;
+        const when = String(item.when || "").trim();
+        const title = String(item.title || "").trim();
+        if (when || title) out.push({ when, title });
+    }
+    return out;
+};
+
+const asCollab = (raw) => {
+    const data = raw && typeof raw === "object" ? raw : {};
+    const seen = new Set();
+    const supports = [];
+    for (const item of data.supports || []) {
+        const code = String(item || "").trim().toUpperCase();
+        if (COLLAB_CENTERS.includes(code) && !seen.has(code)) {
+            seen.add(code);
+            supports.push(code);
+        }
+    }
+    const done = texts(data.done);
+    const next = texts(data.next);
+    return {
+        supports,
+        done: done.length ? done : [""],
+        next: next.length ? next : [""],
+    };
+};
 
 const yearOf = (value) => {
     const text = String(value || "").replaceAll(".", "-");
@@ -86,9 +132,11 @@ export function toWeeklyDeck(report) {
     if (data.schema === WEEKLY_DECK_SCHEMA && Array.isArray(data.done)) {
         const deck = {
             ...data,
-            notices: [],
-            month_events: [],
-            next_month_events: [],
+            director: String(data.director || "").trim(),
+            notices: asNotices(data.notices),
+            month_events: asEvents(data.month_events),
+            next_month_events: asEvents(data.next_month_events),
+            collab: asCollab(data.collab),
             done: data.done.length ? data.done : [emptySection()],
             next: data.next?.length ? data.next : [emptySection()],
         };
@@ -125,9 +173,11 @@ export function toWeeklyDeck(report) {
             nextWeekLabel(data.week_label_done, data.report_date) ||
             data.week_label_next ||
             "",
-        notices: [],
-        month_events: [],
-        next_month_events: [],
+        director: String(data.director || "").trim(),
+        notices: asNotices(data.notices),
+        month_events: asEvents(data.month_events),
+        next_month_events: asEvents(data.next_month_events),
+        collab: asCollab(data.collab),
         done: done.length ? done : [emptySection()],
         next: next.length ? next : [emptySection()],
         projects: data.projects || [],
@@ -169,6 +219,30 @@ export function projectsFromDeck(deck) {
 export function formatDeck(deck) {
     if (!deck) return "";
     const lines = [];
+    const notices = asNotices(deck.notices);
+    if (notices.length) {
+        lines.push("[공지사항]");
+        notices.forEach((notice, index) => {
+            lines.push(`${index + 1}. ${notice.title}`.trim());
+            for (const item of notice.body || []) {
+                if (item) lines.push(`- ${item}`);
+            }
+        });
+        lines.push("");
+    }
+    const monthEvents = asEvents(deck.month_events);
+    const nextEvents = asEvents(deck.next_month_events);
+    if (monthEvents.length || nextEvents.length) {
+        lines.push("[금월 주요 이벤트]");
+        for (const item of monthEvents) {
+            lines.push(`- ${[item.when, item.title].filter(Boolean).join(" ")}`);
+        }
+        lines.push("[익월 주요 이벤트]");
+        for (const item of nextEvents) {
+            lines.push(`- ${[item.when, item.title].filter(Boolean).join(" ")}`);
+        }
+        lines.push("");
+    }
     lines.push(`[진행 현황 ${deck.week_label_done || ""}]`.trim());
     for (const section of deck.done || []) {
         if (section.title) lines.push(section.title);
@@ -183,6 +257,18 @@ export function formatDeck(deck) {
         for (const item of section.items || []) {
             if (item) lines.push(`- ${item}`);
         }
+    }
+    const collab = asCollab(deck.collab);
+    const collabDone = (collab.done || []).filter(Boolean);
+    const collabNext = (collab.next || []).filter(Boolean);
+    if (collab.supports.length || collabDone.length || collabNext.length) {
+        lines.push("");
+        lines.push("[센터 협업 현황]");
+        if (collab.supports.length) {
+            lines.push(`지원: ${collab.supports.join(", ")}`);
+        }
+        for (const item of collabDone) lines.push(`- ${item}`);
+        for (const item of collabNext) lines.push(`- ${item}`);
     }
     return lines.join("\n").trim();
 }

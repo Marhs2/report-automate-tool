@@ -78,9 +78,10 @@ def _fill_cover(slide, deck):
         if "보고일자" not in table.cell(0, 0).text_frame.text:
             continue
         _write_paragraphs(table.cell(0, 1), [deck.get("report_date") or ""])
-        if "센터장" in table.cell(1, 0).text_frame.text:
-            _write_paragraphs(table.cell(1, 0), ["작성자"])
-        _write_paragraphs(table.cell(1, 1), [deck.get("author") or ""])
+        _write_paragraphs(
+            table.cell(1, 1),
+            [deck.get("director") or deck.get("author") or ""],
+        )
 
 
 def _fill_notices(slide, notices):
@@ -272,11 +273,15 @@ def fill_weekly_pptx(report: dict) -> bytes:
         or any(str(x).strip() for x in n.get("body") or [])
     ]
     notice_index = _notice_slide_index(prs)
-    if notice_index is not None:
+    if notice_index is not None and notices:
         _fill_notices(prs.slides[notice_index], notices)
 
     status_index = _status_slide_index(prs)
     if status_index is None:
+        if not notices:
+            notice_index = _notice_slide_index(prs)
+            if notice_index is not None:
+                _delete_slide(prs, notice_index)
         buf = io.BytesIO()
         prs.save(buf)
         return buf.getvalue()
@@ -308,6 +313,34 @@ def fill_weekly_pptx(report: dict) -> bytes:
             next_sections=next_pages[page],
             events=(month_events, next_events) if page == 0 else ([], []),
         )
+
+    collab = deck.get("collab") or {}
+    collab_done = [str(item).strip() for item in collab.get("done") or [] if str(item).strip()]
+    collab_next = [str(item).strip() for item in collab.get("next") or [] if str(item).strip()]
+    supports = [str(item).strip() for item in collab.get("supports") or [] if str(item).strip()]
+    if supports or collab_done or collab_next:
+        collab_slide = duplicate_slide(prs, status_index)
+        for shape in _walk_shapes(collab_slide.shapes):
+            if shape.has_text_frame and "주요 업무" in shape.text_frame.text:
+                _set_textbox(shape, "센터 협업 현황")
+        _fill_status_pair(
+            collab_slide,
+            done_label=deck.get("week_label_done") or "",
+            next_label=deck.get("week_label_next") or "",
+            done_sections=[
+                {
+                    "title": f"지원 {', '.join(supports)}" if supports else "지원",
+                    "items": collab_done,
+                }
+            ],
+            next_sections=[{"title": "요청", "items": collab_next}],
+            events=([], []),
+        )
+
+    if not notices:
+        notice_index = _notice_slide_index(prs)
+        if notice_index is not None:
+            _delete_slide(prs, notice_index)
 
     buf = io.BytesIO()
     prs.save(buf)

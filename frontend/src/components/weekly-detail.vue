@@ -27,47 +27,67 @@
                         </AppField>
                     </div>
                 </div>
+                <p v-if="reportData.carriedFromLastWeek" class="carry-hint" role="status">
+                    지난주 향후 {{ reportData.carriedCount }}건을 이번 주 향후일정에 남겨 두었습니다.
+                </p>
 
                 <div
                     class="card project-block"
-                    v-for="(block, index) in projectBlocks"
+                    v-for="block in projectBlocks"
                     :key="block.key"
-                    :data-accent="projectAccentIndex(index)"
                 >
                     <div class="project-head">
                         <input
                             class="input project-name-input"
                             :value="blockTitle(block)"
-                            placeholder="프로젝트"
+                            placeholder="프로젝트 이름"
                             @input="setBlockTitle(block, $event.target.value)"
                         />
-                        <button type="button" class="btn btn-danger" @click="removeProject(block)">삭제</button>
+                        <button type="button" class="btn btn-small btn-danger" @click="removeProject(block)">
+                            프로젝트 삭제
+                        </button>
                     </div>
                     <div class="split">
-                        <div class="field-group">
-                            <h2>진행</h2>
+                        <section
+                            v-for="col in columns"
+                            :key="col.kind"
+                            class="field-group split-col"
+                        >
+                            <h2>{{ col.label }}</h2>
                             <div
-                                v-for="(_, itemIndex) in (block.done?.items || [])"
-                                :key="`done-${block.key}-${itemIndex}`"
+                                v-for="(_item, itemIndex) in (block[col.kind]?.items || [])"
+                                :key="`${col.kind}-${block.key}-${itemIndex}`"
                                 class="task-row"
                             >
-                                <input class="input" v-model="block.done.items[itemIndex]" />
-                                <button type="button" class="btn remove-btn" @click="removeAt(block.done.items, itemIndex)">-</button>
+                                <textarea
+                                    class="input task-editor"
+                                    :data-weekly-editor="`${block.key}-${col.kind}-${itemIndex}`"
+                                    v-model="block[col.kind].items[itemIndex]"
+                                    rows="1"
+                                    placeholder="내용을 입력하세요"
+                                    @input="growEditor"
+                                    @keydown.enter.exact.prevent="$event.target.blur()"
+                                />
+                                <button
+                                    type="button"
+                                    class="btn btn-small"
+                                    aria-label="항목 삭제"
+                                    @click="removeAt(block[col.kind].items, itemIndex)"
+                                >
+                                    삭제
+                                </button>
                             </div>
-                            <button type="button" class="btn add-btn" @click="addItem(block, 'done')">+</button>
-                        </div>
-                        <div class="field-group">
-                            <h2>다음</h2>
-                            <div
-                                v-for="(_, itemIndex) in (block.next?.items || [])"
-                                :key="`next-${block.key}-${itemIndex}`"
-                                class="task-row"
+                            <p v-if="!(block[col.kind]?.items || []).length" class="empty-msg">
+                                항목이 없습니다
+                            </p>
+                            <button
+                                type="button"
+                                class="btn btn-small"
+                                @click="addItem(block, col.kind)"
                             >
-                                <input class="input" v-model="block.next.items[itemIndex]" />
-                                <button type="button" class="btn remove-btn" @click="removeAt(block.next.items, itemIndex)">-</button>
-                            </div>
-                            <button type="button" class="btn add-btn" @click="addItem(block, 'next')">+</button>
-                        </div>
+                                항목 추가
+                            </button>
+                        </section>
                     </div>
                 </div>
                 <button type="button" class="btn" @click="addProject">프로젝트 추가</button>
@@ -75,9 +95,6 @@
                 <div class="card save-bar">
                     <span class="member-id-display">사용자: {{ userName }}</span>
                     <div class="save-actions">
-                        <p v-if="confirmQuestions.length" class="confirm-hint">
-                            저장 시 확인 질문 {{ confirmQuestions.length }}개
-                        </p>
                         <button class="btn" @click="copyReport" :disabled="isSaving">복사</button>
                         <button class="btn btn-primary" @click="saveReport" :disabled="isSaving">
                             {{ isSaving ? "저장 중..." : "저장" }}
@@ -92,11 +109,10 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, watch } from "vue";
+import { computed, nextTick, ref, onMounted, watch } from "vue";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
-import { projectAccentIndex } from "../lib/projectAccent";
 import {
     emptySection,
     formatDeck,
@@ -115,6 +131,37 @@ const userName = ref("");
 const isSaving = ref(false);
 const { getUsers, getWeeklyReportById, updateWeeklyReport } = useApi();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
+
+const columns = [
+    { kind: "done", label: "진행 현황" },
+    { kind: "next", label: "향후일정" },
+];
+const growEditor = (event) => {
+    const el = event.target;
+    if (!(el instanceof HTMLTextAreaElement)) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+};
+
+const growAllEditors = async () => {
+    await nextTick();
+    document.querySelectorAll("[data-weekly-editor]").forEach((node) => {
+        growEditor({ target: node });
+    });
+};
+
+const startEdit = async (block, kind, index) => {
+    await nextTick();
+    const id = `${block.key}-${kind}-${index}`;
+    const el = [...document.querySelectorAll("[data-weekly-editor]")].find(
+        (node) => node.getAttribute("data-weekly-editor") === id,
+    );
+    if (!(el instanceof HTMLTextAreaElement)) return;
+    el.focus();
+    growEditor({ target: el });
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+};
 
 const nextWeek = computed(() => {
     if (!reportData.value) return "";
@@ -184,9 +231,11 @@ const addItem = (block, kind) => {
         const section = emptySection();
         section.title = blockTitle(block);
         list.push(section);
+        startEdit(block, kind, 0);
         return;
     }
     block[kind].items.push("");
+    startEdit(block, kind, block[kind].items.length - 1);
 };
 
 const removeProject = (block) => {
@@ -212,6 +261,7 @@ watch(
     reportData,
     (newVal) => {
         if (newVal) sessionStorage.setItem("reportData", JSON.stringify(newVal));
+        growAllEditors();
     },
     { deep: true },
 );
@@ -260,6 +310,22 @@ const copyReport = async () => {
     }
 };
 
+const askConfirmQuestions = async () => {
+    const questions = confirmQuestions.value;
+    for (const [index, question] of questions.entries()) {
+        const ok = await askConfirm(question.text, {
+            title: `저장 전 확인 ${index + 1}/${questions.length}`,
+            help: question.ifNo
+                ? `아니요면 ${question.ifNo}`
+                : "아니요면 해당 항목을 고친 뒤 다시 저장하세요.",
+            confirmLabel: "네",
+            cancelLabel: "아니요",
+        });
+        if (!ok) return false;
+    }
+    return true;
+};
+
 const persistReport = async () => {
     const reportId = route.params.id;
     isSaving.value = true;
@@ -281,16 +347,7 @@ const saveReport = async () => {
         showAlert("저장할 주간 보고서 ID가 없습니다.");
         return;
     }
-    const questions = confirmQuestions.value;
-    for (const [index, question] of questions.entries()) {
-        const ok = await askConfirm(question.text, {
-            title: `저장 전 확인 ${index + 1}/${questions.length}`,
-            help: "아니요면 해당 항목을 고친 뒤 다시 저장하세요.",
-            confirmLabel: "네",
-            cancelLabel: "아니요",
-        });
-        if (!ok) return;
-    }
+    if (!(await askConfirmQuestions())) return;
     await persistReport();
 };
 </script>
@@ -302,18 +359,22 @@ const saveReport = async () => {
     justify-content: flex-end;
 }
 
-.confirm-hint {
-    margin: 0;
-    margin-right: auto;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--accent);
+.carry-hint {
+    margin: 0 0 var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
+    color: var(--text);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    word-break: keep-all;
 }
 
 .json-container,
 .project-block,
 .split,
-.field-group,
+.split-col,
 .meta-grid {
     min-width: 0;
     max-width: 100%;
@@ -335,37 +396,38 @@ const saveReport = async () => {
     min-width: 0;
 }
 
-.project-head :deep(.project-name-input) {
-    width: auto;
-    min-width: 0;
-    flex: 1;
+.project-head .btn {
+    flex-shrink: 0;
 }
 
-.project-head :deep(.btn) {
-    flex-shrink: 0;
+.project-head .btn-danger {
+    border-color: var(--danger-border);
+    background: var(--danger-bg);
 }
 
 .split {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--space-4);
+    gap: var(--space-3);
+    align-items: start;
 }
 
-.split h2 {
-    margin: 0 0 var(--space-2);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
+.split-col {
+    margin-bottom: 0;
 }
 
-.task-row :deep(.input) {
-    width: auto;
-    min-width: 0;
-    flex: 1;
+.task-row {
+    align-items: flex-start;
+}
+
+.task-editor {
+    min-height: 36px;
+    resize: none;
+    overflow: hidden;
+    line-height: var(--lh-relaxed);
 }
 
 .project-block {
-    margin-bottom: var(--space-3);
     overflow: hidden;
 }
 

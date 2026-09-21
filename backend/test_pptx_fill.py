@@ -61,20 +61,25 @@ class DeckTests(unittest.TestCase):
             [{"title": "대한전선", "items": ["경광등 25대 설치"]}],
         )
 
-    def test_drops_notices_and_events(self):
+    def test_keeps_notices_events_and_collab(self):
         deck = from_legacy(
             {
                 "schema": "weekly-deck-v1",
                 "done": [{"title": "A", "items": ["x"]}],
                 "next": [],
+                "director": "김동심",
                 "notices": [{"title": "공지", "body": ["내용"]}],
                 "month_events": [{"when": "9/1", "title": "회의"}],
                 "next_month_events": [{"when": "10월", "title": "행사"}],
+                "collab": {"supports": ["DC", "tc"], "done": ["펌웨어 지원"], "next": []},
             }
         )
-        self.assertEqual(deck["notices"], [])
-        self.assertEqual(deck["month_events"], [])
-        self.assertEqual(deck["next_month_events"], [])
+        self.assertEqual(deck["director"], "김동심")
+        self.assertEqual(deck["notices"], [{"title": "공지", "body": ["내용"]}])
+        self.assertEqual(deck["month_events"], [{"when": "9/1", "title": "회의"}])
+        self.assertEqual(deck["next_month_events"], [{"when": "10월", "title": "행사"}])
+        self.assertEqual(deck["collab"]["supports"], ["DC", "TC"])
+        self.assertEqual(deck["collab"]["done"], ["펌웨어 지원"])
 
     def test_schema_report_next_week_follows_selected_dates(self):
         deck = from_legacy(
@@ -166,8 +171,61 @@ class FillPptxTests(unittest.TestCase):
         self.assertNotIn("외 ", blob)
         self.assertNotIn("김래현", blob)
         self.assertNotIn("조기 지급", blob)
+        self.assertNotIn("공지", blob)
         xml = _status_cell_xml(prs)
         self.assertIn('val="bg1"', xml)
+
+    def test_empty_notices_drop_the_notice_slide(self):
+        payload = fill_weekly_pptx(
+            {
+                "memberName": "정동일",
+                "selectedDate": ["2026-09-07", "2026-09-11"],
+                "report": {
+                    "schema": "weekly-deck-v1",
+                    "done": [{"title": "TYM", "items": ["점검"]}],
+                    "next": [],
+                    "notices": [],
+                },
+            }
+        )
+        prs = Presentation(BytesIO(payload))
+        blob = _slide_blob(prs)
+        self.assertNotIn("공지", blob)
+        self.assertIn("점검", blob)
+
+    def test_filled_notices_events_and_collab_stay_in_pptx(self):
+        payload = fill_weekly_pptx(
+            {
+                "memberName": "정동일",
+                "teamName": "Technical Center",
+                "selectedDate": ["2026-09-07", "2026-09-11"],
+                "report": {
+                    "schema": "weekly-deck-v1",
+                    "director": "김동심",
+                    "done": [{"title": "TYM", "items": ["점검"]}],
+                    "next": [],
+                    "notices": [{"title": "보안규정", "body": ["문건 검토"]}],
+                    "month_events": [{"when": "9/15", "title": "월보고"}],
+                    "next_month_events": [{"when": "10/1", "title": "결산"}],
+                    "collab": {
+                        "supports": ["DC"],
+                        "done": ["배터리 교체 지원"],
+                        "next": ["모니터링 지원"],
+                    },
+                },
+            }
+        )
+        prs = Presentation(BytesIO(payload))
+        blob = _slide_blob(prs)
+        self.assertIn("공지", blob)
+        self.assertIn("보안규정", blob)
+        self.assertIn("문건 검토", blob)
+        self.assertIn("월보고", blob)
+        self.assertIn("결산", blob)
+        self.assertIn("센터 협업 현황", blob)
+        self.assertIn("배터리 교체 지원", blob)
+        self.assertIn("김동심", blob)
+        self.assertIn("센터장", blob)
 
     def test_overflow_adds_another_status_slide_instead_of_cutting(self):
         items = [f"업무 {i}" for i in range(40)]

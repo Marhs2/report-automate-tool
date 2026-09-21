@@ -167,6 +167,20 @@ const missedRows = computed(() =>
     statusRows.value.filter((row) => row.submitted === 0),
 );
 const missedNames = computed(() => missedRows.value.map((row) => row.name));
+const memberQuery = ref("");
+
+const visibleRows = computed(() => {
+    const q = memberQuery.value.trim().toLowerCase();
+    const rows = q
+        ? statusRows.value.filter((row) =>
+              String(row.name || "").toLowerCase().includes(q),
+          )
+        : statusRows.value;
+    return [...rows].sort((a, b) => {
+        if (a.submitted !== b.submitted) return a.submitted - b.submitted;
+        return String(a.name).localeCompare(String(b.name), "ko");
+    });
+});
 
 const teamDayCounts = computed(() => {
     const counts = {};
@@ -615,7 +629,7 @@ onMounted(async () => {
         <section class="card week-board" aria-label="이번 주">
             <div class="section-head">
                 <h2>날짜 선택</h2>
-                <p>{{ selects.length }}일 · {{ weekPulse }}</p>
+                <p>{{ selects.length }}일 · 제출 {{ submittedRows.length }}/{{ statusRows.length }} · 미제출 {{ missedRows.length }}</p>
             </div>
             <div class="day-chips" role="group" aria-label="넣을 날짜">
                 <button
@@ -634,26 +648,49 @@ onMounted(async () => {
                 </button>
             </div>
             <div v-if="statusRows.length === 0" class="empty-state">표시할 제출 현황이 없습니다</div>
-            <ul v-else-if="submittedRows.length" class="in-list">
-                <li v-for="row in submittedRows" :key="row.member_id">
-                    <strong>{{ row.name }}</strong>
-                    <span class="in-days">
-                        <button
-                            v-for="cell in row.cells.filter((item) => item.submitted)"
-                            :key="cell.date"
-                            type="button"
-                            class="in-day"
-                            :aria-label="row.name + ' ' + cell.date + ' 제출'"
-                            @click="openDaily(row, cell)"
-                        >
-                            {{ weekdayOf(cell.date) }}
-                        </button>
-                    </span>
-                    <span class="in-sum">{{ row.submitted }}/{{ row.total }}일</span>
-                </li>
-            </ul>
-            <p v-else class="week-empty-in">이번 주 제출한 사람이 없습니다</p>
-            <p v-if="missedRows.length" class="week-missed-count">미제출 {{ missedRows.length }}명</p>
+            <template v-else>
+                <input
+                    class="input member-search"
+                    v-model="memberQuery"
+                    type="search"
+                    placeholder="이름 찾기"
+                    aria-label="이름 찾기"
+                    autocomplete="off"
+                />
+                <div v-if="visibleRows.length === 0" class="week-empty-in">검색 결과가 없습니다</div>
+                <div v-else class="week-table-wrap">
+                    <table class="week-table">
+                        <thead>
+                            <tr>
+                                <th>이름</th>
+                                <th v-for="(dayDate, index) in weekDays" :key="dayDate">
+                                    {{ weekdayLabels[index] }}
+                                    <small>{{ shortDay(dayDate) }}</small>
+                                </th>
+                                <th>합</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in visibleRows" :key="row.member_id">
+                                <th>{{ row.name }}</th>
+                                <td v-for="cell in row.cells" :key="cell.date">
+                                    <button
+                                        v-if="cell.submitted"
+                                        type="button"
+                                        class="week-cell is-in"
+                                        :aria-label="row.name + ' ' + cell.date + ' 제출'"
+                                        @click="openDaily(row, cell)"
+                                    >
+                                        {{ weekdayOf(cell.date) }}
+                                    </button>
+                                    <span v-else class="week-cell is-out">—</span>
+                                </td>
+                                <td class="week-sum">{{ row.submitted }}/{{ row.total }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
         </section>
 
         <section class="card week-files" aria-label="생성된 주간 보고서">
@@ -716,10 +753,8 @@ onMounted(async () => {
     border-color: var(--text-strong);
 }
 
-.week-compose,
-.week-status,
-.week-files {
-    margin-bottom: var(--space-4);
+.weekly-report-page > .card {
+    margin-bottom: var(--space-5);
 }
 
 .week-status .missing-banner {
@@ -803,8 +838,18 @@ onMounted(async () => {
     color: var(--text-muted);
 }
 
+.member-search {
+    width: 100%;
+    max-width: 220px;
+    height: 32px;
+    margin-bottom: var(--space-3);
+}
+
 .week-table-wrap {
-    overflow-x: auto;
+    max-height: 420px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
 }
 
 .week-table {
@@ -815,13 +860,16 @@ onMounted(async () => {
 
 .week-table th,
 .week-table td {
-    border: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
     padding: 6px 8px;
     text-align: center;
     vertical-align: middle;
 }
 
 .week-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     background: var(--surface-soft);
     font-weight: var(--fw-semibold);
     color: var(--text);
@@ -836,18 +884,30 @@ onMounted(async () => {
 }
 
 .week-table tbody th {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface);
     text-align: left;
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
     white-space: nowrap;
 }
 
+.week-table thead th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    text-align: left;
+}
+
 .week-cell {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 44px;
-    padding: 4px 8px;
+    min-width: 28px;
+    min-height: 24px;
+    padding: 0 6px;
     border-radius: 4px;
     font-size: var(--fs-12);
     font-weight: var(--fw-semibold);

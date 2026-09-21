@@ -16,7 +16,12 @@ from fastapi.responses import Response
 from openai import OpenAI
 from pptx_fill import fill_weekly_pptx
 from pptx_to_text import extract_all_text_from_pptx
-from weekly_deck import from_legacy
+from weekly_deck import (
+    from_legacy,
+    merge_last_week_next,
+    next_sections_of,
+    pick_previous_weekly,
+)
 from pydantic import BaseModel
 
 load_dotenv()
@@ -1525,6 +1530,33 @@ def generate_weekly_report(member_id, selects):
             stamped = dict(daily)
             stamped["_reportDate"] = str(row[0] or "")
             dated_reports.append(stamped)
+
+        previous_rows = db.execute(
+            "SELECT selected_date, report_json FROM weekly_reports WHERE member_id = ?",
+            (member_id,),
+        ).fetchall()
+        previous_candidates = []
+        for row in previous_rows:
+            try:
+                previous_candidates.append(
+                    (
+                        json.loads(row[0] or "[]"),
+                        json.loads(row[1] or "{}"),
+                    )
+                )
+            except json.JSONDecodeError:
+                continue
+        last_week = pick_previous_weekly(previous_candidates, selects)
+        last_next = next_sections_of(last_week)
+        weekly_system = load_weekly_prompt()
+        if last_next:
+            weekly_system += (
+                "\n\n지난주 향후(아래)는 이번 주 초안이다. "
+                "이번 일일에서 끝난 것은 completedTasks에 두고, "
+                "일일에 안 나온 지난주 향후는 nextWeekPlans에 그대로 남긴다. 버리지 않는다.\n"
+                "[지난주 향후]\n"
+                + json.dumps(last_next, ensure_ascii=False)
+            )
         try:
             client = OpenAI(
                 base_url=LM_BASE_URL,
@@ -1534,7 +1566,7 @@ def generate_weekly_report(member_id, selects):
             kwargs = dict(
                 model=MODEL_NAME,
                 messages=[
-                    {"role": "system", "content": load_weekly_prompt()},
+                    {"role": "system", "content": weekly_system},
                     {
                         "role": "user",
                         "content": json.dumps(
@@ -1583,6 +1615,9 @@ def generate_weekly_report(member_id, selects):
             report_data = ensure_weekly_projects(report_data, reports)
             report_data = ensure_weekly_plans(report_data, reports)
             report_data = promote_weekly_tasks(report_data, reports)
+            carried = 0
+            if last_next:
+                report_data, carried = merge_last_week_next(report_data, last_next)
             report_data = normalize_issues(report_data)
             report_data = drop_empty_projects(report_data)
             report_data.pop("confirmQuestions", None)
@@ -1611,6 +1646,9 @@ def generate_weekly_report(member_id, selects):
                 member_name=(member_row["name"] if member_row else ""),
                 team_name=(member_row["team_name"] if member_row else "") or "",
             )
+            if carried:
+                report_data["carriedFromLastWeek"] = True
+                report_data["carriedCount"] = carried
         except HTTPException:
             raise
         except Exception as exc:
