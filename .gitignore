@@ -25,6 +25,8 @@ htmlcov/
 .nox/
 *.cover
 .hypothesis/
+test_*.py
+**/test_*.py
 
 # ── Design / local notes ────────────────────────────────
 .superdesign/
