@@ -4,10 +4,11 @@ import reportResult from "../components/report-result.vue";
 import projectList from "../components/projects-list.vue";
 import activities from "../components/user-activities.vue";
 import weekly from "../components/weekly-report.vue";
-import users from "../components/user-select.vue";
 import weeklyDetail from "../components/weekly-detail.vue";
 import projectTimeline from "../components/project-timeline.vue";
 import settings from "../components/settings.vue";
+import admin from "../components/admin.vue";
+import login from "../components/login.vue";
 
 const routes = [
   {
@@ -31,7 +32,9 @@ const routes = [
     name: "report-result",
     component: reportResult,
     meta: {
-      title: "분석 결과",
+      // 저장된 보고를 읽을 때는 화면이 "일일보고 상세"로, 새 추출 초안일 때는
+      // "분석 결과"로 제목을 덮어쓴다(usePageMeta).
+      title: "일일보고 상세",
       navKey: "/",
       parent: { to: "/", label: "일일보고" },
     },
@@ -57,20 +60,38 @@ const routes = [
     redirect: "/weekly",
   },
   {
+    path: "/login",
+    name: "login",
+    component: login,
+    meta: { title: "로그인", public: true },
+  },
+  {
     path: "/users",
-    name: "users",
-    component: users,
-    meta: { title: "사용자 선택", navKey: "/settings" },
+    redirect: "/login",
   },
   {
     path: "/settings",
-    redirect: "/settings/users",
+    redirect: "/settings/teams",
+  },
+  {
+    path: "/settings/users",
+    redirect: "/settings/teams",
   },
   {
     path: "/settings/:tab",
     name: "settings",
     component: settings,
     meta: { title: "설정", navKey: "/settings" },
+  },
+  {
+    path: "/admin",
+    redirect: "/admin/users",
+  },
+  {
+    path: "/admin/:tab",
+    name: "admin",
+    component: admin,
+    meta: { title: "관리", navKey: "/admin", admin: true },
   },
   {
     path: "/weekly-detail/:id",

@@ -1,7 +1,33 @@
 import axios from "axios";
 import { toRaw } from "vue";
+import { selectedUserId } from "./useSelectedUser";
+import { sessionToken } from "./useSession";
 
-const baseURL = "http://127.0.0.1:8000";
+function apiBaseURL() {
+  const fromEnv = import.meta.env.VITE_API_BASE;
+  if (fromEnv) return String(fromEnv).replace(/\/$/, "");
+  if (import.meta.env.DEV) return "/api";
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location;
+    if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+      return `${protocol}//${hostname}:8000`;
+    }
+  }
+  return "http://127.0.0.1:8000";
+}
+
+const baseURL = apiBaseURL();
+
+axios.interceptors.request.use((config) => {
+  config.headers = config.headers || {};
+  const token = sessionToken.value;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  const id = selectedUserId.value;
+  if (id != null && String(id).trim() !== "") {
+    config.headers["X-Member-Id"] = String(id);
+  }
+  return config;
+});
 
 export default function useApi() {
   const postReport = async (reportData, dateData, memberId) => {
@@ -61,6 +87,21 @@ export default function useApi() {
       `${baseURL}/report-drafts/${memberId}/${reportDate}`,
     );
     return response.data;
+  };
+
+  /** AI를 돌리지 않고 원문만 보관한다. 고치려고 다시 추출할 필요가 없다. */
+  const postReportDraft = async (rawText, reportDate, memberId) => {
+    try {
+      const response = await axios.post(`${baseURL}/report-drafts`, {
+        report: rawText,
+        date: reportDate,
+        member_id: memberId,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error saving report draft:", error);
+      throw error;
+    }
   };
 
   const postWeeklyReport = async (userId, selects) => {
@@ -147,6 +188,15 @@ export default function useApi() {
     }
   };
 
+  const postPlainReport = async (rawText, reportDate, memberId) => {
+    const response = await axios.post(`${baseURL}/reports/plain`, {
+      report: rawText,
+      date: reportDate,
+      member_id: memberId,
+    });
+    return response.data;
+  };
+
   const postSaveReport = async (
     parsed_json,
     rawData,
@@ -190,12 +240,46 @@ export default function useApi() {
     }
   };
 
-  const postUsers = async (name, teamId) => {
+  const postLogin = async (name, password) => {
+    const response = await axios.post(`${baseURL}/login`, { name, password });
+    return response.data;
+  };
+
+  const postLogout = async () => {
+    try {
+      await axios.post(`${baseURL}/logout`);
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
+
+  const getMe = async () => {
+    const response = await axios.get(`${baseURL}/me`);
+    return response.data;
+  };
+
+  const changeMyPassword = async (currentPassword, newPassword) => {
+    const response = await axios.post(`${baseURL}/me/password`, {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    return response.data;
+  };
+
+  const setMemberPassword = async (memberId, password) => {
+    const response = await axios.post(`${baseURL}/users/${memberId}/password`, {
+      password,
+    });
+    return response.data;
+  };
+
+  const postUsers = async (name, teamId, password) => {
     try {
       const payload = { name: name };
       if (teamId != null && teamId !== "") {
         payload.team_id = teamId;
       }
+      if (password) payload.password = password;
       const response = await axios.post(`${baseURL}/users`, payload);
       return response.data;
     } catch (error) {
@@ -346,6 +430,8 @@ export default function useApi() {
     postReport,
     postReportPptx,
     getReportDraft,
+    postReportDraft,
+    postPlainReport,
     postSaveReport,
     getReports,
     getReportById,
@@ -356,6 +442,11 @@ export default function useApi() {
     getWeeklyReportById,
     downloadWeeklyPptx,
     updateWeeklyReport,
+    postLogin,
+    postLogout,
+    getMe,
+    changeMyPassword,
+    setMemberPassword,
     postUsers,
     getUsers,
     postTeams,

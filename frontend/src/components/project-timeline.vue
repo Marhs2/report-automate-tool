@@ -2,9 +2,10 @@
 import { onMounted, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
+import { isFutureDate } from "../lib/dateScope";
 
 const router = useRouter();
-const { getProjectNames, getProjectTimeline } = useApi();
+const { getProjectNames, getProjectTimeline, getUsers } = useApi();
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const CLOSE_KEYS = [
@@ -54,10 +55,21 @@ const fetchInitialData = async () => {
   isLoading.value = true;
   try {
     projectNames.value = await getProjectNames();
+    // 들어오자마자 "프로젝트를 선택해주세요"만 있는 빈 화면을 보여주지 않는다.
+    if (!selectedProject.value && projectNames.value.length) {
+      selectedProject.value = projectNames.value[0];
+      await fetchTimeline();
+    }
   } catch (error) {
     console.error("Error fetching initial data:", error);
   } finally {
     isLoading.value = false;
+  }
+  try {
+    allMembers.value = await getUsers();
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    allMembers.value = [];
   }
 };
 
@@ -90,16 +102,81 @@ const projectMembers = computed(() => {
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "ko"));
 });
 
+/* 콤보에는 전체 인원을 다 넣는다.
+   이 프로젝트에 보고한 사람만 나오면 "왜 24명 중 9명만 있지?"가 된다.
+   보고가 없는 사람도 고를 수 있게 두고, 대신 건수를 옆에 적는다. */
+const allMembers = ref([]);
+
+const reportCountByMember = computed(() => {
+  const counts = new Map();
+  for (const entry of scopedTimeline.value) {
+    const id = String(entry.member_id ?? "");
+    if (!id) continue;
+    counts.set(id, (counts.get(id) || 0) + 1);
+  }
+  return counts;
+});
+
+const memberOptions = computed(() => {
+  const counts = reportCountByMember.value;
+  const rows = allMembers.value.length
+    ? allMembers.value.map((user) => ({
+        id: String(user.id),
+        name: user.name || `사용자 ${user.id}`,
+      }))
+    : projectMembers.value;
+  return rows
+    .map((user) => ({ ...user, count: counts.get(user.id) || 0 }))
+    .sort((left, right) => {
+      if (Boolean(right.count) !== Boolean(left.count)) {
+        return right.count - left.count;
+      }
+      return left.name.localeCompare(right.name, "ko");
+    });
+});
+
+const reportingMemberCount = computed(
+  () => memberOptions.value.filter((user) => user.count > 0).length,
+);
+
+/* 아직 오지 않은 날의 보고는 "오늘 이슈"가 아니다.
+   기본은 오늘까지만 보고, 필요하면 켠다. */
+const includeFuture = ref(false);
+
+const futureCount = computed(
+  () => timeline.value.filter((entry) => isFutureDate(entry.date)).length,
+);
+
+const scopedTimeline = computed(() =>
+  includeFuture.value
+    ? timeline.value
+    : timeline.value.filter((entry) => !isFutureDate(entry.date)),
+);
+
+/* 카드가 완료·진행·다음 한 덩어리면 이슈만 따라가기 어렵다. */
+const VIEWS = [
+  { id: "all", label: "전체" },
+  { id: "issues", label: "이슈만" },
+];
+const view = ref("all");
+
 const filteredTimeline = computed(() => {
-  if (!selectedMember.value) return timeline.value;
-  return timeline.value.filter(
+  if (!selectedMember.value) return scopedTimeline.value;
+  return scopedTimeline.value.filter(
     (entry) => String(entry.member_id) === String(selectedMember.value),
   );
 });
 
+/** 이슈만 볼 때는 이슈가 없는 보고를 아예 빼서 스크롤이 줄어든다. */
+const flowEntries = computed(() =>
+  view.value === "issues"
+    ? filteredTimeline.value.filter((entry) => compactRows(entry).length > 0)
+    : filteredTimeline.value,
+);
+
 const groupedByDate = computed(() => {
   const groups = {};
-  for (const entry of filteredTimeline.value) {
+  for (const entry of flowEntries.value) {
     if (!groups[entry.date]) groups[entry.date] = [];
     groups[entry.date].push(entry);
   }
@@ -125,7 +202,7 @@ const totalDays = computed(() => groupedByDate.value.length);
 const totalEntries = computed(() => filteredTimeline.value.length);
 
 const selectedMemberName = computed(() => {
-  const found = projectMembers.value.find(
+  const found = memberOptions.value.find(
     (user) => String(user.id) === String(selectedMember.value),
   );
   return found?.name || "";
@@ -158,6 +235,13 @@ const compactRows = (entry) => {
     (text) => !issues.some((issue) => similar(issue, text)),
   );
   const rows = [];
+  if (view.value === "issues") {
+    for (const text of issues) rows.push({ kind: "issue", label: "이슈", text });
+    for (const text of progress.filter(looksLikeIssue)) {
+      rows.push({ kind: "issue", label: "이슈", text });
+    }
+    return rows;
+  }
   for (const text of completed) rows.push({ kind: "done", label: "완료", text });
   for (const text of progress) rows.push({ kind: "", label: "진행", text });
   for (const text of issues) rows.push({ kind: "issue", label: "이슈", text });
@@ -302,7 +386,12 @@ const onProjectChange = () => {
 
 const openEntry = (entry) => {
   if (!entry?.report_id) return;
-  router.push(`/report-result/${entry.report_id}`);
+  // 크럼이 "프로젝트 흐름"으로 남아야 돌아올 자리를 안다.
+  router.push({
+    name: "report-result",
+    params: { id: entry.report_id },
+    query: { from: "timeline" },
+  });
 };
 
 const clearMemberFilter = () => {
@@ -333,24 +422,55 @@ onMounted(() => {
       </div>
 
       <div class="field">
-        <label for="timeline-member">멤버</label>
+        <!-- 전체 인원을 다 넣고, 이 프로젝트 보고 건수를 옆에 적는다. -->
+        <label for="timeline-member">
+          보고자
+          <span v-if="selectedProject && memberOptions.length">
+            {{ reportingMemberCount }}/{{ memberOptions.length }}명 보고
+          </span>
+        </label>
         <select
           id="timeline-member"
           v-model="selectedMember"
           class="input filter-select"
           :disabled="!selectedProject || isLoadingTimeline"
         >
-          <option value="">전체 멤버</option>
+          <option value="">전체 보고자</option>
           <option
-            v-for="user in projectMembers"
+            v-for="user in memberOptions"
             :key="user.id"
             :value="user.id"
           >
-            {{ user.name }}
+            {{ user.name }}{{ user.count ? ` (${user.count})` : " (보고 없음)" }}
           </option>
         </select>
       </div>
+
+      <div class="field">
+        <label>보기</label>
+        <div class="view-chips" role="group" aria-label="보기">
+          <button
+            v-for="item in VIEWS"
+            :key="item.id"
+            type="button"
+            class="btn btn-small"
+            :class="{ 'is-active': view === item.id }"
+            :aria-pressed="view === item.id"
+            @click="view = item.id"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+      </div>
     </div>
+
+    <p v-if="selectedProject && futureCount" class="future-toggle">
+      아직 오지 않은 날의 보고 {{ futureCount }}건은
+      {{ includeFuture ? "보이는 중" : "빼두었습니다" }}.
+      <button type="button" class="link-btn" @click="includeFuture = !includeFuture">
+        {{ includeFuture ? "오늘까지만 보기" : "예정도 보기" }}
+      </button>
+    </p>
 
     <div v-if="isLoading" class="empty-state">데이터를 불러오는 중...</div>
 
@@ -364,7 +484,10 @@ onMounted(() => {
 
     <div v-else-if="filteredTimeline.length === 0" class="empty-state">
       <p v-if="selectedMember">
-        {{ selectedMemberName || "선택한 멤버" }}의 보고가 없습니다
+        {{ selectedMemberName || "선택한 보고자" }}의 보고가 없습니다
+      </p>
+      <p v-else-if="futureCount && !includeFuture">
+        오늘까지 올라온 보고가 없습니다. 예정된 보고 {{ futureCount }}건이 있습니다.
       </p>
       <p v-else>해당 프로젝트의 보고 이력이 없습니다</p>
       <button
@@ -373,7 +496,15 @@ onMounted(() => {
         class="btn"
         @click="clearMemberFilter"
       >
-        전체 멤버 보기
+        전체 보고자 보기
+      </button>
+      <button
+        v-else-if="futureCount && !includeFuture"
+        type="button"
+        class="btn"
+        @click="includeFuture = true"
+      >
+        예정도 보기
       </button>
     </div>
 
@@ -498,11 +629,36 @@ onMounted(() => {
   min-width: 200px;
 }
 
-.filter-hint {
-  margin: calc(-1 * var(--space-2)) 0 var(--space-5);
+.view-chips {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.view-chips .btn.is-active {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--text-strong);
+}
+
+/* 미래 보고를 숨기고 있다는 사실을 화면에 적는다. 조용히 빼면 데이터가 없는 줄 안다. */
+.future-toggle {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
   font-size: var(--fs-12);
   color: var(--text);
   word-break: keep-all;
+}
+
+.link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .timeline-summary {
@@ -757,5 +913,47 @@ onMounted(() => {
   flex: 1;
   height: 1px;
   background: var(--border);
+}
+
+@media (max-width: 860px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .filter-select {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .view-chips {
+    width: 100%;
+  }
+
+  .view-chips .btn {
+    flex: 1;
+    min-height: 40px;
+  }
+
+  .timeline-summary {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .row {
+    grid-template-columns: 36px 1fr;
+  }
+
+  .day {
+    padding: 12px;
+  }
+
+  .issue-row {
+    min-height: 52px;
+    align-items: flex-start;
+  }
 }
 </style>

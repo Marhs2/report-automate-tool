@@ -26,18 +26,16 @@ htmlcov/
 *.cover
 .hypothesis/
 
-
-
--- Design files ─────────────────────────────────────────
+# ── Design / local notes ────────────────────────────────
 .superdesign/
 DESIGN.md
+fix.md
+model.md
 
-
-# ── DB Data ─────────────────────────────────────────────
+# ── DB / local runtime ──────────────────────────────────
 backend/data/
 backend/.vendor/
-
-# ── SQLite runtime files ────────────────────────────────
+*.db
 *.db-shm
 *.db-wal
 *.db-journal
@@ -45,7 +43,7 @@ backend/.vendor/
 # ── SQL Workbench local state ───────────────────────────
 sql_workbench/.workbench_config.json
 
-# ── Node / frontend (root-level safety) ─────────────────
+# ── Node / frontend ─────────────────────────────────────
 node_modules/
 frontend/node_modules/
 frontend/dist/
@@ -57,7 +55,6 @@ yarn-error.log*
 pnpm-debug.log*
 bun-debug.log*
 frontend/.vscode
-frontend/src/lib/*.test.js
 
 # ── Env / secrets ───────────────────────────────────────
 .env
@@ -75,20 +72,22 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# ── IDE / editors ───────────────────────────────────────
+# ── IDE / editors / agent scratch ───────────────────────
 .idea/
+.cursor/
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
 *.swp
 *.swo
+.omo/
+.senpi/
 *~
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.code-workspace
-
 
 # ── Logs / temp ─────────────────────────────────────────
 logs/
@@ -99,9 +98,8 @@ temp/
 *.bak
 *.orig
 
-# ── Benchmark (dataset, scripts, raw results) ───────────
+# ── Benchmark raw results ───────────────────────────────
 benchmark/
 
-# Superdesign temp HTML
-.superdesign/tmp/
-
+# ── Local fixtures that are not the shared sample ───────
+test-data/dxel-live/

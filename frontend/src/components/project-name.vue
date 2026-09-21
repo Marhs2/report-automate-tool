@@ -5,6 +5,7 @@ import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
 
 const {
+    getProjectNames,
     getRegisteredProjectNames,
     postProjectName,
     deleteProjectName,
@@ -18,6 +19,9 @@ defineProps({
 });
 
 const projectNames = ref([]);
+const usedNames = ref([]);
+const loadError = ref("");
+const registeringName = ref("");
 const newName = ref("");
 const newKeywords = ref("");
 const isLoading = ref(false);
@@ -88,12 +92,53 @@ const mergeKeywords = (current, extra) => {
 
 const fetchProjectNames = async () => {
     isLoading.value = true;
+    loadError.value = "";
     try {
         projectNames.value = await getRegisteredProjectNames();
     } catch (error) {
         console.error("프로젝트 명 조회 실패:", error);
+        projectNames.value = [];
+        // 조용히 비우면 "0개 등록"으로 보여서 설정이 비어 있는 줄 안다.
+        loadError.value =
+            "프로젝트 명을 불러오지 못했습니다. 백엔드가 켜져 있는지 확인해주세요.";
     } finally {
         isLoading.value = false;
+    }
+    try {
+        usedNames.value = await getProjectNames();
+    } catch (error) {
+        console.error("보고서 프로젝트 조회 실패:", error);
+        usedNames.value = [];
+    }
+};
+
+/** 보고서에는 나오는데 설정에 없는 이름.
+ *  목록 필터에는 있는 프로젝트가 설정에는 0개인 상태를 그대로 두지 않는다. */
+const unregisteredNames = computed(() => {
+    const registered = new Set(
+        projectNames.value.map((item) => String(item.name || "").trim()),
+    );
+    return usedNames.value
+        .map((name) => String(name || "").trim())
+        .filter((name) => name && !registered.has(name));
+});
+
+const registerUsedName = async (name) => {
+    registeringName.value = name;
+    try {
+        await postProjectName(name, "");
+        await fetchProjectNames();
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        showAlert(detail || "프로젝트 명 등록에 실패했습니다.");
+    } finally {
+        registeringName.value = "";
+    }
+};
+
+const registerAllUsedNames = async () => {
+    for (const name of [...unregisteredNames.value]) {
+        await registerUsedName(name);
     }
 };
 
@@ -303,6 +348,37 @@ onMounted(() => {
                     등록
                 </button>
             </form>
+
+            <p v-if="loadError" class="error-text" role="alert">{{ loadError }}</p>
+
+            <!-- 설정과 실제 보고가 따로 놀지 않게, 보고서에만 있는 이름을 바로 등록한다. -->
+            <div v-if="unregisteredNames.length" class="unregistered">
+                <p class="unregistered-copy">
+                    보고서에는 있는데 등록되지 않은 프로젝트 {{ unregisteredNames.length }}개
+                </p>
+                <div class="unregistered-chips">
+                    <button
+                        v-for="name in unregisteredNames"
+                        :key="name"
+                        type="button"
+                        class="btn btn-small"
+                        :disabled="registeringName === name"
+                        @click="registerUsedName(name)"
+                    >
+                        <Plus :size="13" />
+                        {{ name }}
+                    </button>
+                    <button
+                        v-if="unregisteredNames.length > 1"
+                        type="button"
+                        class="btn btn-primary btn-small"
+                        :disabled="Boolean(registeringName)"
+                        @click="registerAllUsedNames"
+                    >
+                        전부 등록
+                    </button>
+                </div>
+            </div>
 
             <div v-if="isLoading" class="empty-state">불러오는 중...</div>
             <div
@@ -585,6 +661,28 @@ onMounted(() => {
 
 .list-section {
     margin-bottom: var(--space-6);
+}
+
+.unregistered {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius);
+    background: var(--warning-bg);
+}
+
+.unregistered-copy {
+    margin: 0 0 var(--space-2);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--warning-fg);
+    word-break: keep-all;
+}
+
+.unregistered-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
 }
 
 .list-section h2 {
@@ -872,6 +970,11 @@ onMounted(() => {
 }
 
 @media (max-width: 860px) {
+    .section-head {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
     .project-row-head {
         grid-template-columns: 1fr auto;
     }

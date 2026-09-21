@@ -86,6 +86,8 @@
     --topbar-height: 56px;
     --content-max: 1120px;
     --content-max-wide: 1280px;
+    --bottom-nav-height: 0px;
+    --bottom-nav-offset: 0px;
 
     /* 스크롤바 */
     --scrollbar-thumb: rgba(139, 154, 110, 0.35);

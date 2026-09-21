@@ -1,38 +1,47 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
+import { UploadCloud } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { useDialog } from "../composables/useDialog";
-import AppField from "./ui/AppField.vue";
-import { PASTE_TEMPLATES, applyTemplate, templateById } from "../lib/reportTemplates";
+import {
+    PASTE_TEMPLATES,
+    applyTemplate,
+    hasTypedContent,
+    templateById,
+} from "../lib/reportTemplates";
+import { todayString } from "../lib/dateScope";
 
 const {
     postReport,
     postReportPptx,
     getReportDraft,
+    postReportDraft,
+    postPlainReport,
     getUserActivities,
     getUsers,
     getReports,
 } = useApi();
 const router = useRouter();
-const { alert: showAlert } = useDialog();
+const { alert: showAlert, confirm: askConfirm } = useDialog();
 
 const input = ref("");
 const file = ref(null);
 const buttonType = ref("text");
-const today = new Date();
-const date = ref(
-    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
-);
+const date = ref(todayString());
 
 const aiLoading = ref(false);
+const draftSaving = ref(false);
+const plainSaving = ref(false);
+const draftSavedAt = ref("");
 const formError = ref("");
 const userName = ref("");
 const alreadySaved = ref(false);
 const elapsed = ref(0);
 const prevPlans = ref([]);
 const prevPlansDate = ref("");
+const isDragging = ref(false);
 let elapsedTimer = null;
 
 const elapsedLabel = computed(() => {
@@ -69,9 +78,29 @@ const activeTemplateId = ref("");
 
 const activeTemplate = computed(() => templateById(activeTemplateId.value));
 
-const insertTemplate = (template) => {
+/** 이미 쓴 글이 있으면 말없이 덧붙이지 않는다.
+ *  저장된 하루 위에 템플릿이 붙어 버리면 사고다. 바꿀지 덧붙일지 먼저 묻는다. */
+const insertTemplate = async (template) => {
+    if (!hasTypedContent(input.value)) {
+        activeTemplateId.value = template?.id || "";
+        input.value = applyTemplate(input.value, template, "replace");
+        return;
+    }
+    const replace = await askConfirm(
+        `쓰던 내용을 '${template.label}' 형식으로 바꿀까요?`,
+        {
+            title: "형식 넣기",
+            help: "아니요를 누르면 쓰던 내용 아래에 형식을 덧붙입니다.",
+            confirmLabel: "바꾸기",
+            cancelLabel: "아래에 덧붙이기",
+        },
+    );
     activeTemplateId.value = template?.id || "";
-    input.value = applyTemplate("", template);
+    input.value = applyTemplate(
+        input.value,
+        template,
+        replace ? "replace" : "append",
+    );
 };
 
 const loadUserName = async () => {
@@ -122,6 +151,8 @@ const loadDraft = async () => {
     }
 };
 
+/** 로그인 사용자의 가장 최근 보고에서 '다음 계획'을 가져온다.
+ *  오늘 보고를 쓸 때 어제 약속한 일부터 보여야 한다. */
 const loadPrevPlans = async () => {
     prevPlans.value = [];
     prevPlansDate.value = "";
@@ -191,6 +222,7 @@ onUnmounted(() => {
     stopElapsedTimer();
 });
 watch(date, async () => {
+    draftSavedAt.value = "";
     await loadSavedState();
     await loadPrevPlans();
     await loadDraft();
@@ -201,23 +233,103 @@ const selectType = (nextType) => {
     buttonType.value = nextType;
 };
 
-const uploadFile = (event) => {
-    const selected = event.target.files?.[0] || null;
-    if (selected && !selected.name.toLowerCase().endsWith(".pptx")) {
-        formError.value = "PPTX 파일만 업로드할 수 있습니다.";
-        event.target.value = "";
+const acceptFile = (selected) => {
+    if (!selected) return false;
+    if (!selected.name.toLowerCase().endsWith(".pptx")) {
+        formError.value = "PPTX 파일만 올릴 수 있습니다.";
         file.value = null;
-        return;
+        return false;
     }
     formError.value = "";
     file.value = selected;
+    return true;
+};
+
+const uploadFile = (event) => {
+    const selected = event.target.files?.[0] || null;
+    if (!acceptFile(selected)) event.target.value = "";
+};
+
+/* 드래그해서 놓기. 점선 박스 안의 '파일 고르기'만 되면 손이 한 번 더 간다. */
+const onDragOver = (event) => {
+    event.preventDefault();
+    isDragging.value = true;
+};
+
+const onDragLeave = () => {
+    isDragging.value = false;
+};
+
+const onDrop = (event) => {
+    event.preventDefault();
+    isDragging.value = false;
+    acceptFile(event.dataTransfer?.files?.[0] || null);
+};
+
+const clearFile = () => {
+    file.value = null;
+};
+
+/** AI를 돌리지 않고 원문만 저장한다. 고치려고 매번 추출할 필요가 없어야 한다. */
+const saveDraft = async () => {
+    const memberId = getSelectedMemberId();
+    if (memberId === null) {
+        formError.value = "로그인이 필요합니다.";
+        router.push("/login");
+        return;
+    }
+    if (!input.value.trim()) {
+        formError.value = "저장할 내용을 입력해주세요.";
+        return;
+    }
+    formError.value = "";
+    draftSaving.value = true;
+    try {
+        await postReportDraft(input.value, date.value, memberId);
+        const now = new Date();
+        draftSavedAt.value = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        formError.value = detail || "초안 저장에 실패했습니다.";
+    } finally {
+        draftSaving.value = false;
+    }
+};
+
+const submitPlain = async () => {
+    const memberId = getSelectedMemberId();
+    if (memberId === null) {
+        formError.value = "로그인이 필요합니다.";
+        router.push("/login");
+        return;
+    }
+    if (buttonType.value !== "text") {
+        formError.value = "바로 제출은 직접 입력만 됩니다.";
+        return;
+    }
+    if (!input.value.trim()) {
+        formError.value = "보고서 내용을 입력해주세요.";
+        return;
+    }
+    formError.value = "";
+    plainSaving.value = true;
+    try {
+        await postPlainReport(input.value, date.value, memberId);
+        alreadySaved.value = true;
+        router.push("/");
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        formError.value = detail || "제출에 실패했습니다.";
+    } finally {
+        plainSaving.value = false;
+    }
 };
 
 const sendReport = async () => {
     const memberId = getSelectedMemberId();
     if (memberId === null) {
-        formError.value = "왼쪽 아래에서 사용자를 먼저 선택해주세요.";
-        router.push("/users");
+        formError.value = "로그인이 필요합니다.";
+        router.push("/login");
         return;
     }
 
@@ -273,123 +385,99 @@ const sendReport = async () => {
 
 <template>
     <div class="page">
-        <div class="status-banner">
-            <span
-                >작성자 <strong>{{ userName || "미선택" }}</strong></span
-            >
-            <span
-                >날짜 <strong>{{ date }}</strong></span
-            >
-            <span
-                v-if="alreadySaved"
-                class="status-chip is-saved"
-                >이 날짜 저장됨</span
-            >
-            <span v-else class="status-chip is-draft">아직 저장 전</span>
-        </div>
-        <p v-if="alreadySaved" class="form-hint">
-            이 날짜에 저장된 보고가 있어요. 다시 정리해 저장하면 기존 보고를
-            덮어씁니다.
-        </p>
-
         <div v-if="!hasUser" class="card">
-     
+            <p class="form-hint">로그인이 필요합니다.</p>
             <div class="form-actions">
-                <router-link class="btn btn-primary" to="/users"
-                    >사용자 선택</router-link
-                >
+                <router-link class="btn btn-primary" to="/login">로그인</router-link>
             </div>
         </div>
 
-        <div v-else class="card">
-            <AppField label="날짜" for-id="date">
-                <input type="date" id="date" v-model="date" required />
-            </AppField>
-
-            <div class="field">
-                <label>보고서 유형</label>
-                <div
-                    class="select-type-buttons"
-                    role="group"
-                    aria-label="보고서 유형"
+        <div v-else class="card write-card">
+            <div class="write-head">
+                <span class="write-author">{{ userName || "나" }}</span>
+                <input
+                    type="date"
+                    id="date"
+                    class="input write-date"
+                    v-model="date"
+                    aria-label="보고 날짜"
+                    required
+                />
+                <span class="status-chip" :class="alreadySaved ? 'is-saved' : 'is-draft'">
+                    {{ alreadySaved ? "제출됨 · 다시 제출하면 덮어씀" : (draftSavedAt ? "초안 있음 · 아직 미제출" : "미제출") }}
+                </span>
+                <button
+                    type="button"
+                    class="write-mode-link"
+                    @click="selectType(buttonType === 'text' ? 'file' : 'text')"
                 >
-                    <button
-                        type="button"
-                        class="btn select-type-btn"
-                        :class="{ active: buttonType === 'text' }"
-                        @click="selectType('text')"
-                    >
-                        텍스트
-                    </button>
-                    <button
-                        type="button"
-                        class="btn select-type-btn"
-                        :class="{ active: buttonType === 'file' }"
-                        @click="selectType('file')"
-                    >
-                        파일
-                    </button>
-                </div>
-            </div>
-
-            <div v-if="prevPlans.length" class="prev-plans">
-                <div class="prev-plans-head">
-                    <p class="prev-plans-title">
-                        <strong>{{ prevPlansDate }}</strong> 보고의 다음
-                        계획이에요. 오늘 끝낸 일과 겹치면 입력란에 넣으세요.
-                    </p>
-                    <button
-                        type="button"
-                        class="btn btn-small"
-                        @click="insertPrevPlans"
-                    >
-                        입력란에 추가
-                    </button>
-                </div>
-                <ul class="prev-plans-list">
-                    <li v-for="(item, index) in prevPlans" :key="index">
-                        <span class="prev-plans-project">{{
-                            item.project
-                        }}</span>
-                        {{ item.text }}
-                    </li>
-                </ul>
+                    {{ buttonType === "text" ? "PPTX 올리기" : "직접 입력하기" }}
+                </button>
             </div>
 
             <div v-if="buttonType === 'text'" class="field">
-                <label for="report-input">{{ activeTemplate?.label || "어제 / 오늘 / 막힌 것" }}</label>
-                <div class="template-chips" role="group" aria-label="붙여넣기 칸">
+                <!-- 형식 칩과 어제 계획은 접지 않는다. 입력칸이 화면을 다 먹으면
+                     스크롤하지 않은 사람은 다음 액션을 못 찾는다. -->
+                <div class="write-helpers">
+                    <span class="write-helpers-label">형식 넣기</span>
+                    <div class="template-chips" role="group" aria-label="붙여넣기 형식">
+                        <button
+                            v-for="template in PASTE_TEMPLATES"
+                            :key="template.id"
+                            type="button"
+                            class="btn btn-small"
+                            :class="{ on: activeTemplateId === template.id }"
+                            :aria-pressed="activeTemplateId === template.id"
+                            :title="template.hint"
+                            @click="insertTemplate(template)"
+                        >
+                            {{ template.label }}
+                        </button>
+                    </div>
                     <button
-                        v-for="template in PASTE_TEMPLATES"
-                        :key="template.id"
+                        v-if="prevPlans.length"
                         type="button"
-                        class="btn btn-small"
-                        :class="{ on: activeTemplateId === template.id }"
-                        :aria-pressed="activeTemplateId === template.id"
-                        :title="template.hint"
-                        @click="insertTemplate(template)"
+                        class="btn btn-small write-prev-plans"
+                        :title="`${prevPlansDate} 보고의 다음 계획을 붙입니다`"
+                        @click="insertPrevPlans"
                     >
-                        {{ template.label }}
+                        {{ prevPlansDate }} 다음 계획 {{ prevPlans.length }}건 붙이기
                     </button>
                 </div>
                 <textarea
                     id="report-input"
                     v-model="input"
-                    :placeholder="activeTemplate?.hint || '어제 한 일, 오늘 할 일, 막힌 것을 붙여넣으세요. 요청은 [지시/건의] 칸을 쓰세요.'"
-                    rows="16"
+                    :placeholder="activeTemplate?.hint || '오늘 한 일, 진행 상황, 이슈, 다음 계획을 자유롭게 쓰거나 붙여넣으세요.'"
+                    rows="10"
                     class="textarea"
                 ></textarea>
             </div>
 
-            <div v-else class="field file-drop-area">
-                <label for="pptx-input">PPTX 파일</label>
+            <div
+                v-else
+                class="field file-drop-area"
+                :class="{ 'is-dragging': isDragging }"
+                @dragover="onDragOver"
+                @dragenter="onDragOver"
+                @dragleave="onDragLeave"
+                @drop="onDrop"
+            >
+                <UploadCloud :size="22" aria-hidden="true" />
+                <p class="file-drop-copy">
+                    PPTX 파일을 고르거나 여기로 놓으세요
+                </p>
+                <label class="file-drop-pick" for="pptx-input">파일 고르기</label>
                 <input
                     id="pptx-input"
+                    class="file-drop-input"
                     type="file"
                     accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                     @change="uploadFile"
                 />
-                <p v-if="file" class="file-name">{{ file.name }}</p>
+                <p v-if="file" class="file-name">
+                    {{ file.name }}
+                    <button type="button" class="file-clear" @click="clearFile">지우기</button>
+                </p>
             </div>
 
             <p v-if="formError" class="form-error" role="alert">
@@ -397,22 +485,40 @@ const sendReport = async () => {
             </p>
             <div v-if="aiLoading" class="ai-progress" role="status">
                 <p class="ai-progress-title">
-                    로컬 AI가 보고서를 구조화하고 있어요 ·
-                    {{ elapsedLabel }} 경과
+                    로컬 AI가 정리하고 있어요 · {{ elapsedLabel }} 경과
                 </p>
                 <p class="ai-progress-help">
-                    보통 1~3분, 최대 10분까지 걸릴 수 있어요. 완료될
-                    때까지 이 화면을 유지해주세요. 입력한 내용은
-                    유지됩니다.
+                    보통 1~3분, 최대 10분까지 걸릴 수 있어요. 이 화면을 유지해주세요.
+                    입력한 내용은 그대로 남습니다.
                 </p>
             </div>
             <div class="form-actions">
+                <span v-if="draftSavedAt" class="draft-note" role="status">
+                    {{ draftSavedAt }} 초안 저장됨
+                </span>
+                <!-- AI를 돌리지 않고도 저장할 수 있어야 한다. 고칠 때마다 추출할 이유가 없다. -->
+                <button
+                    v-if="buttonType === 'text'"
+                    class="btn"
+                    @click="saveDraft"
+                    :disabled="aiLoading || draftSaving || plainSaving || !input.trim()"
+                >
+                    {{ draftSaving ? "저장 중..." : "초안만 저장" }}
+                </button>
+                <button
+                    v-if="buttonType === 'text'"
+                    class="btn"
+                    @click="submitPlain"
+                    :disabled="aiLoading || draftSaving || plainSaving || !input.trim()"
+                >
+                    {{ plainSaving ? "제출 중..." : "바로 제출" }}
+                </button>
                 <button
                     class="btn btn-primary"
                     @click="sendReport"
-                    :disabled="aiLoading"
+                    :disabled="aiLoading || plainSaving"
                 >
-                    {{ aiLoading ? `정리 중... (${elapsedLabel})` : "AI로 일일 업무 일지" }}
+                    {{ aiLoading ? `정리 중... (${elapsedLabel})` : "정리하고 제출" }}
                 </button>
             </div>
         </div>
@@ -420,11 +526,69 @@ const sendReport = async () => {
 </template>
 
 <style scoped>
+.write-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.write-author {
+    font-size: var(--fs-16);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.write-date {
+    width: auto;
+    height: 32px;
+    font-size: var(--fs-13);
+}
+
+.write-mode-link {
+    margin-left: auto;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: var(--fs-13);
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.write-mode-link:hover {
+    color: var(--text-strong);
+}
+
+/* 입력칸 위에 항상 보이는 보조 줄. 접어두면 아무도 못 찾는다. */
+.write-helpers {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-2);
+}
+
+.write-helpers-label {
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+}
+
+.write-prev-plans {
+    margin-left: auto;
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+    color: var(--text-strong);
+}
+
 .template-chips {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-    margin-bottom: var(--space-2);
 }
 
 .template-chips .on {
@@ -435,8 +599,17 @@ const sendReport = async () => {
 
 .form-actions {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
+    gap: var(--space-2);
     margin-top: var(--space-4);
+}
+
+.draft-note {
+    margin-right: auto;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--success-fg);
 }
 
 .form-error {
@@ -446,52 +619,95 @@ const sendReport = async () => {
 }
 
 .form-hint {
-    margin-top: var(--space-3);
+    margin: 0;
     font-size: var(--fs-13);
     color: var(--text);
 }
 
-.select-type-buttons {
-    display: flex;
-    gap: var(--space-2);
-}
-
+/* 드래그해서 놓는 칸. 파일 입력은 숨기고 라벨을 버튼처럼 쓴다. */
 .file-drop-area {
-    border: 1px dashed var(--border);
-    padding: var(--space-5);
-    border-radius: var(--radius-sm);
-    background: var(--bg);
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: var(--space-3);
+    padding: var(--space-6) var(--space-5);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    text-align: center;
     transition:
         border-color var(--dur-fast) var(--ease),
         background var(--dur-fast) var(--ease);
 }
 
-.file-drop-area:hover,
-.file-drop-area:focus-within {
-    border-color: var(--accent-border);
+.file-drop-area svg {
+    color: var(--text);
 }
 
-.file-drop-area > input[type="file"] {
+.file-drop-area:hover,
+.file-drop-area:focus-within,
+.file-drop-area.is-dragging {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.file-drop-copy {
+    margin: 0;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.file-drop-pick {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    cursor: pointer;
+}
+
+.file-drop-pick:hover {
+    border-color: var(--accent);
+}
+
+.file-drop-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
     padding: 0;
-    border: none;
-    background: transparent;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
 }
 
 .file-name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
     margin: 0;
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }
 
-.select-type-btn.active,
-.select-type-btn.active:hover {
-    background: var(--accent-soft);
-    border-color: var(--accent-border);
-    color: var(--accent);
+.file-clear {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
 }
 
 .ai-progress {
@@ -514,51 +730,73 @@ const sendReport = async () => {
     color: var(--text);
 }
 
-.prev-plans {
-    margin-bottom: var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-sm);
-    background: var(--surface-soft);
-}
+@media (max-width: 860px) {
+    .write-card {
+        padding-bottom: 88px;
+    }
 
-.prev-plans-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-}
+    .write-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
 
-.prev-plans-title {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
+    .write-mode-link {
+        margin-left: 0;
+        min-height: 44px;
+        text-align: left;
+    }
 
-.prev-plans-list {
-    margin: var(--space-2) 0 0;
-    padding-left: var(--space-4);
-    font-size: var(--fs-13);
-    color: var(--text-strong);
-}
+    .write-prev-plans {
+        margin-left: 0;
+        width: 100%;
+    }
 
-.prev-plans-project {
-    font-weight: var(--fw-semibold);
-}
+    .write-date {
+        width: 100%;
+        min-height: 44px;
+        height: 44px;
+        font-size: 16px;
+    }
 
-.write-hint {
-    margin-top: var(--space-3);
-    font-size: var(--fs-13);
-    color: var(--text);
-}
+    .textarea {
+        min-height: min(46dvh, 360px);
+        font-size: 16px;
+    }
 
-.write-hint summary {
-    cursor: pointer;
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
+    .file-drop-copy {
+        font-size: 14px;
+    }
 
-.write-hint ul {
-    margin: var(--space-2) 0 0;
-    padding-left: var(--space-4);
+    .file-drop-pick {
+        min-height: 44px;
+        height: 44px;
+        padding: 0 18px;
+    }
+
+    .form-actions {
+        position: sticky;
+        bottom: calc(var(--bottom-nav-offset) + 8px);
+        z-index: 8;
+        flex-wrap: wrap;
+        justify-content: stretch;
+        margin: 16px -14px -14px;
+        padding: 10px 14px;
+        background: color-mix(in srgb, var(--surface) 94%, transparent);
+        border-top: 1px solid var(--border);
+        backdrop-filter: blur(12px);
+    }
+
+    .form-actions .btn {
+        flex: 1 1 calc(50% - 6px);
+    }
+
+    .form-actions .btn-primary {
+        flex: 1 1 100%;
+    }
+
+    .draft-note {
+        width: 100%;
+        margin-right: 0;
+    }
 }
 </style>

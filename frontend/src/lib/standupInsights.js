@@ -1,7 +1,15 @@
 import { missingOnDate } from "./dayStatus.js";
 
-export function sortByIssuesFirst(reports, issueCountOf) {
+/** 이슈가 있는 사람을 위로 올린다.
+ *  pinMemberId를 주면 그 사람(= 로그인 사용자)을 무조건 맨 위에 둔다.
+ *  하루에 20명이 넘으면 뒤쪽이 접히는데, 내 보고가 접혀 있으면 첫 화면으로 못 쓴다. */
+export function sortByIssuesFirst(reports, issueCountOf, { pinMemberId } = {}) {
+    const pin = pinMemberId == null ? "" : String(pinMemberId);
+    const isPinned = (report) =>
+        pin !== "" && String(report?.member_id ?? "") === pin;
     return [...(reports || [])].sort((left, right) => {
+        const pinGap = Number(isPinned(right)) - Number(isPinned(left));
+        if (pinGap) return pinGap;
         const gap = issueCountOf(right) - issueCountOf(left);
         if (gap) return gap;
         return String(left.member_name || "").localeCompare(
@@ -22,6 +30,17 @@ export function missingBanner(groups) {
         }
     }
     return names;
+}
+
+/** 배너는 "오늘 미제출"만 말해야 한다.
+ *  모든 날짜를 합치면 지난주 미제출까지 빨간 줄로 올라와서 오늘 상황을 못 읽는다. */
+export function missingBannerForDate(groups, dateStr) {
+    const target = String(dateStr || "").slice(0, 10);
+    if (!target) return [];
+    const group = (groups || []).find(
+        (item) => String(item?.date || "").slice(0, 10) === target,
+    );
+    return missingBanner(group ? [group] : []);
 }
 
 export function weeklyRollup({ days = [], dayCounts = {}, submittedNames = [], blockerCount = 0 } = {}) {

@@ -1,39 +1,104 @@
 <template>
     <div class="page report-doc is-wide">
-        <AppPageHeader :title="userName || '분석 결과'" :subtitle="reportDate || '날짜 없음'" />
-        <div class="status-banner">
-            <span>작성자 <strong>{{ userName || "미선택" }}</strong></span>
-            <span>날짜 <strong>{{ reportDate }}</strong></span>
-            <span v-if="savedReportId" class="status-chip">저장됨</span>
-            <span v-else class="status-chip is-draft">아직 저장 전</span>
-            <div class="save-actions">
-                <button class="btn" @click="retryExtract" :disabled="aiLoading">
-                    {{ aiLoading ? "재추출 중..." : "재추출" }}
-                </button>
-                <button class="btn btn-primary" @click="saveReport" :disabled="aiLoading || saving">
-                    {{ saving ? "저장 중..." : savedReportId ? "수정 저장" : "저장하기" }}
-                </button>
+        <!-- 제목 한 줄에 사람·날짜·상태를 모은다. 예전에는 제목과 아래 띠에 두 번 적혀 있었다. -->
+        <header class="detail-head">
+            <div class="detail-title">
+                <h1>{{ userName || "일일보고" }}</h1>
+                <span class="detail-date">{{ formatDotDate(reportDate) || "날짜 없음" }}</span>
+                <span v-if="savedReportId" class="status-chip">저장됨</span>
+                <span v-else class="status-chip is-draft">아직 저장 전</span>
             </div>
-        </div>
+            <div class="detail-actions">
+                <template v-if="canEdit">
+                    <button class="btn btn-small" @click="retryExtract" :disabled="aiLoading">
+                        {{ aiLoading ? "재추출 중..." : "재추출" }}
+                    </button>
+                    <button
+                        class="btn btn-primary btn-small hide-on-narrow"
+                        @click="saveReport"
+                        :disabled="aiLoading || saving"
+                    >
+                        {{ saving ? "저장 중..." : savedReportId ? "수정 저장" : "저장하기" }}
+                    </button>
+                </template>
+            </div>
+        </header>
 
         <div v-if="isLoading" class="empty-state">불러오는 중...</div>
 
         <div v-else-if="reportData" class="content-container">
             <div class="json-container">
                 <div
+                    v-if="reportData.projects.length > 1"
+                    class="project-nav"
+                    role="group"
+                    aria-label="프로젝트 이동"
+                >
+                    <span class="project-nav-label">
+                        프로젝트 {{ reportData.projects.length }}개로 나눴습니다
+                    </span>
+                    <button
+                        v-for="(project, index) in reportData.projects"
+                        :key="`nav-${project._uid || index}`"
+                        type="button"
+                        class="project-nav-chip"
+                        :data-accent="projectAccentIndex(index)"
+                        @click="scrollToProject(index)"
+                    >
+                        <i class="project-dot" aria-hidden="true"></i>
+                        {{ project.projectName || `프로젝트 ${index + 1}` }}
+                    </button>
+                </div>
+
+                <!-- 읽기 모드: 제출된 보고를 문서처럼 본다. -->
+                <template v-if="!canEdit">
+                <div
                     v-for="(project, projectIndex) in reportData.projects"
-                    :key="project._uid || projectIndex"
+                    :key="`read-${project._uid || projectIndex}`"
+                    :id="`project-${projectIndex}`"
                     class="card projects-container"
                     :data-accent="projectAccentIndex(projectIndex)"
                 >
                     <div class="project-head">
+                        <i class="project-dot" aria-hidden="true"></i>
+                        <h2 class="read-project-name">
+                            {{ project.projectName || `프로젝트 ${projectIndex + 1}` }}
+                        </h2>
+                    </div>
+                    <section
+                        v-for="col in READ_COLUMNS"
+                        :key="col.key"
+                        class="read-block"
+                    >
+                        <h3 :class="col.key">{{ col.label }}</h3>
+                        <ul v-if="(project[col.key] || []).filter(Boolean).length" class="read-list">
+                            <li v-for="(item, itemIndex) in project[col.key].filter(Boolean)" :key="itemIndex">
+                                {{ item }}
+                            </li>
+                        </ul>
+                        <p v-else class="empty-msg">없음</p>
+                    </section>
+                </div>
+                </template>
+
+                <template v-else>
+                <div
+                    v-for="(project, projectIndex) in reportData.projects"
+                    :key="project._uid || projectIndex"
+                    :id="`project-${projectIndex}`"
+                    class="card projects-container"
+                    :data-accent="projectAccentIndex(projectIndex)"
+                >
+                    <div class="project-head">
+                        <i class="project-dot" aria-hidden="true"></i>
                         <span
                             v-if="reportData.projects.length > 1"
                             class="project-kicker"
-                        >{{ projectIndex + 1 }}/{{ reportData.projects.length }}</span>
+                        >프로젝트 {{ projectIndex + 1 }}/{{ reportData.projects.length }}</span>
                         <input
                             class="input project-name-input"
                             v-model="project.projectName"
+                            placeholder="프로젝트 이름"
                         />
                         <button
                             class="btn btn-danger"
@@ -46,59 +111,55 @@
                     <div class="field-group completedTasks">
                         <h2>완료된 업무</h2>
                         <div
-                            v-if="project.completedTasks.length > 0"
                             v-for="(task, taskIndex) in project.completedTasks"
+                            :key="`completed-${taskIndex}`"
                             class="task-row"
                         >
                             <input
-                                :key="`completed-${taskIndex}`"
                                 class="input"
-                                :value="task"
                                 v-model="project.completedTasks[taskIndex]"
                             />
                             <button
                                 class="btn remove-btn"
+                                aria-label="이 항목 삭제"
                                 @click="removeCompletedTask(project, taskIndex)"
                             >
-                                -
+                                삭제
                             </button>
                         </div>
 
-                        <div v-else class="empty-msg">
+                        <div v-if="!project.completedTasks.length" class="empty-msg">
                             완료된 업무가 없습니다
                         </div>
                         <button
                             class="btn add-btn"
                             @click="addCompletedTask(project)"
                         >
-                            +
+                            항목 추가
                         </button>
                     </div>
 
                     <div class="field-group inProgressTasks">
                         <h2>진행 중인 업무</h2>
                         <div
-                            v-if="project.inProgressTasks.length > 0"
                             v-for="(task, taskIndex) in project.inProgressTasks"
+                            :key="`progress-${taskIndex}`"
                             class="task-row"
                         >
                             <input
-                                :key="`progress-${taskIndex}`"
                                 class="input"
-                                :value="task"
                                 v-model="project.inProgressTasks[taskIndex]"
                             />
                             <button
                                 class="btn remove-btn"
-                                @click="
-                                    removeInProgressTask(project, taskIndex)
-                                "
+                                aria-label="이 항목 삭제"
+                                @click="removeInProgressTask(project, taskIndex)"
                             >
-                                -
+                                삭제
                             </button>
                         </div>
 
-                        <div v-else class="empty-msg">
+                        <div v-if="!project.inProgressTasks.length" class="empty-msg">
                             진행 중인 업무가 없습니다
                         </div>
 
@@ -106,97 +167,95 @@
                             class="btn add-btn"
                             @click="addInProgressTask(project)"
                         >
-                            +
+                            항목 추가
                         </button>
                     </div>
 
                     <div class="field-group issues">
                         <h2>이슈</h2>
                         <div
-                            v-if="project.issues.length > 0"
                             v-for="(issue, issueIndex) in project.issues"
+                            :key="`issue-${issueIndex}`"
                             class="task-row"
                         >
                             <input
-                                :key="`issue-${issueIndex}`"
                                 class="input"
                                 v-model="project.issues[issueIndex]"
                             />
                             <button
                                 class="btn remove-btn"
+                                aria-label="이 항목 삭제"
                                 @click="removeIssue(project, issueIndex)"
                             >
-                                -
+                                삭제
                             </button>
                         </div>
 
-                        <div v-else class="empty-msg">이슈가 없습니다</div>
+                        <div v-if="!project.issues.length" class="empty-msg">이슈가 없습니다</div>
                         <button class="btn add-btn" @click="addIssue(project)">
-                            +
+                            항목 추가
                         </button>
                     </div>
 
                     <div class="field-group requests">
                         <h2>요청사항</h2>
                         <div
-                            v-if="project.requests.length > 0"
                             v-for="(request, requestIndex) in project.requests"
+                            :key="`request-${requestIndex}`"
                             class="task-row"
                         >
                             <input
-                                :key="`request-${requestIndex}`"
                                 class="input"
-                                :value="request"
                                 v-model="project.requests[requestIndex]"
                             />
                             <button
                                 class="btn remove-btn"
+                                aria-label="이 항목 삭제"
                                 @click="removeRequest(project, requestIndex)"
                             >
-                                -
+                                삭제
                             </button>
                         </div>
-                        <div v-else class="empty-msg">요청사항이 없습니다</div>
+                        <div v-if="!project.requests.length" class="empty-msg">요청사항이 없습니다</div>
                         <button
                             class="btn add-btn"
                             @click="addRequest(project)"
                         >
-                            +
+                            항목 추가
                         </button>
                     </div>
 
                     <div class="field-group nextPlans">
                         <h2>다음 계획</h2>
                         <div
-                            v-if="project.nextPlans.length > 0"
                             v-for="(plan, planIndex) in project.nextPlans"
+                            :key="`plan-${planIndex}`"
                             class="task-row"
                         >
                             <input
-                                :key="`plan-${planIndex}`"
                                 class="input"
-                                :value="plan"
                                 v-model="project.nextPlans[planIndex]"
                             />
                             <button
                                 class="btn remove-btn"
+                                aria-label="이 항목 삭제"
                                 @click="removeNextPlan(project, planIndex)"
                             >
-                                -
+                                삭제
                             </button>
                         </div>
 
-                        <div v-else class="empty-msg">다음 계획이 없습니다</div>
+                        <div v-if="!project.nextPlans.length" class="empty-msg">다음 계획이 없습니다</div>
                         <button
                             class="btn add-btn"
                             @click="addNextPlan(project)"
                         >
-                            +
+                            항목 추가
                         </button>
                     </div>
                 </div>
 
-                <button class="btn" @click="addProject">추가</button>
+                <button class="btn add-project-btn" @click="addProject">프로젝트 추가</button>
 
                 <div class="card save-bar">
                     <div class="save-actions">
@@ -209,16 +268,17 @@
                         </button>
                     </div>
                 </div>
+                </template>
             </div>
 
-            <div class="card raw-container">
+            <aside v-if="rawData" class="card raw-container">
                 <h2>원본 보고서</h2>
                 <label class="raw-toggle">
                     <input type="checkbox" v-model="highlightOn" />
                     추출 항목과 겹치는 원문 표시
                 </label>
                 <pre class="raw-content" v-html="highlightedRaw"></pre>
-            </div>
+            </aside>
         </div>
 
         <div v-else class="empty-state">
@@ -232,15 +292,18 @@ import { computed, ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
+import { selectedUserId } from "../composables/useSelectedUser";
+import { isAdmin } from "../composables/useSession";
+import { usePageMeta } from "../composables/usePageMeta";
 import {
     highlightedRawHtml,
     projectAccentIndex,
 } from "../lib/projectAccent";
-import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const route = useRoute();
 const router = useRouter();
-const { alert: showAlert } = useDialog();
+const { alert: showAlert, confirm: askConfirm } = useDialog();
+const { setPageMeta } = usePageMeta();
 
 const reportData = ref(null);
 const rawData = ref(null);
@@ -253,12 +316,66 @@ const savedReportId = ref(null);
 const savedMemberId = ref(null);
 const { postSaveReport, postReport, getUsers, getReportById } = useApi();
 
+
+/** 읽기 모드에서 쓰는 순서. 편집 칸과 같은 키를 쓴다. */
+const READ_COLUMNS = [
+    { key: "completedTasks", label: "완료된 업무" },
+    { key: "inProgressTasks", label: "진행 중인 업무" },
+    { key: "issues", label: "이슈" },
+    { key: "requests", label: "요청사항" },
+    { key: "nextPlans", label: "다음 계획" },
+];
+
+const isMine = computed(() => {
+    if (savedMemberId.value == null) return true;
+    if (selectedUserId.value == null) return false;
+    return String(savedMemberId.value) === String(selectedUserId.value);
+});
+
+/** 새로 추출한 초안, 내 보고, 관리자는 고칠 수 있다. */
+const canEdit = computed(() => {
+    if (!savedReportId.value) return true;
+    return isMine.value || isAdmin.value;
+});
+
+const formatDotDate = (value) => {
+    const [year, month, day] = String(value || "").split("-");
+    if (!year || !month || !day) return String(value || "");
+    return `${year}.${month}.${day}`;
+};
+
+/** 어디서 들어왔는지에 따라 위쪽 크럼을 맞춘다.
+ *  달력에서 왔는데 "일일보고"로 돌아가면 보던 자리를 잃는다. */
+const CRUMB_SOURCES = {
+    activities: { to: "/activities", label: "사용자 활동" },
+    timeline: { to: "/project-timeline", label: "프로젝트 흐름" },
+    list: { to: "/", label: "일일보고" },
+};
+
+watch(
+    [() => route.query.from, savedReportId, canEdit],
+    ([from, id, editable]) => {
+        setPageMeta({
+            title: id ? (editable ? "보고 수정" : "일일보고 상세") : "분석 결과",
+            parent: CRUMB_SOURCES[String(from || "")] || CRUMB_SOURCES.list,
+        });
+    },
+    { immediate: true },
+);
+
+
 const issueText = (issue) =>
     typeof issue === "string"
         ? issue.trim()
         : String(issue?.content || "").trim();
 
 const highlightOn = ref(true);
+
+/** 프로젝트가 여러 개면 위 이동 바에서 해당 카드로 스크롤한다. */
+const scrollToProject = (index) => {
+    const el = document.getElementById(`project-${index}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+};
 
 const highlightedRaw = computed(() =>
     highlightedRawHtml(rawData.value, reportData.value?.projects, {
@@ -392,8 +509,13 @@ const addProject = () => {
     });
 };
 
-const removeProject = (index) => {
-    reportData.value.projects.splice(index, 1);
+const removeProject = async (index) => {
+    const name = reportData.value.projects[index]?.projectName || "이 프로젝트";
+    const ok = await askConfirm(`${name}을(를) 삭제할까요?`, {
+        title: "프로젝트 삭제",
+        confirmLabel: "삭제",
+    });
+    if (ok) reportData.value.projects.splice(index, 1);
 };
 
 const addCompletedTask = (project) => {
@@ -438,6 +560,10 @@ const removeNextPlan = (project, index) => {
 
 const saveReport = async () => {
     if (!reportData.value) return;
+    if (!canEdit.value) {
+        showAlert("자신의 보고만 수정할 수 있습니다.");
+        return;
+    }
     
 
 
@@ -480,6 +606,10 @@ const saveReport = async () => {
 };
 
 const retryExtract = async () => {
+    if (!canEdit.value) {
+        showAlert("자신의 보고만 수정할 수 있습니다.");
+        return;
+    }
     if (!rawData.value) {
         showAlert("원문이 없어 재추출할 수 없습니다.");
         return;
@@ -520,3 +650,196 @@ const getSelectedMemberId = () => {
     return memberId > 0 ? memberId : null;
 };
 </script>
+
+<style scoped>
+/* 제목 줄 하나에 사람·날짜·상태·동작을 모은다. */
+.detail-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.detail-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2) var(--space-3);
+    min-width: 0;
+}
+
+.detail-title h1 {
+    margin: 0;
+    font-family: var(--heading);
+    font-size: 22px;
+    letter-spacing: -0.3px;
+    color: var(--text-strong);
+}
+
+.detail-date {
+    font-size: var(--fs-13);
+    color: var(--text);
+}
+
+.detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* 읽기 모드: 입력칸 대신 문서로 읽는다. */
+.read-project-name {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.read-block + .read-block {
+    margin-top: var(--space-4);
+}
+
+.read-block h3 {
+    margin: 0 0 var(--space-2);
+    font-family: var(--sans);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.4px;
+    color: var(--text);
+}
+
+.read-block h3.issues {
+    color: var(--danger-fg);
+}
+
+.read-list {
+    margin: 0;
+    padding-left: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.read-list li {
+    font-size: var(--fs-14);
+    color: var(--text-strong);
+    line-height: var(--lh-base);
+    word-break: keep-all;
+}
+
+.projects-container {
+    scroll-margin-top: var(--space-4);
+}
+
+.project-head {
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+}
+
+.project-dot {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--project-accent, var(--accent));
+}
+
+.project-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.project-nav-label {
+    margin-right: var(--space-2);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.project-nav-chip {
+    --project-accent: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    max-width: 240px;
+    height: 28px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    font: inherit;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.project-nav-chip:hover {
+    border-color: var(--project-accent);
+    background: var(--surface-soft);
+}
+
+.project-nav-chip[data-accent="1"] {
+    --project-accent: var(--info-fg);
+}
+
+.project-nav-chip[data-accent="2"] {
+    --project-accent: var(--warning-fg);
+}
+
+.project-nav-chip[data-accent="3"] {
+    --project-accent: var(--success-fg);
+}
+
+.project-nav-chip[data-accent="4"] {
+    --project-accent: var(--project-4-fg);
+}
+
+.project-nav-chip[data-accent="5"] {
+    --project-accent: var(--project-5-fg);
+}
+
+@media (max-width: 860px) {
+    .detail-head {
+        align-items: flex-start;
+        gap: var(--space-2);
+        margin-bottom: var(--space-3);
+    }
+
+    .detail-title {
+        width: 100%;
+    }
+
+    .detail-title h1 {
+        font-size: 20px;
+    }
+
+    .detail-actions {
+        width: 100%;
+    }
+
+    .detail-actions .btn {
+        flex: 1;
+        min-height: 44px;
+    }
+
+    .project-nav-chip {
+        max-width: 100%;
+        min-height: 40px;
+    }
+}
+</style>

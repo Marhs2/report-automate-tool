@@ -58,7 +58,7 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
-python init_db.py               
+python init_db.py               # 빈 DB면 관리자 / admin1234 생성 (ADMIN_NAME, ADMIN_PASSWORD로 변경)
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 

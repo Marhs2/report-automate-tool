@@ -54,6 +54,19 @@ def next_week_span(end: date) -> str:
     return f"{_md(next_monday)}~{_md(next_monday + timedelta(days=4))}"
 
 
+def week_start_of(selected_dates) -> str:
+    """선택한 날짜들이 속한 주의 월요일.
+
+    주간보고는 한 주에 하나다. 월~수로 만들었다가 월~금으로 다시 만들어도 같은 주이므로
+    같은 키가 나와야 한다. 날짜가 여러 주에 걸치면 가장 늦은 날짜의 주를 쓴다.
+    """
+    days = sorted({d for d in (_as_date(raw) for raw in selected_dates or []) if d})
+    if not days:
+        return ""
+    end = days[-1]
+    return (end - timedelta(days=end.weekday())).isoformat()
+
+
 def next_week_label(done_label: str, report_date: str = "") -> str:
     year = _year_of(report_date)
     days = _parse_md_dates(done_label, year)

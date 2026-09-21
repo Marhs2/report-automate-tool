@@ -7,10 +7,12 @@ from collections import defaultdict
 from datetime import date, timedelta
 from urllib.parse import quote, urlparse
 
+from auth import PASSWORD_MIN_LENGTH, hash_password, new_session_token, verify_password
 from db import get_db
+from init_db import ensure_default_admin
 from dotenv import load_dotenv
 from kr_holidays import kr_holiday_map
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from openai import OpenAI
@@ -21,6 +23,7 @@ from weekly_deck import (
     merge_last_week_next,
     next_sections_of,
     pick_previous_weekly,
+    week_start_of,
 )
 from pydantic import BaseModel
 
@@ -34,7 +37,11 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origin_regex=(
+        r"https?://((localhost|127\.0\.0\.1)|"
+        r"((10|192\.168)\.\d{1,3}\.\d{1,3})|"
+        r"(172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}))(:\d+)?"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -183,9 +190,23 @@ class ReportRequest(BaseModel):
     member_id: int
 
 
+class ReportDraftRequest(BaseModel):
+    """AI를 돌리지 않고 원문만 보관한다. 쓰던 글을 잃지 않고 화면을 떠날 수 있게 한다."""
+
+    report: str
+    date: str
+    member_id: int
+
+
 class UserRequest(BaseModel):
     name: str
     team_id: int | None = None
+    password: str | None = None
+
+
+class LoginRequest(BaseModel):
+    name: str
+    password: str
 
 
 class TeamRequest(BaseModel):
@@ -242,6 +263,124 @@ def validate_member(conn, member_id):
         status_code=400,
         detail="유효하지 않은 사용자입니다. 사용자 선택 화면에서 다시 선택해주세요.",
     )
+
+
+def session_token_from_headers(
+    authorization: str | None = Header(default=None),
+    x_session_token: str | None = Header(default=None),
+) -> str:
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+        if token:
+            return token
+    if x_session_token and str(x_session_token).strip():
+        return str(x_session_token).strip()
+    raise HTTPException(status_code=401, detail="로그인해 주세요.")
+
+
+def current_member_id(token: str = Depends(session_token_from_headers)) -> int:
+    """로그인한 사용자를 현재 작성자로 본다."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT member_id FROM sessions WHERE token = ?",
+            (token,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=401, detail="로그인이 만료되었습니다.")
+        validate_member(conn, row["member_id"])
+        return int(row["member_id"])
+
+
+def require_own_member(actor_id: int, member_id: int, message="자신의 것만 수정할 수 있습니다."):
+    if int(actor_id) != int(member_id):
+        raise HTTPException(status_code=403, detail=message)
+
+
+def require_own_or_admin(
+    actor_id: int,
+    member_id: int,
+    message="자신의 것만 수정할 수 있습니다.",
+    conn=None,
+):
+    if int(actor_id) == int(member_id):
+        return
+    if conn is not None:
+        if member_is_admin(conn, actor_id):
+            return
+        raise HTTPException(status_code=403, detail=message)
+    with get_db() as db:
+        if member_is_admin(db, actor_id):
+            return
+    raise HTTPException(status_code=403, detail=message)
+
+
+def member_is_admin(conn, member_id: int) -> bool:
+    row = conn.execute(
+        "SELECT is_admin FROM members WHERE id = ?",
+        (member_id,),
+    ).fetchone()
+    if not row:
+        return False
+    keys = row.keys()
+    if "is_admin" not in keys:
+        return False
+    return bool(row["is_admin"])
+
+
+def require_admin(conn, actor_id: int):
+    if not member_is_admin(conn, actor_id):
+        raise HTTPException(status_code=403, detail="관리자만 할 수 있습니다.")
+
+
+def visible_raw_text(actor_id, owner_id, raw_text):
+    """타인 원문은 목록·상세 API에서 빼다. 정리된 항목만 보인다."""
+    try:
+        if int(actor_id) == int(owner_id):
+            return raw_text
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+_PLAIN_HEADING = re.compile(
+    r"^("
+    r"프로젝트\s*명\s*:?|"
+    r"\[완료\]|\[진행\]|\[이슈\]|\[내일\]|"
+    r"어제\s*:?|오늘\s*:?|막힌\s*것\s*:?|"
+    r"\d+\.\s*.+|"
+    r"전일\s*계획.*|금일\s*:?|내일\s*:?|"
+    r"지시/확인.*|건의\s*:?"
+    r")\s*$",
+    re.IGNORECASE,
+)
+
+
+def plain_parse_daily(raw_text: str) -> dict:
+    """AI 없이 제출할 때 쓴 글을 구조화한다. 서식 제목은 빼는다."""
+    items = []
+    for line in str(raw_text or "").splitlines():
+        text = line.strip().lstrip("-*•").strip()
+        if not text or _PLAIN_HEADING.match(text):
+            continue
+        items.append(text)
+    if not items:
+        text = str(raw_text or "").strip()
+        if text:
+            items = [text]
+    if not items:
+        return {"projects": []}
+    return {
+        "projects": [
+            {
+                "projectName": "오늘 보고",
+                "completedTasks": items,
+                "inProgressTasks": [],
+                "issues": [],
+                "requests": [],
+                "nextPlans": [],
+            }
+        ]
+    }
 
 
 UNASSIGNED_TEAM_NAME = "미지정"
@@ -307,6 +446,48 @@ def ensure_runtime_schema():
         ):
             conn.execute("ALTER TABLE projects ADD COLUMN report_date DATE")
         conn.execute("DROP TABLE IF EXISTS project_aliases")
+        member_columns = conn.execute("PRAGMA table_info(members)").fetchall()
+        if member_columns and not any(
+            column["name"] == "password_hash" for column in member_columns
+        ):
+            conn.execute(
+                "ALTER TABLE members ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''"
+            )
+        if member_columns and not any(
+            column["name"] == "is_admin" for column in member_columns
+        ):
+            conn.execute(
+                "ALTER TABLE members ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
+            )
+        conn.execute(
+            """
+            UPDATE members
+            SET is_admin = 1
+            WHERE id = (
+                SELECT id FROM members
+                WHERE IFNULL(password_hash, '') != ''
+                ORDER BY id ASC
+                LIMIT 1
+            )
+            AND NOT EXISTS (SELECT 1 FROM members WHERE is_admin = 1)
+            """
+        )
+        created_admin = ensure_default_admin(conn)
+        if created_admin:
+            print(
+                f"기본 관리자 계정: {created_admin['name']} / {created_admin['password']}"
+                "  (ADMIN_NAME, ADMIN_PASSWORD 환경변수로 바꿀 수 있습니다)"
+            )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                member_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (member_id) REFERENCES members(id)
+            )
+            """
+        )
         conn.commit()
 
 
@@ -372,9 +553,60 @@ def project_has_content(project):
     return False
 
 
+_PROJECT_NAME_ALIASES = {
+    "여비규정 개정": "경영지원",
+    "여비규정": "경영지원",
+}
+
+
+def merge_aliased_projects(report_data):
+    """규정·인증 소제목을 행정 프로젝트로 합친다."""
+    if not isinstance(report_data, dict):
+        return {"projects": []}
+    merged = {}
+    order = []
+    for project in report_data.get("projects") or []:
+        if not isinstance(project, dict):
+            continue
+        raw = str(project.get("projectName") or "").strip()
+        name = _PROJECT_NAME_ALIASES.get(raw, raw) or "미분류 프로젝트"
+        project = dict(project)
+        project["projectName"] = name
+        key = name.casefold()
+        if key not in merged:
+            merged[key] = project
+            order.append(key)
+            continue
+        target = merged[key]
+        for field in (
+            "completedTasks",
+            "inProgressTasks",
+            "issues",
+            "requests",
+            "nextPlans",
+            "nextWeekPlans",
+        ):
+            if field not in project and field not in target:
+                continue
+            seen = set()
+            items = []
+            for item in (target.get(field) or []) + (project.get(field) or []):
+                text = str(item if not isinstance(item, dict) else item.get("content") or "").strip()
+                marker = json.dumps(item, ensure_ascii=False) if isinstance(item, dict) else text
+                if not marker or marker in seen:
+                    continue
+                seen.add(marker)
+                items.append(item)
+            if items:
+                target[field] = items
+    report_data["projects"] = [merged[key] for key in order]
+    return report_data
+
+
 def drop_empty_projects(report_data):
     if not isinstance(report_data, dict):
         return {"projects": []}
+    report_data = merge_aliased_projects(report_data)
     projects = report_data.get("projects") or []
     report_data["projects"] = [
         p for p in projects if isinstance(p, dict) and project_has_content(p)
@@ -486,7 +718,21 @@ _WEEKLY_GENERIC_NOUNS = {
     "api",
     "ui",
 }
-_WEEKLY_GENERIC_TOKENS = _WEEKLY_GENERIC_ACTIONS | _WEEKLY_GENERIC_NOUNS
+_WEEKLY_STOP_TOKENS = {
+    "및",
+    "외",
+    "등",
+    "관련",
+    "따른",
+    "대한",
+    "통해",
+    "위해",
+    "이후",
+    "이전",
+    "이번",
+    "다음",
+}
+_WEEKLY_GENERIC_TOKENS = _WEEKLY_GENERIC_ACTIONS | _WEEKLY_GENERIC_NOUNS | _WEEKLY_STOP_TOKENS
 
 
 def _weekly_task_tokens(value):
@@ -500,7 +746,7 @@ def _weekly_task_tokens(value):
             text,
         )
     text = re.sub(r"[^0-9a-z가-힣]+", " ", text)
-    ignored = set(_WEEKLY_TASK_MARKERS) | {
+    ignored = set(_WEEKLY_TASK_MARKERS) | _WEEKLY_STOP_TOKENS | {
         "진행",
         "중",
         "완료",
@@ -526,16 +772,21 @@ def _weekly_task_tokens(value):
 
 def _weekly_tasks_match(left, right):
     """같은 업무 대상으로 볼 만큼 구체적인 토큰이 겹칠 때만 True."""
-    left_tokens = _weekly_task_tokens(left)
-    right_tokens = _weekly_task_tokens(right)
-    specific_common = (left_tokens & right_tokens) - _WEEKLY_GENERIC_TOKENS
+    left_tokens = _weekly_task_tokens(left) - _WEEKLY_GENERIC_TOKENS
+    right_tokens = _weekly_task_tokens(right) - _WEEKLY_GENERIC_TOKENS
+    specific_common = left_tokens & right_tokens
+    if not specific_common:
+        return False
+    # 양쪽에 서로 다른 고유명(매경미디어 vs 주거래, 급여대장 vs 병역지정)이 있으면 별개 업무.
+    extras_left = {token for token in left_tokens - right_tokens if len(token) >= 4}
+    extras_right = {token for token in right_tokens - left_tokens if len(token) >= 4}
+    if extras_left and extras_right:
+        return False
     if len(specific_common) >= 2:
         return True
-    if len(specific_common) == 1:
-        token = next(iter(specific_common))
-        # '미리보기'처럼 구체적이고 충분히 긴 단어 1개만 겹쳐도 같은 대상으로 본다.
-        return len(token) >= 4
-    return False
+    token = next(iter(specific_common))
+    # '미리보기'처럼 구체적이고 충분히 긴 단어 1개만 겹쳐도 같은 대상으로 본다.
+    return len(token) >= 4
 
 
 def reported_project_name(project):
@@ -597,10 +848,22 @@ def promote_weekly_tasks(report_data, source_reports=None):
             )
         )
         def _plan_done(plan):
-            return any(
+            if any(
                 _weekly_tasks_match(plan, completed_task)
                 for completed_task in completed_candidates
-            )
+            ):
+                return True
+            plan_tokens = _weekly_task_tokens(plan) - _WEEKLY_GENERIC_TOKENS
+            for progress_task in in_progress:
+                if plan == progress_task:
+                    return True
+                # 진행 문장이 계획 토큰을 모두 포함하면 같은 일의 중복이다.
+                progress_tokens = (
+                    _weekly_task_tokens(progress_task) - _WEEKLY_GENERIC_TOKENS
+                )
+                if plan_tokens and plan_tokens <= progress_tokens:
+                    return True
+            return False
 
         cleaned_plans = list(
             dict.fromkeys(task for task in next_plans if not _plan_done(task))
@@ -886,15 +1149,6 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
             )
             break
 
-    missing = _missing_weekdays(selects)
-    if missing:
-        labels = ", ".join(_weekday_label(day) for day in missing)
-        add(
-            "missing-days",
-            f"{labels} 일일이 빠져 있습니다. 이 주 범위가 맞나요?",
-            "빠진 날짜의 일일보고를 추가하거나 기간을 다시 선택하세요.",
-        )
-
     for name, bucket in by_project.items():
         counts = defaultdict(int)
         for _day, text in bucket["progress"]:
@@ -1179,7 +1433,7 @@ def read_root():
 
 
 @app.get("/project-timeline")
-def get_project_timeline(name: str, member_id: int = None):
+def get_project_timeline(name: str, member_id: int = None, actor_id: int = Depends(current_member_id)):
     name_map = get_project_name_map()
     canonical = name.strip()
 
@@ -1239,7 +1493,7 @@ def get_project_timeline(name: str, member_id: int = None):
 
 
 @app.get("/project-names")
-def get_project_names():
+def get_project_names(actor_id: int = Depends(current_member_id)):
     name_map = get_project_name_map()
     with get_db() as conn:
         rows = conn.execute("SELECT parsed_json FROM daily_reports").fetchall()
@@ -1260,7 +1514,7 @@ def get_project_names():
 
 
 @app.get("/project-names/registered")
-def get_registered_project_names():
+def get_registered_project_names(actor_id: int = Depends(current_member_id)):
     with get_db() as conn:
         rows = conn.execute(
             "SELECT name, keywords, created_at FROM known_projects ORDER BY name"
@@ -1271,7 +1525,7 @@ def get_registered_project_names():
 
 
 @app.post("/project-names")
-def create_project_name(data: ProjectNameRequest):
+def create_project_name(data: ProjectNameRequest, actor_id: int = Depends(current_member_id)):
     name = data.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="프로젝트 명을 입력해주세요.")
@@ -1291,7 +1545,7 @@ def create_project_name(data: ProjectNameRequest):
 
 
 @app.delete("/project-names/{project_name}")
-def delete_project_name(project_name: str):
+def delete_project_name(project_name: str, actor_id: int = Depends(current_member_id)):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM known_projects WHERE name = ?", (project_name,))
@@ -1304,7 +1558,7 @@ def delete_project_name(project_name: str):
 
 
 @app.put("/project-names/{project_name}")
-def update_project_name_keywords(project_name: str, data: ProjectNameKeywordsRequest):
+def update_project_name_keywords(project_name: str, data: ProjectNameKeywordsRequest, actor_id: int = Depends(current_member_id)):
     keywords = data.keywords.strip()
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1455,7 +1709,7 @@ def call_keyword_model(report):
 
 
 @app.post("/project-names/recommend")
-def recommend_project_keywords(data: KeywordRecommendRequest):
+def recommend_project_keywords(data: KeywordRecommendRequest, actor_id: int = Depends(current_member_id)):
     report = (data.report or "").strip()
     if not report:
         raise HTTPException(status_code=400, detail="원문을 입력해주세요.")
@@ -1671,10 +1925,19 @@ def generate_weekly_report(member_id, selects):
                 detail=f"주간 보고서 AI 호출 실패: {exc}",
             )
 
-        db.execute(
-            "DELETE FROM weekly_reports WHERE member_id = ? AND selected_date = ?",
-            (member_id, json.dumps(selects)),
-        )
+        # 한 주에 주간보고는 하나다. 날짜 조합(월~수 / 월~금)이 달라도 같은 주면 덮어쓴다.
+        # 예전에는 조합이 다르면 새 문서로 쌓여서 같은 주가 목록에 두 줄로 남았다.
+        week_key = week_start_of(selects)
+        for row in db.execute(
+            "SELECT id, selected_date FROM weekly_reports WHERE member_id = ?",
+            (member_id,),
+        ).fetchall():
+            try:
+                stale = json.loads(row[1] or "[]")
+            except json.JSONDecodeError:
+                continue
+            if week_key and week_start_of(stale) == week_key:
+                db.execute("DELETE FROM weekly_reports WHERE id = ?", (row[0],))
         db.execute(
             "INSERT INTO weekly_reports (member_id, selected_date, report_json) VALUES (?, ?, ?)",
             (member_id, json.dumps(selects), json.dumps(report_data, ensure_ascii=False)),
@@ -1684,7 +1947,8 @@ def generate_weekly_report(member_id, selects):
 
 
 @app.post("/weekly-report")
-def weekly_report(data: WeeklyReportRequest):
+def weekly_report(data: WeeklyReportRequest, actor_id: int = Depends(current_member_id)):
+    require_own_or_admin(actor_id, data.userId)
     selects = normalize_selected_dates(data.selects)
     report_data = generate_weekly_report(data.userId, selects)
     if report_data is None:
@@ -1777,7 +2041,8 @@ def process_daily_report(report: str, report_date: str, member_id: int):
 
 
 @app.post("/send-report")
-async def send_report(data: ReportRequest):
+async def send_report(data: ReportRequest, actor_id: int = Depends(current_member_id)):
+    require_own_or_admin(actor_id, data.member_id)
     return process_daily_report(data.report, data.date, data.member_id)
 
 
@@ -1786,7 +2051,9 @@ async def send_report_pptx(
     file: UploadFile = File(...),
     date: str = Form(...),
     member_id: int = Form(...),
+    actor_id: int = Depends(current_member_id),
 ):
+    require_own_or_admin(actor_id, member_id)
     filename = (file.filename or "").lower()
     if not filename.endswith(".pptx"):
         raise HTTPException(
@@ -1817,8 +2084,39 @@ async def send_report_pptx(
     return {"parsed": parsed, "raw_text": raw_text}
 
 
+@app.post("/report-drafts")
+def save_report_draft(
+    data: ReportDraftRequest, actor_id: int = Depends(current_member_id)
+):
+    """초안만 저장한다. 고치려고 AI를 다시 돌릴 필요가 없어야 한다."""
+    require_own_or_admin(actor_id, data.member_id)
+    report_date = validate_report_date(data.date)
+    raw_text = data.report
+    if not raw_text.strip():
+        raise HTTPException(status_code=400, detail="저장할 내용이 없습니다.")
+    with get_db() as conn:
+        validate_member(conn, data.member_id)
+        conn.execute(
+            """
+            INSERT INTO report_drafts (member_id, report_date, raw_text, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(member_id, report_date)
+            DO UPDATE SET raw_text = excluded.raw_text,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            (data.member_id, report_date, raw_text),
+        )
+        conn.commit()
+    return {
+        "message": "초안을 저장했습니다.",
+        "member_id": data.member_id,
+        "report_date": report_date,
+    }
+
+
 @app.get("/report-drafts/{member_id}/{report_date}")
-def get_report_draft(member_id: int, report_date: str):
+def get_report_draft(member_id: int, report_date: str, actor_id: int = Depends(current_member_id)):
+    require_own_or_admin(actor_id, member_id)
     report_date = validate_report_date(report_date)
     with get_db() as conn:
         row = conn.execute(
@@ -1851,6 +2149,7 @@ def get_user_activities(
     month: int,
     start_date: str | None = None,
     end_date: str | None = None,
+    actor_id: int = Depends(current_member_id),
 ):
     if bool(start_date) != bool(end_date):
         raise HTTPException(
@@ -1948,33 +2247,35 @@ def get_user_activities(
 
 
 @app.delete("/reports/{report_id}")
-def delete_report(report_id: int):
+def delete_report(report_id: int, actor_id: int = Depends(current_member_id)):
     with get_db() as db:
-        db.execute(
-            """
-            DELETE FROM daily_reports
-            WHERE id = ?
-        """,
+        row = db.execute(
+            "SELECT member_id FROM daily_reports WHERE id = ?",
             (report_id,),
-        )
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="보고서를 찾을 수 없습니다.")
+        require_own_or_admin(actor_id, row["member_id"], conn=db)
+        db.execute("DELETE FROM daily_reports WHERE id = ?", (report_id,))
     return {"message": "Report deleted successfully"}
 
 
 @app.delete("/weekly/{report_id}")
-def delete_weekly_report(report_id: int):
+def delete_weekly_report(report_id: int, actor_id: int = Depends(current_member_id)):
     with get_db() as db:
-        db.execute(
-            """
-            DELETE FROM weekly_reports
-            WHERE id = ?
-        """,
+        row = db.execute(
+            "SELECT member_id FROM weekly_reports WHERE id = ?",
             (report_id,),
-        )
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Weekly report not found")
+        require_own_or_admin(actor_id, row["member_id"], conn=db)
+        db.execute("DELETE FROM weekly_reports WHERE id = ?", (report_id,))
     return {"message": "Report deleted successfully"}
 
 
 @app.get("/weekly/{user_id}")
-def get_weekly(user_id: int):
+def get_weekly(user_id: int, actor_id: int = Depends(current_member_id)):
     with get_db() as db:
         rows = db.execute(
             """
@@ -2007,7 +2308,7 @@ def get_weekly(user_id: int):
 
 
 @app.get("/weeklyById/{weekly_id}")
-def get_weekly_by_id(weekly_id: int):
+def get_weekly_by_id(weekly_id: int, actor_id: int = Depends(current_member_id)):
     with get_db() as db:
         row = db.execute(
             """
@@ -2041,7 +2342,7 @@ def get_weekly_by_id(weekly_id: int):
 
 
 @app.get("/weeklyById/{weekly_id}/pptx")
-def export_weekly_pptx(weekly_id: int):
+def export_weekly_pptx(weekly_id: int, actor_id: int = Depends(current_member_id)):
     with get_db() as db:
         row = db.execute(
             """
@@ -2086,7 +2387,11 @@ def export_weekly_pptx(weekly_id: int):
 
 
 @app.put("/weekly/{weekly_id}")
-def update_weekly(weekly_id: int, data: UpdateWeeklyData):
+def update_weekly(
+    weekly_id: int,
+    data: UpdateWeeklyData,
+    actor_id: int = Depends(current_member_id),
+):
     try:
         report_data = json.loads(data.report_json)
     except json.JSONDecodeError:
@@ -2099,19 +2404,24 @@ def update_weekly(weekly_id: int, data: UpdateWeeklyData):
 
     with get_db() as conn:
         cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT member_id FROM weekly_reports WHERE id = ?",
+            (weekly_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Weekly report not found")
+        require_own_or_admin(actor_id, row["member_id"], conn=conn)
         cursor.execute(
             "UPDATE weekly_reports SET report_json = ? WHERE id = ?",
             (json.dumps(report_data), weekly_id),
         )
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Weekly report not found")
         conn.commit()
 
     return {"message": "주간 보고서가 수정되었습니다."}
 
 
 @app.get("/reports")
-def get_reports():
+def get_reports(actor_id: int = Depends(current_member_id)):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -2158,7 +2468,7 @@ def get_reports():
 
 
 @app.get("/reports/{report_id}")
-def get_report_by_id(report_id: int):
+def get_report_by_id(report_id: int, actor_id: int = Depends(current_member_id)):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -2181,12 +2491,190 @@ def get_report_by_id(report_id: int):
     }
 
 
+def _member_public(row) -> dict:
+    keys = row.keys()
+    has_password = False
+    if "password_hash" in keys:
+        has_password = bool(row["password_hash"])
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "team_id": row["team_id"],
+        "created_at": row["created_at"] if "created_at" in keys else None,
+        "has_password": has_password,
+        "is_admin": bool(row["is_admin"]) if "is_admin" in keys else False,
+    }
+
+
+def _create_session(conn, member_id: int) -> str:
+    token = new_session_token()
+    conn.execute(
+        "INSERT INTO sessions (token, member_id) VALUES (?, ?)",
+        (token, member_id),
+    )
+    return token
+
+
+@app.post("/login")
+def login(data: LoginRequest):
+    name = data.name.strip()
+    password = data.password
+    if not name or not password:
+        raise HTTPException(status_code=400, detail="이름과 비밀번호를 입력해주세요.")
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT id, name, team_id, password_hash, is_admin
+            FROM members
+            WHERE name = ?
+            """,
+            (name,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(
+                status_code=401, detail="이름 또는 비밀번호가 올바르지 않습니다."
+            )
+        stored = row["password_hash"] or ""
+        if not stored:
+            raise HTTPException(
+                status_code=403,
+                detail="비밀번호가 아직 없습니다. 관리자에게 임시 비밀번호를 받아 주세요.",
+            )
+        if not verify_password(password, stored):
+            raise HTTPException(
+                status_code=401, detail="이름 또는 비밀번호가 올바르지 않습니다."
+            )
+        token = _create_session(conn, row["id"])
+        conn.commit()
+    return {
+        "token": token,
+        "member_id": row["id"],
+        "name": row["name"],
+        "team_id": row["team_id"],
+        "is_admin": bool(row["is_admin"]) if "is_admin" in row.keys() else False,
+    }
+
+
+@app.post("/logout")
+def logout(token: str = Depends(session_token_from_headers)):
+    with get_db() as conn:
+        conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        conn.commit()
+    return {"message": "로그아웃했습니다."}
+
+
+@app.get("/me")
+def me(actor_id: int = Depends(current_member_id)):
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id, name, team_id, created_at, is_admin FROM members WHERE id = ?",
+            (actor_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=401, detail="로그인해 주세요.")
+    return {
+        "member_id": row["id"],
+        "name": row["name"],
+        "team_id": row["team_id"],
+        "created_at": row["created_at"],
+        "is_admin": bool(row["is_admin"]) if "is_admin" in row.keys() else False,
+    }
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class PasswordSetRequest(BaseModel):
+    password: str
+
+
+@app.post("/me/password")
+def change_my_password(
+    data: PasswordChangeRequest, actor_id: int = Depends(current_member_id)
+):
+    try:
+        hashed = hash_password(data.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM members WHERE id = ?",
+            (actor_id,),
+        ).fetchone()
+        if not row or not row["password_hash"]:
+            raise HTTPException(status_code=400, detail="비밀번호가 아직 없습니다.")
+        if not verify_password(data.current_password, row["password_hash"]):
+            raise HTTPException(status_code=401, detail="현재 비밀번호가 올바르지 않습니다.")
+        conn.execute(
+            "UPDATE members SET password_hash = ? WHERE id = ?",
+            (hashed, actor_id),
+        )
+        conn.commit()
+    return {"message": "비밀번호를 바꿨습니다."}
+
+
+@app.post("/users/{member_id}/password")
+def set_member_password(
+    member_id: int,
+    data: PasswordSetRequest,
+    actor_id: int = Depends(current_member_id),
+):
+    try:
+        hashed = hash_password(data.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    with get_db() as conn:
+        require_admin(conn, actor_id)
+        validate_member(conn, member_id)
+        row = conn.execute(
+            "SELECT password_hash FROM members WHERE id = ?",
+            (member_id,),
+        ).fetchone()
+        stored = (row["password_hash"] if row else "") or ""
+        if stored:
+            raise HTTPException(
+                status_code=403,
+                detail="이미 비밀번호가 있는 계정은 본인만 바꿀 수 있습니다.",
+            )
+        conn.execute(
+            "UPDATE members SET password_hash = ? WHERE id = ?",
+            (hashed, member_id),
+        )
+        conn.commit()
+    return {"message": "임시 비밀번호를 넣었습니다."}
+
+
 @app.post("/users")
-def save_user(data: UserRequest):
+def save_user(
+    data: UserRequest,
+    authorization: str | None = Header(default=None),
+    x_session_token: str | None = Header(default=None),
+):
     name = data.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="이름을 입력해주세요.")
+    password = data.password or ""
+    try:
+        hashed = hash_password(password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     with get_db() as conn:
+        member_count = conn.execute("SELECT COUNT(*) AS n FROM members").fetchone()["n"]
+        make_admin = member_count == 0
+        if member_count:
+            try:
+                token = session_token_from_headers(authorization, x_session_token)
+            except HTTPException:
+                raise HTTPException(status_code=401, detail="로그인해 주세요.")
+            session = conn.execute(
+                "SELECT member_id FROM sessions WHERE token = ?",
+                (token,),
+            ).fetchone()
+            if not session:
+                raise HTTPException(status_code=401, detail="로그인이 만료되었습니다.")
+            require_admin(conn, session["member_id"])
         cursor = conn.cursor()
         team_id = data.team_id
         if team_id is None:
@@ -2197,8 +2685,8 @@ def save_user(data: UserRequest):
             raise HTTPException(status_code=400, detail="유효하지 않은 팀입니다.")
         try:
             cursor.execute(
-                "INSERT INTO members (name, team_id) VALUES (?, ?)",
-                (name, team_id),
+                "INSERT INTO members (name, team_id, password_hash, is_admin) VALUES (?, ?, ?, ?)",
+                (name, team_id, hashed, 1 if make_admin else 0),
             )
         except sqlite3.IntegrityError as exc:
             err = str(exc).lower()
@@ -2220,17 +2708,21 @@ def save_user(data: UserRequest):
 
 
 @app.get("/users")
-def get_users():
+def get_users(actor_id: int = Depends(current_member_id)):
     with get_db() as db:
-        users = db.execute("SELECT * FROM members").fetchall()
+        users = db.execute(
+            "SELECT id, name, team_id, created_at, password_hash, is_admin FROM members"
+        ).fetchall()
 
-    return [dict(user) for user in users]
+    return [_member_public(user) for user in users]
 
 @app.post("/teams/set")
-def set_team(data: SetTeamData):
+def set_team(data: SetTeamData, actor_id: int = Depends(current_member_id)):
     team_id = data.team_id
     user_id = data.user_id
     with get_db() as conn:
+        if int(actor_id) != int(user_id) and not member_is_admin(conn, actor_id):
+            raise HTTPException(status_code=403, detail="자신의 부서만 변경할 수 있습니다.")
         validate_member(conn, user_id)
         if not conn.execute("SELECT 1 FROM teams WHERE id = ?", (team_id,)).fetchone():
             raise HTTPException(status_code=400, detail="유효하지 않은 팀입니다.")
@@ -2240,11 +2732,12 @@ def set_team(data: SetTeamData):
     return {"message": "Team set successfully."}
 
 @app.post("/teams")
-def save_team(data: TeamRequest):
+def save_team(data: TeamRequest, actor_id: int = Depends(current_member_id)):
     team_name = data.team_name.strip()
     if not team_name:
         raise HTTPException(status_code=400, detail="팀 이름을 입력해주세요.")
     with get_db() as conn:
+        require_admin(conn, actor_id)
         cursor = conn.cursor()
         try:
             cursor.execute(
@@ -2258,7 +2751,7 @@ def save_team(data: TeamRequest):
     return {"message": "Team saved successfully."}
 
 @app.get("/teams/{member_id}")
-def get_team_by_member_id(member_id: int):
+def get_team_by_member_id(member_id: int, actor_id: int = Depends(current_member_id)):
     with get_db() as db:
         row = db.execute(
             """
@@ -2280,7 +2773,7 @@ def get_team_by_member_id(member_id: int):
 
 
 @app.get("/teams")
-def get_teams():
+def get_teams(actor_id: int = Depends(current_member_id)):
     with get_db() as db:
         teams = db.execute("SELECT * FROM teams").fetchall()
 
@@ -2334,8 +2827,28 @@ def normalize_issues(report_data):
     return report_data
 
 
+@app.post("/reports/plain")
+def save_plain_report(
+    data: ReportDraftRequest, actor_id: int = Depends(current_member_id)
+):
+    """AI를 돌리지 않고 원문을 오늘 보고로 제출한다."""
+    require_own_or_admin(actor_id, data.member_id)
+    if not str(data.report or "").strip():
+        raise HTTPException(status_code=400, detail="보고서 내용을 입력해주세요.")
+    return save_report(
+        SaveReportData(
+            report=data.report,
+            parsed_json=json.dumps(plain_parse_daily(data.report), ensure_ascii=False),
+            member_id=data.member_id,
+            report_date=data.date,
+        ),
+        actor_id,
+    )
+
+
 @app.post("/reports")
-def save_report(data: SaveReportData):
+def save_report(data: SaveReportData, actor_id: int = Depends(current_member_id)):
+    require_own_or_admin(actor_id, data.member_id)
     parsed = (
         json.loads(data.parsed_json)
         if isinstance(data.parsed_json, str)

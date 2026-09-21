@@ -19,6 +19,10 @@
 
 body {
     margin: 0;
+    min-width: 0;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overscroll-behavior-y: none;
 }
 
 ::selection {

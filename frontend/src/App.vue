@@ -4,8 +4,9 @@ import {
     CalendarDays,
     FileBarChart,
     GitGraph,
-    ArrowLeftRight,
+    LogOut,
     Settings2,
+    Shield,
     PanelLeftClose,
     PanelLeftOpen,
     Menu,
@@ -15,13 +16,15 @@ import { useRoute, useRouter } from "vue-router";
 import useApi from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
 import { selectedTeamId } from "./composables/useSelectedTeam";
+import { hasSession, isAdmin, sessionToken } from "./composables/useSession";
 import { useDialog } from "./composables/useDialog";
 import { useSidebar } from "./composables/useSidebar";
-import { navGroupsFromPrimary } from "./lib/nav";
+import { PRIMARY_NAV } from "./lib/nav";
+import { pageParentOverride, pageTitleOverride } from "./composables/usePageMeta";
 
 const router = useRouter();
 const route = useRoute();
-const { getUsers, getTeams } = useApi();
+const { getMe, getTeams, postLogout } = useApi();
 const { collapsedEffective, isNarrow, toggleCollapsed, drawerOpen, openDrawer, closeDrawer } = useSidebar();
 const {
     open: dialogOpen,
@@ -32,7 +35,6 @@ const {
     help: dialogHelp,
     confirmLabel: dialogConfirmLabel,
     cancelLabel: dialogCancelLabel,
-    confirm: askConfirm,
     alert: showAlert,
     accept: acceptDialog,
     reject: rejectDialog,
@@ -44,20 +46,28 @@ const NAV_ICONS = {
     "/activities": CalendarDays,
     "/project-timeline": GitGraph,
     "/settings": Settings2,
+    "/admin": Shield,
 };
 
-const navGroups = navGroupsFromPrimary().map((group) => ({
-    ...group,
-    items: group.items.map((item) => ({
-        ...item,
-        icon: NAV_ICONS[item.to] || Settings2,
-    })),
+/** 항목이 적어 그룹 헤더 없이 나열한다. 설정만 아래로 내린다. */
+const navItems = PRIMARY_NAV.map((item) => ({
+    ...item,
+    icon: NAV_ICONS[item.to] || Settings2,
 }));
 
+const mainNavItems = navItems.filter((item) => item.group !== "설정");
+const settingsNavItems = navItems.filter((item) => item.group === "설정");
+const adminNavItems = computed(() =>
+    isAdmin.value
+        ? [{ to: "/admin", label: "관리", shortLabel: "관리", icon: Shield }]
+        : [],
+);
 
+/** 화면이 자기 제목·상위 위치를 덮어쓸 수 있다.
+ *  같은 라우트라도 "읽는 중"과 "고치는 중"의 이름이 달라야 한다. */
 const pageMeta = computed(() => ({
-    title: route.meta.title || "일일보고",
-    parent: route.meta.parent || null,
+    title: pageTitleOverride.value || route.meta.title || "일일보고",
+    parent: pageParentOverride.value || route.meta.parent || null,
     action: route.meta.action || null,
 }));
 
@@ -66,44 +76,66 @@ const isNavActive = (to) => route.meta.navKey === to;
 const currentUser = ref("");
 const currentTeam = ref("");
 
-const hasSelectedUser = () => {
-    const id = selectedUserId.value;
-    return id != null && String(id).trim() !== "";
-};
+const isPublicPage = computed(() => Boolean(route.meta.public));
 
-router.beforeEach((to, from) => {
-    if (to.path === "/users" || to.path.startsWith("/settings")) return true;
-    if (hasSelectedUser()) return true;
-    showAlert("사용자를 선택해주세요");
-    return from.path === "/users" ? false : "/users";
+router.beforeEach((to) => {
+    if (to.meta.public) {
+        if (hasSession() && to.path === "/login") return "/";
+        return true;
+    }
+    if (!hasSession()) return "/login";
+    if (to.meta.admin && !isAdmin.value) return "/settings";
+    return true;
 });
 
-const loadCurrent = async (storedId, storedTeamId) => {
-    if (!storedId) {
+const clearSession = () => {
+    sessionToken.value = "";
+    isAdmin.value = false;
+    selectedUserId.value = null;
+    selectedTeamId.value = null;
+    currentUser.value = "";
+    currentTeam.value = "";
+    sessionStorage.removeItem("reportData");
+    sessionStorage.removeItem("reportRaw");
+    sessionStorage.removeItem("reportDate");
+};
+
+const loadCurrent = async () => {
+    if (!hasSession()) {
         currentUser.value = "";
         currentTeam.value = "";
         return;
     }
     try {
-        const users = await getUsers();
-        const found = users.find((u) => String(u.id) === String(storedId));
-        currentUser.value = found ? found.name : `사용자 ${storedId}`;
+        const me = await getMe();
+        selectedUserId.value = me.member_id;
+        selectedTeamId.value = me.team_id ?? null;
+        isAdmin.value = Boolean(me.is_admin);
+        currentUser.value = me.name || `사용자 ${me.member_id}`;
         const teams = await getTeams();
-        const foundTeam = teams.find((t) => String(t.id) === String(storedTeamId));
-        currentTeam.value = foundTeam ? foundTeam.team_name : `부서 ${storedTeamId}`;
-    } catch {
-        currentUser.value = `사용자 ${storedId}`;
-        currentTeam.value = `부서 ${storedTeamId}`;
+        const foundTeam = teams.find((t) => String(t.id) === String(me.team_id));
+        currentTeam.value = foundTeam ? foundTeam.team_name : me.team_id ? `부서 ${me.team_id}` : "";
+    } catch (error) {
+        if (error?.response?.status === 401) {
+            clearSession();
+            if (route.path !== "/login") router.replace("/login");
+            return;
+        }
+        currentUser.value = "로그인됨";
     }
 };
 
-watch(
-    [selectedUserId, selectedTeamId],
-    ([id, teamId]) => {
-        loadCurrent(id, teamId);
-    },
-    { immediate: true },
-);
+watch(sessionToken, () => {
+    loadCurrent();
+}, { immediate: true });
+
+/** 사용자를 바꾸면 앞사람이 쓰던 임시 보고가 남아 있어서는 안 된다. */
+watch(selectedUserId, (id, previous) => {
+    if (previous == null || String(id) === String(previous)) return;
+    sessionStorage.removeItem("reportData");
+    sessionStorage.removeItem("reportRaw");
+    sessionStorage.removeItem("reportDate");
+});
 
 watch(
     () => route.path,
@@ -118,19 +150,22 @@ watch(isNarrow, (narrow) => {
     }
 });
 
+const syncOverlayLock = () => {
+    const lock = Boolean(drawerOpen.value || dialogOpen.value);
+    document.documentElement.classList.toggle("is-overlay-open", lock);
+};
+
+watch([drawerOpen, dialogOpen], syncOverlayLock, { immediate: true });
+
 const userInitial = () => {
     const name = currentUser.value || "";
     return name.slice(0, 1) || "?";
 };
 
 const logout = async () => {
-    if (!(await askConfirm("사용자를 변경하시겠습니까?"))) return;
-    selectedUserId.value = null;
-    sessionStorage.removeItem("selectedUser");
-    sessionStorage.removeItem("reportData");
-    sessionStorage.removeItem("reportRaw");
-    sessionStorage.removeItem("reportDate");
-    router.push("/users");
+    await postLogout();
+    clearSession();
+    router.replace("/login");
 };
 
 const onDialogKeydown = (event) => {
@@ -154,17 +189,20 @@ const onDialogKeydown = (event) => {
 
 onMounted(() => {
     window.addEventListener("keydown", onDialogKeydown);
-    if (selectedUserId.value == null) {
-        router.push("/users");
+    if (!hasSession()) {
+        router.push("/login");
     }
 });
 
 onUnmounted(() => {
     window.removeEventListener("keydown", onDialogKeydown);
+    document.documentElement.classList.remove("is-overlay-open");
 });
 </script>
 
 <template>
+    <RouterView v-if="isPublicPage" />
+    <template v-else>
     <aside
         id="app-sidebar"
         class="sidebar"
@@ -186,46 +224,66 @@ onUnmounted(() => {
         </div>
 
         <nav class="nav-links">
-            <div v-for="group in navGroups" :key="group.label" class="nav-group">
-                <p class="nav-group-label">{{ group.label }}</p>
-                <router-link
-                    v-for="item in group.items"
-                    :key="item.to"
-                    :to="item.to"
-                    class="nav-link"
-                    :class="{ 'router-link-exact-active': isNavActive(item.to) }"
-                    :title="collapsedEffective ? item.label : null"
-                >
-                    <component :is="item.icon" :size="16" />
-                    <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
-                </router-link>
-            </div>
+            <router-link
+                v-for="item in mainNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="nav-link"
+                :class="{ 'router-link-exact-active': isNavActive(item.to) }"
+                :title="collapsedEffective ? item.label : null"
+            >
+                <component :is="item.icon" :size="16" />
+                <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
+            </router-link>
         </nav>
 
         <div class="sidebar-footer">
+            <router-link
+                v-for="item in settingsNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="nav-link"
+                :class="{ 'router-link-exact-active': isNavActive(item.to) }"
+                :title="collapsedEffective ? item.label : null"
+            >
+                <component :is="item.icon" :size="16" />
+                <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
+            </router-link>
+            <router-link
+                v-for="item in adminNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="nav-link"
+                :class="{ 'router-link-exact-active': isNavActive(item.to) }"
+                :title="collapsedEffective ? item.label : null"
+            >
+                <component :is="item.icon" :size="16" />
+                <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
+            </router-link>
             <div class="sidebar-user">
                 <span class="sidebar-avatar">{{ userInitial() }}</span>
                 <span class="sidebar-user-meta">
-                    <span class="sidebar-user-name">{{ currentUser || "사용자 미선택" }}</span>
-                    <span class="sidebar-user-team">{{ currentTeam || "부서 미선택" }}</span>
+                    <span class="sidebar-user-name">{{ currentUser || "로그인 필요" }}</span>
+                    <span class="sidebar-user-team">{{ currentTeam || "부서 없음" }}</span>
                 </span>
             </div>
             <button
                 type="button"
                 class="sidebar-logout"
-                :title="collapsedEffective ? '사용자 변경' : null"
+                :title="collapsedEffective ? '로그아웃' : null"
                 @click="logout"
             >
-                <ArrowLeftRight :size="14" />
-                <span>사용자 변경</span>
+                <LogOut :size="14" />
+                <span>로그아웃</span>
             </button>
         </div>
     </aside>
     <div v-if="drawerOpen" class="sidebar-overlay" @click="closeDrawer" />
 
-    <main class="main-content">
+    <main class="main-content" :class="{ 'has-bottom-nav': isNarrow }">
         <header class="topbar">
             <button
+                v-if="!isNarrow"
                 type="button"
                 class="topbar-drawer-btn"
                 aria-label="메뉴 열기"
@@ -233,7 +291,7 @@ onUnmounted(() => {
                 aria-controls="app-sidebar"
                 @click="openDrawer"
             >
-                <Menu :size="18" />
+                <Menu :size="20" />
             </button>
             <nav class="topbar-crumbs" aria-label="현재 위치">
                 <router-link v-if="pageMeta.parent" class="topbar-crumb" :to="pageMeta.parent.to">
@@ -242,14 +300,41 @@ onUnmounted(() => {
                 <span v-if="pageMeta.parent" class="topbar-crumb-sep" aria-hidden="true">›</span>
                 <span class="topbar-title" aria-current="page">{{ pageMeta.title }}</span>
             </nav>
-            <router-link v-if="pageMeta.action" class="btn btn-primary btn-small" :to="pageMeta.action.to">
-                {{ pageMeta.action.label }}
-            </router-link>
+            <div class="topbar-end">
+                <router-link
+                    v-if="pageMeta.action"
+                    class="btn btn-primary btn-small topbar-action"
+                    :to="pageMeta.action.to"
+                >
+                    {{ isNarrow ? "작성" : pageMeta.action.label }}
+                </router-link>
+                <button
+                    type="button"
+                    class="topbar-user-btn"
+                    :aria-label="currentUser ? `${currentUser} · 로그아웃` : '로그아웃'"
+                    @click="logout"
+                >
+                    <span class="sidebar-avatar">{{ userInitial() }}</span>
+                </button>
+            </div>
         </header>
         <div class="main-body">
             <RouterView />
         </div>
     </main>
+    <nav v-if="isNarrow" class="app-bottom-nav" aria-label="주요 메뉴">
+        <router-link
+            v-for="item in [...navItems, ...adminNavItems]"
+            :key="item.to"
+            :to="item.to"
+            :class="{ 'is-active': isNavActive(item.to) }"
+            :aria-current="isNavActive(item.to) ? 'page' : null"
+        >
+            <component :is="item.icon" :size="20" />
+            <span>{{ item.shortLabel || item.label }}</span>
+        </router-link>
+    </nav>
+    </template>
     <div
         v-if="dialogOpen"
         class="app-dialog-overlay"

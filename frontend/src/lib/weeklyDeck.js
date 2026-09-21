@@ -185,6 +185,76 @@ export function toWeeklyDeck(report) {
     };
 }
 
+/* ---- 진행 현황을 완료 / 진행 / 이슈로 다시 나눈다 ----
+   PPT 슬라이드는 "진행 현황" 한 칸이라 세 종류가 한 덩어리로 합쳐져 있다.
+   읽을 때는 무엇이 끝났고 무엇이 막혀 있는지 구분돼야 한다.
+   deck에 남아 있는 legacy projects를 근거로 각 줄의 종류를 되찾는다. */
+
+export const DONE_KINDS = [
+    { kind: "done", label: "완료" },
+    { kind: "progress", label: "진행" },
+    { kind: "issue", label: "이슈" },
+    { kind: "other", label: "기타" },
+];
+
+const normKey = (value) => String(value || "").replace(/\s+/g, "").toLowerCase();
+
+const titleKey = (value) => normKey(value) || "미분류프로젝트";
+
+export function doneKindMap(deck) {
+    const map = new Map();
+    for (const project of deck?.projects || []) {
+        if (!project || typeof project !== "object") continue;
+        const title = titleKey(project.projectName);
+        const put = (list, kind) => {
+            for (const text of texts(list)) {
+                const key = `${title}\u0000${normKey(text)}`;
+                // 완료로 먼저 잡힌 줄은 덮어쓰지 않는다. 같은 문장이 두 칸에 있으면 완료가 이긴다.
+                if (!map.has(key)) map.set(key, kind);
+            }
+        };
+        put(project.completedTasks, "done");
+        put(project.inProgressTasks, "progress");
+        put(project.issues, "issue");
+    }
+    return map;
+}
+
+/** 한 프로젝트의 진행 현황 줄들을 종류별로 묶는다. 비어 있는 종류는 빼낸다. */
+export function groupDoneItems(deck, section) {
+    const map = doneKindMap(deck);
+    const title = titleKey(section?.title);
+    const buckets = { done: [], progress: [], issue: [], other: [] };
+    for (const raw of section?.items || []) {
+        const text = String(raw || "").trim();
+        if (!text) continue;
+        const kind = map.get(`${title}\u0000${normKey(text)}`) || "other";
+        buckets[kind].push(text);
+    }
+    return DONE_KINDS.filter((entry) => buckets[entry.kind].length).map((entry) => ({
+        ...entry,
+        items: buckets[entry.kind],
+    }));
+}
+
+/** PPT 전용 칸이 실제로 채워져 있는지. 0건이면 읽는 화면에 띄우지 않는다. */
+export function deckExtrasCount(deck) {
+    const notices = asNotices(deck?.notices).length;
+    const events =
+        asEvents(deck?.month_events).length +
+        asEvents(deck?.next_month_events).length;
+    const collab = asCollab(deck?.collab);
+    const collabItems = [...(collab.done || []), ...(collab.next || [])].filter(
+        (item) => String(item || "").trim(),
+    ).length;
+    return {
+        notices,
+        events,
+        collab: collab.supports.length + collabItems,
+        total: notices + events + collab.supports.length + collabItems,
+    };
+}
+
 export function projectsFromDeck(deck) {
     const map = new Map();
     for (const section of deck?.done || []) {
