@@ -77,23 +77,27 @@ h2,
 h3,
 h4 {
     font-family: var(--heading);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-semibold);
     color: var(--text-strong);
     margin: 0 0 6px;
+    word-break: keep-all;
+    text-wrap: balance;
 }
 
 h1 {
     font-size: var(--fs-30);
-    letter-spacing: 0;
-    line-height: 1.2;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
 }
 
 h2 {
     font-size: var(--fs-20);
+    letter-spacing: -0.01em;
 }
 
 h3 {
     font-size: var(--fs-16);
+    letter-spacing: -0.005em;
 }
 
 h4 {
@@ -102,6 +106,22 @@ h4 {
 
 p {
     margin: 0;
+    word-break: keep-all;
+}
+
+a {
+    color: var(--accent);
+}
+
+a:hover {
+    color: var(--accent-hover);
+}
+
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
 }
 
 code {

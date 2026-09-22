@@ -9,7 +9,6 @@ import {
     Shield,
     PanelLeftClose,
     PanelLeftOpen,
-    Menu,
 } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -25,7 +24,7 @@ import { pageParentOverride, pageTitleOverride } from "./composables/usePageMeta
 const router = useRouter();
 const route = useRoute();
 const { getMe, getTeams, postLogout } = useApi();
-const { collapsedEffective, isNarrow, toggleCollapsed, drawerOpen, openDrawer, closeDrawer } = useSidebar();
+const { collapsedEffective, isNarrow, toggleCollapsed } = useSidebar();
 const {
     open: dialogOpen,
     locked: dialogLocked,
@@ -71,6 +70,12 @@ const pageMeta = computed(() => ({
 }));
 
 const isNavActive = (to) => route.meta.navKey === to;
+
+/** 모바일은 하단 탭이 작업만 담당한다. 설정과 관리는 상단으로 올려 탭을 4개로 줄인다. */
+const topTools = computed(() =>
+    isNarrow.value ? [...settingsNavItems, ...adminNavItems.value] : [],
+);
+const bottomNavItems = computed(() => (isNarrow.value ? mainNavItems : []));
 
 const currentUser = ref("");
 const currentTeam = ref("");
@@ -136,25 +141,11 @@ watch(selectedUserId, (id, previous) => {
     sessionStorage.removeItem("reportDate");
 });
 
-watch(
-    () => route.path,
-    () => {
-        closeDrawer();
-    },
-);
-
-watch(isNarrow, (narrow) => {
-    if (!narrow) {
-        closeDrawer();
-    }
-});
-
 const syncOverlayLock = () => {
-    const lock = Boolean(drawerOpen.value || dialogOpen.value);
-    document.documentElement.classList.toggle("is-overlay-open", lock);
+    document.documentElement.classList.toggle("is-overlay-open", dialogOpen.value);
 };
 
-watch([drawerOpen, dialogOpen], syncOverlayLock, { immediate: true });
+watch(dialogOpen, syncOverlayLock, { immediate: true });
 
 const userInitial = () => {
     const name = currentUser.value || "";
@@ -168,11 +159,6 @@ const logout = async () => {
 };
 
 const onDialogKeydown = (event) => {
-    if (event.key === "Escape" && drawerOpen.value) {
-        event.preventDefault();
-        closeDrawer();
-        return;
-    }
     if (!dialogOpen.value || dialogLocked.value) return;
     if (event.key === "Escape") {
         event.preventDefault();
@@ -205,7 +191,7 @@ onUnmounted(() => {
     <aside
         id="app-sidebar"
         class="sidebar"
-        :class="{ 'is-collapsed': collapsedEffective, 'is-drawer-open': drawerOpen }"
+        :class="{ 'is-collapsed': collapsedEffective }"
     >
         <div class="sidebar-brand">
             <button
@@ -278,21 +264,9 @@ onUnmounted(() => {
             </button>
         </div>
     </aside>
-    <div v-if="drawerOpen" class="sidebar-overlay" @click="closeDrawer" />
 
     <main class="main-content" :class="{ 'has-bottom-nav': isNarrow }">
         <header class="topbar">
-            <button
-                v-if="!isNarrow"
-                type="button"
-                class="topbar-drawer-btn"
-                aria-label="메뉴 열기"
-                :aria-expanded="drawerOpen"
-                aria-controls="app-sidebar"
-                @click="openDrawer"
-            >
-                <Menu :size="20" />
-            </button>
             <nav class="topbar-crumbs" aria-label="현재 위치">
                 <router-link v-if="pageMeta.parent" class="topbar-crumb" :to="pageMeta.parent.to">
                     {{ pageMeta.parent.label }}
@@ -302,18 +276,21 @@ onUnmounted(() => {
             </nav>
             <div class="topbar-end">
                 <router-link
+                    v-for="item in topTools"
+                    :key="item.to"
+                    class="topbar-tool"
+                    :class="{ 'is-active': isNavActive(item.to) }"
+                    :to="item.to"
+                    :aria-current="isNavActive(item.to) ? 'page' : null"
+                >
+                    {{ item.shortLabel || item.label }}
+                </router-link>
+                <router-link
                     v-if="pageMeta.action"
                     class="btn btn-primary btn-small topbar-action"
                     :to="pageMeta.action.to"
                 >
                     {{ isNarrow ? "작성" : pageMeta.action.label }}
-                </router-link>
-                <router-link
-                    class="topbar-user-btn"
-                    to="/settings"
-                    :aria-label="currentUser ? `${currentUser} 설정` : '설정'"
-                >
-                    <span class="sidebar-avatar">{{ userInitial() }}</span>
                 </router-link>
             </div>
         </header>
@@ -323,7 +300,7 @@ onUnmounted(() => {
     </main>
     <nav v-if="isNarrow" class="app-bottom-nav" aria-label="주요 메뉴">
         <router-link
-            v-for="item in [...navItems, ...adminNavItems]"
+            v-for="item in bottomNavItems"
             :key="item.to"
             :to="item.to"
             :class="{ 'is-active': isNavActive(item.to) }"

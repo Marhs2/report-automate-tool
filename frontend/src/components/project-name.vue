@@ -302,9 +302,6 @@ onMounted(() => {
             <div class="section-head">
                 <div class="section-title">
                     <h2>등록된 프로젝트</h2>
-                    <span v-if="!isLoading" class="count-chip">
-                        {{ projectNames.length }}개 등록
-                    </span>
                 </div>
                 <button
                     type="button"

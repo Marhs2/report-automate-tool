@@ -139,6 +139,7 @@
     align-items: center;
     gap: 10px;
     padding: 6px 12px;
+    border: 1px solid transparent;
     border-radius: var(--radius-pill);
     color: var(--text);
     text-decoration: none;
@@ -146,7 +147,8 @@
     font-weight: var(--fw-medium);
     transition:
         background 0.15s,
-        color 0.15s;
+        color 0.15s,
+        border-color 0.15s;
 }
 
 .nav-link:hover {
@@ -167,9 +169,10 @@
 }
 
 .nav-link.router-link-exact-active {
-    background: var(--surface-soft);
+    background: var(--surface);
+    border-color: var(--border);
     color: var(--text-strong);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-semibold);
 }
 
 .nav-link.router-link-exact-active svg {
@@ -203,26 +206,6 @@
     align-items: center;
     gap: var(--space-2);
     flex-shrink: 0;
-}
-
-.topbar-drawer-btn {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    margin-right: var(--space-2);
-    padding: 0;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-}
-
-.topbar-drawer-btn:hover {
-    background: var(--surface-soft);
-    color: var(--text-strong);
 }
 
 .topbar-crumbs {
@@ -353,6 +336,10 @@
     max-width: var(--content-max);
     margin: 0 auto;
     padding: var(--space-6) var(--space-7) var(--space-8);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    min-width: 0;
 }
 
 .page.is-wide {
@@ -364,7 +351,7 @@
     align-items: flex-end;
     flex-wrap: wrap;
     gap: var(--space-3) var(--space-4);
-    margin-bottom: var(--space-5);
+    margin-bottom: 0;
 }
 
 .page-header-text {
@@ -403,48 +390,14 @@
     gap: var(--space-2);
 }
 
-/* 좁은 화면은 오버레이 드로어. collapsedEffective가 이미 펼침이라 여기서 되돌리지 않는다. */
+/* 좁은 화면은 사이드바 없이 하단 탭만 쓴다. 드로어 오버레이를 두지 않는다. */
 @media (max-width: 860px) {
     #app {
         display: block;
     }
 
     .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        z-index: 60;
-        width: var(--sidebar-width);
-        max-width: 84vw;
-        height: 100vh;
-        flex-basis: auto;
-        overflow-y: auto;
-        border-right: 1px solid var(--border);
-        visibility: hidden;
-        transform: translateX(-100%);
-        transition:
-            transform var(--dur) var(--ease),
-            visibility var(--dur) var(--ease);
-    }
-
-    .sidebar.is-drawer-open {
-        visibility: visible;
-        transform: translateX(0);
-    }
-
-    .sidebar-collapse-btn {
         display: none;
-    }
-
-    .sidebar-overlay {
-        position: fixed;
-        inset: 0;
-        z-index: 50;
-        background: rgba(38, 37, 30, 0.28);
-    }
-
-    .topbar-drawer-btn {
-        display: inline-flex;
     }
 
     .main-content {

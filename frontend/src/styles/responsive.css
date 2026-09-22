@@ -11,7 +11,6 @@ html.is-overlay-open .main-body {
     overflow: hidden;
 }
 
-.topbar-user-btn,
 .app-bottom-nav {
     display: none;
 }
@@ -21,6 +20,21 @@ html.is-overlay-open .main-body {
     align-items: center;
     gap: var(--space-2);
     flex-shrink: 0;
+}
+
+/* 작은 노트북과 가로 태블릿. 데스크톱 3열이 비좁아지는 구간에 중간 상태를 둔다. */
+@media (max-width: 1100px) and (min-width: 861px) {
+    .page {
+        padding: 20px 20px 40px;
+    }
+
+    .app-list-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .app-list-row-meta {
+        grid-column: 1 / -1;
+    }
 }
 
 @media (max-width: 860px) {
@@ -33,7 +47,7 @@ html.is-overlay-open .main-body {
     }
 
     html {
-        -webkit-tap-highlight-color: rgba(139, 154, 110, 0.18);
+        -webkit-tap-highlight-color: rgba(0, 117, 222, 0.15);
     }
 
     html,
@@ -75,8 +89,7 @@ html.is-overlay-open .main-body {
         font-weight: var(--fw-semibold);
     }
 
-    /* 하단 탭이 있으면 햄버거·상위 경로는 자리를 뺏을 뿐이다. */
-    .has-bottom-nav .topbar-drawer-btn,
+    /* 하단 탭이 있으면 상위 경로는 자리를 뺏을 뿐이다. */
     .topbar-crumb,
     .topbar-crumb-sep {
         display: none;
@@ -92,50 +105,24 @@ html.is-overlay-open .main-body {
         font-size: 15px;
     }
 
-    .topbar-drawer-btn {
-        width: 44px;
-        height: 44px;
-        margin-right: 0;
-    }
-
-    .topbar-user-btn {
+    .topbar-tool {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 48px;
-        height: 48px;
-        padding: 0;
-        border: none;
-        border-radius: 50%;
-        background: transparent;
-        color: inherit;
-        text-decoration: none;
-        cursor: pointer;
-    }
-
-    .topbar-user-btn .sidebar-avatar {
-        width: 40px;
-        height: 40px;
-        font-size: 16px;
-    }
-
-    .sidebar {
-        padding-top: max(16px, env(safe-area-inset-top));
-        padding-bottom: max(12px, env(safe-area-inset-bottom));
-        height: 100dvh;
-        max-width: min(320px, 88vw);
-    }
-
-    .nav-link,
-    .sidebar-logout {
+        flex-shrink: 0;
         min-height: 44px;
-        padding: 10px 12px;
+        padding: 0 10px;
+        border-radius: var(--radius-sm);
+        color: var(--text-strong);
+        text-decoration: none;
         font-size: 15px;
+        font-weight: var(--fw-semibold);
+        word-break: keep-all;
     }
 
-    .nav-link svg {
-        width: 20px;
-        height: 20px;
+    .topbar-tool.is-active {
+        background: var(--accent-soft);
+        color: var(--accent-hover);
     }
 
     .sidebar-avatar {
@@ -298,10 +285,6 @@ html.is-overlay-open .main-body {
     .select-grid {
         grid-template-columns: 1fr;
         max-height: none;
-    }
-
-    .select-grid.is-compact {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .select-grid.is-compact {
@@ -547,4 +530,26 @@ html.is-overlay-open .main-body {
         width: 100%;
         margin-left: 28px;
     }
+}
+
+/* 넘침 방지. 가로 스크롤 누수는 대부분 긴 문자열과 표에서 나온다. */
+.page,
+.card,
+.app-list-row,
+.filter-toolbar {
+    min-width: 0;
+}
+
+img,
+video,
+table {
+    max-width: 100%;
+}
+
+pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
 }

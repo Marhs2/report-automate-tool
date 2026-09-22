@@ -90,9 +90,7 @@ onMounted(async () => {
                 placeholder="부서 이름 검색"
                 aria-label="부서 이름 검색"
             />
-            <span class="team-count"
-                >{{ filteredTeams.length }}/{{ teams.length }}개</span
-            >
+
         </div>
 
         <div v-if="isLoading" class="empty-state">부서을 불러오는 중...</div>
@@ -119,9 +117,6 @@ onMounted(async () => {
                 <span class="select-card-meta">{{ memberCountOf(team) }}명</span>
             </button>
         </div>
-        <p class="team-note">
-            카드를 누르면 내 부서가 바뀝니다.
-        </p>
     </div>
 </template>
 

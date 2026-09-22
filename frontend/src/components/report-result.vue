@@ -1,51 +1,83 @@
 <template>
-    <div class="page report-doc is-wide">
+    <div class="page report-doc">
         <!-- 제목 한 줄에 사람·날짜·상태를 모은다. 예전에는 제목과 아래 띠에 두 번 적혀 있었다. -->
         <header class="detail-head">
             <div class="detail-title">
                 <h1>{{ userName || "일일보고" }}</h1>
                 <span class="detail-date">{{ formatDotDate(reportDate) || "날짜 없음" }}</span>
-                <span v-if="savedReportId" class="status-chip">저장됨</span>
-                <span v-else class="status-chip is-draft">아직 저장 전</span>
             </div>
             <div class="detail-actions">
                 <template v-if="canEdit">
-                    <button class="btn btn-small" @click="retryExtract" :disabled="aiLoading">
+                    <button class="edit-quiet" type="button" @click="retryExtract" :disabled="aiLoading">
                         {{ aiLoading ? "재추출 중..." : "재추출" }}
-                    </button>
-                    <button
-                        class="btn btn-primary btn-small hide-on-narrow"
-                        @click="saveReport"
-                        :disabled="aiLoading || saving"
-                    >
-                        {{ saving ? "저장 중..." : savedReportId ? "수정 저장" : "저장하기" }}
                     </button>
                 </template>
             </div>
         </header>
+
+        <Teleport to="body">
+            <div
+                v-if="projectPopup"
+                class="app-dialog-overlay"
+                @click.self="closeProjectPopup"
+            >
+                <div class="card app-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-project-title">
+                    <h2 id="edit-project-title" class="app-dialog-message">프로젝트</h2>
+                    <div class="edit-pick-list" role="listbox" aria-label="프로젝트 목록">
+                        <button
+                            v-for="(project, index) in reportData?.projects || []"
+                            :key="`pick-${index}`"
+                            type="button"
+                            class="edit-pick"
+                            :class="{ 'is-on': index === activeIndex }"
+                            :aria-selected="index === activeIndex"
+                            @click="chooseProject(index)"
+                        >
+                            {{ project.projectName || `프로젝트 ${index + 1}` }}
+                        </button>
+                    </div>
+                    <form class="edit-project-add" @submit.prevent="addNamedProject">
+                        <input
+                            v-model="newProjectName"
+                            class="input"
+                            type="text"
+                            placeholder="새 프로젝트 이름"
+                            aria-label="새 프로젝트 이름"
+                        />
+                        <button class="btn" type="submit">추가</button>
+                    </form>
+                    <button
+                        v-if="activeProject"
+                        class="edit-drop"
+                        type="button"
+                        @click="removeActiveProject"
+                    >
+                        이 프로젝트 삭제
+                    </button>
+                    <div class="app-dialog-actions">
+                        <button class="btn" type="button" @click="closeProjectPopup">닫기</button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
 
         <div v-if="isLoading" class="empty-state">불러오는 중...</div>
 
         <div v-else-if="reportData" class="content-container">
             <div class="json-container">
                 <div
-                    v-if="reportData.projects.length > 1"
+                    v-if="!canEdit && reportData.projects.length > 1"
                     class="project-nav"
                     role="group"
                     aria-label="프로젝트 이동"
                 >
-                    <span class="project-nav-label">
-                        프로젝트 {{ reportData.projects.length }}개로 나눴습니다
-                    </span>
                     <button
                         v-for="(project, index) in reportData.projects"
                         :key="`nav-${project._uid || index}`"
                         type="button"
                         class="project-nav-chip"
-                        :data-accent="projectAccentIndex(index)"
                         @click="scrollToProject(index)"
                     >
-                        <i class="project-dot" aria-hidden="true"></i>
                         {{ project.projectName || `프로젝트 ${index + 1}` }}
                     </button>
                 </div>
@@ -60,202 +92,95 @@
                     :data-accent="projectAccentIndex(projectIndex)"
                 >
                     <div class="project-head">
-                        <i class="project-dot" aria-hidden="true"></i>
                         <h2 class="read-project-name">
                             {{ project.projectName || `프로젝트 ${projectIndex + 1}` }}
                         </h2>
                     </div>
                     <section
-                        v-for="col in READ_COLUMNS"
+                        v-for="col in filledColumns(project)"
                         :key="col.key"
                         class="read-block"
                     >
                         <h3 :class="col.key">{{ col.label }}</h3>
-                        <ul v-if="(project[col.key] || []).filter(Boolean).length" class="read-list">
-                            <li v-for="(item, itemIndex) in project[col.key].filter(Boolean)" :key="itemIndex">
+                        <ul class="read-list">
+                            <li v-for="(item, itemIndex) in col.items" :key="itemIndex">
                                 {{ item }}
                             </li>
                         </ul>
-                        <p v-else class="empty-msg">없음</p>
                     </section>
                 </div>
                 </template>
 
                 <template v-else>
-                <div
-                    v-for="(project, projectIndex) in reportData.projects"
-                    :key="project._uid || projectIndex"
-                    :id="`project-${projectIndex}`"
-                    class="card projects-container"
-                    :data-accent="projectAccentIndex(projectIndex)"
-                >
-                    <div class="project-head">
-                        <i class="project-dot" aria-hidden="true"></i>
-                        <span
-                            v-if="reportData.projects.length > 1"
-                            class="project-kicker"
-                        >프로젝트 {{ projectIndex + 1 }}/{{ reportData.projects.length }}</span>
+                <div v-if="activeProject" class="card projects-container">
+                    <div class="edit-current">
                         <input
-                            class="input project-name-input"
-                            v-model="project.projectName"
+                            class="input"
+                            v-model="activeProject.projectName"
                             placeholder="프로젝트 이름"
+                            aria-label="프로젝트 이름"
                         />
-                        <button
-                            class="btn btn-danger"
-                            @click="removeProject(projectIndex)"
-                        >
-                            삭제
-                        </button>
+                        <button type="button" class="edit-more" @click="openProjectPopup">더보기</button>
                     </div>
-
-                    <div class="field-group completedTasks">
-                        <h2>완료된 업무</h2>
+                    <section
+                        v-for="col in EDIT_COLUMNS"
+                        :key="col.key"
+                        class="edit-bucket"
+                    >
+                        <h2>{{ col.label }}</h2>
                         <div
-                            v-for="(task, taskIndex) in project.completedTasks"
-                            :key="`completed-${taskIndex}`"
-                            class="task-row"
+                            v-for="(text, itemIndex) in activeProject[col.key]"
+                            :key="`${col.key}-${itemIndex}`"
+                            class="edit-row"
                         >
                             <input
                                 class="input"
-                                v-model="project.completedTasks[taskIndex]"
+                                v-model="activeProject[col.key][itemIndex]"
+                                :aria-label="col.label"
                             />
                             <button
-                                class="btn remove-btn"
-                                aria-label="이 항목 삭제"
-                                @click="removeCompletedTask(project, taskIndex)"
+                                type="button"
+                                class="edit-remove"
+                                @click="removeRow(activeProject, col.key, itemIndex)"
                             >
                                 삭제
                             </button>
                         </div>
-
-                        <div v-if="!project.completedTasks.length" class="empty-msg">
-                            완료된 업무가 없습니다
-                        </div>
-                        <button
-                            class="btn add-btn"
-                            @click="addCompletedTask(project)"
-                        >
-                            항목 추가
-                        </button>
-                    </div>
-
-                    <div class="field-group inProgressTasks">
-                        <h2>진행 중인 업무</h2>
-                        <div
-                            v-for="(task, taskIndex) in project.inProgressTasks"
-                            :key="`progress-${taskIndex}`"
-                            class="task-row"
-                        >
-                            <input
-                                class="input"
-                                v-model="project.inProgressTasks[taskIndex]"
-                            />
+                        <p v-if="!activeProject[col.key].length" class="edit-empty">없음</p>
+                    </section>
+                    <form class="edit-compose" @submit.prevent="addCurrentLine">
+                        <div class="edit-kinds" role="group" aria-label="종류">
                             <button
-                                class="btn remove-btn"
-                                aria-label="이 항목 삭제"
-                                @click="removeInProgressTask(project, taskIndex)"
+                                v-for="col in EDIT_COLUMNS"
+                                :key="`kind-${col.key}`"
+                                type="button"
+                                :aria-pressed="editKind === col.key"
+                                :class="{ 'is-on': editKind === col.key }"
+                                @click="editKind = col.key"
                             >
-                                삭제
+                                {{ col.label }}
                             </button>
                         </div>
-
-                        <div v-if="!project.inProgressTasks.length" class="empty-msg">
-                            진행 중인 업무가 없습니다
-                        </div>
-
-                        <button
-                            class="btn add-btn"
-                            @click="addInProgressTask(project)"
-                        >
-                            항목 추가
-                        </button>
-                    </div>
-
-                    <div class="field-group issues">
-                        <h2>이슈</h2>
-                        <div
-                            v-for="(issue, issueIndex) in project.issues"
-                            :key="`issue-${issueIndex}`"
-                            class="task-row"
-                        >
+                        <div class="edit-entry">
                             <input
                                 class="input"
-                                v-model="project.issues[issueIndex]"
+                                v-model="draftText"
+                                :placeholder="activeKind.placeholder"
+                                :aria-label="activeKind.label"
+                                enterkeyhint="done"
                             />
-                            <button
-                                class="btn remove-btn"
-                                aria-label="이 항목 삭제"
-                                @click="removeIssue(project, issueIndex)"
-                            >
-                                삭제
-                            </button>
+                            <button class="btn" type="submit">넣기</button>
                         </div>
-
-                        <div v-if="!project.issues.length" class="empty-msg">이슈가 없습니다</div>
-                        <button class="btn add-btn" @click="addIssue(project)">
-                            항목 추가
-                        </button>
-                    </div>
-
-                    <div class="field-group requests">
-                        <h2>요청사항</h2>
-                        <div
-                            v-for="(request, requestIndex) in project.requests"
-                            :key="`request-${requestIndex}`"
-                            class="task-row"
-                        >
-                            <input
-                                class="input"
-                                v-model="project.requests[requestIndex]"
-                            />
-                            <button
-                                class="btn remove-btn"
-                                aria-label="이 항목 삭제"
-                                @click="removeRequest(project, requestIndex)"
-                            >
-                                삭제
-                            </button>
-                        </div>
-                        <div v-if="!project.requests.length" class="empty-msg">요청사항이 없습니다</div>
-                        <button
-                            class="btn add-btn"
-                            @click="addRequest(project)"
-                        >
-                            항목 추가
-                        </button>
-                    </div>
-
-                    <div class="field-group nextPlans">
-                        <h2>다음 계획</h2>
-                        <div
-                            v-for="(plan, planIndex) in project.nextPlans"
-                            :key="`plan-${planIndex}`"
-                            class="task-row"
-                        >
-                            <input
-                                class="input"
-                                v-model="project.nextPlans[planIndex]"
-                            />
-                            <button
-                                class="btn remove-btn"
-                                aria-label="이 항목 삭제"
-                                @click="removeNextPlan(project, planIndex)"
-                            >
-                                삭제
-                            </button>
-                        </div>
-
-                        <div v-if="!project.nextPlans.length" class="empty-msg">다음 계획이 없습니다</div>
-                        <button
-                            class="btn add-btn"
-                            @click="addNextPlan(project)"
-                        >
-                            항목 추가
-                        </button>
-                    </div>
+                    </form>
                 </div>
-
-                <button class="btn add-project-btn" @click="addProject">프로젝트 추가</button>
+                <button
+                    v-else
+                    type="button"
+                    class="btn add-project-btn"
+                    @click="openProjectPopup"
+                >
+                    프로젝트 추가
+                </button>
 
                 <div class="card save-bar">
                     <div class="save-actions">
@@ -272,12 +197,16 @@
             </div>
 
             <aside v-if="rawData" class="card raw-container">
-                <h2>원본 보고서</h2>
-                <label class="raw-toggle">
-                    <input type="checkbox" v-model="highlightOn" />
-                    추출 항목과 겹치는 원문 표시
-                </label>
-                <pre class="raw-content" v-html="highlightedRaw"></pre>
+                <button type="button" class="raw-fold" @click="rawOpen = !rawOpen">
+                    {{ rawOpen ? "원본 접기" : "원본 보기" }}
+                </button>
+                <template v-if="rawOpen">
+                    <label class="raw-toggle">
+                        <input type="checkbox" v-model="highlightOn" />
+                        추출 항목과 겹치는 원문 표시
+                    </label>
+                    <pre class="raw-content" v-html="highlightedRaw"></pre>
+                </template>
             </aside>
         </div>
 
@@ -326,6 +255,34 @@ const READ_COLUMNS = [
     { key: "nextPlans", label: "다음 계획" },
 ];
 
+const EDIT_COLUMNS = [
+    { key: "completedTasks", label: "완료", placeholder: "오늘 마무리한 일" },
+    { key: "inProgressTasks", label: "진행", placeholder: "아직 끝나지 않은 일" },
+    { key: "issues", label: "이슈", placeholder: "무엇이 막혔는지" },
+    { key: "requests", label: "요청", placeholder: "필요한 도움" },
+    { key: "nextPlans", label: "다음 계획", placeholder: "다음에 할 일" },
+];
+
+const activeIndex = ref(0);
+const editKind = ref(EDIT_COLUMNS[0].key);
+const draftText = ref("");
+const projectPopup = ref(false);
+const newProjectName = ref("");
+const rawOpen = ref(
+    typeof window !== "undefined" && window.matchMedia("(min-width: 861px)").matches,
+);
+
+const activeProject = computed(() => reportData.value?.projects?.[activeIndex.value] || null);
+const activeKind = computed(
+    () => EDIT_COLUMNS.find((col) => col.key === editKind.value) || EDIT_COLUMNS[0],
+);
+
+const filledColumns = (project) =>
+    READ_COLUMNS.map((col) => ({
+        ...col,
+        items: (project?.[col.key] || []).map((item) => String(item || "").trim()).filter(Boolean),
+    })).filter((col) => col.items.length);
+
 const isMine = computed(() => {
     if (savedMemberId.value == null) return true;
     if (selectedUserId.value == null) return false;
@@ -367,6 +324,8 @@ watch(
 onUnmounted(() => {
     pageTitleOverride.value = "";
     pageParentOverride.value = null;
+    window.removeEventListener("keydown", onEditKey);
+    document.documentElement.classList.remove("is-overlay-open");
 });
 
 
@@ -439,11 +398,11 @@ const toEditable = (parsed) => {
         typeof parsed === "string" ? JSON.parse(parsed) : { ...parsed };
     data.projects = (data.projects || []).map((project) => ({
         projectName: project.projectName || "",
-        completedTasks: asTexts(project.completedTasks),
-        inProgressTasks: asTexts(project.inProgressTasks),
-        issues: asTexts(project.issues),
-        requests: asTexts(project.requests),
-        nextPlans: asTexts(project.nextPlans),
+        completedTasks: asTexts(project.completedTasks).filter(Boolean),
+        inProgressTasks: asTexts(project.inProgressTasks).filter(Boolean),
+        issues: asTexts(project.issues).filter(Boolean),
+        requests: asTexts(project.requests).filter(Boolean),
+        nextPlans: asTexts(project.nextPlans).filter(Boolean),
     }));
     return data;
 };
@@ -463,6 +422,7 @@ const resolveUserName = async (userId) => {
 };
 
 const loadDraft = () => {
+    activeIndex.value = 0;
     savedReportId.value = null;
     savedMemberId.value = null;
     const stored = sessionStorage.getItem("reportData");
@@ -476,6 +436,7 @@ const loadDraft = () => {
 
 const loadSaved = async (id) => {
     isLoading.value = true;
+    activeIndex.value = 0;
     savedReportId.value = id;
     reportData.value = null;
     try {
@@ -515,53 +476,70 @@ const addProject = () => {
     });
 };
 
+const chooseProject = (index) => {
+    activeIndex.value = index;
+    closeProjectPopup();
+};
+
+const openProjectPopup = () => {
+    newProjectName.value = "";
+    projectPopup.value = true;
+    document.documentElement.classList.add("is-overlay-open");
+};
+
+const closeProjectPopup = () => {
+    projectPopup.value = false;
+    newProjectName.value = "";
+    document.documentElement.classList.remove("is-overlay-open");
+};
+
+const onEditKey = (event) => {
+    if (event.key === "Escape") closeProjectPopup();
+};
+
+watch(projectPopup, (open) => {
+    if (open) window.addEventListener("keydown", onEditKey);
+    else window.removeEventListener("keydown", onEditKey);
+});
+
+const addNamedProject = () => {
+    const name = newProjectName.value.trim();
+    if (!name || !reportData.value) return;
+    addProject();
+    const projects = reportData.value.projects;
+    projects[projects.length - 1].projectName = name;
+    activeIndex.value = projects.length - 1;
+    closeProjectPopup();
+};
+
+const removeRow = (project, key, index) => {
+    project[key].splice(index, 1);
+};
+
+const addCurrentLine = () => {
+    const text = draftText.value.trim();
+    if (!text || !activeProject.value) return;
+    activeProject.value[editKind.value].push(text);
+    draftText.value = "";
+};
+
 const removeProject = async (index) => {
     const name = reportData.value.projects[index]?.projectName || "이 프로젝트";
     const ok = await askConfirm(`${name}을(를) 삭제할까요?`, {
         title: "프로젝트 삭제",
         confirmLabel: "삭제",
     });
-    if (ok) reportData.value.projects.splice(index, 1);
+    if (!ok) return;
+    reportData.value.projects.splice(index, 1);
+    if (activeIndex.value >= reportData.value.projects.length) {
+        activeIndex.value = Math.max(0, reportData.value.projects.length - 1);
+    }
 };
 
-const addCompletedTask = (project) => {
-    project.completedTasks.push("");
-};
-
-const removeCompletedTask = (project, index) => {
-    project.completedTasks.splice(index, 1);
-};
-
-const addInProgressTask = (project) => {
-    project.inProgressTasks.push("");
-};
-
-const removeInProgressTask = (project, index) => {
-    project.inProgressTasks.splice(index, 1);
-};
-
-const addIssue = (project) => {
-    project.issues.push("");
-};
-
-const removeIssue = (project, index) => {
-    project.issues.splice(index, 1);
-};
-
-const addRequest = (project) => {
-    project.requests.push("");
-};
-
-const removeRequest = (project, index) => {
-    project.requests.splice(index, 1);
-};
-
-const addNextPlan = (project) => {
-    project.nextPlans.push("");
-};
-
-const removeNextPlan = (project, index) => {
-    project.nextPlans.splice(index, 1);
+const removeActiveProject = async () => {
+    const index = activeIndex.value;
+    closeProjectPopup();
+    await removeProject(index);
 };
 
 const saveReport = async () => {
@@ -573,6 +551,14 @@ const saveReport = async () => {
     
 
 
+
+    for (const project of reportData.value.projects) {
+        for (const col of EDIT_COLUMNS) {
+            project[col.key] = (project[col.key] || [])
+                .map((item) => String(item || "").trim())
+                .filter(Boolean);
+        }
+    }
 
     const jsonData = JSON.stringify(reportData.value, null, 2);
     const dateValue =
@@ -665,7 +651,7 @@ const getSelectedMemberId = () => {
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    margin-bottom: var(--space-4);
+    margin-bottom: 0;
 }
 
 .detail-title {
@@ -738,7 +724,7 @@ const getSelectedMemberId = () => {
 }
 
 .projects-container {
-    scroll-margin-top: var(--space-4);
+    scroll-margin-top: 72px;
 }
 
 .project-head {
@@ -835,15 +821,14 @@ const getSelectedMemberId = () => {
     }
 
     .detail-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        width: 100%;
+        display: flex;
+        width: auto;
         gap: 8px;
     }
 
     .detail-actions .btn {
         flex: none;
-        width: 100%;
+        width: auto;
         min-height: 44px;
     }
 
@@ -864,5 +849,219 @@ const getSelectedMemberId = () => {
         max-width: 220px;
         min-height: 44px;
     }
+}
+
+.report-doc .save-bar {
+    position: static;
+    bottom: auto;
+}
+
+.edit-quiet {
+    min-height: 44px;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.edit-quiet:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.edit-current {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.edit-current .input {
+    min-width: 0;
+    flex: 1;
+    min-height: 44px;
+    font-size: 16px;
+    font-weight: var(--fw-semibold);
+}
+
+.edit-more {
+    flex: none;
+    min-height: 44px;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    color: #007aff;
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.edit-bucket + .edit-bucket {
+    margin-top: 12px;
+}
+
+.edit-bucket h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+}
+
+.edit-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.edit-row .input {
+    min-width: 0;
+    flex: 1;
+    min-height: 44px;
+    font-size: 16px;
+}
+
+.edit-remove {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    border: 0;
+    background: transparent;
+    color: var(--danger-fg);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.edit-empty {
+    margin: 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    font-size: 15px;
+    color: var(--text-muted);
+}
+
+.edit-compose {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.edit-kinds {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.edit-kinds::-webkit-scrollbar {
+    display: none;
+}
+
+.edit-kinds button {
+    flex: none;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid #7a7268;
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.edit-kinds button.is-on {
+    border-color: var(--text-strong);
+    background: var(--accent-soft);
+}
+
+.edit-entry {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.edit-entry .input {
+    min-width: 0;
+    flex: 1;
+    min-height: 44px;
+    font-size: 16px;
+}
+
+.edit-pick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 240px;
+    margin-bottom: 12px;
+    overflow: auto;
+}
+
+.edit-pick {
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 16px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.edit-pick.is-on {
+    border-color: var(--text-strong);
+    background: var(--accent-soft);
+}
+
+.edit-project-add {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.edit-project-add .input {
+    min-width: 0;
+    flex: 1;
+    min-height: 44px;
+}
+
+.edit-drop {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin: 0 0 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--danger-fg);
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.app-dialog-actions .edit-quiet {
+    color: var(--danger-fg);
+}
+
+.raw-fold {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 16px;
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
 }
 </style>

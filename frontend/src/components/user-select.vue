@@ -278,12 +278,7 @@ onMounted(async () => {
             </button>
         </nav>
 
-        <div v-if="embedded && unassignedCount" class="team-gap" role="status">
-            <p class="team-gap-copy">
-                부서 미지정 {{ unassignedCount }}명.
-                비밀번호가 없는 사람만 임시 비밀번호를 넣어 줄 수 있습니다.
-            </p>
-        </div>
+ 
 
         <div v-if="users.length === 0" class="empty-state">
             등록된 사용자가 없습니다. 아래에서 생성하세요.

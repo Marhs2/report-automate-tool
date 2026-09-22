@@ -50,11 +50,7 @@ const login = async () => {
 <template>
     <div class="login-page">
         <form class="card login-card" @submit.prevent="login">
-            <p class="login-kicker">일일보고</p>
             <h1>로그인</h1>
-            <p class="login-help">
-                등록된 이름과 비밀번호로 들어옵니다. 비밀번호가 없으면 관리자에게 받으세요.
-            </p>
             <label class="login-field">
                 <span>이름</span>
                 <input

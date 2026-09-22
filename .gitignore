@@ -108,3 +108,6 @@ test-data/dxel-live/
 
 docs/유사서비스-벤치마크-및-실사용사례.md
 docs/design-reference.md
+feedback.
+
+frontend/src/lib/*.test.js

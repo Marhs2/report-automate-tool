@@ -1,12 +1,10 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ChevronLeft, ChevronRight, X } from "lucide-vue-next";
+import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
 import { dayCounts } from "../lib/dayStatus";
-import { peakDayLabel, peakSubmissionDay } from "../lib/standupInsights";
-import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const router = useRouter();
 const { alert: showAlert } = useDialog();
@@ -128,25 +126,14 @@ function selectDefaultDay() {
     const todayTime = parseDate(today).getTime();
     const todayInView =
         todayTime >= start.getTime() && todayTime <= end.getTime();
-    const isPhone =
-        typeof window !== "undefined" &&
-        window.matchMedia("(max-width: 860px)").matches;
-    if (isPhone) {
-        if (!selectedDate.value) return;
-        const selectedTime = parseDate(selectedDate.value).getTime();
-        if (selectedTime < start.getTime() || selectedTime > end.getTime()) {
-            selectedDate.value = "";
-        }
+    const fallback = todayInView ? today : formatDate(start);
+    if (!selectedDate.value) {
+        selectedDate.value = fallback;
         return;
     }
-    if (!selectedDate.value && todayInView) {
-        selectedDate.value = today;
-        return;
-    }
-    if (!selectedDate.value) return;
     const selectedTime = parseDate(selectedDate.value).getTime();
     if (selectedTime < start.getTime() || selectedTime > end.getTime()) {
-        selectedDate.value = todayInView ? today : "";
+        selectedDate.value = fallback;
     }
 }
 
@@ -183,13 +170,8 @@ function goThisMonth() {
 }
 
 onMounted(() => {
-    window.addEventListener("keydown", onDayPopKey);
     fetchUserActivities();
     fetchTeams();
-});
-
-onUnmounted(() => {
-    window.removeEventListener("keydown", onDayPopKey);
 });
 
 const orderedActivities = computed(() =>
@@ -261,52 +243,20 @@ const railGroups = (cell) => {
 
 const countsOf = (cell) => dayCounts(cell.entries || [], cell.isOffday);
 
-/** 셀에 제출률만 있으면 "누가" 안 냈는지는 오른쪽 레일을 열어야 안다.
- *  실제로 챙겨야 하는 쪽은 미제출이므로 이름을 칸 안에 적는다. */
-const CELL_NAME_LIMIT = 3;
-
-const missingNamesOf = (cell) =>
-    (cell.entries || [])
-        .filter((entry) => !entry.submitted)
-        .map((entry) => entry.name)
-        .filter(Boolean);
-
-const submittedNamesOf = (cell) =>
-    (cell.entries || [])
-        .filter((entry) => entry.submitted)
-        .map((entry) => entry.name)
-        .filter(Boolean);
-
-const cellNote = (cell) => {
+/** 칸에는 숫자만 둔다. 이름은 날짜를 열었을 때 목록으로 본다. */
+const dayStatusLabel = (cell) => {
+    const { submitted, total } = ratioOf(cell);
     if (cell.isOffday) {
-        const submitted = submittedNamesOf(cell);
-        if (!submitted.length) return null;
-        return {
-            tone: "off",
-            text:
-                submitted.length <= CELL_NAME_LIMIT
-                    ? submitted.join(" · ")
-                    : `${submitted.slice(0, 2).join(" · ")} 외 ${submitted.length - 2}명`,
-        };
+        if (cell.holidayName && submitted) return `${cell.holidayName} ${submitted}`;
+        if (cell.holidayName) return cell.holidayName;
+        if (submitted) return `휴일 ${submitted}`;
+        return "휴일";
     }
-    const total = (cell.entries || []).length;
-    if (!total) return null;
-    const missing = missingNamesOf(cell);
-    if (!missing.length) return { tone: "full", text: "전원 제출" };
-    if (missing.length === total) return { tone: "missed", text: "제출 없음" };
-    return {
-        tone: "missed",
-        text:
-            missing.length <= CELL_NAME_LIMIT
-                ? missing.join(" · ")
-                : `${missing.slice(0, 2).join(" · ")} 외 ${missing.length - 2}명`,
-    };
-};
-
-const cellNoteTitle = (cell) => {
-    if (cell.isOffday) return submittedNamesOf(cell).join(" · ");
-    const missing = missingNamesOf(cell);
-    return missing.length ? `미제출 ${missing.join(" · ")}` : "전원 제출";
+    if (cell.isFuture) return "예정";
+    if (!total) return "";
+    if (submitted === 0) return "제출 없음";
+    if (submitted === total) return "전원 제출";
+    return `${submitted}/${total}`;
 };
 
 /** 셀에 이름을 나열하는 대신 제출률만 막대로 보여준다. */
@@ -320,20 +270,30 @@ const ratioOf = (cell) => {
     };
 };
 
-const toggleDay = (dateStr) => {
-    selectedDate.value = selectedDate.value === dateStr ? "" : dateStr;
+const dotKind = (cell) => {
+    if (cell.outside) return "";
+    const { submitted, total } = ratioOf(cell);
+    if (!submitted) return "";
+    if (!cell.isOffday && !cell.isFuture && total && submitted === total) return "full";
+    return "partial";
 };
 
-const dayPopRef = ref(null);
-
-const closeDay = () => {
-    selectedDate.value = "";
+const selectDay = (cell) => {
+    if (cell.outside) {
+        const date = parseDate(cell.date);
+        selectedYear.value = date.getFullYear();
+        selectedMonth.value = date.getMonth() + 1;
+        selectedDate.value = cell.date;
+        fetchUserActivities();
+        return;
+    }
+    selectedDate.value = cell.date;
 };
 
-const onDayPopKey = (event) => {
-    if (event.key !== "Escape" || !selectedDate.value) return;
-    event.preventDefault();
-    closeDay();
+const agendaTitle = (cell) => {
+    const [, month, day] = String(cell.date).split("-");
+    const longWeek = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+    return `${Number(month)}월 ${Number(day)}일 ${longWeek[cell.weekday] || ""}`;
 };
 
 const rangeBounds = computed(() => {
@@ -381,12 +341,6 @@ const selectedCell = computed(
         null,
 );
 
-watch(selectedCell, async (cell) => {
-    if (!cell) return;
-    await nextTick();
-    dayPopRef.value?.querySelector(".day-pop-close")?.focus();
-});
-
 const weekdayCount = computed(
     () => inRangeDays.value.filter((cell) => !cell.isOffday).length,
 );
@@ -403,32 +357,7 @@ const progressOf = (activity) => {
     };
 };
 
-const periodLabel = computed(
-    () => `${selectedYear.value}년 ${selectedMonth.value}월`,
-);
-
-const pulseLabel = computed(() => {
-    const today = inRangeDays.value.find((cell) => cell.isToday);
-    if (today && !today.isOffday) {
-        const counts = countsOf(today);
-        return `오늘 ${counts.submitted}/${counts.submitted + counts.missed} 제출`;
-    }
-    if (today?.isOffday) return `오늘 · ${today.holidayName || "휴일"}`;
-    return `${members.value.length}명 · 평일 ${weekdayCount.value}일`;
-});
-
-const peakLabel = computed(() =>
-    peakDayLabel(
-        peakSubmissionDay(
-            inRangeDays.value.map((cell) => ({
-                date: cell.date,
-                weekday: cell.weekday,
-                submitted: countsOf(cell).submitted,
-                isOffday: cell.isOffday,
-            })),
-        ),
-    ),
-);
+const calendarCells = computed(() => calendarWeeks.value.flat());
 
 const progressByMember = computed(() => {
     const map = {};
@@ -440,27 +369,29 @@ const progressByMember = computed(() => {
 </script>
 
 <template>
-    <div class="page calendar-page is-wide">
-        <AppPageHeader :title="periodLabel" :subtitle="pulseLabel">
-            <template #filters>
-                <div class="month-nav">
+    <div class="page calendar-page">
+        <header class="ios-head">
+            <div class="ios-title-row">
+                <h1>{{ selectedMonth }}월</h1>
+                <div class="ios-nav">
                     <button
                         v-if="!isThisMonth"
                         type="button"
-                        class="btn btn-small"
+                        class="ios-today"
                         @click="goThisMonth"
                     >
-                        이번 달로
+                        오늘
                     </button>
-                    <div class="month-nav-arrows">
-                        <button class="icon-btn" aria-label="이전 달" @click="prevMonth">
-                            <ChevronLeft :size="16" />
-                        </button>
-                        <button class="icon-btn" aria-label="다음 달" @click="nextMonth">
-                            <ChevronRight :size="16" />
-                        </button>
-                    </div>
+                    <button type="button" class="ios-arrow" aria-label="이전 달" @click="prevMonth">
+                        <ChevronLeft :size="18" />
+                    </button>
+                    <button type="button" class="ios-arrow" aria-label="다음 달" @click="nextMonth">
+                        <ChevronRight :size="18" />
+                    </button>
                 </div>
+            </div>
+            <div class="ios-sub">
+                <p>{{ selectedYear }}</p>
                 <select
                     id="activity-filter-team"
                     class="team-filter"
@@ -473,721 +404,376 @@ const progressByMember = computed(() => {
                         {{ team.team_name }}
                     </option>
                 </select>
-            </template>
-        </AppPageHeader>
+            </div>
+        </header>
 
         <div v-if="orderedActivities.length === 0" class="empty-state">
             표시할 활동 기록이 없습니다
         </div>
-        <div v-else class="calendar-workspace">
-            <div class="card calendar-card">
-                <p v-if="peakLabel" class="cal-peak">{{ peakLabel }}</p>
-                <div class="cal-weekdays">
+
+        <div v-else class="ios-board">
+            <div class="ios-month">
+                <div class="ios-weekdays">
                     <span
-                        v-for="label in WEEKDAY_LABELS"
+                        v-for="(label, index) in WEEKDAY_LABELS"
                         :key="label"
-                        :class="{ weekend: label === '일' || label === '토' }"
+                        :class="{ sun: index === 0, sat: index === 6 }"
                     >
                         {{ label }}
                     </span>
                 </div>
-                <div class="cal-weeks">
-                    <div v-for="(week, weekIndex) in calendarWeeks" :key="weekIndex" class="cal-week">
-                        <template v-for="cell in week" :key="cell.date">
-                            <div v-if="cell.outside" class="cal-day outside">
-                                <span class="cal-day-num">{{ cell.day }}</span>
-                            </div>
-                            <button
-                                v-else
-                                type="button"
-                                class="cal-day"
-                                :class="{
-                                    weekend: cell.isWeekend,
-                                    holiday: cell.isHoliday,
-                                    today: cell.isToday,
-                                    selected: selectedDate === cell.date,
-                                }"
-                                :aria-pressed="selectedDate === cell.date"
-                                :aria-label="`${formatDotDate(cell.date)} 제출 ${countsOf(cell).submitted}${cell.isOffday ? '' : `, 미제출 ${countsOf(cell).missed}`}`"
-                                @click="toggleDay(cell.date)"
-                            >
-                                <span class="cal-day-top">
-                                    <span class="cal-day-num">{{ cell.day }}</span>
-                                    <span v-if="cell.holidayName" class="cal-holiday" :title="cell.holidayName">
-                                        {{ cell.holidayName }}
-                                    </span>
-                                    <span v-else-if="cell.isWeekend" class="cal-day-tag">휴무</span>
-                                    <span v-else-if="cell.isFuture" class="cal-day-tag">예정</span>
-                                    <!-- 표기를 하나로 맞춘다. 만점인 날만 숫자가 빠지는 일이 없어야 한다. -->
-                                    <span
-                                        v-if="!cell.isOffday && ratioOf(cell).total"
-                                        class="cal-day-ratio"
-                                    >
-                                        {{ ratioOf(cell).submitted }}/{{ ratioOf(cell).total }}
-                                    </span>
-                                    <span
-                                        v-else-if="cell.isOffday && countsOf(cell).submitted"
-                                        class="cal-day-ratio is-off"
-                                    >
-                                        휴일 {{ countsOf(cell).submitted }}
-                                    </span>
-                                </span>
-                                <span
-                                    v-if="!cell.isOffday && ratioOf(cell).total"
-                                    class="cal-meter"
-                                >
-                                    <span
-                                        class="cal-meter-fill"
-                                        :class="{ 'is-full': ratioOf(cell).pct === 100 }"
-                                        :style="{ width: ratioOf(cell).pct + '%' }"
-                                    />
-                                </span>
-                                <span
-                                    v-if="cellNote(cell)"
-                                    class="cal-names"
-                                    :class="cellNote(cell).tone"
-                                    :title="cellNoteTitle(cell)"
-                                >
-                                    {{ cellNote(cell).text }}
-                                </span>
-                            </button>
-                        </template>
-                    </div>
+                <div class="ios-grid">
+                    <button
+                        v-for="cell in calendarCells"
+                        :key="cell.date"
+                        type="button"
+                        class="ios-cell"
+                        :aria-pressed="selectedDate === cell.date"
+                        :aria-label="`${formatDotDate(cell.date)} ${dayStatusLabel(cell)}`"
+                        @click="selectDay(cell)"
+                    >
+                        <span
+                            class="ios-num"
+                            :class="{
+                                sun: cell.weekday === 0,
+                                sat: cell.weekday === 6,
+                                holiday: cell.isHoliday,
+                                outside: cell.outside,
+                                today: cell.isToday && !cell.outside,
+                                selected: selectedDate === cell.date,
+                            }"
+                        >
+                            {{ cell.day }}
+                        </span>
+                        <span class="ios-dot" :class="dotKind(cell) || 'is-empty'"></span>
+                    </button>
                 </div>
             </div>
 
-        </div>
-        <Teleport to="body">
-            <div
-                v-if="selectedCell"
-                class="day-pop-overlay"
-                @click.self="closeDay"
-            >
-                <section
-                    ref="dayPopRef"
-                    class="card day-pop"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="day-pop-title"
+            <section v-if="selectedCell" class="ios-agenda" :aria-label="agendaTitle(selectedCell)">
+                <h2>{{ agendaTitle(selectedCell) }}</h2>
+                <p v-if="selectedCell.holidayName" class="ios-holiday">{{ selectedCell.holidayName }}</p>
+                <p class="ios-agenda-meta">
+                    제출 {{ countsOf(selectedCell).submitted }}
+                    <template v-if="!selectedCell.isOffday">
+                        · 미제출 {{ countsOf(selectedCell).missed }}
+                    </template>
+                </p>
+
+                <div
+                    v-for="group in railGroups(selectedCell)"
+                    :key="group.key"
+                    class="agenda-group"
                 >
-                    <div class="day-detail-head">
-                        <p id="day-pop-title" class="day-detail-title">
-                            <strong>{{ formatDotDate(selectedCell.date) }} ({{ selectedCell.weekLabel }})</strong>
-                            <span v-if="selectedCell.holidayName">{{ selectedCell.holidayName }}</span>
-                        </p>
-                        <button type="button" class="icon-btn day-pop-close" aria-label="닫기" @click="closeDay">
-                            <X :size="16" />
+                    <h3>{{ group.label }}</h3>
+                    <template v-for="entry in group.people" :key="entry.member_id">
+                        <button
+                            v-if="entry.submitted"
+                            type="button"
+                            class="agenda-row"
+                            @click="openCell({ member_id: entry.member_id, name: entry.name }, entry.item)"
+                        >
+                            <span class="agenda-mark full"></span>
+                            <span class="agenda-name">{{ entry.name }}</span>
                         </button>
-                    </div>
-                    <p class="day-rail-pulse">
-                        제출 {{ countsOf(selectedCell).submitted }}
-                        <template v-if="!selectedCell.isOffday"> · 미제출 {{ countsOf(selectedCell).missed }}</template>
-                    </p>
-                    <div
-                        v-for="group in railGroups(selectedCell)"
-                        :key="group.key"
-                        class="rail-group"
-                    >
-                        <h3 class="rail-group-head" :class="group.key">
-                            {{ group.label }}
-                            <span class="rail-group-count">{{ group.people.length }}</span>
-                        </h3>
-                        <div class="rail-chips">
-                            <button
-                                v-for="entry in group.people"
-                                :key="entry.member_id"
-                                type="button"
-                                class="rail-chip"
-                                :class="group.key"
-                                :title="`${entry.name} · 이번 달 ${progressByMember[String(entry.member_id)]?.submitted || 0}/${progressByMember[String(entry.member_id)]?.total || 0}`"
-                                @click="openCell({ member_id: entry.member_id, name: entry.name }, entry.item)"
-                            >
-                                {{ entry.name }}
-                                <em>{{ progressByMember[String(entry.member_id)]?.submitted || 0 }}/{{ progressByMember[String(entry.member_id)]?.total || 0 }}</em>
-                            </button>
+                        <div v-else class="agenda-row is-missed">
+                            <span class="agenda-mark"></span>
+                            <span class="agenda-name">{{ entry.name }}</span>
                         </div>
-                    </div>
-                    <p v-if="!railGroups(selectedCell).length" class="day-detail-empty">
-                        이 날 제출한 보고가 없습니다
-                    </p>
-                </section>
-            </div>
-        </Teleport>
+                    </template>
+                </div>
+                <p v-if="!railGroups(selectedCell).length" class="ios-empty">
+                    이 날 제출한 보고가 없습니다
+                </p>
+            </section>
+        </div>
     </div>
 </template>
 
 <style scoped>
 .calendar-page {
-    max-width: none;
-    box-sizing: border-box;
+    max-width: 880px;
+}
+
+.ios-head {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - var(--topbar-height));
-    min-height: 0;
-    overflow: hidden;
+    gap: 2px;
 }
 
-.calendar-page :deep(.page-header) {
-    flex-shrink: 0;
-}
-
-.calendar-workspace,
-.calendar-workspace.has-rail {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    gap: var(--space-4);
-    align-items: stretch;
-    width: 100%;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.calendar-workspace > .calendar-card,
-.calendar-workspace > .day-rail {
-    min-width: 0;
-    width: 100%;
-    max-width: 100%;
-}
-
-@media (min-width: 1280px) {
-    .calendar-workspace.has-rail {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
-        align-items: stretch;
-    }
-
-    .calendar-workspace.has-rail > .day-rail {
-        width: auto;
-    }
-}
-
-.month-nav {
+.ios-title-row,
+.ios-sub {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    flex-shrink: 0;
+    justify-content: space-between;
+    gap: 12px;
 }
 
-.month-nav-arrows {
+.ios-title-row h1 {
+    margin: 0;
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: #1c1c1e;
+}
+
+.ios-sub p {
+    margin: 0;
+    font-size: 15px;
+    color: rgba(60, 60, 67, 0.6);
+}
+
+.ios-nav {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
-    margin-left: auto;
+    gap: 4px;
 }
 
-.icon-btn {
+.ios-today,
+.ios-arrow {
+    border: 0;
+    background: transparent;
+    color: #007aff;
+    cursor: pointer;
+}
+
+.ios-today {
+    min-height: 44px;
+    padding: 0 8px;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 400;
+}
+
+.ios-arrow {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 1px solid var(--border);
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    background: var(--surface);
-    color: var(--text);
-    cursor: pointer;
-    transition:
-        background var(--dur-fast) var(--ease),
-        color var(--dur-fast) var(--ease);
 }
 
-.icon-btn:hover {
-    background: var(--surface-soft);
-    color: var(--text-strong);
+.ios-arrow:hover,
+.ios-today:hover {
+    background: rgba(0, 122, 255, 0.08);
 }
 
 .team-filter {
     height: 32px;
-    width: auto;
-    min-width: 108px;
-    padding: 0 var(--space-6) 0 var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    color: var(--text-strong);
+    max-width: 160px;
+    padding: 0 28px 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(120, 120, 128, 0.12);
+    color: #1c1c1e;
     font: inherit;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    cursor: pointer;
+    font-size: 15px;
 }
 
-.team-filter:hover {
-    border-color: var(--border-strong);
-}
-
-.team-filter:focus {
-    outline: none;
-    border-color: var(--accent);
-}
-
-.calendar-card {
+.ios-board {
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    min-width: 0;
-    padding: var(--space-4);
-    overflow: hidden;
+    gap: 20px;
 }
 
-.cal-peak {
-    margin: 0 0 var(--space-3);
-    font-size: var(--fs-12);
-    font-weight: var(--fw-medium);
-    color: var(--text);
-    word-break: keep-all;
-}
-
-.cal-weekdays {
+.ios-weekdays,
+.ios-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
 }
 
-.cal-weekdays span {
+.ios-weekdays span {
     text-align: center;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-    padding: var(--space-1) 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(60, 60, 67, 0.6);
 }
 
-.cal-weekdays .weekend {
-    opacity: 0.7;
+.ios-weekdays .sun,
+.ios-num.sun,
+.ios-num.holiday,
+.ios-holiday {
+    color: #ff3b30;
 }
 
-.cal-weeks {
+.ios-weekdays .sat,
+.ios-num.sat {
+    color: #007aff;
+}
+
+.ios-num.holiday {
+    color: #ff3b30;
+}
+
+.ios-cell {
     display: flex;
     flex-direction: column;
-    flex: 1;
-    gap: var(--space-2);
-    min-height: 0;
-}
-
-.cal-week {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 1fr);
-    flex: 1 1 0;
-    gap: var(--space-2);
-    min-height: 0;
-}
-
-/* 옆 목록이 없어도 한 달이 화면 높이를 넘지 않게, 남은 높이를 주로 나눈다. */
-.cal-day {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 6px;
-    height: 100%;
-    min-height: 0;
-    width: 100%;
-    padding: 8px 10px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    font: inherit;
-    color: inherit;
-    text-align: left;
+    align-items: center;
+    gap: 2px;
+    min-height: 48px;
+    margin: 0;
+    padding: 2px 0 4px;
+    border: 0;
+    background: transparent;
     cursor: pointer;
 }
 
-/* 주말은 중립 톤, 공휴일은 위험 톤으로 구분한다. */
-.cal-day.weekend {
-    background: var(--surface-soft);
-}
-
-.cal-day.holiday {
-    background: var(--danger-bg);
-}
-
-.cal-day.outside {
-    opacity: 0.38;
-    background: transparent;
-    border-color: transparent;
-    cursor: default;
-}
-
-.cal-day.today {
-    border-color: var(--accent);
-    outline: 1px solid var(--accent);
-}
-
-.cal-day.selected {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-    outline: 1px solid var(--accent);
-}
-
-.cal-day:not(.outside):not(.selected):hover {
-    border-color: var(--border-strong);
-}
-
-.cal-day-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    min-width: 0;
-}
-
-.cal-day-num {
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    line-height: 1.1;
-}
-
-.cal-day.weekend .cal-day-num,
-.cal-day.outside .cal-day-num {
-    color: var(--text-muted);
-}
-
-.cal-day.holiday .cal-day-num,
-.cal-holiday {
-    color: var(--danger-fg);
-}
-
-.cal-day.today .cal-day-num {
-    color: var(--accent-hover);
-}
-
-.cal-holiday {
-    font-size: 10px;
-    font-weight: var(--fw-semibold);
-    line-height: 1.2;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    word-break: keep-all;
-}
-
-.cal-day-ratio {
-    font-size: var(--fs-11);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-    white-space: nowrap;
-}
-
-.cal-day-ratio.is-off {
-    color: var(--danger-fg);
-}
-
-/* 주말·공휴일·미래를 같은 자리에 같은 모양으로 표시한다. */
-.cal-day-tag {
-    font-size: 10px;
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-
-/* 칸 안의 이름 줄. 미제출이 있으면 미제출 이름, 없으면 '전원 제출'. */
-.cal-names {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    margin-top: auto;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-medium);
-    line-height: 1.35;
-    overflow: hidden;
-    color: var(--text);
-    word-break: keep-all;
-}
-
-.cal-names.missed {
-    color: var(--danger-fg);
-}
-
-.cal-names.full {
-    color: var(--success-fg);
-}
-
-.cal-names.off {
-    color: var(--text-muted);
-}
-
-/* 제출률 막대. 이름 목록 대신 하루 상태를 한 눈금으로 보여준다. */
-.cal-meter {
-    display: block;
-    height: 6px;
-    border-radius: var(--radius-pill);
-    background: var(--border);
-    overflow: hidden;
-}
-
-.cal-meter-fill {
-    display: block;
-    height: 100%;
-    border-radius: var(--radius-pill);
-    background: var(--warning-fg);
-}
-
-.cal-meter-fill.is-full {
-    background: var(--success-fg);
-}
-
-.day-pop-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 80;
+.ios-num {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
-    background: rgba(38, 37, 30, 0.28);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 1;
+    color: #1c1c1e;
 }
 
-.day-pop {
-    width: min(420px, 100%);
-    max-height: min(72vh, 560px);
-    overflow: auto;
-    padding: var(--space-4);
+.ios-num.outside {
+    color: rgba(60, 60, 67, 0.3);
 }
 
-.day-pop-close {
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
+.ios-num.outside.sun,
+.ios-num.outside.sat,
+.ios-num.outside.holiday {
+    color: rgba(60, 60, 67, 0.3);
 }
 
-@media (max-width: 860px) {
-    .day-pop-overlay {
-        align-items: flex-end;
-        padding: 0 0 var(--bottom-nav-offset);
-    }
-
-    .day-pop {
-        width: 100%;
-        max-height: min(68vh, 520px);
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
-        padding-bottom: 20px;
-    }
-
-    .day-pop .rail-chip {
-        min-height: 44px;
-    }
+.ios-num.today {
+    background: #ff3b30;
+    color: #fff;
+    font-weight: 600;
 }
 
-.day-rail {
-    position: static;
-    padding: var(--space-3) var(--space-4);
+.ios-num.selected:not(.today) {
+    background: #e5e5ea;
+}
+
+.ios-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #007aff;
+}
+
+.ios-dot.full {
+    background: #34c759;
+}
+
+.ios-dot.is-empty {
+    background: transparent;
+}
+
+.ios-agenda {
     min-width: 0;
-    max-height: none;
-    overflow: visible;
+    padding: 4px 0 8px;
 }
 
-@media (min-width: 1280px) {
-    .day-rail {
-        position: sticky;
-        top: calc(var(--topbar-height) + var(--space-3));
-        max-height: calc(100vh - var(--topbar-height) - var(--space-6));
-        overflow: auto;
-    }
-}
-
-.day-rail-pulse {
-    margin: 0 0 var(--space-2);
-    font-size: var(--fs-12);
-    color: var(--text);
-}
-
-.day-detail-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin-bottom: var(--space-2);
-}
-
-.day-detail-title {
+.ios-agenda h2 {
     margin: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    font-size: var(--fs-13);
-    color: var(--text);
-    word-break: keep-all;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #1c1c1e;
 }
 
-.rail-group + .rail-group {
-    margin-top: var(--space-3);
+.ios-holiday,
+.ios-agenda-meta,
+.ios-empty {
+    margin: 4px 0 0;
+    font-size: 13px;
 }
 
-.rail-group-head {
+.ios-agenda-meta,
+.ios-empty {
+    color: rgba(60, 60, 67, 0.6);
+}
+
+.agenda-group {
+    margin-top: 16px;
+}
+
+.agenda-group h3 {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(60, 60, 67, 0.6);
+}
+
+.agenda-row {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    margin: 0 0 var(--space-1);
-    font-family: var(--sans);
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.rail-group-head.missed {
-    color: var(--danger-fg);
-}
-
-.rail-group-count {
-    padding: 0 6px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-    font-size: var(--fs-11);
-    color: var(--text);
-}
-
-.rail-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.rail-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 28px;
-    padding: 0 10px;
-    border: none;
-    border-radius: var(--radius-pill);
-    background: var(--success-bg);
-    color: var(--success-fg);
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 8px 0;
+    border: 0;
+    border-top: 1px solid rgba(60, 60, 67, 0.12);
+    background: transparent;
     font: inherit;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    white-space: nowrap;
+    text-align: left;
+    color: #1c1c1e;
+}
+
+.agenda-group .agenda-row:first-of-type {
+    border-top: 0;
+}
+
+button.agenda-row {
     cursor: pointer;
 }
 
-.rail-chip em {
-    font-style: normal;
-    font-weight: var(--fw-medium);
-    opacity: 0.8;
+.agenda-row.is-missed {
+    color: rgba(60, 60, 67, 0.45);
 }
 
-.rail-chip.missed {
-    background: var(--danger-bg);
-    color: var(--danger-fg);
+.agenda-mark {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(60, 60, 67, 0.28);
+    flex: 0 0 auto;
 }
 
-.rail-chip:hover,
-.rail-chip:focus-visible {
-    background: var(--success-border);
+.agenda-mark.full {
+    background: #34c759;
 }
 
-.rail-chip.missed:hover,
-.rail-chip.missed:focus-visible {
-    filter: brightness(0.96);
+.agenda-name {
+    font-size: 17px;
 }
 
-.day-detail-empty {
-    margin: 0;
-    font-size: var(--fs-12);
-    color: var(--text);
-}
-
-@media (max-width: 1279px) {
-    .calendar-workspace,
-    .calendar-workspace.has-rail {
-        display: flex;
-        flex-direction: column;
+@media (min-width: 900px) {
+    .ios-board {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 36px;
     }
 
-    .calendar-workspace.has-rail .day-rail {
-        flex: 0 1 220px;
-        overflow: auto;
+    .ios-month {
+        flex: 0 0 420px;
+        width: 420px;
     }
 
-    .calendar-card {
-        order: 1;
-    }
-
-    .day-rail {
-        order: 2;
-        position: static;
-        top: auto;
-        max-height: none;
-        overflow: visible;
+    .ios-agenda {
+        flex: 1;
+        padding-top: 28px;
     }
 }
 
 @media (max-width: 860px) {
-    .calendar-page {
-        height: auto;
-        overflow: visible;
-        display: block;
+    .ios-title-row h1 {
+        font-size: 32px;
     }
 
-    .calendar-workspace,
-    .calendar-workspace.has-rail {
-        overflow: visible;
-    }
-
-    .calendar-card,
-    .cal-weeks,
-    .cal-week {
-        flex: none;
-        height: auto;
-        overflow: visible;
-    }
-
-    .cal-weekdays,
-    .cal-week {
-        gap: 4px;
-    }
-
-    .cal-holiday,
-    .cal-names,
-    .cal-meter,
-    .cal-day-tag {
-        display: none;
-    }
-
-    .cal-day {
-        height: auto;
-        min-height: 72px;
-        padding: 8px 6px;
-        gap: 4px;
-        overflow: visible;
-    }
-
-    .cal-day-top {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 2px;
-    }
-
-    .cal-day-num {
-        font-size: 14px;
-        font-weight: var(--fw-semibold);
-    }
-
-    .cal-day-ratio {
-        font-size: 10px;
-        line-height: 1.1;
-    }
-
-    .rail-chip {
-        min-height: 32px;
-    }
-
-    .page-header-filters .team-filter {
-        width: 100%;
-        min-width: 0;
-        height: 44px;
+    .team-filter {
+        max-width: 140px;
         font-size: 16px;
-    }
-
-    .month-nav {
-        width: 100%;
     }
 }
 </style>

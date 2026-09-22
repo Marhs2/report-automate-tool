@@ -12,6 +12,8 @@ import {
     templateById,
 } from "../lib/reportTemplates";
 import { todayString } from "../lib/dateScope";
+import { onlyStructuredLineReport, LINE_KINDS } from "../lib/lineReport.js";
+import LineWriter from "./ui/line-writer.vue";
 
 const {
     postReport,
@@ -21,6 +23,8 @@ const {
     getUserActivities,
     getUsers,
     getReports,
+    getProjectNames,
+    postProjectName,
 } = useApi();
 const router = useRouter();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
@@ -40,12 +44,39 @@ const elapsed = ref(0);
 const prevPlans = ref([]);
 const prevPlansDate = ref("");
 const isDragging = ref(false);
+const knownProjects = ref([]);
+const activeWriteProject = ref("");
+const newProjectName = ref("");
+const addingProject = ref(false);
+const isNarrow = ref(
+    typeof window !== "undefined" &&
+        window.matchMedia("(max-width: 860px)").matches,
+);
+let narrowQuery = null;
 let elapsedTimer = null;
 
 const elapsedLabel = computed(() => {
     const minutes = Math.floor(elapsed.value / 60);
     const seconds = elapsed.value % 60;
     return minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+});
+
+const waitStages = [
+    { label: "글을 읽고 있어요" },
+    { label: "항목을 나누고 있어요" },
+    { label: "문장을 다듬고 있어요" },
+];
+
+const waitStage = computed(() => {
+    if (elapsed.value >= 20) return 2;
+    if (elapsed.value >= 8) return 1;
+    return 0;
+});
+
+const waitDateLabel = computed(() => {
+    const [, month, day] = String(date.value || "").split("-");
+    if (!month || !day) return "일일보고";
+    return `${Number(month)}월 ${Number(day)}일`;
 });
 
 const startElapsedTimer = () => {
@@ -138,10 +169,20 @@ const loadSavedState = async () => {
 
 const loadDraft = async () => {
     const memberId = getSelectedMemberId();
-    if (memberId === null || input.value.trim()) return;
+    if (memberId === null || !date.value) return;
+    // 제출된 글은 작성 칸에 다시 넣지 않는다. 남으면 지우고 새로 써야 한다.
+    if (alreadySaved.value) {
+        input.value = "";
+        draftSavedAt.value = "";
+        return;
+    }
     try {
         const draft = await getReportDraft(memberId, date.value);
-        input.value = draft.raw_text;
+        if (alreadySaved.value || input.value.trim()) return;
+        const raw = String(draft.raw_text || "");
+        input.value = isNarrow.value && buttonType.value === "text"
+            ? onlyStructuredLineReport(raw)
+            : raw;
     } catch (error) {
         if (error.response?.status !== 404) {
             console.error("원문 초안 불러오기 실패:", error);
@@ -228,26 +269,114 @@ const insertPrevPlans = () => {
     input.value = base + lines.join("\n");
 };
 
+const loadProjects = async () => {
+    try {
+        const names = await getProjectNames();
+        knownProjects.value = Array.isArray(names)
+            ? names.map((name) => String(name || "").trim()).filter(Boolean)
+            : [];
+    } catch {
+        knownProjects.value = [];
+    }
+    if (!knownProjects.value.includes(activeWriteProject.value)) {
+        activeWriteProject.value = knownProjects.value[0] || "";
+    }
+};
+
+const registerProject = async (name) => {
+    const value = String(name || "").trim();
+    if (!value) return;
+    if (!knownProjects.value.includes(value)) {
+        knownProjects.value = [...knownProjects.value, value];
+    }
+    activeWriteProject.value = value;
+    try {
+        await postProjectName(value, "");
+    } catch (error) {
+        if (error.response?.status !== 409) {
+            formError.value = error.response?.data?.detail || "프로젝트를 추가하지 못했습니다.";
+        }
+    }
+};
+
+const chooseWriteProject = (name) => {
+    activeWriteProject.value = name;
+    closeProjectPopup();
+};
+
+const addWriteProject = async () => {
+    const name = newProjectName.value.trim();
+    if (!name) return;
+    await registerProject(name);
+    newProjectName.value = "";
+};
+
+const openProjectPopup = () => {
+    newProjectName.value = "";
+    addingProject.value = true;
+    document.documentElement.classList.add("is-overlay-open");
+};
+
+const closeProjectPopup = () => {
+    addingProject.value = false;
+    newProjectName.value = "";
+    document.documentElement.classList.remove("is-overlay-open");
+};
+
+const onProjectKey = (event) => {
+    if (event.key === "Escape" && addingProject.value) closeProjectPopup();
+};
+
+const reportBody = () => {
+    const raw = input.value;
+    if (isNarrow.value || !activeWriteProject.value) return raw;
+    if (raw.includes("프로젝트 명:")) return raw;
+    const body = raw.trim();
+    if (!body) return raw;
+    return `프로젝트 명: ${activeWriteProject.value}\n\n${body}`;
+};
+
 const refreshMeta = async () => {
     await loadUserName();
     await loadSavedState();
     await loadPrevPlans();
+    await loadProjects();
+};
+
+const syncNarrow = () => {
+    isNarrow.value = Boolean(narrowQuery?.matches);
 };
 
 onMounted(async () => {
+    narrowQuery = window.matchMedia("(max-width: 860px)");
+    syncNarrow();
+    narrowQuery.addEventListener("change", syncNarrow);
+    window.addEventListener("keydown", onProjectKey);
     await refreshMeta();
     await loadDraft();
 });
 onUnmounted(() => {
     stopElapsedTimer();
+    narrowQuery?.removeEventListener("change", syncNarrow);
+    window.removeEventListener("keydown", onProjectKey);
+    if (addingProject.value || aiLoading.value) {
+        document.documentElement.classList.remove("is-overlay-open");
+    }
 });
 watch(date, async () => {
+    input.value = "";
+    activeTemplateId.value = "";
     draftSavedAt.value = "";
     await loadSavedState();
     await loadPrevPlans();
     await loadDraft();
 });
-watch(selectedUserId, refreshMeta);
+watch(selectedUserId, async () => {
+    input.value = "";
+    draftSavedAt.value = "";
+    await refreshMeta();
+    await loadDraft();
+});
 
 const selectType = (nextType) => {
     buttonType.value = nextType;
@@ -305,7 +434,7 @@ const saveDraft = async () => {
     formError.value = "";
     draftSaving.value = true;
     try {
-        await postReportDraft(input.value, date.value, memberId);
+        await postReportDraft(reportBody(), date.value, memberId);
         const now = new Date();
         draftSavedAt.value = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     } catch (error) {
@@ -336,6 +465,7 @@ const sendReport = async () => {
 
     formError.value = "";
     aiLoading.value = true;
+    document.documentElement.classList.add("is-overlay-open");
     startElapsedTimer();
 
     try {
@@ -343,7 +473,7 @@ const sendReport = async () => {
         let rawText;
 
         if (buttonType.value === "text") {
-            rawText = input.value;
+            rawText = reportBody();
             parsed = await postReport(
                 { content: rawText },
                 date.value,
@@ -370,6 +500,9 @@ const sendReport = async () => {
     } finally {
         stopElapsedTimer();
         aiLoading.value = false;
+        if (!addingProject.value) {
+            document.documentElement.classList.remove("is-overlay-open");
+        }
     }
 };
 </script>
@@ -383,7 +516,11 @@ const sendReport = async () => {
             </div>
         </div>
 
-        <div v-else class="card write-card">
+        <div
+            v-else
+            class="card write-card"
+            :class="{ 'is-lines': isNarrow && buttonType === 'text' }"
+        >
             <div class="write-head">
                 <span class="write-author">{{ userName || "나" }}</span>
                 <input
@@ -395,6 +532,7 @@ const sendReport = async () => {
                     required
                 />
                 <span
+                    v-if="!(isNarrow && buttonType === 'text')"
                     class="status-chip"
                     :class="alreadySaved ? 'is-saved' : 'is-draft'"
                     :title="statusDetail"
@@ -403,6 +541,7 @@ const sendReport = async () => {
                     <span v-if="statusDetail" class="status-chip-more"> · {{ statusDetail }}</span>
                 </span>
                 <button
+                    v-if="!(isNarrow && buttonType === 'text')"
                     type="button"
                     class="write-mode-link"
                     @click="selectType(buttonType === 'text' ? 'file' : 'text')"
@@ -411,7 +550,81 @@ const sendReport = async () => {
                 </button>
             </div>
 
-            <div v-if="buttonType === 'text'" class="field write-field">
+            <template v-if="buttonType === 'text' && isNarrow">
+                <LineWriter
+                    v-model="input"
+                    :projects="knownProjects"
+                    @add-project="registerProject"
+                />
+                <div class="form-actions line-send-row">
+                    <button
+                        class="btn btn-primary line-send"
+                        @click="sendReport"
+                        :disabled="aiLoading"
+                    >
+                        {{ aiLoading ? "제출 중" : "제출" }}
+                    </button>
+                </div>
+            </template>
+
+            <div v-else-if="buttonType === 'text'" class="field write-field">
+                <div class="write-current">
+                    <p>{{ activeWriteProject || "프로젝트를 고르세요" }}</p>
+                    <button type="button" class="write-more" @click="openProjectPopup">더보기</button>
+                </div>
+                <Teleport to="body">
+                    <div
+                        v-if="addingProject"
+                        class="app-dialog-overlay"
+                        @click.self="closeProjectPopup"
+                    >
+                        <div
+                            class="card app-dialog project-dialog"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="write-project-title"
+                        >
+                            <h2 id="write-project-title" class="app-dialog-message">프로젝트</h2>
+                            <div class="write-pick-list" role="listbox" aria-label="프로젝트 목록">
+                                <button
+                                    v-for="name in knownProjects"
+                                    :key="name"
+                                    type="button"
+                                    class="write-pick"
+                                    :class="{ 'is-on': name === activeWriteProject }"
+                                    :aria-selected="name === activeWriteProject"
+                                    @click="chooseWriteProject(name)"
+                                >
+                                    {{ name }}
+                                </button>
+                            </div>
+                            <form class="write-project-add" @submit.prevent="addWriteProject">
+                                <input
+                                    id="write-new-project"
+                                    v-model="newProjectName"
+                                    class="input"
+                                    type="text"
+                                    placeholder="새 프로젝트 이름"
+                                    aria-label="새 프로젝트 이름"
+                                />
+                                <button class="btn" type="submit">추가</button>
+                            </form>
+                            <div class="app-dialog-actions">
+                                <button class="btn" type="button" @click="closeProjectPopup">닫기</button>
+                            </div>
+                        </div>
+                    </div>
+                </Teleport>
+                <div
+                    v-if="!input.trim()"
+                    class="write-preview"
+                    aria-label="내용이 없을 때 미리보기"
+                >
+                    <div v-for="kind in LINE_KINDS" :key="kind" class="write-preview-block">
+                        <h2>{{ kind }}</h2>
+                        <p>없음</p>
+                    </div>
+                </div>
                 <textarea
                     id="report-input"
                     v-model="input"
@@ -478,16 +691,7 @@ const sendReport = async () => {
             <p v-if="formError" class="form-error" role="alert">
                 {{ formError }}
             </p>
-            <div v-if="aiLoading" class="ai-progress" role="status">
-                <p class="ai-progress-title">
-                    로컬 AI가 정리하고 있어요 · {{ elapsedLabel }} 경과
-                </p>
-                <p class="ai-progress-help">
-                    보통 1~3분, 최대 10분까지 걸릴 수 있어요. 이 화면을 유지해주세요.
-                    입력한 내용은 그대로 남습니다.
-                </p>
-            </div>
-            <div class="form-actions">
+            <div v-if="!(buttonType === 'text' && isNarrow)" class="form-actions">
                 <span v-if="draftSavedAt" class="draft-note" role="status">
                     {{ draftSavedAt }} 초안 저장됨
                 </span>
@@ -506,11 +710,32 @@ const sendReport = async () => {
                     @click="sendReport"
                     :disabled="aiLoading"
                 >
-                    {{ aiLoading ? `정리 중... (${elapsedLabel})` : "제출" }}
+                    {{ aiLoading ? "제출 중" : "제출" }}
                 </button>
             </div>
         </div>
     </div>
+    <Teleport to="body">
+        <div v-if="aiLoading" class="submit-wait" role="status" aria-live="polite">
+            <div class="submit-wait-card">
+                <p class="submit-wait-date">{{ waitDateLabel }}</p>
+                <h2>{{ waitStages[waitStage].label }}</h2>
+                <div class="submit-meter" aria-hidden="true">
+                    <span :style="{ width: ['18%', '52%', '78%'][waitStage] }"></span>
+                </div>
+                <ol class="submit-steps">
+                    <li
+                        v-for="(stage, index) in waitStages"
+                        :key="stage.label"
+                        :class="{ 'is-done': index < waitStage, 'is-on': index === waitStage }"
+                    >
+                        {{ stage.label }}
+                    </li>
+                </ol>
+                <p class="submit-wait-time">{{ elapsedLabel }} · 보통 1분에서 3분</p>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <style scoped>
@@ -555,6 +780,112 @@ const sendReport = async () => {
 .write-field {
     display: flex;
     flex-direction: column;
+}
+
+.write-current,
+.write-preview {
+    order: 0;
+}
+
+.write-current {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 44px;
+    margin-bottom: 8px;
+}
+
+.write-current p {
+    margin: 0;
+    min-width: 0;
+    font-size: 16px;
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.write-more {
+    flex: none;
+    min-height: 44px;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    color: #007aff;
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.write-pick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 240px;
+    margin-bottom: 12px;
+    overflow: auto;
+}
+
+.write-pick {
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 16px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.write-pick.is-on {
+    border-color: var(--text-strong);
+    background: var(--accent-soft);
+}
+
+.write-project-add {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.write-project-add .input {
+    min-width: 0;
+    flex: 1;
+    min-height: 44px;
+}
+
+.write-preview {
+    margin-bottom: 12px;
+}
+
+.write-preview-block h2 {
+    margin: 10px 0 0;
+    font-size: 13px;
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+}
+
+.write-preview-block p {
+    margin: 2px 0 0;
+    font-size: 15px;
+    color: var(--text-muted);
+}
+
+.app-dialog h2 {
+    margin: 0 0 12px;
+}
+
+.app-dialog .input {
+    width: 100%;
+    min-height: 44px;
+    margin-bottom: 16px;
+    font-size: 16px;
+}
+
+.write-field .textarea {
+    min-height: 320px;
 }
 
 .write-helpers {
@@ -708,23 +1039,79 @@ const sendReport = async () => {
     cursor: pointer;
 }
 
-.ai-progress {
-    margin-top: var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-sm);
-    background: var(--accent-soft);
+.submit-wait {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(17, 17, 17, 0.32);
 }
 
-.ai-progress-title {
+.submit-wait-card {
+    width: min(420px, 100%);
+    padding: 22px 20px 18px;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-2);
+}
+
+.submit-wait-date {
     margin: 0;
-    font-size: var(--fs-13);
+    font-size: 13px;
+    color: var(--text);
+}
+
+.submit-wait-card h2 {
+    margin: 6px 0 0;
+    font-size: 22px;
     font-weight: var(--fw-semibold);
+    letter-spacing: -0.02em;
     color: var(--text-strong);
 }
 
-.ai-progress-help {
-    margin: var(--space-2) 0 0;
-    font-size: var(--fs-13);
+.submit-meter {
+    height: 2px;
+    margin: 16px 0;
+    background: var(--border);
+}
+
+.submit-meter span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.4s ease;
+}
+
+.submit-steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.submit-steps li {
+    min-height: 28px;
+    font-size: 15px;
+    color: var(--text-muted);
+}
+
+.submit-steps li.is-on {
+    color: var(--text-strong);
+    font-weight: var(--fw-semibold);
+}
+
+.submit-steps li.is-done {
+    color: var(--text);
+}
+
+.submit-wait-time {
+    margin: 14px 0 0;
+    font-size: 13px;
     color: var(--text);
 }
 
@@ -838,6 +1225,31 @@ const sendReport = async () => {
 
     .form-actions .btn-primary {
         flex: 1 1 100%;
+    }
+
+    .write-card.is-lines {
+        padding-bottom: 14px;
+    }
+
+    .form-actions.line-send-row {
+        position: static;
+        margin: 12px 0 0;
+        padding: 0;
+        border-top: none;
+    }
+
+    .form-actions.line-send-row .line-send {
+        flex: 1 1 auto;
+        min-height: 44px;
+        height: 44px;
+        color: var(--text-strong);
+    }
+
+    .form-actions.line-send-row .line-send:hover,
+    .form-actions.line-send-row .line-send:active {
+        background: var(--accent-soft);
+        border-color: var(--text-strong);
+        color: var(--text-strong);
     }
 
     .draft-note {

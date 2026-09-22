@@ -7,18 +7,21 @@ import { useDialog } from "../composables/useDialog";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
-import { ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-vue-next";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { useRouter } from "vue-router";
-import AppPageHeader from "./ui/AppPageHeader.vue";
 import { projectsFromDeck, toWeeklyDeck } from "../lib/weeklyDeck";
+import { useSidebar } from "../composables/useSidebar";
 import {
     isFutureDate,
+    mondayOf,
+    weekdayLabelOf,
     weekKeyOfDates,
     weekRangeLabel,
 } from "../lib/dateScope";
 
 
 const router = useRouter();
+const { isNarrow } = useSidebar();
 
 const {
     postWeeklyReport,
@@ -35,7 +38,6 @@ const userId = ref(selectedUserId.value || "");
 const weeklyReport = ref(null);
 const isLoading = ref(false);
 const myDays = ref({});
-const weekdayLabels = ["월", "화", "수", "목", "금"];
 
 const formatLocalDate = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -49,36 +51,91 @@ const normalizeDay = (value) => {
     return formatLocalDate(parsed);
 };
 
-const weekOffset = ref(0);
+const weekdayName = (dateStr) => weekdayLabelOf(dateStr);
 
-const getWeekDays = (offset) => {
+const parseIso = (value) => {
+    const [year, month, day] = String(value || "").split("-").map(Number);
+    if (!year || !month || !day) return null;
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return null;
+    }
+    return date;
+};
+
+const thisWorkWeek = () => {
     const now = new Date();
-    const day = now.getDay();
+    const weekday = now.getDay();
     const monday = new Date(now);
-    monday.setDate(now.getDate() - (day === 0 ? 7 : day) + 1 + offset * 7);
+    monday.setDate(now.getDate() - (weekday === 0 ? 7 : weekday) + 1);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    return { start: formatLocalDate(monday), end: formatLocalDate(friday) };
+};
 
+const workdaysBetween = (start, end) => {
+    const from = parseIso(start);
+    const to = parseIso(end);
+    if (!from || !to || from > to) return [];
     const days = [];
-    for (let i = 0; i < 5; i++) {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        days.push(formatLocalDate(d));
+    const cursor = new Date(from);
+    while (cursor <= to) {
+        const weekday = cursor.getDay();
+        if (weekday !== 0 && weekday !== 6) days.push(formatLocalDate(cursor));
+        cursor.setDate(cursor.getDate() + 1);
     }
     return days;
 };
 
-const loadWeek = async (offset) => {
-    weekOffset.value = offset;
-    weekDays.value = getWeekDays(offset);
+const openingWeek = thisWorkWeek();
+const rangeStart = ref(openingWeek.start);
+const rangeEnd = ref(openingWeek.end);
+
+const applyRange = async (start, end) => {
+    if (!start || !end || start > end) return;
+    const from = parseIso(start);
+    const to = parseIso(end);
+    const span = Math.round((to - from) / 86400000);
+    if (span > 62) {
+        showAlert("기간은 두 달 안으로 골라 주세요.");
+        return;
+    }
+    rangeStart.value = start;
+    rangeEnd.value = end;
+    weekDays.value = workdaysBetween(start, end);
     selects.value = [];
     await loadMyWeek();
 };
 
-const weekLabel = computed(() => {
-    if (weekDays.value.length < 5) return "";
-    const start = weekDays.value[0];
-    const end = weekDays.value[4];
-    const suffix = weekOffset.value === 0 ? " (이번 주)" : "";
-    return `${start} ~ ${end}${suffix}`;
+const pickStart = (value) => {
+    if (!value) return;
+    const end = value > rangeEnd.value ? value : rangeEnd.value;
+    applyRange(value, end);
+};
+
+const pickEnd = (value) => {
+    if (!value) return;
+    const start = value < rangeStart.value ? value : rangeStart.value;
+    applyRange(start, value);
+};
+
+const shiftRange = (weeks) => {
+    const start = parseIso(rangeStart.value);
+    const end = parseIso(rangeEnd.value);
+    if (!start || !end) return;
+    start.setDate(start.getDate() + weeks * 7);
+    end.setDate(end.getDate() + weeks * 7);
+    applyRange(formatLocalDate(start), formatLocalDate(end));
+};
+
+const resetThisWeek = () => {
+    const week = thisWorkWeek();
+    applyRange(week.start, week.end);
+};
+
+const isThisWeek = computed(() => {
+    const week = thisWorkWeek();
+    return rangeStart.value === week.start && rangeEnd.value === week.end;
 });
 
 const shortDay = (dateStr) => {
@@ -88,8 +145,8 @@ const shortDay = (dateStr) => {
 };
 
 const headerTitle = computed(() => {
-    if (weekDays.value.length < 5) return "주간 보고서";
-    return `${shortDay(weekDays.value[0])} ~ ${shortDay(weekDays.value[4])}`;
+    if (!rangeStart.value || !rangeEnd.value) return "주간 보고서";
+    return `${shortDay(rangeStart.value)} ~ ${shortDay(rangeEnd.value)}`;
 });
 
 const isDayOn = (dayDate) => selects.value.includes(dayDate);
@@ -115,8 +172,8 @@ const reportRange = (report) => {
 };
 
 
-const prevWeek = () => loadWeek(weekOffset.value - 1);
-const nextWeek = () => loadWeek(weekOffset.value + 1);
+const prevWeek = () => shiftRange(-1);
+const nextWeek = () => shiftRange(1);
 
 /** 내가 그 날 일일보고를 냈는지. 주간보고는 내 일일보고만으로 만든다. */
 const hasMine = (dayDate) => (myDays.value[dayDate] || 0) > 0;
@@ -135,11 +192,48 @@ const myDayCount = computed(
 );
 
 const headerSubtitle = computed(() => {
-    const week = weekOffset.value === 0 ? "이번 주" : weekLabel.value;
-    return `${week} · 오늘까지 내 일일보고 ${myDayCount.value}일`;
+    const week = isThisWeek.value ? "이번 주 · " : "";
+    return `${week}내 일일보고 ${myDayCount.value}일`;
 });
 
-weekDays.value = getWeekDays(0);
+const weekGroups = computed(() => {
+    const groups = [];
+    for (const day of weekDays.value) {
+        const key = mondayOf(day);
+        let group = groups.find((item) => item.key === key);
+        if (!group) {
+            group = { key, days: [] };
+            groups.push(group);
+        }
+        group.days.push(day);
+    }
+    return groups.map((group) => {
+        const written = group.days.filter((day) => hasMine(day) && !isFutureDay(day)).length;
+        const picked = group.days.filter((day) => selects.value.includes(day)).length;
+        return {
+            key: group.key,
+            days: group.days,
+            label: `${shortDay(group.days[0])} ~ ${shortDay(group.days[group.days.length - 1])}`,
+            summary: written ? `선택 ${picked}` : "없음",
+            picked,
+        };
+    });
+});
+
+const foldWeeks = computed(() => isNarrow.value && weekGroups.value.length > 1);
+const openWeek = ref("");
+
+watch(weekGroups, (groups) => {
+    if (!groups.length) {
+        openWeek.value = "";
+        return;
+    }
+    if (groups.some((group) => group.key === openWeek.value)) return;
+    const picked = [...groups].reverse().find((group) => group.picked > 0);
+    openWeek.value = (picked || groups[groups.length - 1]).key;
+});
+
+weekDays.value = workdaysBetween(rangeStart.value, rangeEnd.value);
 
 const deleteWeekly = async (reportId) => {
     const report = (weeklyReport.value || []).find((row) => String(row.id) === String(reportId));
@@ -200,16 +294,16 @@ const sendDates = async () => {
     }
 };
 
-/** 이번 주에 내가 낸 일일보고만 조회해 선택 가능한 날짜를 정한다. */
+/** 고른 기간에 내가 낸 일일보고만 조회해 선택 가능한 날짜를 정한다. */
 const loadMyWeek = async () => {
     myDays.value = {};
-    if (weekDays.value.length < 5 || !userId.value) return;
+    if (!rangeStart.value || !rangeEnd.value || !userId.value) return;
     try {
         const rows = await getUserActivities(
-            Number(weekDays.value[0].slice(0, 4)),
-            Number(weekDays.value[0].slice(5, 7)),
-            weekDays.value[0],
-            weekDays.value[4],
+            Number(rangeStart.value.slice(0, 4)),
+            Number(rangeStart.value.slice(5, 7)),
+            rangeStart.value,
+            rangeEnd.value,
         );
         const mine = (rows || []).find(
             (row) => String(row.member_id) === String(userId.value),
@@ -461,69 +555,100 @@ onMounted(async () => {
 
 <template>
     <div class="page weekly-report-page">
-        <AppPageHeader :title="headerTitle" :subtitle="headerSubtitle">
-            <template #filters>
-                <div class="week-nav">
-                    <button
-                        v-if="weekOffset !== 0"
-                        type="button"
-                        class="btn btn-small"
-                        @click="loadWeek(0)"
-                        :disabled="isLoading"
-                    >
-                        이번 주로
-                    </button>
-                    <div class="week-nav-arrows">
-                        <button class="icon-btn" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
-                            <ChevronLeft :size="16" />
-                        </button>
-                        <button class="icon-btn" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
-                            <ChevronRight :size="16" />
-                        </button>
-                    </div>
-                </div>
-            </template>
-            <template #actions>
-                <button class="btn btn-primary hide-on-narrow" @click="sendDates()" :disabled="isLoading || selects.length === 0">
-                    {{ isLoading ? "만드는 중..." : "내 주간 보고서 만들기" }}
+        <header class="week-head">
+            <div class="week-head-text">
+                <h1>{{ headerTitle }}</h1>
+                <p>{{ headerSubtitle }}</p>
+            </div>
+            <div class="week-nav">
+                <button
+                    v-if="!isThisWeek"
+                    type="button"
+                    class="btn btn-small"
+                    @click="resetThisWeek"
+                    :disabled="isLoading"
+                >
+                    이번 주로
                 </button>
-            </template>
-        </AppPageHeader>
+                <div class="week-nav-arrows">
+                    <button class="icon-btn" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
+                        <ChevronLeft :size="16" />
+                    </button>
+                    <button class="icon-btn" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
+                        <ChevronRight :size="16" />
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="week-range">
+            <label>
+                <span>주 시작</span>
+                <input
+                    class="input"
+                    type="date"
+                    :value="rangeStart"
+                    :disabled="isLoading"
+                    @change="pickStart($event.target.value)"
+                />
+            </label>
+            <label>
+                <span>주 끝</span>
+                <input
+                    class="input"
+                    type="date"
+                    :value="rangeEnd"
+                    :disabled="isLoading"
+                    @change="pickEnd($event.target.value)"
+                />
+            </label>
+        </div>
 
         <section class="card" aria-label="넣을 날짜">
             <div class="section-head">
                 <h2>넣을 날짜</h2>
-                <p>{{ selects.length }}일 선택</p>
             </div>
-            <div class="day-chips" role="group" aria-label="넣을 날짜">
-                <button
-                    v-for="(dayDate, index) in weekDays"
-                    :key="dayDate"
-                    type="button"
-                    class="day-chip"
-                    :class="{
-                        on: isDayOn(dayDate),
-                        'is-blank': !hasMine(dayDate),
-                        'is-future': isFutureDay(dayDate),
-                    }"
-                    :aria-pressed="isDayOn(dayDate)"
-                    :disabled="!hasMine(dayDate)"
-                    :title="hasMine(dayDate) ? (isFutureDay(dayDate) ? '아직 오지 않은 날입니다' : null) : '이 날 작성한 일일보고가 없습니다'"
-                    @click="toggleSelectDay(dayDate)"
-                >
-                    <span class="day-chip-name">{{ weekdayLabels[index] }}</span>
-                    <span class="day-chip-date">{{ shortDay(dayDate) }}</span>
-                    <span class="day-chip-state">{{ dayState(dayDate) }}</span>
-                </button>
+            <div class="week-folds">
+                <div v-for="group in weekGroups" :key="group.key" class="week-fold">
+                    <button
+                        v-if="foldWeeks"
+                        type="button"
+                        class="week-fold-head"
+                        :aria-expanded="openWeek === group.key"
+                        @click="openWeek = openWeek === group.key ? '' : group.key"
+                    >
+                        <span>{{ group.label }}</span>
+                        <span class="week-fold-meta">{{ group.summary }}</span>
+                        <ChevronDown :size="16" :class="{ 'is-open': openWeek === group.key }" />
+                    </button>
+                    <div
+                        v-if="!foldWeeks || openWeek === group.key"
+                        class="day-chips"
+                        role="group"
+                        :aria-label="group.label"
+                    >
+                        <button
+                            v-for="dayDate in group.days"
+                            :key="dayDate"
+                            type="button"
+                            class="day-chip"
+                            :class="{
+                                on: isDayOn(dayDate),
+                                'is-blank': !hasMine(dayDate),
+                                'is-future': isFutureDay(dayDate),
+                            }"
+                            :aria-pressed="isDayOn(dayDate)"
+                            :disabled="!hasMine(dayDate)"
+                            :title="hasMine(dayDate) ? (isFutureDay(dayDate) ? '아직 오지 않은 날입니다' : null) : '이 날 작성한 일일보고가 없습니다'"
+                            @click="toggleSelectDay(dayDate)"
+                        >
+                            <span class="day-chip-name">{{ weekdayName(dayDate) }}</span>
+                            <span class="day-chip-date">{{ shortDay(dayDate) }}</span>
+                            <span class="day-chip-state">{{ dayState(dayDate) }}</span>
+                        </button>
+                    </div>
+                </div>
             </div>
-            <p v-if="myDayCount === 0" class="week-hint">
-                이 주에 오늘까지 작성한 일일보고가 없습니다.
-                <router-link to="/report">일일보고를 먼저 작성</router-link>하면 여기서 모을 수 있습니다.
-            </p>
-            <p v-else class="week-hint">
-                내가 쓴 일일보고만 모아 만듭니다. 팀 전체 제출 현황은
-                <router-link to="/activities">사용자 활동</router-link>에서 봅니다.
-            </p>
             <button
                 class="btn btn-primary create-week-btn"
                 @click="sendDates()"
@@ -536,22 +661,28 @@ onMounted(async () => {
         <section class="card" aria-label="만든 주간 보고서">
             <div class="section-head">
                 <h2>내가 만든 보고서</h2>
-                <p>{{ weeklyGroups.length }}주</p>
             </div>
             <div v-if="weeklyGroups.length === 0" class="empty-state">
                 아직 만든 주간 보고서가 없습니다
             </div>
             <ul v-else class="report-list">
                 <li v-for="group in weeklyGroups" :key="group.key" class="report-row">
-                    <button type="button" class="report-main" :disabled="isLoading" @click="viewReport(group.latest)">
-                        <strong>{{ group.label }}</strong>
-                        <span v-if="projectNamesOf(group.latest).length">
-                            {{ projectNamesOf(group.latest).join(" · ") }}
-                        </span>
-                        <span v-if="group.older.length" class="report-dupe">
-                            같은 주 이전 버전 {{ group.older.length }}건
-                        </span>
-                    </button>
+                    <div class="report-top">
+                        <button type="button" class="report-main" :disabled="isLoading" @click="viewReport(group.latest)">
+                            <strong>{{ group.label }}</strong>
+                            <span v-if="projectNamesOf(group.latest).length">
+                                {{ projectNamesOf(group.latest).join(" · ") }}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            class="row-delete"
+                            @click="deleteWeekly(group.latest.id)"
+                            :disabled="isLoading"
+                        >
+                            삭제
+                        </button>
+                    </div>
                     <div class="report-row-actions">
                         <button
                             v-if="group.older.length"
@@ -560,22 +691,13 @@ onMounted(async () => {
                             :disabled="isLoading"
                             @click="cleanupOlder(group)"
                         >
-                            이전 버전 정리
+                            정리
                         </button>
                         <button type="button" class="btn btn-small" @click="downloadReport(group.latest)" :disabled="isLoading">
-                            <Download :size="14" /> Word
+                            Word
                         </button>
                         <button type="button" class="btn btn-small" @click="downloadPptx(group.latest)" :disabled="isLoading">
-                            <Download :size="14" /> PPT
-                        </button>
-                        <button
-                            type="button"
-                            class="icon-btn is-danger"
-                            aria-label="주간 보고서 삭제"
-                            @click="deleteWeekly(group.latest.id)"
-                            :disabled="isLoading"
-                        >
-                            <Trash2 :size="15" />
+                            PPT
                         </button>
                     </div>
                 </li>
@@ -585,18 +707,73 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.week-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    width: 100%;
+}
+
+.week-head-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.week-head h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: var(--fw-semibold);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--text-strong);
+    white-space: nowrap;
+}
+
+.week-head p {
+    margin: 2px 0 0;
+    font-size: var(--fs-13);
+    color: var(--text);
+    word-break: keep-all;
+}
+
 .week-nav {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    flex-shrink: 0;
+    flex: 0 0 auto;
+    width: auto;
 }
 
 .week-nav-arrows {
     display: flex;
     align-items: center;
     gap: var(--space-1);
-    margin-left: auto;
+}
+
+.week-range {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+}
+
+.week-range label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.week-range span {
+    font-size: 13px;
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+}
+
+.week-range .input {
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
 }
 
 .icon-btn {
@@ -636,8 +813,25 @@ onMounted(async () => {
     color: var(--danger-fg);
 }
 
+.row-delete {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    border: 0;
+    background: transparent;
+    color: var(--danger-fg);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.row-delete:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .weekly-report-page > .card {
-    margin-bottom: var(--space-4);
+    margin-bottom: 0;
 }
 
 .section-head {
@@ -668,16 +862,58 @@ onMounted(async () => {
     gap: var(--space-2);
 }
 
+.week-fold-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 52px;
+    padding: 8px 4px;
+    border: 0;
+    background: transparent;
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 16px;
+    font-weight: var(--fw-semibold);
+    text-align: left;
+    cursor: pointer;
+}
+
+.week-fold + .week-fold {
+    border-top: 1px solid var(--border);
+}
+
+.week-fold-meta {
+    margin-left: auto;
+    font-size: 14px;
+    font-weight: var(--fw-regular, 400);
+    color: var(--text);
+}
+
+.week-fold-head svg {
+    flex: none;
+    color: var(--text);
+    transition: transform var(--dur-fast) var(--ease);
+}
+
+.week-fold-head svg.is-open {
+    transform: rotate(180deg);
+}
+
 .day-chip {
     display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+    min-height: 88px;
+    padding: 12px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
     color: var(--text);
     font: inherit;
+    text-align: left;
     cursor: pointer;
     transition:
         border-color var(--dur-fast) var(--ease),
@@ -691,6 +927,11 @@ onMounted(async () => {
 .day-chip.on {
     border-color: var(--accent);
     background: var(--accent-soft);
+    box-shadow: none;
+}
+
+.day-chip:disabled {
+    opacity: 1;
 }
 
 .day-chip-name {
@@ -705,15 +946,14 @@ onMounted(async () => {
 }
 
 .day-chip-state {
-    margin-left: auto;
-    font-size: var(--fs-12);
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     color: var(--success-fg);
 }
 
 .day-chip.is-blank {
     cursor: not-allowed;
-    background: var(--bg);
+    background: transparent;
 }
 
 .day-chip.is-blank .day-chip-name,
@@ -731,8 +971,9 @@ onMounted(async () => {
 }
 
 /* 아직 오지 않은 날. 켤 수는 있지만 끝난 날처럼 보이지 않게 흐리게 둔다. */
-.day-chip.is-future:not(.on) {
-    opacity: 0.7;
+.day-chip.is-future:not(.on) .day-chip-name,
+.day-chip.is-future:not(.on) .day-chip-date {
+    color: var(--text-muted);
 }
 
 .day-chip.is-future .day-chip-state {
@@ -767,6 +1008,14 @@ onMounted(async () => {
     gap: var(--space-3);
     padding: var(--space-2) 0;
     border-top: 1px solid var(--border);
+}
+
+.report-top {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 1;
+    min-width: 0;
 }
 
 .report-row:first-child {
@@ -812,12 +1061,15 @@ onMounted(async () => {
 }
 
 .create-week-btn {
-    display: none;
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    margin-top: var(--space-4);
 }
 
 @media (max-width: 860px) {
-    :deep(.page-header-actions) {
-        display: none;
+    .week-head h1 {
+        font-size: 20px;
     }
 
     .week-nav .icon-btn {
@@ -826,46 +1078,57 @@ onMounted(async () => {
     }
 
     .day-chips {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        overflow: visible;
-        margin: 0;
-        padding: 0;
-        gap: 6px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
     }
 
     .day-chip {
-        min-width: 0;
-        min-height: 72px;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        justify-content: center;
-        gap: 2px;
-        padding: 8px 2px;
+        min-height: 52px;
+        padding: 8px 12px;
+        border-width: 0 0 1px;
+        border-radius: 0;
+        background: transparent;
+    }
+
+    .day-chip:last-child {
+        border-bottom: none;
+    }
+
+    .day-chip.on {
+        border-radius: 0;
+        border-color: transparent;
+        background: transparent;
+        box-shadow: inset 3px 0 0 var(--accent);
     }
 
     .day-chip-name {
+        font-size: 16px;
+    }
+
+    .day-chip-date {
         font-size: 14px;
     }
 
-    .day-chip-date,
     .day-chip-state {
-        margin-left: 0;
-        font-size: 11px;
+        margin-left: auto;
+        font-size: 14px;
     }
 
     .create-week-btn {
-        display: flex;
-        width: 100%;
         min-height: 48px;
-        margin-top: var(--space-3);
     }
 
     .report-row {
         flex-direction: column;
         align-items: stretch;
-        gap: 8px;
-        padding: 14px 0;
+        gap: 12px;
+        padding: 4px 0 8px;
+    }
+
+    .report-top {
+        width: 100%;
     }
 
     .report-main {
@@ -874,33 +1137,24 @@ onMounted(async () => {
     }
 
     .report-main strong {
-        font-size: 15px;
+        font-size: 16px;
     }
 
     .report-row-actions {
         display: grid;
-        grid-template-columns: 1fr 1fr 44px;
+        grid-template-columns: 1fr 1fr;
         width: 100%;
         gap: 8px;
     }
 
-    .report-row-actions .cleanup-btn {
+    .report-row-actions .cleanup-btn,
+    .cleanup-btn {
         grid-column: 1 / -1;
     }
 
     .report-row-actions .btn {
         min-height: 44px;
         width: 100%;
-    }
-
-    .cleanup-btn {
-        grid-column: 1 / -1;
-    }
-
-    .report-row-actions .icon-btn {
-        width: 44px;
-        height: 44px;
-        justify-self: end;
     }
 }
 

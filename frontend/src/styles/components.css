@@ -32,43 +32,49 @@
 }
 
 .app-tab.is-active {
-    background: var(--surface-soft);
+    background: var(--surface);
     color: var(--text-strong);
     border-color: var(--border);
+    font-weight: var(--fw-semibold);
 }
 
 .filter-toolbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0;
-    margin-bottom: var(--space-5);
-    padding: var(--space-1) var(--space-2);
+    gap: var(--space-3);
+    margin-bottom: 0;
+    padding: var(--space-3) var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius);
 }
 
 .filter-toolbar .input {
     flex: 1;
     min-width: 0;
-    height: 32px;
-    padding: var(--space-1) var(--space-3);
-    border: none;
-    background: transparent;
-    border-radius: 0;
+    height: 36px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: var(--radius-sm);
 }
 
-.filter-toolbar .input:hover,
-.filter-toolbar .input:focus,
+.filter-toolbar .input:hover {
+    border-color: var(--border-strong);
+}
+
+.filter-toolbar .input:focus {
+    border-color: var(--accent);
+}
+
 .filter-toolbar .input:focus-visible {
-    border-color: transparent;
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
 .filter-divider {
-    flex-shrink: 0;
-    width: 1px;
-    height: 16px;
-    background: var(--border);
+    display: none;
 }
 
 .app-list-row {
@@ -154,11 +160,11 @@
     font: inherit;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text-strong);
     outline: none;
-    transition: border-color var(--dur-fast) var(--ease);
+    transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
 .input:hover,
@@ -175,6 +181,7 @@
 .field>select:focus,
 .field>textarea:focus {
     border-color: var(--accent);
+    box-shadow: var(--shadow-1);
 }
 
 .input:focus-visible,
@@ -182,12 +189,13 @@
 .field>input:focus-visible,
 .field>select:focus-visible,
 .field>textarea:focus-visible {
-    outline: none;
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
 ::placeholder {
-    color: var(--text);
-    opacity: 0.6;
+    color: var(--text-muted);
+    opacity: 1;
 }
 
 select.input,
@@ -243,6 +251,7 @@ input[type="file"]::file-selector-button:hover {
     resize: vertical;
     line-height: var(--lh-relaxed);
     min-height: 200px;
+    border-radius: var(--radius);
 }
 
 .btn {
@@ -447,11 +456,12 @@ input[type="file"]::file-selector-button:hover {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(38, 37, 30, 0.28);
+    background: rgba(17, 17, 17, 0.32);
 }
 
 .app-dialog {
     width: min(440px, 100%);
+    box-shadow: var(--shadow-2);
 }
 
 .app-dialog-kicker {

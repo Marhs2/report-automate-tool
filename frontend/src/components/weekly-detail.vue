@@ -5,8 +5,6 @@
             <div class="detail-title">
                 <h1>{{ userName || "주간 보고서" }}</h1>
                 <span class="detail-period">{{ periodLabel }}</span>
-                <span v-if="!isEditing" class="status-chip">읽기</span>
-                <span v-else class="status-chip is-draft">고치는 중</span>
             </div>
             <div class="detail-actions">
                 <button type="button" class="btn btn-small" @click="goBack">목록</button>
@@ -34,10 +32,6 @@
 
         <div v-if="reportData && !isEditing" class="content-container single">
             <div class="json-container">
-                <p v-if="reportData.carriedFromLastWeek" class="carry-hint" role="status">
-                    지난주 향후 {{ reportData.carriedCount }}건을 이번 주 향후일정에 남겨 두었습니다.
-                </p>
-
                 <div v-if="!projectBlocks.length" class="empty-state">
                     아직 채워진 프로젝트가 없습니다
                 </div>
@@ -65,7 +59,6 @@
                                     <li v-for="(item, index) in group.items" :key="index">{{ item }}</li>
                                 </ul>
                             </div>
-                            <p v-if="!doneGroups(block).length" class="empty-msg">항목이 없습니다</p>
                         </div>
                         <div class="split-col">
                             <h3 class="read-col-head">
@@ -75,17 +68,12 @@
                             <ul v-if="nextItems(block).length" class="read-list">
                                 <li v-for="(item, index) in nextItems(block)" :key="index">{{ item }}</li>
                             </ul>
-                            <p v-else class="empty-msg">항목이 없습니다</p>
                         </div>
                     </div>
                 </section>
 
                 <!-- PPT 전용 칸. 비어 있으면 "0건"을 늘어놓지 않고 한 줄로 접는다. -->
-                <p v-if="extras.total === 0" class="extras-note">
-                    PPT 전용 칸(공지사항 · 주요 이벤트 · 센터 협업)은 비어 있습니다.
-                    비워 두면 해당 슬라이드가 빠집니다.
-                </p>
-                <section v-else class="card extras-card">
+                <section v-if="extras.total" class="card extras-card">
                     <h2 class="read-project-name">PPT 전용 칸</h2>
                     <div v-if="extras.notices" class="read-kind">
                         <h4>공지사항 {{ extras.notices }}</h4>
@@ -93,7 +81,7 @@
                             <li v-for="(notice, index) in notices" :key="`rn-${index}`">
                                 {{ notice.title }}
                                 <template v-if="notice.body.filter(Boolean).length">
-                                    — {{ notice.body.filter(Boolean).join(" / ") }}
+                                    : {{ notice.body.filter(Boolean).join(" / ") }}
                                 </template>
                             </li>
                         </ul>
@@ -388,7 +376,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, onMounted, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
@@ -896,7 +884,7 @@ const saveReport = async () => {
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    margin-bottom: var(--space-4);
+    margin-bottom: 0;
 }
 
 .detail-title {
@@ -1290,6 +1278,7 @@ const saveReport = async () => {
     align-items: center;
     justify-content: flex-end;
 }
+
 
 @media (max-width: 1100px) {
     .meta-grid,

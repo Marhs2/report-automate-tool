@@ -6,7 +6,6 @@ import useApi from "../composables/useApi";
 import { isAdmin, sessionToken } from "../composables/useSession";
 import { selectedTeamId } from "../composables/useSelectedTeam";
 import { selectedUserId } from "../composables/useSelectedUser";
-import AppPageHeader from "./ui/AppPageHeader.vue";
 import AppTabs from "./ui/AppTabs.vue";
 import TeamSelect from "./team-select.vue";
 import ProjectName from "./project-name.vue";
@@ -53,7 +52,6 @@ const logout = async () => {
 
 <template>
     <div class="page">
-        <AppPageHeader subtitle="내 부서 · 프로젝트명" />
         <AppTabs :tabs="SETTINGS_TABS" :active="tab" />
         <TeamSelect v-if="tab === 'teams'" embedded />
         <ProjectName v-else embedded />

@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, ref, computed } from "vue";
+import { ChevronRight } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { isFutureDate } from "../lib/dateScope";
@@ -104,10 +105,6 @@ const memberOptions = computed(() => {
     });
 });
 
-const reportingMemberCount = computed(
-  () => memberOptions.value.filter((user) => user.count > 0).length,
-);
-
 /* 아직 오지 않은 날의 보고는 "오늘 이슈"가 아니다.
    기본은 오늘까지만 보고, 필요하면 켠다. */
 const includeFuture = ref(false);
@@ -168,7 +165,6 @@ const flowGroups = computed(() =>
 );
 
 const totalDays = computed(() => groupedByDate.value.length);
-const totalEntries = computed(() => filteredTimeline.value.length);
 
 const selectedMemberName = computed(() => {
   const found = memberOptions.value.find(
@@ -177,11 +173,24 @@ const selectedMemberName = computed(() => {
   return found?.name || "";
 });
 
-const formatDate = (value) => {
+const displayDate = (value) => {
   const [year, month, day] = String(value).split("-");
   if (!year || !month || !day) return value;
-  return `${year}.${month}.${day}`;
+  const monthDay = `${Number(month)}.${Number(day)}`;
+  if (year === String(new Date().getFullYear())) return monthDay;
+  return `${year}.${monthDay}`;
 };
+
+const summaryLine = computed(() => {
+  const shown = flowEntries.value.length;
+  const people = new Set(
+    flowEntries.value.map((entry) => String(entry.member_id || "")).filter(Boolean),
+  );
+  const parts = [`보고 ${shown}건`];
+  if (totalDays.value) parts.push(`${totalDays.value}일`);
+  if (!selectedMember.value && people.size) parts.push(`작성 ${people.size}명`);
+  return parts.join(" · ");
+});
 
 const weekday = (value) => {
   const date = new Date(`${value}T00:00:00`);
@@ -291,12 +300,7 @@ onMounted(() => {
 
       <div class="field">
         <!-- 전체 인원을 다 넣고, 이 프로젝트 보고 건수를 옆에 적는다. -->
-        <label for="timeline-member">
-          보고자
-          <span v-if="selectedProject && memberOptions.length">
-            {{ reportingMemberCount }}/{{ memberOptions.length }}명 보고
-          </span>
-        </label>
+        <label for="timeline-member">보고자</label>
         <select
           id="timeline-member"
           v-model="selectedMember"
@@ -314,7 +318,7 @@ onMounted(() => {
         </select>
       </div>
 
-      <div class="field">
+      <div class="field field-view">
         <label>보기</label>
         <div class="view-chips" role="group" aria-label="보기">
           <button
@@ -332,13 +336,17 @@ onMounted(() => {
       </div>
     </div>
 
-    <p v-if="selectedProject && futureCount" class="future-toggle">
-      아직 오지 않은 날의 보고 {{ futureCount }}건은
-      {{ includeFuture ? "보이는 중" : "빼두었습니다" }}.
-      <button type="button" class="link-btn" @click="includeFuture = !includeFuture">
-        {{ includeFuture ? "오늘까지만 보기" : "예정도 보기" }}
+    <div v-if="selectedProject && !isLoading" class="flow-meta">
+      <p v-if="!isLoadingTimeline && filteredTimeline.length">{{ summaryLine }}</p>
+      <button
+        v-if="futureCount"
+        type="button"
+        class="text-toggle"
+        @click="includeFuture = !includeFuture"
+      >
+        {{ includeFuture ? "오늘까지만" : `예정 ${futureCount}건 보기` }}
       </button>
-    </p>
+    </div>
 
     <div v-if="isLoading" class="empty-state">데이터를 불러오는 중...</div>
 
@@ -377,19 +385,6 @@ onMounted(() => {
     </div>
 
     <div v-else class="timeline-container">
-      <div class="timeline-summary">
-        <span class="summary-badge">{{ totalDays }}일</span>
-        <span class="summary-badge">{{ totalEntries }}건 보고</span>
-        <span v-if="issueBoard.open.length" class="summary-badge danger">
-          막힌 일 {{ issueBoard.open.length }}
-        </span>
-        <span v-if="issueBoard.unmentioned.length" class="summary-badge muted">
-          언급 없음 {{ issueBoard.unmentioned.length }}
-        </span>
-        <span v-if="issueBoard.resolved.length" class="summary-badge">
-          해결 {{ issueBoard.resolved.length }}
-        </span>
-      </div>
 
       <section v-if="hasIssueBoard" class="card open-issues">
         <h2>이슈</h2>
@@ -400,10 +395,9 @@ onMounted(() => {
             v-for="(item, index) in issueBoard.open"
             :key="`open-${item.member_id}-${item.firstDate}-${index}`"
             type="button"
-            class="issue-row"
+            class="issue-row is-open"
             @click="openIssueEntry(item)"
           >
-            <span class="issue-chip">막힌 일</span>
             <span class="issue-copy">
               <span class="issue-text">{{ item.text }}</span>
               <span class="issue-meta">{{ issueMeta(item) }}</span>
@@ -417,10 +411,9 @@ onMounted(() => {
             v-for="(item, index) in issueBoard.unmentioned"
             :key="`omit-${item.member_id}-${item.firstDate}-${index}`"
             type="button"
-            class="issue-row"
+            class="issue-row is-quiet"
             @click="openIssueEntry(item)"
           >
-            <span class="issue-chip muted">언급 없음</span>
             <span class="issue-copy">
               <span class="issue-text">{{ item.text }}</span>
               <span class="issue-meta">{{ issueMeta(item) }}</span>
@@ -434,10 +427,9 @@ onMounted(() => {
             v-for="(item, index) in issueBoard.resolved"
             :key="`done-${item.member_id}-${item.firstDate}-${index}`"
             type="button"
-            class="issue-row"
+            class="issue-row is-done"
             @click="openIssueEntry(item)"
           >
-            <span class="issue-chip done">해결</span>
             <span class="issue-copy">
               <span class="issue-text">{{ item.text }}</span>
               <span class="issue-meta">{{ issueMeta(item) }}</span>
@@ -452,22 +444,21 @@ onMounted(() => {
 
           <article class="day">
             <div class="day-head">
-              <span class="day-date">{{ formatDate(group.date) }}</span>
+              <span class="day-date">{{ displayDate(group.date) }}</span>
               <span class="day-week">{{ weekday(group.date) }}</span>
               <span v-if="group.entries.length > 1" class="date-count">
                 {{ group.entries.length }}건
               </span>
             </div>
 
-            <div
+            <button
               v-for="entry in group.entries"
               :key="entry.report_id || `${entry.member_id}-${group.date}`"
+              type="button"
               class="day-entry"
-              tabindex="0"
               @click="openEntry(entry)"
-              @keydown.enter.prevent="openEntry(entry)"
-              @keydown.space.prevent="openEntry(entry)"
             >
+              <ChevronRight class="entry-go" :size="16" aria-hidden="true" />
               <header v-if="!selectedMember" class="entry-header">
                 <span class="avatar">{{
                   String(entry.member_name || "?").slice(0, 1)
@@ -483,7 +474,7 @@ onMounted(() => {
                 <span class="k" :class="row.kind">{{ row.label }}</span>
                 <p class="v">{{ row.text }}</p>
               </div>
-            </div>
+            </button>
           </article>
         </template>
       </div>
@@ -508,53 +499,31 @@ onMounted(() => {
   color: var(--text-strong);
 }
 
-/* 미래 보고를 숨기고 있다는 사실을 화면에 적는다. 조용히 빼면 데이터가 없는 줄 안다. */
-.future-toggle {
-  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
-  font-size: var(--fs-12);
-  color: var(--text);
-  word-break: keep-all;
-}
-
-.link-btn {
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: var(--fs-12);
-  font-weight: var(--fw-semibold);
-  color: var(--accent-hover);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-
-.timeline-summary {
+.flow-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.summary-badge {
-  display: inline-flex;
   align-items: center;
-  padding: 5px var(--space-3);
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+}
+
+.flow-meta p {
+  margin: 0;
   font-size: var(--fs-13);
-  font-weight: var(--fw-medium);
-  border-radius: var(--radius-pill);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.summary-badge.danger {
-  background: var(--danger-bg);
-  color: var(--danger-fg);
-}
-
-.summary-badge.muted {
-  background: var(--surface-soft);
   color: var(--text);
+}
+
+.text-toggle {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  color: var(--accent-hover);
+  cursor: pointer;
 }
 
 .open-issues {
@@ -611,25 +580,19 @@ onMounted(() => {
   color: var(--text-strong);
 }
 
-.issue-chip {
-  flex: 0 0 auto;
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--danger-bg);
-  color: var(--danger-fg);
-  font-size: var(--fs-11);
-  font-weight: var(--fw-semibold);
-  line-height: 1.4;
+.issue-row.is-open {
+  box-shadow: inset 3px 0 0 var(--danger-fg);
+  padding-left: 10px;
 }
 
-.issue-chip.muted {
-  background: var(--surface-soft);
-  color: var(--text);
+.issue-row.is-done {
+  box-shadow: inset 3px 0 0 var(--success-fg);
+  padding-left: 10px;
 }
 
-.issue-chip.done {
-  background: var(--accent-soft);
-  color: var(--accent);
+.issue-row.is-quiet {
+  box-shadow: inset 3px 0 0 var(--border-strong);
+  padding-left: 10px;
 }
 
 .issue-copy {
@@ -660,7 +623,7 @@ onMounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-4);
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .day-head {
@@ -682,16 +645,31 @@ onMounted(() => {
 }
 
 .date-count {
+  margin-left: auto;
   font-size: var(--fs-12);
   color: var(--text);
-  background: var(--surface-soft);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-pill);
 }
 
 .day-entry {
-  cursor: pointer;
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0 22px 0 0;
+  border: 0;
   border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.entry-go {
+  position: absolute;
+  top: 6px;
+  right: 0;
+  color: var(--text-muted);
 }
 
 .day-entry + .day-entry {
@@ -751,7 +729,7 @@ onMounted(() => {
 }
 
 .k.done {
-  color: var(--accent);
+  color: var(--success-fg);
 }
 
 .k.issue {
@@ -797,18 +775,19 @@ onMounted(() => {
     font-size: 16px;
   }
 
+  .field-view {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
   .view-chips {
-    width: 100%;
+    width: auto;
   }
 
   .view-chips .btn {
-    flex: 1;
+    flex: none;
     min-height: 44px;
-  }
-
-  .timeline-summary {
-    flex-wrap: wrap;
-    gap: 6px;
   }
 
   .row {

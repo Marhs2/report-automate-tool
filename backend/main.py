@@ -2886,6 +2886,10 @@ def save_report(data: SaveReportData, actor_id: int = Depends(current_member_id)
             """,
             (member_id, report_date, raw_text, json.dumps(parsed)),
         )
+        cursor.execute(
+            "DELETE FROM report_drafts WHERE member_id = ? AND report_date = ?",
+            (member_id, report_date),
+        )
 
         cursor.execute(
             "DELETE FROM projects WHERE member_id = ? AND report_date = ?",
