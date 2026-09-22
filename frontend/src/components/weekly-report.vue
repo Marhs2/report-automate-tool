@@ -49,9 +49,6 @@ const normalizeDay = (value) => {
     return formatLocalDate(parsed);
 };
 
-const dateKey = (dates) =>
-    [...(dates || [])].map(normalizeDay).filter(Boolean).sort().join("|");
-
 const weekOffset = ref(0);
 
 const getWeekDays = (offset) => {
@@ -179,20 +176,21 @@ const sendDates = async () => {
     }
     isLoading.value = true;
     try {
-        await postWeeklyReport(userId.value, selects.value);
-        await fetchWeeklyReport();
-        showAlert("주간 보고서를 만들었습니다.");
-        const wanted = dateKey(selects.value);
-        const reports = [...(weeklyReport.value || [])];
-        const created =
-            reports
-                .filter((report) => dateKey(report.selectedDate) === wanted)
-                .sort((a, b) => Number(b.id) - Number(a.id))[0] ||
-            reports.sort((a, b) => Number(b.id) - Number(a.id))[0];
-        if (created?.id) {
-            router.push(`/weekly-detail/${created.id}`);
+        const response = await postWeeklyReport(userId.value, selects.value);
+        const draft = response.data || {};
+        if (!draft.report) {
+            showAlert("주간 보고서 초안을 만들지 못했습니다.");
             return;
         }
+        sessionStorage.setItem(
+            "weeklyDraft",
+            JSON.stringify({
+                memberId: draft.memberId ?? userId.value,
+                selects: draft.selects || [...selects.value],
+                report: draft.report,
+            }),
+        );
+        router.push("/weekly-detail/new");
     } catch (error) {
         const detail = error.response?.data?.detail;
         console.error("주간 보고서 생성 실패:", error);
@@ -466,15 +464,23 @@ onMounted(async () => {
         <AppPageHeader :title="headerTitle" :subtitle="headerSubtitle">
             <template #filters>
                 <div class="week-nav">
-                    <button class="icon-btn" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
-                        <ChevronLeft :size="16" />
-                    </button>
-                    <button class="icon-btn" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
-                        <ChevronRight :size="16" />
-                    </button>
-                    <button v-if="weekOffset !== 0" class="btn btn-small" @click="loadWeek(0)" :disabled="isLoading">
+                    <button
+                        v-if="weekOffset !== 0"
+                        type="button"
+                        class="btn btn-small"
+                        @click="loadWeek(0)"
+                        :disabled="isLoading"
+                    >
                         이번 주로
                     </button>
+                    <div class="week-nav-arrows">
+                        <button class="icon-btn" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
+                            <ChevronLeft :size="16" />
+                        </button>
+                        <button class="icon-btn" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
+                            <ChevronRight :size="16" />
+                        </button>
+                    </div>
                 </div>
             </template>
             <template #actions>
@@ -582,8 +588,15 @@ onMounted(async () => {
 .week-nav {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: var(--space-2);
     flex-shrink: 0;
+}
+
+.week-nav-arrows {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: auto;
 }
 
 .icon-btn {
@@ -866,9 +879,13 @@ onMounted(async () => {
 
     .report-row-actions {
         display: grid;
-        grid-template-columns: 1fr 1fr auto;
+        grid-template-columns: 1fr 1fr 44px;
         width: 100%;
         gap: 8px;
+    }
+
+    .report-row-actions .cleanup-btn {
+        grid-column: 1 / -1;
     }
 
     .report-row-actions .btn {

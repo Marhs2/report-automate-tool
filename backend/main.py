@@ -23,7 +23,7 @@ from weekly_deck import (
     merge_last_week_next,
     next_sections_of,
     pick_previous_weekly,
-    week_start_of,
+    replace_member_week,
 )
 from pydantic import BaseModel
 
@@ -244,6 +244,12 @@ class KeywordRecommendRequest(BaseModel):
 
 
 class UpdateWeeklyData(BaseModel):
+    report_json: str
+
+
+class CreateWeeklyData(BaseModel):
+    member_id: int
+    selects: list[str]
     report_json: str
 
 
@@ -946,15 +952,6 @@ def _clip_question_item(text, limit=42):
     return cleaned[: limit - 1] + "…"
 
 
-def _weekday_label(iso_date):
-    try:
-        parsed = date.fromisoformat(str(iso_date)[:10])
-    except ValueError:
-        return str(iso_date)
-    names = ["월", "화", "수", "목", "금", "토", "일"]
-    return f"{names[parsed.weekday()]} {parsed.isoformat()}"
-
-
 def _missing_weekdays(selects):
     selected = []
     for raw in selects or []:
@@ -1050,11 +1047,11 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
                 add(
                     f"dual:{name}:{done}",
                     (
-                        f"{name}의 completedTasks '{_clip_question_item(done)}'와 "
-                        f"inProgressTasks '{_clip_question_item(prog)}'가 같은 대상으로 보입니다. "
+                        f"{name}의 완료 '{_clip_question_item(done)}'와 "
+                        f"진행 '{_clip_question_item(prog)}'가 같은 대상으로 보입니다. "
                         f"이번 주 완료가 맞나요?"
                     ),
-                    "진행에서 해당 문장을 빼 주세요.",
+                    "진행에서 그 문장을 빼 주세요.",
                 )
                 break
             for plan in next_plans:
@@ -1064,10 +1061,10 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
                     f"done-plan:{name}:{done}",
                     (
                         f"{name}의 '{_clip_question_item(done)}'이 완료인데 "
-                        f"nextWeekPlans에도 '{_clip_question_item(plan)}'이 있습니다. "
-                        f"다음 주 계획에서 빼도 될까요?"
+                        f"향후일정에도 '{_clip_question_item(plan)}'이 있습니다. "
+                        f"향후일정에서 빼도 될까요?"
                     ),
-                    "다음 주 계획에서 해당 문장을 빼 주세요.",
+                    "향후일정에서 그 문장을 빼 주세요.",
                 )
                 break
 
@@ -1183,8 +1180,8 @@ def build_weekly_confirm_questions(report_data, source_reports, selects):
         label = empty_next[0] if len(empty_next) == 1 else f"{empty_next[0]} 외 {len(empty_next) - 1}개"
         add(
             "empty-next",
-            f"{label}의 다음 주 계획이 비어 있습니다. 다음 일이 없는 게 맞나요?",
-            "다음 주 할 일이 있으면 nextWeekPlans에 추가해 주세요.",
+            f"{label}의 향후일정이 비어 있습니다. 다음 일이 없는 게 맞나요?",
+            "다음 주 할 일이 있으면 향후일정에 적어 주세요.",
         )
 
     return questions[:3]
@@ -1757,7 +1754,7 @@ def normalize_selected_dates(selects):
     return sorted(normalized)
 
 
-def generate_weekly_report(member_id, selects):
+def generate_weekly_report(member_id, selects, *, persist=True):
     selects = normalize_selected_dates(selects)
     with get_db() as db:
         res = db.execute(
@@ -1925,24 +1922,14 @@ def generate_weekly_report(member_id, selects):
                 detail=f"주간 보고서 AI 호출 실패: {exc}",
             )
 
-        # 한 주에 주간보고는 하나다. 날짜 조합(월~수 / 월~금)이 달라도 같은 주면 덮어쓴다.
-        # 예전에는 조합이 다르면 새 문서로 쌓여서 같은 주가 목록에 두 줄로 남았다.
-        week_key = week_start_of(selects)
-        for row in db.execute(
-            "SELECT id, selected_date FROM weekly_reports WHERE member_id = ?",
-            (member_id,),
-        ).fetchall():
-            try:
-                stale = json.loads(row[1] or "[]")
-            except json.JSONDecodeError:
-                continue
-            if week_key and week_start_of(stale) == week_key:
-                db.execute("DELETE FROM weekly_reports WHERE id = ?", (row[0],))
-        db.execute(
-            "INSERT INTO weekly_reports (member_id, selected_date, report_json) VALUES (?, ?, ?)",
-            (member_id, json.dumps(selects), json.dumps(report_data, ensure_ascii=False)),
-        )
-        db.commit()
+        if persist:
+            replace_member_week(
+                db,
+                member_id,
+                selects,
+                json.dumps(report_data, ensure_ascii=False),
+            )
+            db.commit()
         return report_data
 
 
@@ -1950,12 +1937,37 @@ def generate_weekly_report(member_id, selects):
 def weekly_report(data: WeeklyReportRequest, actor_id: int = Depends(current_member_id)):
     require_own_or_admin(actor_id, data.userId)
     selects = normalize_selected_dates(data.selects)
-    report_data = generate_weekly_report(data.userId, selects)
+    report_data = generate_weekly_report(data.userId, selects, persist=False)
     if report_data is None:
         raise HTTPException(
             status_code=404, detail="선택한 기간에 저장된 일일보고가 없습니다."
         )
-    return report_data
+    return {"report": report_data, "selects": selects, "memberId": data.userId}
+
+
+@app.post("/weekly")
+def create_weekly(data: CreateWeeklyData, actor_id: int = Depends(current_member_id)):
+    require_own_or_admin(actor_id, data.member_id)
+    selects = normalize_selected_dates(data.selects)
+    if not selects:
+        raise HTTPException(status_code=400, detail="기간(날짜)을 최소 1개 선택해주세요.")
+    try:
+        report_data = json.loads(data.report_json)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="유효한 JSON이 아닙니다.")
+    if not isinstance(report_data, dict):
+        raise HTTPException(
+            status_code=400, detail="주간 보고서 데이터가 유효하지 않습니다."
+        )
+    report_data = normalize_issues(report_data)
+    with get_db() as db:
+        new_id = replace_member_week(
+            db,
+            data.member_id,
+            selects,
+            json.dumps(report_data, ensure_ascii=False),
+        )
+    return {"id": new_id}
 
 
 def process_daily_report(report: str, report_date: str, member_id: int):
@@ -2866,54 +2878,6 @@ def save_report(data: SaveReportData, actor_id: int = Depends(current_member_id)
         cursor.execute(
             "DELETE FROM daily_reports WHERE member_id = ? AND report_date = ?",
             (member_id, report_date),
-        )
-        cursor.execute(
-            """
-            INSERT INTO daily_reports (member_id, report_date, raw_text, parsed_json)
-            VALUES (?, ?, ?, ?)
-            """,
-            (member_id, report_date, raw_text, json.dumps(parsed)),
-        )
-
-        cursor.execute(
-            "DELETE FROM projects WHERE member_id = ? AND report_date = ?",
-            (member_id, report_date),
-        )
-        save_projects(conn, parsed, member_id, report_date)
-        conn.commit()
-    return {"message": "Report saved successfully.", "report_date": report_date}
-
-
-def save_projects(conn, report_data, member_id, report_date):
-    cursor = conn.cursor()
-
-    for project in report_data.get("projects", []):
-        if not isinstance(project, dict):
-            continue
-        cursor.execute(
-            """
-            INSERT INTO projects (
-                member_id,
-                name,
-                completed_tasks,
-                in_progress_tasks,
-                issues,
-                requests,
-                next_plans,
-                report_date
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                member_id,
-                project.get("projectName") or "미분류 프로젝트",
-                json.dumps(project.get("completedTasks", [])),
-                json.dumps(project.get("inProgressTasks", [])),
-                json.dumps(project.get("issues", [])),
-                json.dumps(project.get("requests", [])),
-                json.dumps(project.get("nextPlans", [])),
-                report_date,
-            ),
         )
         cursor.execute(
             """

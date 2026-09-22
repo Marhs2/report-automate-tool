@@ -1,26 +1,21 @@
 :root {
-    /* 표면 */
     --bg: #f7f2eb;
     --surface: #fffdf8;
     --surface-soft: #f2ece3;
     --sidebar-bg: #efe8dc;
 
-    /* 테두리 */
     --border: #e6ddcf;
     --border-strong: #d6c9b4;
 
-    /* 텍스트 */
     --text-strong: #1f1d18;
     --text: #6b655a;
     --text-muted: #8f887b;
 
-    /* 액센트 */
     --accent: #8b9a6e;
     --accent-hover: #738056;
     --accent-soft: #eef1e5;
     --accent-border: #c3ccae;
 
-    /* 상태 */
     --success-fg: #5f7a3f;
     --success-bg: #eef2e4;
     --success-border: #c9d5ad;
@@ -40,7 +35,6 @@
     --project-5-bg: #e6f0ee;
     --project-5-border: #b7d0cb;
 
-    /* 간격 */
     --space-1: 4px;
     --space-2: 8px;
     --space-3: 12px;
@@ -50,7 +44,6 @@
     --space-7: 32px;
     --space-8: 48px;
 
-    /* 타이포 */
     --sans: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
     --heading: "SF Pro Rounded", ui-rounded, "Hiragino Sans", var(--sans);
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -69,18 +62,15 @@
     --fw-semibold: 600;
     --fw-bold: 700;
 
-    /* 형태 */
     --radius-sm: 8px;
     --radius: 12px;
     --radius-lg: 16px;
     --radius-pill: 9999px;
 
-    /* 모션 */
     --dur-fast: 0.12s;
     --dur: 0.2s;
     --ease: cubic-bezier(0.2, 0.6, 0.3, 1);
 
-    /* 레이아웃 */
     --sidebar-width: 272px;
     --sidebar-width-collapsed: 64px;
     --topbar-height: 56px;
@@ -89,6 +79,5 @@
     --bottom-nav-height: 0px;
     --bottom-nav-offset: 0px;
 
-    /* 스크롤바 */
     --scrollbar-thumb: rgba(139, 154, 110, 0.35);
 }

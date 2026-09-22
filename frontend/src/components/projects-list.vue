@@ -202,9 +202,8 @@ const isDefaultView = computed(
         filterTeam.value === "all",
 );
 
-/* ---- 기간 스코프 ----
-   KPI 카드는 서로를 대체하는 탭이다. 오늘 → 이번 주 → 이슈 → 전체 중 하나만 켜진다.
-   예전에는 이슈 필터가 날짜 필터 위에 겹쳐서 "오늘 제출 24"를 누르면 1건만 남았다. */
+/* 오늘, 이번 주, 이슈, 전체는 하나만 켠다.
+   이슈를 날짜 위에 겹치면 오늘 제출 수가 1건으로 줄어든다. */
 const SCOPES = [
     { id: "today", label: "오늘" },
     { id: "week", label: "이번 주" },
@@ -420,7 +419,7 @@ const visibleReports = (group) =>
 const hiddenCount = (group) =>
     Math.max(0, group.reports.length - ROW_LIMIT);
 
-/* 미제출이 많으면 이름 줄도 길어진다. 앞 6명만 적고 나머지는 수로 표시한다. */
+/* 미제출이 많으면 배너 줄도 길어진다. 앞 6명만 적고 나머지는 수로 표시한다. */
 const MISSING_PREVIEW = 6;
 
 const missingPreview = (names) => names.slice(0, MISSING_PREVIEW).join(" · ");
@@ -632,12 +631,6 @@ onMounted(() => {
                     </em>
                 </button>
                 <template v-if="isDateOpen(group.date)">
-                <p v-if="group.missing.length" class="missing-row">
-                    미제출 {{ missingPreview(group.missing) }}
-                    <template v-if="missingRest(group.missing)">
-                        외 {{ missingRest(group.missing) }}명
-                    </template>
-                </p>
                 <AppListRow
                     v-for="report in visibleReports(group)"
                     :key="report.id"
@@ -1009,14 +1002,6 @@ button.stat-card:hover,
     color: var(--text);
 }
 
-.missing-row {
-    margin: 0;
-    padding: var(--space-2) var(--space-4) var(--space-3);
-    font-size: var(--fs-12);
-    color: var(--text);
-    border-top: 1px dashed var(--border);
-}
-
 .meta-chip {
     display: inline-flex;
     align-items: center;
@@ -1124,11 +1109,23 @@ button.stat-card:hover,
     }
 
     .filter-presets {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 8px;
     }
 
-    .filter-presets .btn {
-        flex: 1 1 auto;
+    .filter-presets .btn,
+    .list-count,
+    .scope-note {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    .list-count,
+    .scope-note {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
     }
 
     .today-banner {
@@ -1160,8 +1157,37 @@ button.stat-card:hover,
         -webkit-box-orient: vertical;
     }
 
+    .person-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px 10px;
+        padding-right: 12px;
+    }
+
+    .person-row :deep(.app-list-row-main) {
+        grid-column: 1;
+        grid-row: 1;
+        min-width: 0;
+    }
+
+    .person-row :deep(.app-list-row-meta) {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
     .person-row :deep(.app-list-row-actions) {
+        grid-column: 2;
+        grid-row: 1;
         align-self: center;
+        justify-content: flex-end;
+    }
+
+    .person-row :deep(.btn-icon) {
+        width: 44px;
+        height: 44px;
+        min-height: 44px;
+        padding: 0;
     }
 }
 </style>

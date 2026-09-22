@@ -25,10 +25,10 @@ html.is-overlay-open .main-body {
 
 @media (max-width: 860px) {
     :root {
-        --topbar-height: 52px;
+        --topbar-height: 64px;
         --content-max: 100%;
         --content-max-wide: 100%;
-        --bottom-nav-height: 56px;
+        --bottom-nav-height: 72px;
         --bottom-nav-offset: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
     }
 
@@ -71,7 +71,7 @@ html.is-overlay-open .main-body {
     }
 
     .topbar-title {
-        font-size: 16px;
+        font-size: 20px;
         font-weight: var(--fw-semibold);
     }
 
@@ -85,9 +85,11 @@ html.is-overlay-open .main-body {
     .topbar .btn,
     .topbar-action {
         flex-shrink: 0;
-        min-height: 36px;
-        padding-left: var(--space-3);
-        padding-right: var(--space-3);
+        height: 44px;
+        min-height: 44px;
+        padding-left: 16px;
+        padding-right: 16px;
+        font-size: 15px;
     }
 
     .topbar-drawer-btn {
@@ -100,18 +102,21 @@ html.is-overlay-open .main-body {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 44px;
-        height: 44px;
+        width: 48px;
+        height: 48px;
         padding: 0;
         border: none;
         border-radius: 50%;
         background: transparent;
+        color: inherit;
+        text-decoration: none;
         cursor: pointer;
     }
 
     .topbar-user-btn .sidebar-avatar {
-        width: 32px;
-        height: 32px;
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
     }
 
     .sidebar {
@@ -163,10 +168,9 @@ html.is-overlay-open .main-body {
         align-items: stretch;
         justify-content: space-around;
         min-height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
-        padding: 6px 2px env(safe-area-inset-bottom, 0px);
+        padding: 8px 6px env(safe-area-inset-bottom, 0px);
         border-top: 1px solid var(--border);
-        background: color-mix(in srgb, var(--surface) 94%, transparent);
-        backdrop-filter: blur(16px);
+        background: var(--surface);
     }
 
     .app-bottom-nav a {
@@ -175,22 +179,28 @@ html.is-overlay-open .main-body {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 3px;
+        gap: 4px;
         min-width: 0;
-        min-height: 48px;
-        padding: 4px 2px;
+        min-height: 64px;
+        padding: 6px 4px;
         border-radius: 12px;
-        color: var(--text-muted);
+        color: var(--text);
         text-decoration: none;
-        font-size: 10px;
+        font-size: 13px;
         font-weight: var(--fw-semibold);
         line-height: 1.15;
-        letter-spacing: -0.02em;
+    }
+
+    .app-bottom-nav a span {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .app-bottom-nav a svg {
-        width: 20px;
-        height: 20px;
+        width: 26px;
+        height: 26px;
         opacity: 0.7;
     }
 
@@ -409,12 +419,21 @@ html.is-overlay-open .main-body {
     }
 
     .detail-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         width: 100%;
+        gap: 8px;
     }
 
     .detail-actions .btn {
-        flex: 1;
+        flex: none;
+        width: 100%;
         min-width: 0;
+        min-height: 44px;
+    }
+
+    .detail-actions .btn-primary {
+        grid-column: 1 / -1;
     }
 
     .detail-title h1 {
@@ -428,7 +447,6 @@ html.is-overlay-open .main-body {
     .week-nav,
     .month-nav {
         width: 100%;
-        justify-content: space-between;
     }
 
     .cal-holiday,

@@ -288,13 +288,13 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { isAdmin } from "../composables/useSession";
-import { usePageMeta } from "../composables/usePageMeta";
+import { pageParentOverride, pageTitleOverride, usePageMeta } from "../composables/usePageMeta";
 import {
     highlightedRawHtml,
     projectAccentIndex,
@@ -353,8 +353,9 @@ const CRUMB_SOURCES = {
 };
 
 watch(
-    [() => route.query.from, savedReportId, canEdit],
-    ([from, id, editable]) => {
+    [() => route.name, () => route.query.from, savedReportId, canEdit],
+    ([name, from, id, editable]) => {
+        if (name !== "report-result") return;
         setPageMeta({
             title: id ? (editable ? "보고 수정" : "일일보고 상세") : "분석 결과",
             parent: CRUMB_SOURCES[String(from || "")] || CRUMB_SOURCES.list,
@@ -362,6 +363,11 @@ watch(
     },
     { immediate: true },
 );
+
+onUnmounted(() => {
+    pageTitleOverride.value = "";
+    pageParentOverride.value = null;
+});
 
 
 const issueText = (issue) =>
@@ -829,17 +835,34 @@ const getSelectedMemberId = () => {
     }
 
     .detail-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         width: 100%;
+        gap: 8px;
     }
 
     .detail-actions .btn {
-        flex: 1;
+        flex: none;
+        width: 100%;
         min-height: 44px;
     }
 
+    .project-nav {
+        flex-wrap: nowrap;
+        align-items: stretch;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+    }
+
+    .project-nav-label {
+        flex: none;
+        align-self: center;
+    }
+
     .project-nav-chip {
-        max-width: 100%;
-        min-height: 40px;
+        flex: none;
+        max-width: 220px;
+        min-height: 44px;
     }
 }
 </style>

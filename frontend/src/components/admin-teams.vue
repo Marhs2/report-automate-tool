@@ -100,7 +100,7 @@ onMounted(async () => {
         <div v-else-if="filteredTeams.length === 0" class="empty-state">
             '{{ query.trim() }}'에 해당하는 부서가 없습니다
         </div>
-        <div v-else class="select-grid">
+        <div v-else class="team-board">
             <div
                 v-for="team in filteredTeams"
                 :key="team.id"
@@ -170,6 +170,29 @@ onMounted(async () => {
     margin: 0 0 var(--space-3);
 }
 
+.team-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: var(--space-5);
+}
+
+.team-board .select-card {
+    min-height: 64px;
+    cursor: default;
+}
+
+.team-board .select-card-name {
+    flex: 1;
+    min-width: 0;
+}
+
+.team-board .select-card-meta {
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--text);
+}
+
 .add-row {
     display: flex;
     gap: var(--space-2);
@@ -179,16 +202,45 @@ onMounted(async () => {
 .add-row .input {
     flex: 1;
     min-width: 0;
+    height: 40px;
+    font-size: 15px;
 }
 
 .add-row .btn {
     flex-shrink: 0;
+    min-height: 40px;
 }
 
 @media (max-width: 860px) {
+    .team-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .team-toolbar .input {
+        height: 44px;
+        font-size: 16px;
+    }
+
+    .team-board {
+        grid-template-columns: 1fr;
+    }
+
+    .team-board .select-card {
+        min-height: 56px;
+    }
+
     .add-row {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .add-row .input,
+    .add-row .btn {
+        width: 100%;
+        height: 44px;
+        min-height: 44px;
+        font-size: 16px;
     }
 }
 </style>

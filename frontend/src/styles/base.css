@@ -35,7 +35,6 @@ body {
     outline-offset: 2px;
 }
 
-/* Scrollbars */
 * {
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) transparent;

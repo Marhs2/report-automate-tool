@@ -49,7 +49,6 @@ const NAV_ICONS = {
     "/admin": Shield,
 };
 
-/** 항목이 적어 그룹 헤더 없이 나열한다. 설정만 아래로 내린다. */
 const navItems = PRIMARY_NAV.map((item) => ({
     ...item,
     icon: NAV_ICONS[item.to] || Settings2,
@@ -209,7 +208,6 @@ onUnmounted(() => {
         :class="{ 'is-collapsed': collapsedEffective, 'is-drawer-open': drawerOpen }"
     >
         <div class="sidebar-brand">
-            <span v-if="!collapsedEffective" class="sidebar-brand-name">일일보고</span>
             <button
                 type="button"
                 class="sidebar-collapse-btn"
@@ -223,7 +221,8 @@ onUnmounted(() => {
             </button>
         </div>
 
-        <nav class="nav-links">
+        <nav class="nav-links" aria-label="주요 메뉴">
+            <p v-if="!collapsedEffective" class="nav-group-label">작업</p>
             <router-link
                 v-for="item in mainNavItems"
                 :key="item.to"
@@ -235,9 +234,7 @@ onUnmounted(() => {
                 <component :is="item.icon" :size="16" />
                 <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
             </router-link>
-        </nav>
-
-        <div class="sidebar-footer">
+            <p v-if="!collapsedEffective" class="nav-group-label">설정</p>
             <router-link
                 v-for="item in settingsNavItems"
                 :key="item.to"
@@ -260,6 +257,9 @@ onUnmounted(() => {
                 <component :is="item.icon" :size="16" />
                 <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
             </router-link>
+        </nav>
+
+        <div class="sidebar-footer">
             <div class="sidebar-user">
                 <span class="sidebar-avatar">{{ userInitial() }}</span>
                 <span class="sidebar-user-meta">
@@ -308,14 +308,13 @@ onUnmounted(() => {
                 >
                     {{ isNarrow ? "작성" : pageMeta.action.label }}
                 </router-link>
-                <button
-                    type="button"
+                <router-link
                     class="topbar-user-btn"
-                    :aria-label="currentUser ? `${currentUser} · 로그아웃` : '로그아웃'"
-                    @click="logout"
+                    to="/settings"
+                    :aria-label="currentUser ? `${currentUser} 설정` : '설정'"
                 >
                     <span class="sidebar-avatar">{{ userInitial() }}</span>
-                </button>
+                </router-link>
             </div>
         </header>
         <div class="main-body">

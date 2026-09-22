@@ -18,7 +18,6 @@ const {
     postReportPptx,
     getReportDraft,
     postReportDraft,
-    postPlainReport,
     getUserActivities,
     getUsers,
     getReports,
@@ -33,7 +32,6 @@ const date = ref(todayString());
 
 const aiLoading = ref(false);
 const draftSaving = ref(false);
-const plainSaving = ref(false);
 const draftSavedAt = ref("");
 const formError = ref("");
 const userName = ref("");
@@ -200,6 +198,28 @@ const loadPrevPlans = async () => {
     }
 };
 
+const prevPlansLabel = computed(() => {
+    const count = prevPlans.value.length;
+    if (!count) return "";
+    const parts = String(prevPlansDate.value).split("-");
+    const month = Number(parts[1]);
+    const day = Number(parts[2]);
+    const when = month && day ? `${month}.${day}` : prevPlansDate.value;
+    return `${when} 계획 ${count}건`;
+});
+
+const statusLabel = computed(() => {
+    if (alreadySaved.value) return "제출됨";
+    if (draftSavedAt.value) return "초안 있음";
+    return "미제출";
+});
+
+const statusDetail = computed(() => {
+    if (alreadySaved.value) return "다시 제출하면 덮어씀";
+    if (draftSavedAt.value) return "아직 미제출";
+    return "";
+});
+
 const insertPrevPlans = () => {
     const lines = prevPlans.value.map(
         (item) => `- [${item.project}] ${item.text}`,
@@ -296,35 +316,6 @@ const saveDraft = async () => {
     }
 };
 
-const submitPlain = async () => {
-    const memberId = getSelectedMemberId();
-    if (memberId === null) {
-        formError.value = "로그인이 필요합니다.";
-        router.push("/login");
-        return;
-    }
-    if (buttonType.value !== "text") {
-        formError.value = "바로 제출은 직접 입력만 됩니다.";
-        return;
-    }
-    if (!input.value.trim()) {
-        formError.value = "보고서 내용을 입력해주세요.";
-        return;
-    }
-    formError.value = "";
-    plainSaving.value = true;
-    try {
-        await postPlainReport(input.value, date.value, memberId);
-        alreadySaved.value = true;
-        router.push("/");
-    } catch (error) {
-        const detail = error.response?.data?.detail;
-        formError.value = detail || "제출에 실패했습니다.";
-    } finally {
-        plainSaving.value = false;
-    }
-};
-
 const sendReport = async () => {
     const memberId = getSelectedMemberId();
     if (memberId === null) {
@@ -403,8 +394,13 @@ const sendReport = async () => {
                     aria-label="보고 날짜"
                     required
                 />
-                <span class="status-chip" :class="alreadySaved ? 'is-saved' : 'is-draft'">
-                    {{ alreadySaved ? "제출됨 · 다시 제출하면 덮어씀" : (draftSavedAt ? "초안 있음 · 아직 미제출" : "미제출") }}
+                <span
+                    class="status-chip"
+                    :class="alreadySaved ? 'is-saved' : 'is-draft'"
+                    :title="statusDetail"
+                >
+                    {{ statusLabel }}
+                    <span v-if="statusDetail" class="status-chip-more"> · {{ statusDetail }}</span>
                 </span>
                 <button
                     type="button"
@@ -415,11 +411,17 @@ const sendReport = async () => {
                 </button>
             </div>
 
-            <div v-if="buttonType === 'text'" class="field">
-                <!-- 형식 칩과 어제 계획은 접지 않는다. 입력칸이 화면을 다 먹으면
-                     스크롤하지 않은 사람은 다음 액션을 못 찾는다. -->
+            <div v-if="buttonType === 'text'" class="field write-field">
+                <textarea
+                    id="report-input"
+                    v-model="input"
+                    :placeholder="activeTemplate?.hint || '오늘 한 일, 진행 상황, 이슈, 다음 계획을 자유롭게 쓰거나 붙여넣으세요.'"
+                    rows="10"
+                    class="textarea"
+                ></textarea>
+                <!-- 좁은 화면에서는 글을 먼저 보여주고, 형식은 한 줄로 옆으로 넘긴다. -->
                 <div class="write-helpers">
-                    <span class="write-helpers-label">형식 넣기</span>
+                    <span class="write-helpers-label">형식</span>
                     <div class="template-chips" role="group" aria-label="붙여넣기 형식">
                         <button
                             v-for="template in PASTE_TEMPLATES"
@@ -438,19 +440,12 @@ const sendReport = async () => {
                         v-if="prevPlans.length"
                         type="button"
                         class="btn btn-small write-prev-plans"
-                        :title="`${prevPlansDate} 보고의 다음 계획을 붙입니다`"
+                        :title="`${prevPlansDate} 보고의 다음 계획 ${prevPlans.length}건을 붙입니다`"
                         @click="insertPrevPlans"
                     >
-                        {{ prevPlansDate }} 다음 계획 {{ prevPlans.length }}건 붙이기
+                        {{ prevPlansLabel }}
                     </button>
                 </div>
-                <textarea
-                    id="report-input"
-                    v-model="input"
-                    :placeholder="activeTemplate?.hint || '오늘 한 일, 진행 상황, 이슈, 다음 계획을 자유롭게 쓰거나 붙여넣으세요.'"
-                    rows="10"
-                    class="textarea"
-                ></textarea>
             </div>
 
             <div
@@ -501,24 +496,17 @@ const sendReport = async () => {
                     v-if="buttonType === 'text'"
                     class="btn"
                     @click="saveDraft"
-                    :disabled="aiLoading || draftSaving || plainSaving || !input.trim()"
+                    :disabled="aiLoading || draftSaving || !input.trim()"
                 >
                     {{ draftSaving ? "저장 중..." : "초안만 저장" }}
                 </button>
-                <button
-                    v-if="buttonType === 'text'"
-                    class="btn"
-                    @click="submitPlain"
-                    :disabled="aiLoading || draftSaving || plainSaving || !input.trim()"
-                >
-                    {{ plainSaving ? "제출 중..." : "바로 제출" }}
-                </button>
+          
                 <button
                     class="btn btn-primary"
                     @click="sendReport"
-                    :disabled="aiLoading || plainSaving"
+                    :disabled="aiLoading"
                 >
-                    {{ aiLoading ? `정리 중... (${elapsedLabel})` : "정리하고 제출" }}
+                    {{ aiLoading ? `정리 중... (${elapsedLabel})` : "제출" }}
                 </button>
             </div>
         </div>
@@ -564,12 +552,22 @@ const sendReport = async () => {
 }
 
 /* 입력칸 위에 항상 보이는 보조 줄. 접어두면 아무도 못 찾는다. */
+.write-field {
+    display: flex;
+    flex-direction: column;
+}
+
 .write-helpers {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    order: 1;
     gap: var(--space-2) var(--space-3);
     margin-bottom: var(--space-2);
+}
+
+.write-field .textarea {
+    order: 2;
 }
 
 .write-helpers-label {
@@ -736,31 +734,80 @@ const sendReport = async () => {
     }
 
     .write-head {
-        flex-direction: column;
-        align-items: stretch;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px 12px;
     }
 
-    .write-mode-link {
-        margin-left: 0;
-        min-height: 44px;
-        text-align: left;
-    }
-
-    .write-prev-plans {
-        margin-left: 0;
-        width: 100%;
+    .write-author {
+        min-width: 0;
     }
 
     .write-date {
-        width: 100%;
+        width: auto;
+        min-width: 148px;
         min-height: 44px;
         height: 44px;
         font-size: 16px;
     }
 
-    .textarea {
-        min-height: min(46dvh, 360px);
+    .status-chip {
+        justify-self: start;
+        max-width: 100%;
+    }
+
+    .status-chip-more {
+        display: none;
+    }
+
+    .write-mode-link {
+        margin-left: 0;
+        justify-self: end;
+        min-height: 44px;
+        text-align: right;
+    }
+
+    .write-field {
+        gap: 10px;
+    }
+
+    .write-field .textarea {
+        order: 1;
+        min-height: 42dvh;
         font-size: 16px;
+        line-height: 1.5;
+    }
+
+    .write-helpers {
+        order: 2;
+        margin-bottom: 0;
+    }
+
+    .write-helpers {
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 8px;
+        margin: 0 -4px;
+        padding: 2px 4px 6px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+    }
+
+    .write-helpers-label,
+    .template-chips,
+    .write-prev-plans {
+        flex: none;
+    }
+
+    .template-chips {
+        flex-wrap: nowrap;
+    }
+
+    .write-prev-plans {
+        margin-left: 0;
+        width: auto;
+        white-space: nowrap;
     }
 
     .file-drop-copy {
@@ -781,9 +828,8 @@ const sendReport = async () => {
         justify-content: stretch;
         margin: 16px -14px -14px;
         padding: 10px 14px;
-        background: color-mix(in srgb, var(--surface) 94%, transparent);
+        background: var(--surface);
         border-top: 1px solid var(--border);
-        backdrop-filter: blur(12px);
     }
 
     .form-actions .btn {

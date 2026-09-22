@@ -4,8 +4,10 @@ import {
     deckExtrasCount,
     doneKindMap,
     groupDoneItems,
+    humanizeConfirmText,
     nextWeekLabel,
     toWeeklyDeck,
+    visibleConfirmQuestions,
 } from "./weeklyDeck.js";
 
 describe("nextWeekLabel", () => {
@@ -23,6 +25,33 @@ describe("nextWeekLabel", () => {
 
     it("crosses the year boundary", () => {
         assert.equal(nextWeekLabel("12/28~12/31", "2026.12.31"), "1/4~1/8");
+    });
+});
+
+describe("confirm questions", () => {
+    it("replaces schema field names with the labels on the form", () => {
+        assert.equal(
+            humanizeConfirmText(
+                "다음 주 할 일이 있으면 nextWeekPlans에 추가해 주세요.",
+            ),
+            "다음 주 할 일이 있으면 향후일정에 추가해 주세요.",
+        );
+    });
+
+    it("drops an empty-next question once that project has a next item", () => {
+        const questions = visibleConfirmQuestions(
+            [
+                {
+                    id: "empty-next",
+                    text: "오늘 보고의 다음 주 계획이 비어 있습니다. 다음 일이 없는 게 맞나요?",
+                    ifNo: "다음 주 할 일이 있으면 nextWeekPlans에 추가해 주세요.",
+                },
+            ],
+            {
+                next: [{ title: "오늘 보고", items: ["검수 메모"] }],
+            },
+        );
+        assert.deepEqual(questions, []);
     });
 });
 

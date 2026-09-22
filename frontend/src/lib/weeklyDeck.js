@@ -127,6 +127,52 @@ export function nextWeekLabel(doneLabel, reportDate = "") {
     return `${monthDay(monday)}~${monthDay(friday)}`;
 }
 
+const CONFIRM_FIELD_LABELS = [
+    ["nextWeekPlans", "향후일정"],
+    ["inProgressTasks", "진행"],
+    ["completedTasks", "완료"],
+    ["nextPlans", "향후일정"],
+];
+
+export function humanizeConfirmText(text) {
+    let out = String(text || "");
+    for (const [field, label] of CONFIRM_FIELD_LABELS) {
+        out = out.replaceAll(field, label);
+    }
+    return out;
+}
+
+function nextSectionFilled(deck, title) {
+    return (deck?.next || []).some(
+        (section) =>
+            String(section?.title || "").trim() === title &&
+            (section.items || []).some((item) => String(item || "").trim()),
+    );
+}
+
+/** 이미 향후일정에 적은 프로젝트는 빈 계획 질문을 다시 내지 않는다. */
+export function visibleConfirmQuestions(questions, deck) {
+    return (Array.isArray(questions) ? questions : [])
+        .map((item, index) => ({
+            id: item?.id || `q-${index}`,
+            text: humanizeConfirmText(item?.text).trim(),
+            ifNo: humanizeConfirmText(item?.ifNo).trim(),
+        }))
+        .filter((item) => item.text)
+        .filter((item) => {
+            const emptyNext =
+                item.id === "empty-next" ||
+                item.text.includes("다음 주 계획이 비어") ||
+                item.text.includes("향후일정이 비어");
+            if (!emptyNext) return true;
+            const name = item.text.split("의 ")[0].replace(/^'/, "").trim();
+            const head = name.split(" 외 ")[0].trim();
+            if (!head || name.includes(" 외 ")) return true;
+            return !nextSectionFilled(deck, head);
+        })
+        .slice(0, 3);
+}
+
 export function toWeeklyDeck(report) {
     const data = report && typeof report === "object" ? report : {};
     if (data.schema === WEEKLY_DECK_SCHEMA && Array.isArray(data.done)) {
@@ -185,10 +231,8 @@ export function toWeeklyDeck(report) {
     };
 }
 
-/* ---- 진행 현황을 완료 / 진행 / 이슈로 다시 나눈다 ----
-   PPT 슬라이드는 "진행 현황" 한 칸이라 세 종류가 한 덩어리로 합쳐져 있다.
-   읽을 때는 무엇이 끝났고 무엇이 막혀 있는지 구분돼야 한다.
-   deck에 남아 있는 legacy projects를 근거로 각 줄의 종류를 되찾는다. */
+/* PPT 진행 현황은 한 칸이라 완료, 진행, 이슈가 섞여 있다.
+   줄 종류는 legacy projects로 되찾는다. */
 
 export const DONE_KINDS = [
     { kind: "done", label: "완료" },

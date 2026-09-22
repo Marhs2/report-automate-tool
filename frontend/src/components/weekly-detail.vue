@@ -1,6 +1,6 @@
 <template>
     <div class="page report-doc is-wide">
-        <!-- 주간 상세는 먼저 읽는 화면이다. 고칠 때만 입력칸을 연다. -->
+        <!-- 고칠 수 있으면 수정 화면으로 연다. 저장 전에는 목록에 남지 않는다. -->
         <header class="detail-head">
             <div class="detail-title">
                 <h1>{{ userName || "주간 보고서" }}</h1>
@@ -27,7 +27,7 @@
                     @click="saveReport"
                     :disabled="isSaving"
                 >
-                    {{ isSaving ? "저장 중..." : "수정 저장" }}
+                    {{ isSaving ? "저장 중..." : saveLabel }}
                 </button>
             </div>
         </header>
@@ -376,7 +376,7 @@
                             @click="saveReport"
                             :disabled="isSaving"
                         >
-                            {{ isSaving ? "저장 중..." : "수정 저장" }}
+                            {{ isSaving ? "저장 중..." : saveLabel }}
                         </button>
                     </div>
                 </div>
@@ -405,6 +405,7 @@ import {
     groupDoneItems,
     nextWeekLabel,
     toWeeklyDeck,
+    visibleConfirmQuestions,
 } from "../lib/weeklyDeck";
 import AppField from "./ui/AppField.vue";
 
@@ -416,14 +417,15 @@ const reportData = ref(null);
 const userName = ref("");
 const ownerMemberId = ref(null);
 const isSaving = ref(false);
-/** 먼저 읽는 화면으로 연다. 고칠 때만 입력칸을 켠다. */
 const isEditing = ref(false);
+const isUnsaved = computed(() => String(route.params.id || "") === "new");
+const saveLabel = computed(() => (isUnsaved.value ? "저장" : "수정 저장"));
 const isMine = computed(() => {
     if (ownerMemberId.value == null || selectedUserId.value == null) return false;
     return String(ownerMemberId.value) === String(selectedUserId.value);
 });
 const canEdit = computed(() => isMine.value || isAdmin.value);
-const { getUsers, getWeeklyReportById, updateWeeklyReport } = useApi();
+const { getUsers, getWeeklyReportById, postCreateWeekly, updateWeeklyReport } = useApi();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
 
 const toggleEditing = () => {
@@ -509,18 +511,9 @@ const metaSummary = computed(() => {
         .join(" · ");
 });
 
-const confirmQuestions = computed(() => {
-    const items = reportData.value?.confirmQuestions;
-    if (!Array.isArray(items)) return [];
-    return items
-        .map((item, index) => ({
-            id: item?.id || `q-${index}`,
-            text: String(item?.text || "").trim(),
-            ifNo: String(item?.ifNo || "").trim(),
-        }))
-        .filter((item) => item.text)
-        .slice(0, 3);
-});
+const confirmQuestions = computed(() =>
+    visibleConfirmQuestions(reportData.value?.confirmQuestions, reportData.value),
+);
 
 const removeAt = (list, index) => {
     list.splice(index, 1);
@@ -593,9 +586,7 @@ const addProject = () => {
     reportData.value.done.push(emptySection());
 };
 
-/* ---- 실제 주간보고 슬라이드에 필요한 나머지 칸 ----
-   공지사항 / 금월·익월 주요 이벤트 / 센터 협업 현황.
-   비어 있으면 PPTX에서 해당 슬라이드가 빠지므로 여기서 채운다. */
+/* 공지, 금월·익월 이벤트, 센터 협업. 비면 PPTX에서 그 슬라이드가 빠진다. */
 
 const notices = computed(() => reportData.value?.notices || []);
 
@@ -707,10 +698,58 @@ const rememberHeader = () => {
 
 
 
+const WEEKLY_DRAFT_KEY = "weeklyDraft";
+
+const openForEdit = () => {
+    isEditing.value = canEdit.value;
+    if (isEditing.value) growAllEditors();
+};
+
+const loadDraft = () => {
+    const raw = sessionStorage.getItem(WEEKLY_DRAFT_KEY);
+    if (!raw) {
+        showAlert("저장 전 초안이 없습니다. 목록에서 다시 만들어 주세요.");
+        return;
+    }
+    let draft;
+    try {
+        draft = JSON.parse(raw);
+    } catch {
+        showAlert("저장 전 초안을 읽지 못했습니다. 목록에서 다시 만들어 주세요.");
+        return;
+    }
+    reportData.value = toWeeklyDeck(draft.report);
+    ownerMemberId.value = draft.memberId ?? selectedUserId.value ?? null;
+    userName.value = reportData.value.author || "";
+    applyRememberedHeader();
+    openForEdit();
+    if (!userName.value && ownerMemberId.value != null) {
+        getUsers()
+            .then((users) => {
+                const found = users.find((user) => String(user.id) === String(ownerMemberId.value));
+                userName.value = found ? found.name : `사용자 ${ownerMemberId.value}`;
+            })
+            .catch(() => {
+                userName.value = `사용자 ${ownerMemberId.value}`;
+            });
+    }
+};
+
 watch(
     reportData,
     (newVal) => {
         if (newVal) sessionStorage.setItem("reportData", JSON.stringify(newVal));
+        if (newVal && isUnsaved.value) {
+            const raw = sessionStorage.getItem(WEEKLY_DRAFT_KEY);
+            let draft = {};
+            try {
+                draft = raw ? JSON.parse(raw) : {};
+            } catch {
+                draft = {};
+            }
+            draft.report = newVal;
+            sessionStorage.setItem(WEEKLY_DRAFT_KEY, JSON.stringify(draft));
+        }
         growAllEditors();
     },
     { deep: true },
@@ -718,6 +757,10 @@ watch(
 
 onMounted(async () => {
     const reportId = route.params.id;
+    if (String(reportId) === "new") {
+        loadDraft();
+        return;
+    }
     if (reportId) {
         try {
             const data = await getWeeklyReportById(reportId);
@@ -730,6 +773,7 @@ onMounted(async () => {
             applyRememberedHeader();
             sessionStorage.setItem("reportData", JSON.stringify(reportData.value));
             sessionStorage.setItem("selectedUser", String(data.memberId));
+            openForEdit();
         } catch (error) {
             console.error("보고서 불러오기 실패:", error);
             showAlert("보고서를 불러오는데 실패했습니다.");
@@ -766,12 +810,13 @@ const askConfirmQuestions = async () => {
     const questions = confirmQuestions.value;
     for (const [index, question] of questions.entries()) {
         const ok = await askConfirm(question.text, {
-            title: `저장 전 확인 ${index + 1}/${questions.length}`,
-            help: question.ifNo
-                ? `아니요면 ${question.ifNo}`
-                : "아니요면 해당 항목을 고친 뒤 다시 저장하세요.",
-            confirmLabel: "네",
-            cancelLabel: "아니요",
+            title:
+                questions.length > 1
+                    ? `저장 전 확인 ${index + 1}/${questions.length}`
+                    : "저장 전 확인",
+            help: question.ifNo || "아니면 고친 뒤 다시 저장하세요.",
+            confirmLabel: "네, 맞아요",
+            cancelLabel: "아니요, 고칠게요",
         });
         if (!ok) return false;
     }
@@ -793,24 +838,58 @@ const persistReport = async () => {
     }
 };
 
+const createSavedReport = async () => {
+    const raw = sessionStorage.getItem(WEEKLY_DRAFT_KEY);
+    let draft = {};
+    try {
+        draft = raw ? JSON.parse(raw) : {};
+    } catch {
+        draft = {};
+    }
+    const selects = Array.isArray(draft.selects) ? draft.selects : [];
+    if (!selects.length) {
+        showAlert("저장할 날짜가 없습니다. 목록에서 다시 만들어 주세요.");
+        return;
+    }
+    isSaving.value = true;
+    try {
+        rememberHeader();
+        const created = await postCreateWeekly(
+            draft.memberId ?? ownerMemberId.value,
+            selects,
+            JSON.stringify(reportData.value),
+        );
+        sessionStorage.removeItem(WEEKLY_DRAFT_KEY);
+        showAlert("주간 보고서가 저장되었습니다.");
+        await router.replace(`/weekly-detail/${created.id}`);
+    } catch (error) {
+        console.error("저장 실패:", error);
+        showAlert("주간 보고서 저장에 실패했습니다.");
+    } finally {
+        isSaving.value = false;
+    }
+};
+
 const saveReport = async () => {
     if (!reportData.value) return;
     if (!canEdit.value) {
         showAlert("자신의 보고만 수정할 수 있습니다.");
         return;
     }
-    const reportId = route.params.id;
-    if (!reportId) {
+    if (!route.params.id) {
         showAlert("저장할 주간 보고서 ID가 없습니다.");
         return;
     }
     if (!(await askConfirmQuestions())) return;
+    if (isUnsaved.value) {
+        await createSavedReport();
+        return;
+    }
     await persistReport();
 };
 </script>
 
 <style scoped>
-/* 제목 줄: 사람 · 주차 · 상태 · 동작. */
 .detail-head {
     display: flex;
     flex-wrap: wrap;
@@ -848,7 +927,6 @@ const saveReport = async () => {
     gap: var(--space-2);
 }
 
-/* 읽기 모드 */
 .read-project-name {
     margin: 0 0 var(--space-3);
     font-size: var(--fs-16);
@@ -1217,6 +1295,49 @@ const saveReport = async () => {
     .meta-grid,
     .split {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 860px) {
+    .detail-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        gap: 8px;
+    }
+
+    .detail-actions .btn {
+        flex: none;
+        width: 100%;
+        min-height: 44px;
+    }
+
+    .meta-summary {
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+
+    .fold-card > summary {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        row-gap: 4px;
+    }
+
+    .fold-hint {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+
+    .fold-block-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .task-editor {
+        min-height: 72px;
+        font-size: 16px;
     }
 }
 </style>

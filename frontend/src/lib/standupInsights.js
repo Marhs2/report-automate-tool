@@ -1,8 +1,4 @@
-import { missingOnDate } from "./dayStatus.js";
-
-/** 이슈가 있는 사람을 위로 올린다.
- *  pinMemberId를 주면 그 사람(= 로그인 사용자)을 무조건 맨 위에 둔다.
- *  하루에 20명이 넘으면 뒤쪽이 접히는데, 내 보고가 접혀 있으면 첫 화면으로 못 쓴다. */
+/** 이슈가 있는 사람을 위로 올린다. pinMemberId는 접혀도 맨 위에 둔다. */
 export function sortByIssuesFirst(reports, issueCountOf, { pinMemberId } = {}) {
     const pin = pinMemberId == null ? "" : String(pinMemberId);
     const isPinned = (report) =>
@@ -19,150 +15,12 @@ export function sortByIssuesFirst(reports, issueCountOf, { pinMemberId } = {}) {
     });
 }
 
-export function missingBanner(groups) {
-    const names = [];
-    const seen = new Set();
-    for (const group of groups || []) {
-        for (const name of group.missing || []) {
-            if (!name || seen.has(name)) continue;
-            seen.add(name);
-            names.push(name);
-        }
-    }
-    return names;
-}
-
-/** 배너는 "오늘 미제출"만 말해야 한다.
- *  모든 날짜를 합치면 지난주 미제출까지 빨간 줄로 올라와서 오늘 상황을 못 읽는다. */
-export function missingBannerForDate(groups, dateStr) {
-    const target = String(dateStr || "").slice(0, 10);
-    if (!target) return [];
-    const group = (groups || []).find(
-        (item) => String(item?.date || "").slice(0, 10) === target,
-    );
-    return missingBanner(group ? [group] : []);
-}
-
-export function weeklyRollup({ days = [], dayCounts = {}, submittedNames = [], blockerCount = 0 } = {}) {
-    const reports = days.reduce(
-        (sum, day) => sum + Number(dayCounts[day] || 0),
-        0,
-    );
-    return {
-        days: days.length,
-        reports,
-        contributors: submittedNames.length,
-        blockers: Number(blockerCount) || 0,
-    };
-}
-
-export function weeklyRollupLabel(rollup) {
-    const item = rollup || weeklyRollup();
-    return `${item.days}일 · ${item.reports}건 · ${item.contributors}명 · 이슈 ${item.blockers}`;
-}
-
 export function peakSubmissionDay(days = []) {
     const work = days.filter((day) => !day.isOffday);
     if (!work.length) return null;
     return work.reduce((best, day) =>
         day.submitted > best.submitted ? day : best,
     );
-}
-
-export function weekdaySubmitted(days = []) {
-    const labels = ["일", "월", "화", "수", "목", "금", "토"];
-    const buckets = labels.map((label) => ({ label, submitted: 0, total: 0 }));
-    for (const day of days) {
-        if (day.isOffday) continue;
-        const index = Number(day.weekday);
-        if (!Number.isInteger(index) || index < 0 || index > 6) continue;
-        buckets[index].submitted += Number(day.submitted) || 0;
-        buckets[index].total += 1;
-    }
-    return buckets.filter((bucket) => bucket.total > 0);
-}
-
-export function issueSnippets(report) {
-    const who = report?.memberName || report?.member_name || "";
-    const items = [];
-    for (const project of report?.report?.projects || report?.projects || []) {
-        for (const issue of project.issues || []) {
-            const text =
-                issue && typeof issue === "object"
-                    ? String(issue.content || "").trim()
-                    : String(issue || "").trim();
-            if (!text) continue;
-            items.push({
-                who,
-                project: project.projectName || "",
-                text,
-            });
-        }
-    }
-    return items;
-}
-
-function parseJson(value) {
-    if (!value) return {};
-    if (typeof value === "string") {
-        try {
-            return JSON.parse(value) || {};
-        } catch {
-            return {};
-        }
-    }
-    return typeof value === "object" ? value : {};
-}
-
-export function fromDailyReport(row) {
-    const parsed = parseJson(row?.parsed_json ?? row?.report ?? row);
-    const projects = parsed.projects || [];
-    return {
-        memberName: row?.member_name || row?.memberName || "",
-        report: {
-            done: projects.map((project) => ({
-                title: project.projectName || "",
-                items: project.completedTasks || [],
-            })),
-            next: projects.map((project) => ({
-                title: project.projectName || "",
-                items:
-                    Array.isArray(project.nextWeekPlans) &&
-                    project.nextWeekPlans.length
-                        ? project.nextWeekPlans
-                        : project.nextPlans || [],
-            })),
-            projects,
-        },
-    };
-}
-
-export function weeklyHighlights(reports, { winLimit = 6, nextLimit = 6 } = {}) {
-    const wins = [];
-    const next = [];
-    const blockers = [];
-    for (const report of reports || []) {
-        const who = report.memberName || report.member_name || "";
-        const deck = report.report || report;
-        for (const section of deck.done || []) {
-            for (const item of section.items || []) {
-                const text = String(item || "").trim();
-                if (text) wins.push({ who, project: section.title || "", text });
-            }
-        }
-        for (const section of deck.next || []) {
-            for (const item of section.items || []) {
-                const text = String(item || "").trim();
-                if (text) next.push({ who, project: section.title || "", text });
-            }
-        }
-        blockers.push(...issueSnippets(report));
-    }
-    return {
-        wins: wins.slice(0, winLimit),
-        blockers,
-        next: next.slice(0, nextLimit),
-    };
 }
 
 export function peakDayLabel(peak) {
@@ -174,12 +32,4 @@ export function peakDayLabel(peak) {
     const week = labels[Number(peak.weekday)] || "";
     const when = month && day ? `${week} ${month}.${day}` : week;
     return `제출 최다 · ${when} · ${peak.submitted}건`;
-}
-
-export function missingForDate(date, roster, submitted, holidayNames) {
-    return missingOnDate(
-        date,
-        (roster || []).filter((name) => !submitted.has(name)),
-        holidayNames || {},
-    );
 }

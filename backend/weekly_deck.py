@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import date, timedelta
 
@@ -54,6 +55,26 @@ def next_week_span(end: date) -> str:
     return f"{_md(next_monday)}~{_md(next_monday + timedelta(days=4))}"
 
 
+def replace_member_week(conn, member_id, selects, report_json: str) -> int:
+    """같은 주의 기존 행을 지우고 이 초안을 넣는다. 다른 주는 그대로 둔다."""
+    week_key = week_start_of(selects)
+    for row in conn.execute(
+        "SELECT id, selected_date FROM weekly_reports WHERE member_id = ?",
+        (member_id,),
+    ):
+        try:
+            stale = json.loads(row[1] or "[]")
+        except json.JSONDecodeError:
+            continue
+        if week_key and week_start_of(stale) == week_key:
+            conn.execute("DELETE FROM weekly_reports WHERE id = ?", (row[0],))
+    cursor = conn.execute(
+        "INSERT INTO weekly_reports (member_id, selected_date, report_json) VALUES (?, ?, ?)",
+        (member_id, json.dumps(selects, ensure_ascii=False), report_json),
+    )
+    return int(cursor.lastrowid)
+
+
 def week_start_of(selected_dates) -> str:
     """선택한 날짜들이 속한 주의 월요일.
 
@@ -103,23 +124,7 @@ def _texts(values) -> list[str]:
     return out
 
 
-def empty_section(title=""):
-    return {"title": title, "items": [""]}
-
-
-def empty_event():
-    return {"when": "", "title": ""}
-
-
-def empty_notice():
-    return {"title": "", "body": [""]}
-
-
 COLLAB_CENTERS = ("AC", "BC", "DC", "TC", "CSC")
-
-
-def empty_collab():
-    return {"supports": [], "done": [""], "next": [""]}
 
 
 def _as_notices(raw) -> list[dict]:
@@ -397,32 +402,3 @@ def merge_last_week_next(report_data, last_next):
             project["nextPlans"] = list(current)
     report_data["projects"] = projects
     return report_data, carried
-
-
-def to_legacy_projects(deck) -> list[dict]:
-    by_title = {}
-    for section in deck.get("done") or []:
-        title = str(section.get("title") or "").strip() or "미분류 프로젝트"
-        by_title[title] = {
-            "projectName": title,
-            "completedTasks": list(section.get("items") or []),
-            "inProgressTasks": [],
-            "issues": [],
-            "nextPlans": [],
-            "nextWeekPlans": [],
-        }
-    for section in deck.get("next") or []:
-        title = str(section.get("title") or "").strip() or "미분류 프로젝트"
-        row = by_title.get(title) or {
-            "projectName": title,
-            "completedTasks": [],
-            "inProgressTasks": [],
-            "issues": [],
-            "nextPlans": [],
-            "nextWeekPlans": [],
-        }
-        items = list(section.get("items") or [])
-        row["nextPlans"] = items
-        row["nextWeekPlans"] = items
-        by_title[title] = row
-    return list(by_title.values())

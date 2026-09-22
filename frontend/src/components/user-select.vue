@@ -5,6 +5,7 @@ import { selectedUserId } from "../composables/useSelectedUser.js";
 import { selectedTeamId } from "../composables/useSelectedTeam.js";
 import { Plus } from "lucide-vue-next";
 import { useDialog } from "../composables/useDialog";
+import AppField from "./ui/AppField.vue";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 
 const props = defineProps({
@@ -348,62 +349,73 @@ onMounted(async () => {
             </section>
         </div>
 
-        <form v-if="selectedRecord" class="card add-card" @submit.prevent="saveMyPassword">
-            <h2>내 비밀번호 변경</h2>
-            <div class="add-row">
-                <input
-                    type="password"
-                    v-model="currentPassword"
-                    class="input"
-                    placeholder="현재 비밀번호"
-                    autocomplete="current-password"
-                    required
-                />
-                <input
-                    type="password"
-                    v-model="nextPassword"
-                    class="input"
-                    placeholder="새 비밀번호 (4자 이상)"
-                    minlength="4"
-                    autocomplete="new-password"
-                    required
-                />
-                <button class="btn btn-primary" type="submit" :disabled="passwordSaving">
+        <form v-if="selectedRecord" class="card account-form" @submit.prevent="saveMyPassword">
+            <div class="account-form-head">
+                <h2>내 비밀번호 변경</h2>
+                <p>로그인 중인 {{ selectedRecord.name }} 계정의 비밀번호를 바꿉니다.</p>
+            </div>
+            <div class="account-form-grid">
+                <AppField label="현재 비밀번호" for-id="current-password">
+                    <input
+                        id="current-password"
+                        type="password"
+                        v-model="currentPassword"
+                        class="input"
+                        autocomplete="current-password"
+                        required
+                    />
+                </AppField>
+                <AppField label="새 비밀번호" for-id="next-password">
+                    <input
+                        id="next-password"
+                        type="password"
+                        v-model="nextPassword"
+                        class="input"
+                        minlength="4"
+                        autocomplete="new-password"
+                        required
+                    />
+                </AppField>
+                <button class="btn btn-primary account-form-submit" type="submit" :disabled="passwordSaving">
                     {{ passwordSaving ? "변경 중..." : "변경" }}
                 </button>
             </div>
+            <p class="account-form-note">새 비밀번호는 4자 이상입니다.</p>
         </form>
 
-        <form class="card add-card" @submit.prevent="saveUser">
-            <h2>새 사용자</h2>
-            <div class="add-row">
-                <input
-                    id="new-user"
-                    type="text"
-                    v-model="newUser"
-                    class="input"
-                    placeholder="이름을 입력하세요"
-                    required
-                />
-                <input
-                    id="new-user-password"
-                    type="password"
-                    v-model="newPassword"
-                    class="input"
-                    placeholder="비밀번호 (4자 이상)"
-                    required
-                    minlength="4"
-                    autocomplete="new-password"
-                />
-                <button
-                    class="btn btn-primary"
-                    type="submit"
-                    :disabled="isSaving"
-                >
+        <form class="card account-form" @submit.prevent="saveUser">
+            <div class="account-form-head">
+                <h2>새 사용자</h2>
+                <p>이름과 처음 로그인에 쓸 비밀번호를 정합니다.</p>
+            </div>
+            <div class="account-form-grid">
+                <AppField label="이름" for-id="new-user">
+                    <input
+                        id="new-user"
+                        type="text"
+                        v-model="newUser"
+                        class="input"
+                        autocomplete="off"
+                        required
+                    />
+                </AppField>
+                <AppField label="비밀번호" for-id="new-user-password">
+                    <input
+                        id="new-user-password"
+                        type="password"
+                        v-model="newPassword"
+                        class="input"
+                        minlength="4"
+                        autocomplete="new-password"
+                        required
+                    />
+                </AppField>
+                <button class="btn btn-primary account-form-submit" type="submit" :disabled="isSaving">
                     <Plus :size="14" />
                     {{ isSaving ? "생성 중..." : "생성" }}
                 </button>
             </div>
+            <p class="account-form-note">비밀번호는 4자 이상입니다.</p>
         </form>
     </div>
 </template>
@@ -420,7 +432,7 @@ onMounted(async () => {
     margin-bottom: var(--space-3);
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: 2;
     background: var(--bg);
     padding: var(--space-2) 0;
 }
@@ -448,23 +460,29 @@ onMounted(async () => {
 .team-chip,
 .letter-chip {
     flex-shrink: 0;
-    min-height: 32px;
-    padding: 0 10px;
+    min-height: 36px;
+    padding: 0 12px;
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: var(--fs-12);
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     cursor: pointer;
 }
 
 .team-chip.is-on,
-.letter-chip:focus-visible {
+.letter-chip.is-on {
     background: var(--accent-soft);
     border-color: var(--accent);
     color: var(--accent-hover);
+}
+
+.team-chip:focus-visible,
+.letter-chip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 .team-gap {
@@ -511,10 +529,11 @@ onMounted(async () => {
 }
 
 .user-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1.2fr) minmax(160px, 220px) minmax(160px, 240px);
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-4);
+    gap: 12px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
 }
 
@@ -527,7 +546,6 @@ onMounted(async () => {
 }
 
 .user-row-name {
-    flex: 1;
     min-width: 0;
     display: flex;
     flex-wrap: wrap;
@@ -545,31 +563,12 @@ onMounted(async () => {
     color: var(--text-muted);
 }
 
-.user-row-team {
-    flex-shrink: 0;
-}
-
-.user-row-team-name {
-    flex-shrink: 0;
-    min-width: 148px;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.user-row-team-name {
-    flex-shrink: 0;
-    min-width: 148px;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
 .user-row-team .input {
-    width: auto;
-    min-width: 148px;
-    height: 32px;
+    width: 100%;
+    min-width: 0;
+    height: 40px;
     padding: 0 28px 0 12px;
-    line-height: 30px;
-    font-size: var(--fs-13);
+    font-size: var(--fs-14);
 }
 
 .user-row-now {
@@ -580,15 +579,17 @@ onMounted(async () => {
 }
 
 .user-row-temp {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--space-2);
-    flex-shrink: 0;
+    gap: 8px;
+    min-width: 0;
 }
 
 .user-row-temp .input {
-    width: 148px;
-    height: 32px;
+    width: 100%;
+    min-width: 0;
+    height: 40px;
 }
 
 .sr-only {
@@ -603,35 +604,102 @@ onMounted(async () => {
     border: 0;
 }
 
-.add-card h2 {
-    margin: 0 0 var(--space-3);
+.account-form + .account-form {
+    margin-top: 16px;
 }
 
-.add-row {
-    display: flex;
-    gap: var(--space-2);
-    align-items: center;
+.account-form-head h2 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--text-strong);
 }
 
-.add-row .input {
-    flex: 1;
+.account-form-head p,
+.account-form-note {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text);
+    word-break: keep-all;
+}
+
+.account-form-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+    margin-top: 14px;
+}
+
+.account-form-grid :deep(.input) {
+    width: 100%;
     min-width: 0;
+    height: 40px;
+    font-size: 15px;
 }
 
-.add-row .btn {
-    flex-shrink: 0;
+.account-form-submit {
+    min-height: 40px;
+}
+
+.account-form-note {
+    margin-top: 8px;
 }
 
 @media (max-width: 860px) {
-    .add-row,
+    .user-toolbar {
+        top: var(--topbar-height);
+    }
+
+    .team-filters,
+    .letter-jump {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        margin-right: -4px;
+        padding-bottom: 4px;
+    }
+
+    .team-chip,
+    .letter-chip {
+        min-height: 44px;
+        font-size: 14px;
+    }
+
     .user-row {
-        flex-direction: column;
-        align-items: stretch;
+        grid-template-columns: 36px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px 10px;
+        padding: 12px;
+    }
+
+    .user-row-team,
+    .user-row-temp,
+    .user-row-now {
+        grid-column: 1 / -1;
     }
 
     .user-row-team .input,
     .user-row-temp .input {
+        height: 44px;
+        font-size: 16px;
+    }
+
+    .user-row-temp .btn {
+        min-height: 44px;
+    }
+
+    .account-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .account-form-grid :deep(.input) {
+        height: 44px;
+        font-size: 16px;
+    }
+
+    .account-form-submit {
         width: 100%;
+        min-height: 44px;
     }
 }
 </style>

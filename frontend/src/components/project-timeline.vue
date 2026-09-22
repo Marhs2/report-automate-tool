@@ -3,22 +3,17 @@ import { onMounted, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { isFutureDate } from "../lib/dateScope";
+import {
+  buildIssueBoard,
+  looksLikeIssue,
+  sameWork,
+  textsOf,
+} from "../lib/issueBoard";
 
 const router = useRouter();
 const { getProjectNames, getProjectTimeline, getUsers } = useApi();
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const CLOSE_KEYS = [
-  "속도",
-  "검색",
-  "깨지",
-  "느려",
-  "중복",
-  "동일명함",
-  "긴명함",
-  "명함이름",
-  "흐린",
-];
 
 const projectNames = ref([]);
 const timeline = ref([]);
@@ -26,30 +21,6 @@ const selectedProject = ref("");
 const selectedMember = ref("");
 const isLoading = ref(false);
 const isLoadingTimeline = ref(false);
-
-const itemText = (value) =>
-  value && typeof value === "object"
-    ? String(value.content ?? "").trim()
-    : String(value ?? "").trim();
-
-const normalize = (value) => itemText(value).replace(/\s+/g, "").toLowerCase();
-
-const similar = (a, b) => {
-  const na = normalize(a);
-  const nb = normalize(b);
-  if (!na || !nb) return false;
-  if (na === nb) return true;
-  const shorter = na.length <= nb.length ? na : nb;
-  const longer = na.length <= nb.length ? nb : na;
-  if (shorter.length >= 10 && longer.includes(shorter)) return true;
-  return CLOSE_KEYS.some((key) => na.includes(key) && nb.includes(key));
-};
-
-const looksLikeIssue = (value) =>
-  /검색|안\s*나|나오지|오류|버그|깨지|느려|실패|장애/.test(itemText(value));
-
-const textsOf = (list) =>
-  (Array.isArray(list) ? list : []).map(itemText).filter(Boolean);
 
 const fetchInitialData = async () => {
   isLoading.value = true;
@@ -102,9 +73,7 @@ const projectMembers = computed(() => {
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "ko"));
 });
 
-/* 콤보에는 전체 인원을 다 넣는다.
-   이 프로젝트에 보고한 사람만 나오면 "왜 24명 중 9명만 있지?"가 된다.
-   보고가 없는 사람도 고를 수 있게 두고, 대신 건수를 옆에 적는다. */
+/* 콤보는 전체 인원이다. 이 프로젝트 보고자만 넣으면 빠진 사람을 고를 수 없다. */
 const allMembers = ref([]);
 
 const reportCountByMember = computed(() => {
@@ -232,7 +201,7 @@ const compactRows = (entry) => {
   const requests = textsOf(entry.requests);
   const plans = textsOf(entry.nextPlans);
   const progress = textsOf(entry.inProgressTasks).filter(
-    (text) => !issues.some((issue) => similar(issue, text)),
+    (text) => !issues.some((issue) => sameWork(issue, text)),
   );
   const rows = [];
   if (view.value === "issues") {
@@ -250,108 +219,7 @@ const compactRows = (entry) => {
   return rows;
 };
 
-const issueTexts = (entry) => [
-  ...textsOf(entry.issues),
-  ...textsOf(entry.inProgressTasks).filter(looksLikeIssue),
-];
-
-const issueBoard = computed(() => {
-  const byMember = new Map();
-  const latestByMember = new Map();
-  const chronological = [...filteredTimeline.value].sort((a, b) => {
-    const dateCmp = String(a.date).localeCompare(String(b.date));
-    if (dateCmp) return dateCmp;
-    return String(a.member_id).localeCompare(String(b.member_id));
-  });
-
-  for (const entry of chronological) {
-    const memberKey = String(entry.member_id);
-    latestByMember.set(memberKey, entry);
-    if (!byMember.has(memberKey)) byMember.set(memberKey, []);
-    const threads = byMember.get(memberKey);
-
-    for (const done of textsOf(entry.completedTasks)) {
-      for (const item of threads) {
-        if (similar(item.text, done)) {
-          item.resolvedDate = entry.date;
-          item.resolvedReportId = entry.report_id;
-        }
-      }
-    }
-
-    const issueOnly = textsOf(entry.issues);
-    const progressOnly = textsOf(entry.inProgressTasks).filter(looksLikeIssue);
-
-    for (const text of issueOnly) {
-      const existing = threads.find((item) => similar(item.text, text));
-      if (existing) {
-        existing.text = text;
-        existing.fromIssue = true;
-        existing.lastDate = entry.date;
-        existing.report_id = entry.report_id;
-        continue;
-      }
-      threads.push({
-        text,
-        fromIssue: true,
-        firstDate: entry.date,
-        lastDate: entry.date,
-        report_id: entry.report_id,
-        member_id: entry.member_id,
-        member_name: entry.member_name,
-      });
-    }
-
-    for (const text of progressOnly) {
-      const existing = threads.find((item) => similar(item.text, text));
-      if (existing) {
-        existing.lastDate = entry.date;
-        existing.report_id = entry.report_id;
-        continue;
-      }
-      threads.push({
-        text,
-        fromIssue: false,
-        firstDate: entry.date,
-        lastDate: entry.date,
-        report_id: entry.report_id,
-        member_id: entry.member_id,
-        member_name: entry.member_name,
-      });
-    }
-  }
-
-  const open = [];
-  const unmentioned = [];
-  const resolved = [];
-
-  for (const [memberKey, threads] of byMember) {
-    const latest = latestByMember.get(memberKey);
-    const latestOpen = latest ? issueTexts(latest) : [];
-
-    for (const item of threads) {
-      const stillOpen = latestOpen.some((text) => similar(item.text, text));
-      let status = "unmentioned";
-      if (stillOpen) status = "open";
-      else if (
-        item.resolvedDate &&
-        String(item.resolvedDate) >= String(item.lastDate)
-      ) {
-        status = "resolved";
-      }
-      const row = { ...item, status };
-      if (status === "open") open.push(row);
-      else if (status === "resolved") resolved.push(row);
-      else unmentioned.push(row);
-    }
-  }
-
-  const byFirst = (a, b) => String(a.firstDate).localeCompare(String(b.firstDate));
-  open.sort(byFirst);
-  unmentioned.sort(byFirst);
-  resolved.sort(byFirst);
-  return { open, unmentioned, resolved };
-});
+const issueBoard = computed(() => buildIssueBoard(filteredTimeline.value));
 
 const hasIssueBoard =
   computed(() =>
@@ -935,7 +803,7 @@ onMounted(() => {
 
   .view-chips .btn {
     flex: 1;
-    min-height: 40px;
+    min-height: 44px;
   }
 
   .timeline-summary {
@@ -954,6 +822,11 @@ onMounted(() => {
   .issue-row {
     min-height: 52px;
     align-items: flex-start;
+  }
+
+  .issue-text,
+  .row span {
+    overflow-wrap: anywhere;
   }
 }
 </style>

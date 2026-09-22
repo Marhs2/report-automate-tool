@@ -1,6 +1,3 @@
-/* ---------------------------------- */
-/* Shared components                  */
-/* ---------------------------------- */
 .card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -348,8 +345,7 @@ input[type="file"]::file-selector-button:hover {
     color: var(--accent-hover);
 }
 
-/* 선택 카드 그리드 — team-select / user-select 공용.
-   `.selected`는 두 화면의 템플릿이 :class로 붙이는 상태 클래스다. */
+/* .selected는 team-select / user-select 템플릿이 :class로 붙이는 상태 클래스다. */
 .select-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));

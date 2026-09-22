@@ -74,4 +74,4 @@
 
 출력 규칙
 confirmQuestions 배열만 출력한다. 다른 필드 이름을 만들지 않는다.
-질문에 초안 문장을 인용할 때는 초안에 있는 칸 이름(completedTasks, inProgressTasks, issues, nextWeekPlans)을 쓴다.
+질문에 칸 이름을 쓸 때는 완료, 진행, 이슈, 향후일정만 쓴다. completedTasks, inProgressTasks, nextWeekPlans, nextPlans는 쓰지 않는다.

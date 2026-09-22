@@ -146,6 +146,15 @@ export default function useApi() {
     }
   };
 
+  const postCreateWeekly = async (memberId, selects, reportJson) => {
+    const response = await axios.post(`${baseURL}/weekly`, {
+      member_id: memberId,
+      selects: toRaw(selects),
+      report_json: reportJson,
+    });
+    return response.data;
+  };
+
   const updateWeeklyReport = async (weeklyId, reportJson) => {
     try {
       const response = await axios.put(`${baseURL}/weekly/${weeklyId}`, {
@@ -186,15 +195,6 @@ export default function useApi() {
       console.error("Error fetching user activities:", error);
       throw error;
     }
-  };
-
-  const postPlainReport = async (rawText, reportDate, memberId) => {
-    const response = await axios.post(`${baseURL}/reports/plain`, {
-      report: rawText,
-      date: reportDate,
-      member_id: memberId,
-    });
-    return response.data;
   };
 
   const postSaveReport = async (
@@ -431,13 +431,13 @@ export default function useApi() {
     postReportPptx,
     getReportDraft,
     postReportDraft,
-    postPlainReport,
     postSaveReport,
     getReports,
     getReportById,
     getUserActivities,
     getHolidays,
     postWeeklyReport,
+    postCreateWeekly,
     getWeeklyReport,
     getWeeklyReportById,
     downloadWeeklyPptx,

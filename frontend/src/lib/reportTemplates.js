@@ -72,10 +72,8 @@ export function templateById(id) {
     return PASTE_TEMPLATES.find((item) => item.id === id) || null;
 }
 
-/** 형식 넣기.
- *  mode "replace": 쓴 내용을 형식으로 바꾼다(빈 칸에서 시작할 때 기대하는 동작).
- *  mode "append": 쓴 내용 아래에 형식을 덧붙인다.
- *  이미 쓴 글이 있는데 말없이 덧붙이면 저장된 하루가 망가진다. 호출하는 쪽에서 먼저 물어본다. */
+/** replace는 쓴 글을 형식으로 바꾸고, append는 아래에 붙인다.
+ *  이미 쓴 글에 append하면 호출하는 쪽이 먼저 확인한다. */
 export function applyTemplate(current, template, mode = "append") {
     const body = String(template?.body || "");
     const typed = String(current || "").replace(/\s+$/, "");

@@ -1,6 +1,3 @@
-/* ---------------------------------- */
-/* App shell                          */
-/* ---------------------------------- */
 #app {
     display: flex;
     min-height: 100vh;
@@ -31,15 +28,32 @@
 .sidebar-brand {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: right;
     gap: var(--space-2);
-    min-height: 32px;
-    padding: 0 var(--space-1) 0 var(--space-3);
+    min-height: 36px;
+    padding: 0 var(--space-1) 0 var(--space-2);
 }
 
 .sidebar.is-collapsed .sidebar-brand {
+    flex-direction: column;
     justify-content: center;
     padding: 0;
+}
+
+.sidebar-mark {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+}
+
+.sidebar-brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
 }
 
 .sidebar-brand-name {
@@ -48,6 +62,23 @@
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
     white-space: nowrap;
+}
+
+.sidebar-brand-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-12);
+    line-height: 1.3;
+    color: var(--text);
+}
+
+.nav-group-label {
+    margin: 10px 12px 4px;
+    font-size: var(--fs-11);
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    color: var(--text);
 }
 
 .sidebar-collapse-btn {
@@ -174,7 +205,6 @@
     flex-shrink: 0;
 }
 
-/* 좁은 화면에서만 보이는 드로어 열기 버튼 (미디어쿼리에서 inline-flex로 전환) */
 .topbar-drawer-btn {
     display: none;
     align-items: center;
@@ -319,9 +349,6 @@
     color: var(--danger-fg);
 }
 
-/* ---------------------------------- */
-/* Page layout                        */
-/* ---------------------------------- */
 .page {
     max-width: var(--content-max);
     margin: 0 auto;
@@ -376,9 +403,7 @@
     gap: var(--space-2);
 }
 
-/* 좁은 화면: 사이드바를 왼쪽에서 슬라이드되는 오버레이 드로어로 전환한다.
-   접힘 상태(.is-collapsed)는 useSidebar의 collapsedEffective가 좁은 화면에서
-   false로 만들기 때문에 여기서 따로 되돌릴 필요가 없다. */
+/* 좁은 화면은 오버레이 드로어. collapsedEffective가 이미 펼침이라 여기서 되돌리지 않는다. */
 @media (max-width: 860px) {
     #app {
         display: block;

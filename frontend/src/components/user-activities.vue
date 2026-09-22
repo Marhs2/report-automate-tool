@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, computed } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ChevronLeft, ChevronRight, X } from "lucide-vue-next";
 import useApi from "../composables/useApi";
@@ -183,8 +183,13 @@ function goThisMonth() {
 }
 
 onMounted(() => {
+    window.addEventListener("keydown", onDayPopKey);
     fetchUserActivities();
     fetchTeams();
+});
+
+onUnmounted(() => {
+    window.removeEventListener("keydown", onDayPopKey);
 });
 
 const orderedActivities = computed(() =>
@@ -319,6 +324,18 @@ const toggleDay = (dateStr) => {
     selectedDate.value = selectedDate.value === dateStr ? "" : dateStr;
 };
 
+const dayPopRef = ref(null);
+
+const closeDay = () => {
+    selectedDate.value = "";
+};
+
+const onDayPopKey = (event) => {
+    if (event.key !== "Escape" || !selectedDate.value) return;
+    event.preventDefault();
+    closeDay();
+};
+
 const rangeBounds = computed(() => {
     return {
         start: new Date(selectedYear.value, selectedMonth.value - 1, 1),
@@ -363,6 +380,12 @@ const selectedCell = computed(
         inRangeDays.value.find((cell) => cell.date === selectedDate.value) ||
         null,
 );
+
+watch(selectedCell, async (cell) => {
+    if (!cell) return;
+    await nextTick();
+    dayPopRef.value?.querySelector(".day-pop-close")?.focus();
+});
 
 const weekdayCount = computed(
     () => inRangeDays.value.filter((cell) => !cell.isOffday).length,
@@ -421,15 +444,22 @@ const progressByMember = computed(() => {
         <AppPageHeader :title="periodLabel" :subtitle="pulseLabel">
             <template #filters>
                 <div class="month-nav">
-                    <button class="icon-btn" aria-label="이전 달" @click="prevMonth">
-                        <ChevronLeft :size="16" />
-                    </button>
-                    <button class="icon-btn" aria-label="다음 달" @click="nextMonth">
-                        <ChevronRight :size="16" />
-                    </button>
-                    <button v-if="!isThisMonth" class="btn btn-small" @click="goThisMonth">
+                    <button
+                        v-if="!isThisMonth"
+                        type="button"
+                        class="btn btn-small"
+                        @click="goThisMonth"
+                    >
                         이번 달로
                     </button>
+                    <div class="month-nav-arrows">
+                        <button class="icon-btn" aria-label="이전 달" @click="prevMonth">
+                            <ChevronLeft :size="16" />
+                        </button>
+                        <button class="icon-btn" aria-label="다음 달" @click="nextMonth">
+                            <ChevronRight :size="16" />
+                        </button>
+                    </div>
                 </div>
                 <select
                     id="activity-filter-team"
@@ -449,7 +479,7 @@ const progressByMember = computed(() => {
         <div v-if="orderedActivities.length === 0" class="empty-state">
             표시할 활동 기록이 없습니다
         </div>
-        <div v-else class="calendar-workspace" :class="{ 'has-rail': Boolean(selectedCell) }">
+        <div v-else class="calendar-workspace">
             <div class="card calendar-card">
                 <p v-if="peakLabel" class="cal-peak">{{ peakLabel }}</p>
                 <div class="cal-weekdays">
@@ -526,69 +556,92 @@ const progressByMember = computed(() => {
                 </div>
             </div>
 
-            <section
+        </div>
+        <Teleport to="body">
+            <div
                 v-if="selectedCell"
-                class="card day-rail"
-                :aria-label="`${formatDotDate(selectedCell.date)} 제출 목록`"
+                class="day-pop-overlay"
+                @click.self="closeDay"
             >
-                <div class="day-detail-head">
-                    <p class="day-detail-title">
-                        <strong>{{ formatDotDate(selectedCell.date) }} ({{ selectedCell.weekLabel }})</strong>
-                        <span v-if="selectedCell.holidayName">{{ selectedCell.holidayName }}</span>
-                    </p>
-                    <button type="button" class="icon-btn" aria-label="닫기" @click="selectedDate = ''">
-                        <X :size="15" />
-                    </button>
-                </div>
-                <p class="day-rail-pulse">
-                    제출 {{ countsOf(selectedCell).submitted }}
-                    <template v-if="!selectedCell.isOffday"> · 미제출 {{ countsOf(selectedCell).missed }}</template>
-                </p>
-                <div
-                    v-for="group in railGroups(selectedCell)"
-                    :key="group.key"
-                    class="rail-group"
+                <section
+                    ref="dayPopRef"
+                    class="card day-pop"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="day-pop-title"
                 >
-                    <h3 class="rail-group-head" :class="group.key">
-                        {{ group.label }}
-                        <span class="rail-group-count">{{ group.people.length }}</span>
-                    </h3>
-                    <div class="rail-chips">
-                        <button
-                            v-for="entry in group.people"
-                            :key="entry.member_id"
-                            type="button"
-                            class="rail-chip"
-                            :class="group.key"
-                            :title="`${entry.name} · 이번 달 ${progressByMember[String(entry.member_id)]?.submitted || 0}/${progressByMember[String(entry.member_id)]?.total || 0}`"
-                            @click="openCell({ member_id: entry.member_id, name: entry.name }, entry.item)"
-                        >
-                            {{ entry.name }}
-                            <em>{{ progressByMember[String(entry.member_id)]?.submitted || 0 }}/{{ progressByMember[String(entry.member_id)]?.total || 0 }}</em>
+                    <div class="day-detail-head">
+                        <p id="day-pop-title" class="day-detail-title">
+                            <strong>{{ formatDotDate(selectedCell.date) }} ({{ selectedCell.weekLabel }})</strong>
+                            <span v-if="selectedCell.holidayName">{{ selectedCell.holidayName }}</span>
+                        </p>
+                        <button type="button" class="icon-btn day-pop-close" aria-label="닫기" @click="closeDay">
+                            <X :size="16" />
                         </button>
                     </div>
-                </div>
-                <p v-if="!railGroups(selectedCell).length" class="day-detail-empty">
-                    이 날 제출한 보고가 없습니다
-                </p>
-            </section>
-        </div>
+                    <p class="day-rail-pulse">
+                        제출 {{ countsOf(selectedCell).submitted }}
+                        <template v-if="!selectedCell.isOffday"> · 미제출 {{ countsOf(selectedCell).missed }}</template>
+                    </p>
+                    <div
+                        v-for="group in railGroups(selectedCell)"
+                        :key="group.key"
+                        class="rail-group"
+                    >
+                        <h3 class="rail-group-head" :class="group.key">
+                            {{ group.label }}
+                            <span class="rail-group-count">{{ group.people.length }}</span>
+                        </h3>
+                        <div class="rail-chips">
+                            <button
+                                v-for="entry in group.people"
+                                :key="entry.member_id"
+                                type="button"
+                                class="rail-chip"
+                                :class="group.key"
+                                :title="`${entry.name} · 이번 달 ${progressByMember[String(entry.member_id)]?.submitted || 0}/${progressByMember[String(entry.member_id)]?.total || 0}`"
+                                @click="openCell({ member_id: entry.member_id, name: entry.name }, entry.item)"
+                            >
+                                {{ entry.name }}
+                                <em>{{ progressByMember[String(entry.member_id)]?.submitted || 0 }}/{{ progressByMember[String(entry.member_id)]?.total || 0 }}</em>
+                            </button>
+                        </div>
+                    </div>
+                    <p v-if="!railGroups(selectedCell).length" class="day-detail-empty">
+                        이 날 제출한 보고가 없습니다
+                    </p>
+                </section>
+            </div>
+        </Teleport>
     </div>
 </template>
 
 <style scoped>
 .calendar-page {
     max-width: none;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--topbar-height));
+    min-height: 0;
+    overflow: hidden;
+}
+
+.calendar-page :deep(.page-header) {
+    flex-shrink: 0;
 }
 
 .calendar-workspace,
 .calendar-workspace.has-rail {
     display: flex;
     flex-direction: column;
+    flex: 1;
     gap: var(--space-4);
     align-items: stretch;
     width: 100%;
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .calendar-workspace > .calendar-card,
@@ -602,7 +655,7 @@ const progressByMember = computed(() => {
     .calendar-workspace.has-rail {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
-        align-items: start;
+        align-items: stretch;
     }
 
     .calendar-workspace.has-rail > .day-rail {
@@ -613,8 +666,15 @@ const progressByMember = computed(() => {
 .month-nav {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: var(--space-2);
     flex-shrink: 0;
+}
+
+.month-nav-arrows {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: auto;
 }
 
 .icon-btn {
@@ -664,8 +724,13 @@ const progressByMember = computed(() => {
 }
 
 .calendar-card {
-    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
     min-width: 0;
+    padding: var(--space-4);
+    overflow: hidden;
 }
 
 .cal-peak {
@@ -698,24 +763,31 @@ const progressByMember = computed(() => {
 .cal-weeks {
     display: flex;
     flex-direction: column;
+    flex: 1;
     gap: var(--space-2);
+    min-height: 0;
 }
 
 .cal-week {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    flex: 1 1 0;
     gap: var(--space-2);
+    min-height: 0;
 }
 
-/* 이름 한 줄이 들어가므로 예전보다 조금 높다. 그래도 한 달이 한 화면에 들어온다. */
+/* 옆 목록이 없어도 한 달이 화면 높이를 넘지 않게, 남은 높이를 주로 나눈다. */
 .cal-day {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    gap: var(--space-1);
-    min-height: 76px;
+    gap: 6px;
+    height: 100%;
+    min-height: 0;
     width: 100%;
-    padding: var(--space-2);
+    padding: 8px 10px;
+    overflow: hidden;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -765,10 +837,10 @@ const progressByMember = computed(() => {
 }
 
 .cal-day-num {
-    font-size: var(--fs-13);
+    font-size: var(--fs-16);
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
-    line-height: 1;
+    line-height: 1.1;
 }
 
 .cal-day.weekend .cal-day-num,
@@ -817,15 +889,16 @@ const progressByMember = computed(() => {
 
 /* 칸 안의 이름 줄. 미제출이 있으면 미제출 이름, 없으면 '전원 제출'. */
 .cal-names {
-    display: block;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     margin-top: auto;
-    font-size: 10px;
+    font-size: var(--fs-12);
     font-weight: var(--fw-medium);
-    line-height: 1.3;
+    line-height: 1.35;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     color: var(--text);
+    word-break: keep-all;
 }
 
 .cal-names.missed {
@@ -843,7 +916,7 @@ const progressByMember = computed(() => {
 /* 제출률 막대. 이름 목록 대신 하루 상태를 한 눈금으로 보여준다. */
 .cal-meter {
     display: block;
-    height: 4px;
+    height: 6px;
     border-radius: var(--radius-pill);
     background: var(--border);
     overflow: hidden;
@@ -858,6 +931,49 @@ const progressByMember = computed(() => {
 
 .cal-meter-fill.is-full {
     background: var(--success-fg);
+}
+
+.day-pop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(38, 37, 30, 0.28);
+}
+
+.day-pop {
+    width: min(420px, 100%);
+    max-height: min(72vh, 560px);
+    overflow: auto;
+    padding: var(--space-4);
+}
+
+.day-pop-close {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 860px) {
+    .day-pop-overlay {
+        align-items: flex-end;
+        padding: 0 0 var(--bottom-nav-offset);
+    }
+
+    .day-pop {
+        width: 100%;
+        max-height: min(68vh, 520px);
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        padding-bottom: 20px;
+    }
+
+    .day-pop .rail-chip {
+        min-height: 44px;
+    }
 }
 
 .day-rail {
@@ -985,6 +1101,11 @@ const progressByMember = computed(() => {
         flex-direction: column;
     }
 
+    .calendar-workspace.has-rail .day-rail {
+        flex: 0 1 220px;
+        overflow: auto;
+    }
+
     .calendar-card {
         order: 1;
     }
@@ -999,6 +1120,25 @@ const progressByMember = computed(() => {
 }
 
 @media (max-width: 860px) {
+    .calendar-page {
+        height: auto;
+        overflow: visible;
+        display: block;
+    }
+
+    .calendar-workspace,
+    .calendar-workspace.has-rail {
+        overflow: visible;
+    }
+
+    .calendar-card,
+    .cal-weeks,
+    .cal-week {
+        flex: none;
+        height: auto;
+        overflow: visible;
+    }
+
     .cal-weekdays,
     .cal-week {
         gap: 4px;
@@ -1012,9 +1152,11 @@ const progressByMember = computed(() => {
     }
 
     .cal-day {
-        min-height: 48px;
-        padding: 6px 4px;
-        gap: 2px;
+        height: auto;
+        min-height: 72px;
+        padding: 8px 6px;
+        gap: 4px;
+        overflow: visible;
     }
 
     .cal-day-top {
@@ -1046,7 +1188,6 @@ const progressByMember = computed(() => {
 
     .month-nav {
         width: 100%;
-        justify-content: space-between;
     }
 }
 </style>

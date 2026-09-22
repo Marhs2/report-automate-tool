@@ -1,4 +1,3 @@
-/** Primary sidebar destinations. App.vue imports this list. */
 export const PRIMARY_NAV = [
     { to: "/", label: "일일보고", shortLabel: "일일", group: "작업" },
     { to: "/weekly", label: "주간 보고서", shortLabel: "주간", group: "작업" },

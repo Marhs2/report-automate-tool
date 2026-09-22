@@ -214,7 +214,7 @@
 
 @media (max-width: 860px) {
     .report-doc.page {
-        padding-bottom: calc(24px + var(--bottom-nav-offset));
+        padding-bottom: calc(36px + var(--bottom-nav-offset));
     }
 
     .report-doc .content-container {
@@ -228,19 +228,25 @@
     }
 
     .report-doc .project-head {
-        flex-wrap: wrap;
-        gap: 10px;
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 8px;
     }
 
     .report-doc .project-name-input {
-        flex: 1 1 140px;
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
         min-height: 44px;
         font-size: 16px;
     }
 
     .report-doc .project-head .btn-danger {
         min-height: 44px;
-        min-width: 72px;
+        min-width: 64px;
+        padding: 0 12px;
+        border-radius: 12px;
     }
 
     .report-doc .field-group {
@@ -255,31 +261,38 @@
     }
 
     .report-doc .task-row {
-        flex-wrap: nowrap;
-        align-items: stretch;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 44px;
+        align-items: start;
         gap: 8px;
     }
 
+    .report-doc .task-row:has(.event-when) {
+        grid-template-columns: 84px minmax(0, 1fr) 44px;
+    }
+
     .report-doc .task-row .input {
-        flex: 1 1 auto;
+        width: 100%;
         min-width: 0;
         min-height: 44px;
         font-size: 16px;
     }
 
     .report-doc .remove-btn {
-        width: auto;
-        min-width: 52px;
-        min-height: 44px;
-        padding: 0 10px;
-        font-size: 13px;
+        width: 44px;
+        min-width: 44px;
+        height: 44px;
+        padding: 0;
+        border-radius: 12px;
+        font-size: 12px;
     }
 
     .report-doc .add-btn {
         width: auto;
         min-height: 44px;
         padding: 0 14px;
-        align-self: stretch;
+        align-self: flex-start;
+        border-radius: 12px;
     }
 
     .report-doc .add-project-btn {
