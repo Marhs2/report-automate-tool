@@ -4,7 +4,6 @@ import {
     KIND_FIELDS,
     LINE_KINDS,
     parseLineReport,
-    scheduleLine,
     onlyStructuredLineReport,
     serializeLineReport,
 } from "../../lib/lineReport.js";
@@ -20,7 +19,6 @@ const lines = ref([]);
 const activeProject = ref("");
 const kind = ref("완료");
 const lineValue = ref("");
-const scheduleTitle = ref("");
 const addedNames = ref([]);
 const newProjectName = ref("");
 const addingProject = ref(false);
@@ -50,6 +48,9 @@ const chooseProject = (name) => {
 };
 
 const field = computed(() => KIND_FIELDS[kind.value]);
+const projectLabel = computed(() =>
+    activeProject.value ? `${activeProject.value}, 프로젝트 변경` : "프로젝트 고르기",
+);
 
 const publish = () => {
     const raw = serializeLineReport(lines.value);
@@ -91,31 +92,30 @@ watch(
 );
 
 const selectKind = async (next) => {
-    const switchingDate = (kind.value === "일정") !== (next === "일정");
     kind.value = next;
-    if (switchingDate) {
-        lineValue.value = "";
-        scheduleTitle.value = "";
-    }
     await nextTick();
-    document.getElementById(next === "일정" ? "line-date" : "line-text")?.focus();
+    document.getElementById("line-text")?.focus();
 };
 
 const addLine = () => {
-    if (!activeProject.value) return;
-    const text =
-        kind.value === "일정"
-            ? scheduleLine(lineValue.value, scheduleTitle.value)
-            : lineValue.value.trim();
-    if (!text) return;
+    const text = lineValue.value.trim();
+    if (!activeProject.value || !text) return;
     lines.value = [
         ...lines.value,
         { id: nextId++, project: activeProject.value, kind: kind.value, text },
     ];
     lineValue.value = "";
-    scheduleTitle.value = "";
     publish();
 };
+
+const commitPending = () => {
+    if (!lineValue.value.trim()) return "";
+    if (!activeProject.value) return "프로젝트를 고른 뒤 제출하세요.";
+    addLine();
+    return "";
+};
+
+defineExpose({ commitPending });
 
 const removeLine = (id) => {
     lines.value = lines.value.filter((line) => line.id !== id);
@@ -160,9 +160,17 @@ onUnmounted(() => {
 
 <template>
     <div class="line-writer">
-        <div class="line-current">
-            <p>{{ activeProject || "프로젝트를 고르세요" }}</p>
-            <button type="button" class="line-more" @click="openProjectPopup">더보기</button>
+        <div class="line-context">
+            <button
+                type="button"
+                class="line-project"
+                :aria-label="projectLabel"
+                @click="openProjectPopup"
+            >
+                <span class="line-project-name">{{ activeProject || "프로젝트를 고르세요" }}</span>
+                <span class="line-project-cue" aria-hidden="true">변경</span>
+            </button>
+            <slot name="date" />
         </div>
         <Teleport to="body">
             <div
@@ -230,38 +238,20 @@ onUnmounted(() => {
                     {{ item }}
                 </button>
             </div>
-            <template v-if="kind === '일정'">
-                <label for="line-date">일정 날짜</label>
-                <input id="line-date" v-model="lineValue" class="input" type="date" required />
-                <label for="line-schedule">일정 내용</label>
-                <div class="line-entry">
-                    <input
-                        id="line-schedule"
-                        v-model="scheduleTitle"
-                        class="input"
-                        type="text"
-                        placeholder="일정 내용"
-                        enterkeyhint="done"
-                        required
-                    />
-                    <button class="btn line-quiet" type="submit">넣기</button>
-                </div>
-            </template>
-            <template v-else>
-                <label for="line-text">{{ field.label }}</label>
-                <div class="line-entry">
-                    <input
-                        id="line-text"
-                        v-model="lineValue"
-                        class="input"
-                        type="text"
-                        :placeholder="field.placeholder"
-                        enterkeyhint="done"
-                        required
-                    />
-                    <button class="btn line-quiet" type="submit">넣기</button>
-                </div>
-            </template>
+            <label class="sr-only" for="line-text">{{ field.label }}</label>
+            <div class="line-entry">
+                <input
+                    id="line-text"
+                    v-model="lineValue"
+                    class="input"
+                    type="text"
+                    :placeholder="field.placeholder"
+                    enterkeyhint="done"
+                    required
+                />
+                <button class="btn line-quiet" type="submit">넣기</button>
+            </div>
+            <slot name="dock" />
         </form>
     </div>
 </template>
@@ -269,38 +259,72 @@ onUnmounted(() => {
 <style scoped>
 .line-writer {
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: 12px;
     min-width: 0;
+    min-height: 100%;
 }
 
-.line-current {
+.line-context {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
     gap: 8px;
     min-height: 44px;
 }
 
-.line-current p {
-    margin: 0;
-    min-width: 0;
-    font-size: 16px;
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    word-break: keep-all;
+.line-context :slotted(input) {
+    flex: none;
+    width: auto;
 }
 
-.line-more {
-    flex: none;
+.line-project {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
     min-height: 44px;
-    padding: 0 12px;
+    padding: 0;
     border: 0;
     background: transparent;
-    color: #007aff;
+    color: var(--text-strong);
     font: inherit;
     font-size: 16px;
+    font-weight: var(--fw-semibold);
+    text-align: left;
     cursor: pointer;
+}
+
+.line-project-name {
+    min-width: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    white-space: normal;
+    line-height: 1.25;
+    word-break: keep-all;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    max-width: 100%;
+}
+
+.line-project-cue {
+    flex: none;
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: var(--fw-semibold);
+}
+
+.line-project:focus-visible {
+    outline: 2px solid var(--text-strong);
+    outline-offset: 2px;
 }
 
 .line-pick-list {
@@ -336,14 +360,9 @@ onUnmounted(() => {
 
 .line-kinds {
     display: flex;
-    gap: 6px;
+    flex-wrap: wrap;
+    gap: 8px;
     min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-
-.line-kinds::-webkit-scrollbar {
-    display: none;
 }
 
 .line-kinds button,
@@ -357,10 +376,12 @@ onUnmounted(() => {
 }
 
 .line-kinds button {
-    flex: none;
-    padding: 0 12px;
+    flex: 1 1 calc(33.33% - 8px);
+    min-width: 0;
+    padding: 0 8px;
     border-radius: var(--radius-pill);
     font-size: 14px;
+    white-space: nowrap;
 }
 
 .line-kinds button.is-on {
@@ -375,12 +396,18 @@ onUnmounted(() => {
     outline-offset: 2px;
 }
 
-.line-group h2,
-.line-bucket h2 {
-    margin: 8px 0 0;
-    font-size: 13px;
-    font-weight: var(--fw-semibold);
-    color: var(--text);
+.line-group {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.line-bucket {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .line-preview {
@@ -390,7 +417,27 @@ onUnmounted(() => {
     align-items: center;
     border-top: 1px solid var(--border);
     font-size: 15px;
-    color: var(--text-muted);
+    color: var(--text);
+}
+
+.line-group h2,
+.line-bucket h2 {
+    margin: 8px 0 0;
+    font-size: 13px;
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .app-dialog h2 {
@@ -428,12 +475,36 @@ onUnmounted(() => {
     cursor: pointer;
 }
 
+.line-compose {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.line-compose .input {
+    scroll-margin-bottom: calc(var(--bottom-nav-offset) + 16px);
+}
+
 .line-compose label {
     display: block;
-    margin: 8px 0 4px;
+    margin: 0;
     font-size: 12px;
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
+}
+
+.line-compose :slotted(.form-error) {
+    margin: 0;
+}
+
+.line-compose :slotted(.line-send) {
+    width: 100%;
+    min-height: 44px;
+    height: 44px;
 }
 
 .line-entry {
@@ -442,8 +513,7 @@ onUnmounted(() => {
     align-items: center;
 }
 
-.line-entry .input,
-.line-compose .input[type="date"] {
+.line-entry .input {
     min-width: 0;
     width: 100%;
     min-height: 44px;

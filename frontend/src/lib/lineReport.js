@@ -1,34 +1,18 @@
 /** 모바일 한 줄 작성기. 제목은 추출기가 읽는 칸 이름이라 바꾸면 제출 결과가 달라진다. */
 
-export const LINE_KINDS = ["완료", "진행", "이슈", "다음 계획", "일정"];
+export const LINE_KINDS = ["완료", "진행", "이슈", "요청", "다음 계획"];
 
 export const KIND_FIELDS = {
     "완료": { label: "끝낸 일", placeholder: "오늘 마무리한 일" },
     "진행": { label: "하고 있는 일", placeholder: "아직 끝나지 않은 일" },
     "이슈": { label: "막힌 점", placeholder: "무엇이 막혔는지" },
+    "요청": { label: "요청", placeholder: "필요한 도움" },
     "다음 계획": { label: "다음 계획", placeholder: "다음에 할 일" },
-    "일정": { label: "일정 날짜", placeholder: "" },
 };
 
 const PROJECT_RE = /^프로젝트 명:\s*(.+)\s*$/;
-const KIND_RE = /^\[(완료|진행|이슈|다음 계획|일정)\]\s*$/;
+const KIND_RE = /^\[(완료|진행|이슈|요청|다음 계획)\]\s*$/;
 const ITEM_RE = /^-\s+(.+)$/;
-
-export function formatScheduleDate(iso) {
-    const parts = String(iso || "").split("-");
-    if (parts.length !== 3 || !/^\d{4}$/.test(parts[0])) return "";
-    const month = Number(parts[1]);
-    const day = Number(parts[2]);
-    if (!month || !day) return "";
-    return `${parts[0]}.${month}.${day}`;
-}
-
-export function scheduleLine(iso, title) {
-    const date = formatScheduleDate(iso);
-    const name = String(title || "").trim();
-    if (!date || !name) return "";
-    return `${date} ${name}`;
-}
 
 export function serializeLineReport(lines) {
     const names = [];

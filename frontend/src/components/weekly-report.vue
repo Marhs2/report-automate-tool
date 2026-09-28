@@ -183,7 +183,7 @@ const isFutureDay = (dayDate) => isFutureDate(dayDate);
 
 const dayState = (dayDate) => {
     if (isFutureDay(dayDate)) return hasMine(dayDate) ? "예정 · 작성함" : "예정";
-    return hasMine(dayDate) ? "작성함" : "없음";
+    return hasMine(dayDate) ? "작성함" : "보고 없음";
 };
 
 const myDayCount = computed(
@@ -214,7 +214,7 @@ const weekGroups = computed(() => {
             key: group.key,
             days: group.days,
             label: `${shortDay(group.days[0])} ~ ${shortDay(group.days[group.days.length - 1])}`,
-            summary: written ? `선택 ${picked}` : "없음",
+            summary: written ? `선택 ${picked}` : "보고 없음",
             picked,
         };
     });
@@ -604,9 +604,9 @@ onMounted(async () => {
             </label>
         </div>
 
-        <section class="card" aria-label="넣을 날짜">
+        <section class="card" aria-label="주간보고에 넣을 날">
             <div class="section-head">
-                <h2>넣을 날짜</h2>
+                <h2>주간보고에 넣을 날</h2>
             </div>
             <div class="week-folds">
                 <div v-for="group in weekGroups" :key="group.key" class="week-fold">

@@ -36,8 +36,8 @@
     word-break: keep-all;
     overflow-wrap: anywhere;
     font-family: inherit;
-    font-size: 14px;
-    line-height: 1.7;
+    font-size: 15px;
+    line-height: 1.75;
     max-height: 80vh;
     overflow-y: auto;
     color: var(--text-strong);
@@ -153,8 +153,13 @@
 .report-doc .field-group h3 {
     margin: 0;
     font-size: 13px;
-    font-weight: 500;
-    color: var(--text);
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.report-doc .field-group .input,
+.report-doc .task-row .input {
+    line-height: 1.55;
 }
 
 .report-doc .empty-msg {
@@ -192,6 +197,9 @@
     gap: 12px;
     align-items: center;
     bottom: max(var(--space-3), var(--bottom-nav-offset));
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
 }
 
 .report-doc .save-actions {
@@ -213,9 +221,7 @@
 }
 
 @media (max-width: 860px) {
-    .report-doc.page {
-        padding-bottom: calc(36px + var(--bottom-nav-offset));
-    }
+
 
     .report-doc .content-container {
         grid-template-columns: 1fr;
@@ -227,6 +233,15 @@
         order: 2;
     }
 
+    .report-doc .project-head,
+    .report-doc .task-row,
+    .report-doc .field-group,
+    .report-doc .split,
+    .report-doc .project-block {
+        min-width: 0;
+        max-width: 100%;
+    }
+
     .report-doc .project-head {
         display: flex;
         flex-wrap: nowrap;
@@ -234,10 +249,12 @@
         gap: 8px;
     }
 
+    /* iOS는 input의 기본 너비를 줄이지 않아 삭제 버튼이 칸 밖으로 밀린다. */
     .report-doc .project-name-input {
-        flex: 1 1 auto;
-        width: auto;
+        flex: 1 1 0%;
+        width: 0;
         min-width: 0;
+        max-width: 100%;
         min-height: 44px;
         font-size: 16px;
     }
@@ -260,38 +277,58 @@
         color: var(--text-strong);
     }
 
+    .report-doc .project-head,
     .report-doc .task-row {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 44px;
+        grid-template-columns: minmax(0, 1fr) max-content;
         align-items: start;
         gap: 8px;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .report-doc .task-row .input,
+    .report-doc .project-name-input {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        min-height: 44px;
+        font-size: 16px;
+        grid-column: 1;
+    }
+
+    .report-doc .task-row .remove-btn,
+    .report-doc .project-head .btn {
+        grid-column: 2;
+        justify-self: end;
     }
 
     .report-doc .task-row:has(.event-when) {
-        grid-template-columns: 84px minmax(0, 1fr) 44px;
+        grid-template-columns: minmax(0, 1fr) max-content;
     }
 
-    .report-doc .task-row .input {
+    .report-doc .task-row .event-when {
+        grid-column: 1 / -1;
         width: 100%;
-        min-width: 0;
-        min-height: 44px;
-        font-size: 16px;
+        max-width: none;
+        flex: none;
+        text-align: left;
     }
 
     .report-doc .remove-btn {
-        width: 44px;
-        min-width: 44px;
+        width: auto;
+        min-width: 56px;
         height: 44px;
-        padding: 0;
+        padding: 0 12px;
         border-radius: 12px;
-        font-size: 12px;
+        font-size: 13px;
     }
 
     .report-doc .add-btn {
-        width: auto;
+        width: 100%;
         min-height: 44px;
         padding: 0 14px;
-        align-self: flex-start;
+        align-self: stretch;
         border-radius: 12px;
     }
 
@@ -306,6 +343,9 @@
         z-index: 30;
         margin-top: 8px;
         padding: 10px 12px;
+        flex-direction: column;
+        align-items: stretch;
+        background: var(--surface);
     }
 
     .report-doc .save-actions .btn {

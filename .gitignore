@@ -108,6 +108,10 @@ test-data/dxel-live/
 
 docs/유사서비스-벤치마크-및-실사용사례.md
 docs/design-reference.md
-feedback.
+docs/주간업무-시트-연결-설계.md
+feedback.md
+
+
+weekly-send-test/
 
 frontend/src/lib/*.test.js

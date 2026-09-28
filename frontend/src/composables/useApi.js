@@ -202,6 +202,7 @@ export default function useApi() {
     rawData,
     member_id,
     report_date,
+    report_id,
   ) => {
     try {
       const payload = {
@@ -211,6 +212,9 @@ export default function useApi() {
       };
       if (report_date) {
         payload.report_date = report_date;
+      }
+      if (report_id) {
+        payload.report_id = parseInt(report_id, 10);
       }
       const response = await axios.post(`${baseURL}/reports`, payload);
       return response.data;

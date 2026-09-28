@@ -282,7 +282,7 @@ onMounted(() => {
 
 <template>
   <div class="page is-wide">
-    <div class="toolbar">
+    <div class="toolbar filters">
       <div class="field">
         <label for="timeline-project">프로젝트</label>
         <select
@@ -483,14 +483,29 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.filters {
+  align-items: end;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(168px, 0.7fr);
+  gap: 12px;
+  margin-bottom: 0;
+}
+
 .filter-select {
-  width: auto;
-  min-width: 200px;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
 }
 
 .view-chips {
   display: flex;
   gap: var(--space-1);
+  min-height: 36px;
+}
+
+.view-chips .btn {
+  flex: 1;
+  height: 36px;
 }
 
 .view-chips .btn.is-active {
@@ -762,31 +777,22 @@ onMounted(() => {
 }
 
 @media (max-width: 860px) {
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+  .filters {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .filters > .field:first-child {
+    grid-column: 1 / -1;
   }
 
   .filter-select {
-    width: 100%;
-    min-width: 0;
     height: 44px;
     font-size: 16px;
   }
 
-  .field-view {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .view-chips {
-    width: auto;
-  }
-
+  .view-chips,
   .view-chips .btn {
-    flex: none;
+    height: 44px;
     min-height: 44px;
   }
 

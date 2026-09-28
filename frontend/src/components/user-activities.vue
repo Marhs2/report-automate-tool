@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import useApi from "../composables/useApi";
+import AppPageHeader from "./ui/AppPageHeader.vue";
 import { useDialog } from "../composables/useDialog";
-import { dayCounts } from "../lib/dayStatus";
+import { AGENDA_NAME_LIMIT, dayCounts, previewPeople } from "../lib/dayStatus";
 
 const router = useRouter();
 const { alert: showAlert } = useDialog();
@@ -22,6 +23,8 @@ const selectedDate = ref("");
 
 const teams = ref([]);
 const filterTeam = ref("all");
+const nameQuery = ref("");
+const expandedGroups = ref({});
 
 const parseDate = (dateStr) => new Date(`${dateStr}T00:00:00`);
 
@@ -144,6 +147,7 @@ const isThisMonth = computed(
 );
 
 function prevMonth() {
+    closeAgenda();
     if (selectedMonth.value === 1) {
         selectedMonth.value = 12;
         selectedYear.value--;
@@ -154,6 +158,7 @@ function prevMonth() {
 }
 
 function nextMonth() {
+    closeAgenda();
     if (selectedMonth.value === 12) {
         selectedMonth.value = 1;
         selectedYear.value++;
@@ -164,14 +169,54 @@ function nextMonth() {
 }
 
 function goThisMonth() {
+    closeAgenda();
     selectedYear.value = currentDate.getFullYear();
     selectedMonth.value = currentDate.getMonth() + 1;
     fetchUserActivities();
 }
 
+const isNarrow = ref(
+    typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches,
+);
+const agendaOpen = ref(false);
+let narrowQuery = null;
+
+const syncNarrow = () => {
+    isNarrow.value = Boolean(narrowQuery?.matches);
+    if (!isNarrow.value) closeAgenda();
+};
+
+const openAgenda = () => {
+    agendaOpen.value = true;
+    document.documentElement.classList.add("is-overlay-open");
+};
+
+const closeAgenda = () => {
+    agendaOpen.value = false;
+    document.documentElement.classList.remove("is-overlay-open");
+};
+
+const onAgendaKey = (event) => {
+    if (event.key === "Escape") closeAgenda();
+};
+
+watch(agendaOpen, (open) => {
+    if (open) window.addEventListener("keydown", onAgendaKey);
+    else window.removeEventListener("keydown", onAgendaKey);
+});
+
 onMounted(() => {
+    narrowQuery = window.matchMedia("(max-width: 860px)");
+    syncNarrow();
+    narrowQuery.addEventListener("change", syncNarrow);
     fetchUserActivities();
     fetchTeams();
+});
+
+onUnmounted(() => {
+    narrowQuery?.removeEventListener("change", syncNarrow);
+    window.removeEventListener("keydown", onAgendaKey);
+    document.documentElement.classList.remove("is-overlay-open");
 });
 
 const orderedActivities = computed(() =>
@@ -229,8 +274,12 @@ const visibleEntries = (cell) =>
 /** 인원이 많으면 한 줄로 나열하기 어렵다. 먼저 챙겨야 하는 미제출을 위로 올린다. */
 const railGroups = (cell) => {
     const entries = visibleEntries(cell);
-    const submitted = entries.filter((entry) => entry.submitted);
-    const missed = entries.filter((entry) => !entry.submitted);
+    const byName = (left, right) =>
+        String(left.name || "").localeCompare(String(right.name || ""), "ko");
+    const submitted = entries
+        .filter((entry) => entry.submitted)
+        .sort(byName);
+    const missed = entries.filter((entry) => !entry.submitted).sort(byName);
     const groups = [];
     if (missed.length) {
         groups.push({ key: "missed", label: "미제출", people: missed });
@@ -239,6 +288,52 @@ const railGroups = (cell) => {
         groups.push({ key: "submitted", label: "제출", people: submitted });
     }
     return groups;
+};
+
+const rosterCount = (cell) => (cell ? visibleEntries(cell).length : 0);
+
+const expandKey = (cell, groupKey) => `${cell?.date || ""}:${groupKey}`;
+
+const expandGroup = (key) => {
+    const current = Number(expandedGroups.value[key]) || AGENDA_NAME_LIMIT;
+    expandedGroups.value = {
+        ...expandedGroups.value,
+        [key]: current + AGENDA_NAME_LIMIT,
+    };
+};
+
+/** 인원이 많으면 다섯 명씩 열고, 이름은 검색으로 찾는다. */
+const agendaGroups = (cell) =>
+    railGroups(cell)
+        .map((group) => {
+            const key = expandKey(cell, group.key);
+            const preview = previewPeople(group.people, {
+                query: nameQuery.value,
+                visible: expandedGroups.value[key] || AGENDA_NAME_LIMIT,
+                limit: AGENDA_NAME_LIMIT,
+            });
+            return {
+                ...group,
+                expandKey: key,
+                people: preview.matched,
+                shown: preview.shown,
+                hidden: preview.hidden,
+                next: preview.next,
+            };
+        })
+        .filter((group) => group.people.length);
+
+watch(selectedDate, () => {
+    nameQuery.value = "";
+    expandedGroups.value = {};
+});
+
+const showNameSearch = (cell) => rosterCount(cell) > 8;
+
+const personTitle = (entry) => {
+    const progress = progressByMember.value[String(entry.member_id)];
+    if (!progress?.total) return entry.name;
+    return `${entry.name} · 이번 달 ${progress.submitted}/${progress.total}`;
 };
 
 const countsOf = (cell) => dayCounts(cell.entries || [], cell.isOffday);
@@ -285,9 +380,10 @@ const selectDay = (cell) => {
         selectedMonth.value = date.getMonth() + 1;
         selectedDate.value = cell.date;
         fetchUserActivities();
-        return;
+    } else {
+        selectedDate.value = cell.date;
     }
-    selectedDate.value = cell.date;
+    if (isNarrow.value) openAgenda();
 };
 
 const agendaTitle = (cell) => {
@@ -369,32 +465,12 @@ const progressByMember = computed(() => {
 </script>
 
 <template>
-    <div class="page calendar-page">
-        <header class="ios-head">
-            <div class="ios-title-row">
-                <h1>{{ selectedMonth }}월</h1>
-                <div class="ios-nav">
-                    <button
-                        v-if="!isThisMonth"
-                        type="button"
-                        class="ios-today"
-                        @click="goThisMonth"
-                    >
-                        오늘
-                    </button>
-                    <button type="button" class="ios-arrow" aria-label="이전 달" @click="prevMonth">
-                        <ChevronLeft :size="18" />
-                    </button>
-                    <button type="button" class="ios-arrow" aria-label="다음 달" @click="nextMonth">
-                        <ChevronRight :size="18" />
-                    </button>
-                </div>
-            </div>
-            <div class="ios-sub">
-                <p>{{ selectedYear }}</p>
+    <div class="page">
+        <AppPageHeader :title="`${selectedYear}년 ${selectedMonth}월`">
+            <template #filters>
                 <select
                     id="activity-filter-team"
-                    class="team-filter"
+                    class="input team-filter"
                     v-model="filterTeam"
                     aria-label="팀"
                     autocomplete="off"
@@ -404,16 +480,34 @@ const progressByMember = computed(() => {
                         {{ team.team_name }}
                     </option>
                 </select>
-            </div>
-        </header>
+            </template>
+            <template #actions>
+                <button
+                    v-if="!isThisMonth"
+                    type="button"
+                    class="btn btn-small"
+                    @click="goThisMonth"
+                >
+                    이번 달
+                </button>
+                <div class="month-nav">
+                    <button type="button" class="icon-btn" aria-label="이전 달" @click="prevMonth">
+                        <ChevronLeft :size="16" />
+                    </button>
+                    <button type="button" class="icon-btn" aria-label="다음 달" @click="nextMonth">
+                        <ChevronRight :size="16" />
+                    </button>
+                </div>
+            </template>
+        </AppPageHeader>
 
         <div v-if="orderedActivities.length === 0" class="empty-state">
             표시할 활동 기록이 없습니다
         </div>
 
-        <div v-else class="ios-board">
-            <div class="ios-month">
-                <div class="ios-weekdays">
+        <div v-else class="activity-board">
+            <section class="card month-card" aria-label="달력">
+                <div class="weekdays">
                     <span
                         v-for="(label, index) in WEEKDAY_LABELS"
                         :key="label"
@@ -422,18 +516,18 @@ const progressByMember = computed(() => {
                         {{ label }}
                     </span>
                 </div>
-                <div class="ios-grid">
+                <div class="month-grid">
                     <button
                         v-for="cell in calendarCells"
                         :key="cell.date"
                         type="button"
-                        class="ios-cell"
+                        class="day-cell"
                         :aria-pressed="selectedDate === cell.date"
                         :aria-label="`${formatDotDate(cell.date)} ${dayStatusLabel(cell)}`"
                         @click="selectDay(cell)"
                     >
                         <span
-                            class="ios-num"
+                            class="day-num"
                             :class="{
                                 sun: cell.weekday === 0,
                                 sat: cell.weekday === 6,
@@ -445,335 +539,450 @@ const progressByMember = computed(() => {
                         >
                             {{ cell.day }}
                         </span>
-                        <span class="ios-dot" :class="dotKind(cell) || 'is-empty'"></span>
+                        <span class="day-dot" :class="dotKind(cell) || 'is-empty'"></span>
                     </button>
                 </div>
-            </div>
+            </section>
 
-            <section v-if="selectedCell" class="ios-agenda" :aria-label="agendaTitle(selectedCell)">
-                <h2>{{ agendaTitle(selectedCell) }}</h2>
-                <p v-if="selectedCell.holidayName" class="ios-holiday">{{ selectedCell.holidayName }}</p>
-                <p class="ios-agenda-meta">
+            <section v-if="selectedCell && !isNarrow" class="card agenda" :aria-label="agendaTitle(selectedCell)">
+                <div class="section-head">
+                    <h2>{{ agendaTitle(selectedCell) }}</h2>
+                </div>
+                <p v-if="selectedCell.holidayName" class="agenda-holiday">{{ selectedCell.holidayName }}</p>
+                <p class="agenda-meta">
                     제출 {{ countsOf(selectedCell).submitted }}
                     <template v-if="!selectedCell.isOffday">
                         · 미제출 {{ countsOf(selectedCell).missed }}
                     </template>
                 </p>
 
+                <label v-if="showNameSearch(selectedCell)" class="agenda-search">
+                    <input
+                        v-model="nameQuery"
+                        class="input"
+                        type="search"
+                        placeholder="이름 검색"
+                        aria-label="이름 검색"
+                        autocomplete="off"
+                    />
+                </label>
+
                 <div
-                    v-for="group in railGroups(selectedCell)"
-                    :key="group.key"
+                    v-for="group in agendaGroups(selectedCell)"
+                    :key="group.expandKey"
                     class="agenda-group"
                 >
-                    <h3>{{ group.label }}</h3>
-                    <template v-for="entry in group.people" :key="entry.member_id">
+                    <h3>{{ group.label }} {{ group.people.length }}</h3>
+                    <div class="agenda-chips">
                         <button
-                            v-if="entry.submitted"
+                            v-for="entry in group.shown.filter((person) => person.submitted)"
+                            :key="entry.member_id"
                             type="button"
-                            class="agenda-row"
+                            class="person-chip"
+                            :title="personTitle(entry)"
                             @click="openCell({ member_id: entry.member_id, name: entry.name }, entry.item)"
                         >
-                            <span class="agenda-mark full"></span>
-                            <span class="agenda-name">{{ entry.name }}</span>
+                            {{ entry.name }}
                         </button>
-                        <div v-else class="agenda-row is-missed">
-                            <span class="agenda-mark"></span>
-                            <span class="agenda-name">{{ entry.name }}</span>
-                        </div>
-                    </template>
+                        <span
+                            v-for="entry in group.shown.filter((person) => !person.submitted)"
+                            :key="entry.member_id"
+                            class="person-chip is-missed"
+                            :title="personTitle(entry)"
+                        >
+                            {{ entry.name }}
+                        </span>
+                    </div>
+                    <button
+                        v-if="group.hidden"
+                        type="button"
+                        class="more-people"
+                        @click="expandGroup(group.expandKey)"
+                    >
+                        {{ group.next }}명 더 보기
+                    </button>
                 </div>
-                <p v-if="!railGroups(selectedCell).length" class="ios-empty">
+                <p v-if="!railGroups(selectedCell).length" class="agenda-empty">
                     이 날 제출한 보고가 없습니다
                 </p>
+                <p
+                    v-else-if="nameQuery.trim() && !agendaGroups(selectedCell).length"
+                    class="agenda-empty"
+                >
+                    해당하는 사람이 없습니다
+                </p>
             </section>
+        <Teleport to="body">
+            <div
+                v-if="isNarrow && agendaOpen && selectedCell"
+                class="app-dialog-overlay"
+                @click.self="closeAgenda"
+            >
+                <div
+                    class="card app-dialog agenda agenda-sheet"
+                    role="dialog"
+                    aria-modal="true"
+                    :aria-label="agendaTitle(selectedCell)"
+                >
+                    <div class="section-head">
+                        <h2>{{ agendaTitle(selectedCell) }}</h2>
+                    </div>
+                    <p v-if="selectedCell.holidayName" class="agenda-holiday">{{ selectedCell.holidayName }}</p>
+                    <p class="agenda-meta">
+                        제출 {{ countsOf(selectedCell).submitted }}
+                        <template v-if="!selectedCell.isOffday">
+                            · 미제출 {{ countsOf(selectedCell).missed }}
+                        </template>
+                    </p>
+                    <label v-if="showNameSearch(selectedCell)" class="agenda-search">
+                        <input
+                            v-model="nameQuery"
+                            class="input"
+                            type="search"
+                            placeholder="이름 검색"
+                            aria-label="이름 검색"
+                            autocomplete="off"
+                        />
+                    </label>
+                    <div
+                        v-for="group in agendaGroups(selectedCell)"
+                        :key="`sheet-${group.expandKey}`"
+                        class="agenda-group"
+                    >
+                        <h3>{{ group.label }} {{ group.people.length }}</h3>
+                        <div class="agenda-chips">
+                            <button
+                                v-for="entry in group.shown.filter((person) => person.submitted)"
+                                :key="entry.member_id"
+                                type="button"
+                                class="person-chip"
+                                :title="personTitle(entry)"
+                                @click="openCell({ member_id: entry.member_id, name: entry.name }, entry.item)"
+                            >
+                                {{ entry.name }}
+                            </button>
+                            <span
+                                v-for="entry in group.shown.filter((person) => !person.submitted)"
+                                :key="entry.member_id"
+                                class="person-chip is-missed"
+                                :title="personTitle(entry)"
+                            >
+                                {{ entry.name }}
+                            </span>
+                        </div>
+                        <button
+                            v-if="group.hidden"
+                            type="button"
+                            class="more-people"
+                            @click="expandGroup(group.expandKey)"
+                        >
+                            {{ group.next }}명 더 보기
+                        </button>
+                    </div>
+                    <p v-if="!railGroups(selectedCell).length" class="agenda-empty">
+                        이 날 제출한 보고가 없습니다
+                    </p>
+                    <p
+                        v-else-if="nameQuery.trim() && !agendaGroups(selectedCell).length"
+                        class="agenda-empty"
+                    >
+                        해당하는 사람이 없습니다
+                    </p>
+                    <div class="app-dialog-actions">
+                        <button class="btn" type="button" @click="closeAgenda">닫기</button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
         </div>
     </div>
 </template>
 
 <style scoped>
-.calendar-page {
-    max-width: 880px;
-}
-
-.ios-head {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.ios-title-row,
-.ios-sub {
+.month-nav {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-1);
 }
 
-.ios-title-row h1 {
-    margin: 0;
-    font-size: 34px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    line-height: 1;
-    color: #1c1c1e;
-}
-
-.ios-sub p {
-    margin: 0;
-    font-size: 15px;
-    color: rgba(60, 60, 67, 0.6);
-}
-
-.ios-nav {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.ios-today,
-.ios-arrow {
-    border: 0;
-    background: transparent;
-    color: #007aff;
-    cursor: pointer;
-}
-
-.ios-today {
-    min-height: 44px;
-    padding: 0 8px;
-    font: inherit;
-    font-size: 17px;
-    font-weight: 400;
-}
-
-.ios-arrow {
+.icon-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border);
     border-radius: 50%;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
 }
 
-.ios-arrow:hover,
-.ios-today:hover {
-    background: rgba(0, 122, 255, 0.08);
+.icon-btn:hover {
+    background: var(--surface-soft);
+    color: var(--text-strong);
 }
 
 .team-filter {
-    height: 32px;
-    max-width: 160px;
-    padding: 0 28px 0 10px;
-    border: 0;
-    border-radius: 8px;
-    background: rgba(120, 120, 128, 0.12);
-    color: #1c1c1e;
-    font: inherit;
-    font-size: 15px;
+    width: 180px;
+    height: 36px;
 }
 
-.ios-board {
+.activity-board {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: var(--space-5);
 }
 
-.ios-weekdays,
-.ios-grid {
+.weekdays,
+.month-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
-.ios-weekdays span {
+.weekdays span {
     text-align: center;
-    font-size: 13px;
-    font-weight: 600;
-    color: rgba(60, 60, 67, 0.6);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
 }
 
-.ios-weekdays .sun,
-.ios-num.sun,
-.ios-num.holiday,
-.ios-holiday {
-    color: #ff3b30;
+.weekdays .sun,
+.day-num.sun,
+.day-num.holiday,
+.agenda-holiday {
+    color: var(--danger-fg);
 }
 
-.ios-weekdays .sat,
-.ios-num.sat {
-    color: #007aff;
+.weekdays .sat,
+.day-num.sat {
+    color: var(--info-fg);
 }
 
-.ios-num.holiday {
-    color: #ff3b30;
-}
-
-.ios-cell {
+.day-cell {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    min-height: 48px;
+    min-height: 44px;
     margin: 0;
-    padding: 2px 0 4px;
+    padding: 4px 0;
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     cursor: pointer;
 }
 
-.ios-num {
+.day-cell:hover {
+    background: var(--surface-soft);
+}
+
+.day-num {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    font-size: 17px;
-    font-weight: 400;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-medium);
     line-height: 1;
-    color: #1c1c1e;
+    color: var(--text-strong);
 }
 
-.ios-num.outside {
-    color: rgba(60, 60, 67, 0.3);
+.day-num.outside,
+.day-num.outside.sun,
+.day-num.outside.sat,
+.day-num.outside.holiday {
+    color: var(--text-muted);
 }
 
-.ios-num.outside.sun,
-.ios-num.outside.sat,
-.ios-num.outside.holiday {
-    color: rgba(60, 60, 67, 0.3);
+.day-num.today {
+    box-shadow: inset 0 0 0 1px var(--accent);
+    color: var(--accent);
+    font-weight: var(--fw-semibold);
 }
 
-.ios-num.today {
-    background: #ff3b30;
+.day-num.selected {
+    background: var(--accent);
+    box-shadow: none;
     color: #fff;
-    font-weight: 600;
+    font-weight: var(--fw-semibold);
 }
 
-.ios-num.selected:not(.today) {
-    background: #e5e5ea;
-}
-
-.ios-dot {
+.day-dot {
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: #007aff;
+    background: var(--accent);
 }
 
-.ios-dot.full {
-    background: #34c759;
+.day-dot.full {
+    background: var(--success-fg);
 }
 
-.ios-dot.is-empty {
+.day-dot.partial {
+    background: var(--warning-fg);
+}
+
+.day-dot.is-empty {
     background: transparent;
 }
 
-.ios-agenda {
-    min-width: 0;
-    padding: 4px 0 8px;
+.section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
 }
 
-.ios-agenda h2 {
+.section-head h2 {
     margin: 0;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: #1c1c1e;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
 }
 
-.ios-holiday,
-.ios-agenda-meta,
-.ios-empty {
-    margin: 4px 0 0;
-    font-size: 13px;
+.agenda-holiday,
+.agenda-meta,
+.agenda-empty {
+    margin: 0;
+    font-size: var(--fs-13);
 }
 
-.ios-agenda-meta,
-.ios-empty {
-    color: rgba(60, 60, 67, 0.6);
+.agenda-meta,
+.agenda-empty {
+    color: var(--text-muted);
 }
 
 .agenda-group {
-    margin-top: 16px;
+    margin-top: var(--space-4);
 }
 
 .agenda-group h3 {
-    margin: 0 0 4px;
-    font-size: 13px;
-    font-weight: 600;
-    color: rgba(60, 60, 67, 0.6);
+    margin: 0 0 var(--space-2);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
 }
 
-.agenda-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.agenda-search {
+    display: block;
+    margin-top: var(--space-3);
+}
+
+.agenda-search .input {
     width: 100%;
-    min-height: 44px;
+    height: 36px;
+}
+
+.agenda-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.person-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    min-height: 32px;
     margin: 0;
-    padding: 8px 0;
-    border: 0;
-    border-top: 1px solid rgba(60, 60, 67, 0.12);
-    background: transparent;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
     font: inherit;
-    text-align: left;
-    color: #1c1c1e;
+    font-size: var(--fs-13);
+    line-height: 1.2;
+    color: var(--text-strong);
 }
 
-.agenda-group .agenda-row:first-of-type {
-    border-top: 0;
-}
-
-button.agenda-row {
+button.person-chip {
     cursor: pointer;
 }
 
-.agenda-row.is-missed {
-    color: rgba(60, 60, 67, 0.45);
+button.person-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
-.agenda-mark {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: rgba(60, 60, 67, 0.28);
-    flex: 0 0 auto;
+.person-chip.is-missed {
+    border-color: transparent;
+    background: var(--surface-soft);
+    color: var(--text-muted);
 }
 
-.agenda-mark.full {
-    background: #34c759;
-}
-
-.agenda-name {
-    font-size: 17px;
+.more-people {
+    margin-top: 8px;
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: var(--fs-13);
+    color: var(--accent);
+    cursor: pointer;
 }
 
 @media (min-width: 900px) {
-    .ios-board {
+    .activity-board {
         flex-direction: row;
         align-items: flex-start;
-        gap: 36px;
     }
 
-    .ios-month {
+    .month-card {
         flex: 0 0 420px;
         width: 420px;
     }
 
-    .ios-agenda {
+    .agenda {
+        position: sticky;
+        top: var(--space-4);
         flex: 1;
-        padding-top: 28px;
+        min-width: 0;
+        max-height: calc(100vh - var(--topbar-height) - 96px);
+        overflow: auto;
     }
 }
 
+.agenda-sheet {
+    display: flex;
+    flex-direction: column;
+    max-height: min(78vh, 640px);
+    overflow: auto;
+}
+
+.agenda-sheet .app-dialog-actions {
+    position: sticky;
+    bottom: 0;
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    background: var(--surface);
+}
+
 @media (max-width: 860px) {
-    .ios-title-row h1 {
-        font-size: 32px;
+    .team-filter {
+        width: auto;
+        min-width: 160px;
+        height: 44px;
     }
 
-    .team-filter {
-        max-width: 140px;
-        font-size: 16px;
+    .month-nav .icon-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .agenda-search .input,
+    .person-chip,
+    .more-people {
+        min-height: 44px;
+    }
+
+    .agenda-search .input {
+        height: 44px;
     }
 }
 </style>

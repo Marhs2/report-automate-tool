@@ -7,6 +7,42 @@ export function memberInitials(name) {
 
 export const CELL_EVENT_LIMIT = 3;
 
+/** 날짜 현황에서 더 보기를 누를 때마다 여는 이름 수. */
+export const AGENDA_NAME_LIMIT = 5;
+
+export function filterPeopleByName(people = [], query = "") {
+    const needle = String(query).trim().toLowerCase();
+    if (!needle) return people;
+    return people.filter((entry) =>
+        String(entry?.name || "")
+            .toLowerCase()
+            .includes(needle),
+    );
+}
+
+/** 검색 중이면 맞는 이름을 모두 보여주고, 아니면 visible명까지만 자른다. */
+export function previewPeople(
+    people = [],
+    { query = "", visible = 0, limit = AGENDA_NAME_LIMIT } = {},
+) {
+    const matched = filterPeopleByName(people, query);
+    const page = Math.max(1, Number(limit) || AGENDA_NAME_LIMIT);
+    if (String(query).trim()) {
+        return { shown: matched, hidden: 0, matched, next: 0 };
+    }
+    const count = Math.max(page, Number(visible) || page);
+    if (matched.length <= count) {
+        return { shown: matched, hidden: 0, matched, next: 0 };
+    }
+    const hidden = matched.length - count;
+    return {
+        shown: matched.slice(0, count),
+        hidden,
+        matched,
+        next: Math.min(page, hidden),
+    };
+}
+
 export function cellEventBars(entries = [], limit = CELL_EVENT_LIMIT) {
     const submitted = entries.filter((entry) => entry.submitted);
     if (submitted.length <= limit) {

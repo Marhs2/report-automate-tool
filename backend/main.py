@@ -228,6 +228,7 @@ class SaveReportData(BaseModel):
     parsed_json: str
     member_id: int
     report_date: str | None = None
+    report_id: int | None = None
 
 
 class ProjectNameRequest(BaseModel):
@@ -336,6 +337,8 @@ def member_is_admin(conn, member_id: int) -> bool:
 def require_admin(conn, actor_id: int):
     if not member_is_admin(conn, actor_id):
         raise HTTPException(status_code=403, detail="관리자만 할 수 있습니다.")
+
+
 
 
 def visible_raw_text(actor_id, owner_id, raw_text):
@@ -2719,6 +2722,7 @@ def save_user(
     }
 
 
+
 @app.get("/users")
 def get_users(actor_id: int = Depends(current_member_id)):
     with get_db() as db:
@@ -2871,21 +2875,60 @@ def save_report(data: SaveReportData, actor_id: int = Depends(current_member_id)
     report_date = validate_report_date(data.report_date or date.today().isoformat())
     raw_text = data.report
     member_id = data.member_id
+    payload = json.dumps(parsed)
 
     with get_db() as conn:
         validate_member(conn, member_id)
         cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM daily_reports WHERE member_id = ? AND report_date = ?",
-            (member_id, report_date),
-        )
-        cursor.execute(
-            """
-            INSERT INTO daily_reports (member_id, report_date, raw_text, parsed_json)
-            VALUES (?, ?, ?, ?)
-            """,
-            (member_id, report_date, raw_text, json.dumps(parsed)),
-        )
+        target_id = None
+        if data.report_id:
+            row = cursor.execute(
+                "SELECT id, member_id FROM daily_reports WHERE id = ?",
+                (data.report_id,),
+            ).fetchone()
+            if row is None or row[1] != member_id:
+                raise HTTPException(
+                    status_code=404, detail="해당 보고서를 찾을 수 없습니다."
+                )
+            target_id = row[0]
+        else:
+            row = cursor.execute(
+                """
+                SELECT id FROM daily_reports
+                WHERE member_id = ? AND report_date = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (member_id, report_date),
+            ).fetchone()
+            if row:
+                target_id = row[0]
+
+        if target_id is not None:
+            cursor.execute(
+                """
+                UPDATE daily_reports
+                SET report_date = ?, raw_text = ?, parsed_json = ?
+                WHERE id = ?
+                """,
+                (report_date, raw_text, payload, target_id),
+            )
+            cursor.execute(
+                """
+                DELETE FROM daily_reports
+                WHERE member_id = ? AND report_date = ? AND id != ?
+                """,
+                (member_id, report_date, target_id),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO daily_reports (member_id, report_date, raw_text, parsed_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (member_id, report_date, raw_text, payload),
+            )
+            target_id = cursor.lastrowid
         cursor.execute(
             "DELETE FROM report_drafts WHERE member_id = ? AND report_date = ?",
             (member_id, report_date),
@@ -2897,7 +2940,11 @@ def save_report(data: SaveReportData, actor_id: int = Depends(current_member_id)
         )
         save_projects(conn, parsed, member_id, report_date)
         conn.commit()
-    return {"message": "Report saved successfully.", "report_date": report_date}
+    return {
+        "message": "Report saved successfully.",
+        "report_date": report_date,
+        "id": target_id,
+    }
 
 
 def save_projects(conn, report_data, member_id, report_date):

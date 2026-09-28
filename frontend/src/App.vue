@@ -9,6 +9,7 @@ import {
     Shield,
     PanelLeftClose,
     PanelLeftOpen,
+    ChevronLeft,
 } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -81,6 +82,15 @@ const currentUser = ref("");
 const currentTeam = ref("");
 
 const isPublicPage = computed(() => Boolean(route.meta.public));
+/** 작성·수정 화면은 메뉴와 제목 줄을 치우고 뒤로 가기만 남긴다. */
+const FOCUS_ROUTES = new Set(["report", "report-result", "weekly-detail"]);
+const isWritePage = computed(() => FOCUS_ROUTES.has(String(route.name || "")));
+
+const goBack = () => {
+    if (window.history.state?.back) router.back();
+    else if (route.name === "weekly-detail") router.push("/weekly");
+    else router.push(pageMeta.value.parent?.to || "/");
+};
 
 router.beforeEach((to) => {
     if (to.meta.public) {
@@ -189,6 +199,7 @@ onUnmounted(() => {
     <RouterView v-if="isPublicPage" />
     <template v-else>
     <aside
+        v-if="!isWritePage"
         id="app-sidebar"
         class="sidebar"
         :class="{ 'is-collapsed': collapsedEffective }"
@@ -265,8 +276,14 @@ onUnmounted(() => {
         </div>
     </aside>
 
-    <main class="main-content" :class="{ 'has-bottom-nav': isNarrow }">
-        <header class="topbar">
+    <main class="main-content" :class="{ 'has-bottom-nav': isNarrow && !isWritePage, 'is-focus-write': isWritePage }">
+        <div v-if="isWritePage" class="write-backbar">
+            <button type="button" class="write-back" @click="goBack">
+                <ChevronLeft :size="22" />
+                뒤로
+            </button>
+        </div>
+        <header v-else class="topbar">
             <nav class="topbar-crumbs" aria-label="현재 위치">
                 <router-link v-if="pageMeta.parent" class="topbar-crumb" :to="pageMeta.parent.to">
                     {{ pageMeta.parent.label }}
@@ -298,7 +315,7 @@ onUnmounted(() => {
             <RouterView />
         </div>
     </main>
-    <nav v-if="isNarrow" class="app-bottom-nav" aria-label="주요 메뉴">
+    <nav v-if="isNarrow && !isWritePage" class="app-bottom-nav" aria-label="주요 메뉴">
         <router-link
             v-for="item in bottomNavItems"
             :key="item.to"

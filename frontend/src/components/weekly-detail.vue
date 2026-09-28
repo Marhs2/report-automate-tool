@@ -7,24 +7,17 @@
                 <span class="detail-period">{{ periodLabel }}</span>
             </div>
             <div class="detail-actions">
-                <button type="button" class="btn btn-small" @click="goBack">목록</button>
-                <button type="button" class="btn btn-small" @click="copyReport" :disabled="isSaving">복사</button>
-                <button
-                    v-if="canEdit"
-                    type="button"
-                    class="btn btn-small"
-                    :class="{ 'btn-primary': !isEditing }"
-                    @click="toggleEditing"
-                >
+                <div class="detail-copy-col">
+                    <button type="button" class="btn btn-small" @click="copyReport"
+                        :disabled="isSaving || isReextracting">복사</button>
+                </div>
+                <button v-if="canEdit" type="button" class="btn btn-small" @click="toggleEditing"
+                    :disabled="isReextracting"
+                    :style="{ backgroundColor: !isEditing ? 'var(--accent)' : 'var(--surface)', color: !isEditing ? 'var(--surface)' : '' }">
                     {{ isEditing ? "읽기" : "수정" }}
                 </button>
-                <button
-                    v-if="canEdit && isEditing"
-                    type="button"
-                    class="btn btn-primary btn-small hide-on-narrow"
-                    @click="saveReport"
-                    :disabled="isSaving"
-                >
+                <button v-if="canEdit && isEditing" type="button" class="btn btn-primary btn-small hide-on-narrow"
+                    @click="saveReport" :disabled="isSaving || isReextracting">
                     {{ isSaving ? "저장 중..." : saveLabel }}
                 </button>
             </div>
@@ -36,11 +29,7 @@
                     아직 채워진 프로젝트가 없습니다
                 </div>
 
-                <section
-                    v-for="block in projectBlocks"
-                    :key="`read-${block.key}`"
-                    class="card project-block"
-                >
+                <section v-for="block in projectBlocks" :key="`read-${block.key}`" class="card project-block">
                     <h2 class="read-project-name">{{ blockTitle(block) || "제목 없음" }}</h2>
                     <div class="split">
                         <div class="split-col">
@@ -49,11 +38,8 @@
                                 <span v-if="reportData.week_label_done">{{ reportData.week_label_done }}</span>
                             </h3>
                             <!-- 슬라이드에서는 한 칸이지만 읽을 때는 완료 / 진행 / 이슈로 나눠 본다. -->
-                            <div
-                                v-for="group in doneGroups(block)"
-                                :key="`${block.key}-${group.kind}`"
-                                class="read-kind"
-                            >
+                            <div v-for="group in doneGroups(block)" :key="`${block.key}-${group.kind}`"
+                                class="read-kind">
                                 <h4 :class="group.kind">{{ group.label }} {{ group.items.length }}</h4>
                                 <ul class="read-list">
                                     <li v-for="(item, index) in group.items" :key="index">{{ item }}</li>
@@ -89,10 +75,8 @@
                     <div v-if="extras.events" class="read-kind">
                         <h4>주요 이벤트 {{ extras.events }}</h4>
                         <ul class="read-list">
-                            <li
-                                v-for="(event, index) in [...eventsOf('month_events'), ...eventsOf('next_month_events')]"
-                                :key="`re-${index}`"
-                            >
+                            <li v-for="(event, index) in [...eventsOf('month_events'), ...eventsOf('next_month_events')]"
+                                :key="`re-${index}`">
                                 {{ [event.when, event.title].filter(Boolean).join(" ") }}
                             </li>
                         </ul>
@@ -103,10 +87,8 @@
                             지원 {{ collab.supports.join(", ") }}
                         </p>
                         <ul class="read-list">
-                            <li
-                                v-for="(item, index) in [...(collab?.done || []), ...(collab?.next || [])].filter(Boolean)"
-                                :key="`rc-${index}`"
-                            >
+                            <li v-for="(item, index) in [...(collab?.done || []), ...(collab?.next || [])].filter(Boolean)"
+                                :key="`rc-${index}`">
                                 {{ item }}
                             </li>
                         </ul>
@@ -155,42 +137,27 @@
                         <span class="fold-count">{{ notices.length }}건</span>
                         <span v-if="!notices.length" class="fold-hint">비우면 슬라이드가 빠집니다</span>
                     </summary>
-                    <div v-for="(notice, noticeIndex) in notices" :key="`notice-${noticeIndex}`" class="fold-block">
+                    <div v-for="(notice, noticeIndex) in notices" :key="`notice-${noticeIndex}`"
+                        class="fold-block notice-block">
                         <div class="fold-block-head">
-                            <input
-                                class="input"
-                                v-model="notice.title"
-                                placeholder="공지 제목 (예: 보안업무관리 규정 제정)"
-                            />
-                            <button
-                                type="button"
-                                class="btn btn-danger"
-                                @click="removeNotice(noticeIndex)"
-                            >
+                            <input class="input" v-model="notice.title" placeholder="공지 제목" />
+                            <button type="button" class="btn btn-danger" @click="removeNotice(noticeIndex)">
                                 삭제
                             </button>
                         </div>
                         <div v-for="(_line, lineIndex) in notice.body" :key="`line-${lineIndex}`" class="task-row">
-                            <input
-                                class="input"
-                                v-model="notice.body[lineIndex]"
-                                placeholder="세부 내용 한 줄"
-                            />
-                            <button
-                                type="button"
-                                class="btn remove-btn"
-                                aria-label="이 항목 삭제"
-                                @click="removeNoticeLine(notice, lineIndex)"
-                            >
+                            <input class="input" v-model="notice.body[lineIndex]" placeholder="세부 내용 한 줄" />
+                            <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
+                                @click="removeNoticeLine(notice, lineIndex)">
                                 삭제
                             </button>
                         </div>
                         <button type="button" class="btn add-btn" @click="addNoticeLine(notice)">
-                            항목 추가
+                            줄 추가
                         </button>
                     </div>
-                    <button type="button" class="btn add-btn" @click="addNotice">
-                        항목 추가
+                    <button type="button" class="btn add-project-btn add-notice-btn" @click="addNotice">
+                        공지 추가
                     </button>
                 </details>
 
@@ -204,27 +171,12 @@
                     <div class="split">
                         <section v-for="list in eventLists" :key="list.key" class="field-group split-col">
                             <h2>{{ list.label }}</h2>
-                            <div
-                                v-for="(event, eventIndex) in eventsOf(list.key)"
-                                :key="`${list.key}-${eventIndex}`"
-                                class="task-row"
-                            >
-                                <input
-                                    class="input event-when"
-                                    v-model="event.when"
-                                    placeholder="6/15"
-                                />
-                                <input
-                                    class="input"
-                                    v-model="event.title"
-                                    placeholder="내용"
-                                />
-                                <button
-                                    type="button"
-                                    class="btn remove-btn"
-                                    aria-label="이 항목 삭제"
-                                    @click="removeEvent(list.key, eventIndex)"
-                                >
+                            <div v-for="(event, eventIndex) in eventsOf(list.key)" :key="`${list.key}-${eventIndex}`"
+                                class="task-row">
+                                <input class="input event-when" v-model="event.when" placeholder="6/15" />
+                                <input class="input" v-model="event.title" placeholder="내용" />
+                                <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
+                                    @click="removeEvent(list.key, eventIndex)">
                                     삭제
                                 </button>
                             </div>
@@ -236,64 +188,32 @@
                     </div>
                 </details>
 
-                <div
-                    class="card project-block"
-                    v-for="block in projectBlocks"
-                    :key="block.key"
-                >
+                <div class="card project-block" v-for="block in projectBlocks" :key="block.key">
                     <div class="project-head">
-                        <input
-                            class="input project-name-input"
-                            :value="blockTitle(block)"
-                            placeholder="프로젝트 이름"
-                            @input="setBlockTitle(block, $event.target.value)"
-                        />
-                        <button
-                            type="button"
-                            class="btn btn-danger"
-                            @click="removeProject(block)"
-                        >
+                        <input class="input project-name-input" :value="blockTitle(block)" placeholder="프로젝트 이름"
+                            @input="setBlockTitle(block, $event.target.value)" />
+                        <button type="button" class="btn btn-danger" @click="removeProject(block)">
                             삭제
                         </button>
                     </div>
                     <div class="split">
-                        <section
-                            v-for="col in columns"
-                            :key="col.kind"
-                            class="field-group split-col"
-                        >
+                        <section v-for="col in columns" :key="col.kind" class="field-group split-col">
                             <h2>{{ col.label }}</h2>
-                            <div
-                                v-for="(_item, itemIndex) in (block[col.kind]?.items || [])"
-                                :key="`${col.kind}-${block.key}-${itemIndex}`"
-                                class="task-row"
-                            >
-                                <textarea
-                                    class="input task-editor"
+                            <div v-for="(_item, itemIndex) in (block[col.kind]?.items || [])"
+                                :key="`${col.kind}-${block.key}-${itemIndex}`" class="task-row">
+                                <textarea class="input task-editor"
                                     :data-weekly-editor="`${block.key}-${col.kind}-${itemIndex}`"
-                                    v-model="block[col.kind].items[itemIndex]"
-                                    rows="1"
-                                    placeholder="내용을 입력하세요"
-                                    @input="growEditor"
-                                    @keydown.enter.exact.prevent="$event.target.blur()"
-                                />
-                                <button
-                                    type="button"
-                                    class="btn remove-btn"
-                                    aria-label="이 항목 삭제"
-                                    @click="removeAt(block[col.kind].items, itemIndex)"
-                                >
+                                    v-model="block[col.kind].items[itemIndex]" rows="1" placeholder="내용을 입력하세요"
+                                    @input="growEditor" @keydown.enter.exact.prevent="$event.target.blur()" />
+                                <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
+                                    @click="removeAt(block[col.kind].items, itemIndex)">
                                     삭제
                                 </button>
                             </div>
                             <p v-if="!(block[col.kind]?.items || []).length" class="empty-msg">
                                 항목이 없습니다
                             </p>
-                            <button
-                                type="button"
-                                class="btn add-btn"
-                                @click="addItem(block, col.kind)"
-                            >
+                            <button type="button" class="btn add-btn" @click="addItem(block, col.kind)">
                                 항목 추가
                             </button>
                         </section>
@@ -313,37 +233,20 @@
                     </summary>
                     <div class="support-picker" role="group" aria-label="지원 센터">
                         <span class="support-label">지원</span>
-                        <button
-                            v-for="code in COLLAB_CENTERS"
-                            :key="code"
-                            type="button"
-                            class="support-chip"
+                        <button v-for="code in COLLAB_CENTERS" :key="code" type="button" class="support-chip"
                             :class="{ 'is-on': collab.supports.includes(code) }"
-                            :aria-pressed="collab.supports.includes(code)"
-                            @click="toggleSupport(code)"
-                        >
+                            :aria-pressed="collab.supports.includes(code)" @click="toggleSupport(code)">
                             {{ code }}
                         </button>
                     </div>
                     <div class="split">
                         <section v-for="col in collabColumns" :key="col.kind" class="field-group split-col">
                             <h2>{{ col.label }}</h2>
-                            <div
-                                v-for="(_item, itemIndex) in collab[col.kind]"
-                                :key="`collab-${col.kind}-${itemIndex}`"
-                                class="task-row"
-                            >
-                                <input
-                                    class="input"
-                                    v-model="collab[col.kind][itemIndex]"
-                                    placeholder="내용을 입력하세요"
-                                />
-                                <button
-                                    type="button"
-                                    class="btn remove-btn"
-                                    aria-label="이 항목 삭제"
-                                    @click="removeCollabItem(col.kind, itemIndex)"
-                                >
+                            <div v-for="(_item, itemIndex) in collab[col.kind]" :key="`collab-${col.kind}-${itemIndex}`"
+                                class="task-row">
+                                <input class="input" v-model="collab[col.kind][itemIndex]" placeholder="내용을 입력하세요" />
+                                <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
+                                    @click="removeCollabItem(col.kind, itemIndex)">
                                     삭제
                                 </button>
                             </div>
@@ -357,13 +260,12 @@
                 <div class="card save-bar">
                     <span class="save-note">{{ userName }}</span>
                     <div class="save-actions">
-                        <button class="btn" @click="copyReport" :disabled="isSaving">복사</button>
-                        <button
-                            v-if="canEdit"
-                            class="btn btn-primary"
-                            @click="saveReport"
-                            :disabled="isSaving"
-                        >
+                        <button v-if="canEdit" type="button" class="btn btn-small" @click="reextractReport"
+                            :disabled="isSaving || isReextracting">
+                            {{ isReextracting ? "재추출 중..." : "재추출" }}
+                        </button>
+                        <button v-if="canEdit" class="btn btn-primary" @click="saveReport"
+                            :disabled="isSaving || isReextracting">
                             {{ isSaving ? "저장 중..." : saveLabel }}
                         </button>
                     </div>
@@ -399,13 +301,14 @@ import AppField from "./ui/AppField.vue";
 
 const route = useRoute();
 const router = useRouter();
-const goBack = () => router.push("/weekly");
 
 const reportData = ref(null);
 const userName = ref("");
 const ownerMemberId = ref(null);
 const isSaving = ref(false);
+const isReextracting = ref(false);
 const isEditing = ref(false);
+const selectedDates = ref([]);
 const isUnsaved = computed(() => String(route.params.id || "") === "new");
 const saveLabel = computed(() => (isUnsaved.value ? "저장" : "수정 저장"));
 const isMine = computed(() => {
@@ -413,7 +316,7 @@ const isMine = computed(() => {
     return String(ownerMemberId.value) === String(selectedUserId.value);
 });
 const canEdit = computed(() => isMine.value || isAdmin.value);
-const { getUsers, getWeeklyReportById, postCreateWeekly, updateWeeklyReport } = useApi();
+const { getUsers, getWeeklyReportById, postCreateWeekly, postWeeklyReport, updateWeeklyReport } = useApi();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
 
 const toggleEditing = () => {
@@ -707,6 +610,7 @@ const loadDraft = () => {
         return;
     }
     reportData.value = toWeeklyDeck(draft.report);
+    selectedDates.value = Array.isArray(draft.selects) ? draft.selects : [];
     ownerMemberId.value = draft.memberId ?? selectedUserId.value ?? null;
     userName.value = reportData.value.author || "";
     applyRememberedHeader();
@@ -753,6 +657,7 @@ onMounted(async () => {
         try {
             const data = await getWeeklyReportById(reportId);
             reportData.value = toWeeklyDeck(data.report);
+            selectedDates.value = Array.isArray(data.selectedDate) ? data.selectedDate : [];
             if (!reportData.value.author) {
                 reportData.value.author = data.memberName || "";
             }
@@ -782,6 +687,63 @@ onMounted(async () => {
             });
     }
 });
+
+const reextractReport = async () => {
+    if (!canEdit.value) {
+        showAlert("자신의 보고만 다시 만들 수 있습니다.");
+        return;
+    }
+    const dates = selectedDates.value;
+    if (!dates.length) {
+        showAlert("다시 뽑을 날짜가 없습니다. 목록에서 기간을 골라 주세요.");
+        return;
+    }
+    const ok = await askConfirm("지금 고친 내용은 바뀝니다. 저장하기 전까지는 반영되지 않습니다.", {
+        title: "일일보고로 다시 뽑을까요?",
+        confirmLabel: "재추출",
+    });
+    if (!ok) return;
+    const memberId = ownerMemberId.value ?? selectedUserId.value;
+    if (memberId == null) {
+        showAlert("사용자 정보가 없습니다.");
+        return;
+    }
+    isReextracting.value = true;
+    try {
+        const response = await postWeeklyReport(memberId, dates);
+        const nextDraft = response.data || {};
+        if (!nextDraft.report) {
+            showAlert("주간 보고서를 다시 만들지 못했습니다.");
+            return;
+        }
+        const next = toWeeklyDeck(nextDraft.report);
+        if (!next.author) next.author = userName.value;
+        if (Array.isArray(nextDraft.selects) && nextDraft.selects.length) {
+            selectedDates.value = nextDraft.selects;
+        }
+        if (isUnsaved.value) {
+            const raw = sessionStorage.getItem(WEEKLY_DRAFT_KEY);
+            let stored = {};
+            try {
+                stored = raw ? JSON.parse(raw) : {};
+            } catch {
+                stored = {};
+            }
+            stored.selects = selectedDates.value;
+            stored.report = next;
+            sessionStorage.setItem(WEEKLY_DRAFT_KEY, JSON.stringify(stored));
+        }
+        reportData.value = next;
+        applyRememberedHeader();
+        showAlert("일일보고로 다시 뽑았습니다. 저장해야 반영됩니다.");
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        console.error("재추출 실패:", error);
+        showAlert(detail || "재추출에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+        isReextracting.value = false;
+    }
+};
 
 const copyReport = async () => {
     if (!reportData.value) return;
@@ -911,8 +873,15 @@ const saveReport = async () => {
 .detail-actions {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--space-2);
+}
+
+.detail-copy-col {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
 }
 
 .read-project-name {
@@ -940,7 +909,7 @@ const saveReport = async () => {
     color: var(--text);
 }
 
-.read-kind + .read-kind {
+.read-kind+.read-kind {
     margin-top: var(--space-3);
 }
 
@@ -1002,7 +971,7 @@ const saveReport = async () => {
     padding: var(--space-3) var(--space-4);
 }
 
-.fold-card > summary {
+.fold-card>summary {
     display: flex;
     align-items: center;
     gap: var(--space-2);
@@ -1011,7 +980,7 @@ const saveReport = async () => {
     color: var(--text);
 }
 
-.fold-card[open] > summary {
+.fold-card[open]>summary {
     margin-bottom: var(--space-4);
 }
 
@@ -1036,20 +1005,53 @@ const saveReport = async () => {
     color: var(--text-muted);
 }
 
-.fold-block + .fold-block {
-    margin-top: var(--space-4);
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--border);
+.fold-block+.fold-block {
+    margin-top: 12px;
+}
+
+.notice-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
 }
 
 .fold-block-head {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
+    gap: 8px;
+    margin-bottom: 0;
+    min-width: 0;
+    width: 100%;
 }
 
-.fold-card .add-project {
+.fold-block-head .input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.fold-block-head .btn {
+    width: auto;
+    min-width: 56px;
+    height: 44px;
+    padding: 0 12px;
+}
+
+.notice-block .add-btn {
+    width: 100%;
+    align-self: stretch;
+    border-style: dashed;
+    background: transparent;
+}
+
+.fold-card .add-project,
+.add-notice-btn {
     margin-top: var(--space-3);
 }
 
@@ -1099,7 +1101,7 @@ const saveReport = async () => {
     padding: var(--space-3) var(--space-4);
 }
 
-.meta-card > summary {
+.meta-card>summary {
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -1123,7 +1125,7 @@ const saveReport = async () => {
     color: var(--text-muted);
 }
 
-.meta-card[open] > summary {
+.meta-card[open]>summary {
     margin-bottom: var(--space-4);
 }
 
@@ -1281,6 +1283,7 @@ const saveReport = async () => {
 
 
 @media (max-width: 1100px) {
+
     .meta-grid,
     .split {
         grid-template-columns: minmax(0, 1fr);
@@ -1290,12 +1293,13 @@ const saveReport = async () => {
 @media (max-width: 860px) {
     .detail-actions {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         width: 100%;
         gap: 8px;
     }
 
-    .detail-actions .btn {
+    .detail-actions .btn,
+    .detail-copy-col .btn {
         flex: none;
         width: 100%;
         min-height: 44px;
@@ -1308,7 +1312,7 @@ const saveReport = async () => {
         -webkit-line-clamp: 2;
     }
 
-    .fold-card > summary {
+    .fold-card>summary {
         flex-wrap: wrap;
         align-items: flex-start;
         row-gap: 4px;
@@ -1319,13 +1323,23 @@ const saveReport = async () => {
         margin-left: 0;
     }
 
-    .fold-block-head {
-        flex-direction: column;
-        align-items: stretch;
+    .save-bar {
+        background: var(--surface);
+    }
+
+    .save-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .save-actions .btn {
+        width: 100%;
     }
 
     .task-editor {
-        min-height: 72px;
+        min-height: 44px;
         font-size: 16px;
     }
 }

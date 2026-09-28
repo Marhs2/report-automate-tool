@@ -6,8 +6,7 @@ import { useDialog } from "../composables/useDialog";
 import { isAdmin } from "../composables/useSession";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { weekdayLabelOf } from "../lib/dateScope";
-import { reportHeadline } from "../lib/reportSummary";
-import AppListRow from "./ui/AppListRow.vue";
+import { reportCounts, reportHeadline } from "../lib/reportSummary";
 
 const router = useRouter();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
@@ -96,6 +95,7 @@ const groups = computed(() => {
         date,
         label: formatDate(date),
         weekday: weekdayLabelOf(date),
+        point: groupPoint(index.get(date)),
         reports: index.get(date).slice().sort((a, b) => {
             if (isMine(a) !== isMine(b)) return isMine(a) ? -1 : 1;
             return String(a.member_name || "").localeCompare(
@@ -110,6 +110,26 @@ const formatDate = (value) => {
     const [year, month, day] = String(value || "").split("-");
     if (!year || !month || !day) return value || "";
     return `${year}.${Number(month)}.${Number(day)}`;
+};
+
+const groupPoint = (rows) => {
+    const issues = rows.reduce(
+        (sum, report) => sum + reportCounts(report.parsed_json).issues,
+        0,
+    );
+    const bits = [`${rows.length}명`];
+    if (issues) bits.push(`이슈 ${issues}`);
+    return bits.join(" · ");
+};
+
+const badgesOf = (report) => {
+    const counts = reportCounts(report.parsed_json);
+    return [
+        counts.done && { key: "done", label: `완료 ${counts.done}` },
+        counts.progress && { key: "progress", label: `진행 ${counts.progress}` },
+        counts.issues && { key: "issues", label: `이슈 ${counts.issues}` },
+        counts.requests && { key: "requests", label: `요청 ${counts.requests}` },
+    ].filter(Boolean);
 };
 
 const openDetail = (reportId) => {
@@ -174,32 +194,47 @@ onMounted(() => {
             {{ query.trim() || filterProject ? "검색 결과가 없습니다." : "보고서가 없습니다." }}
         </p>
 
-        <section v-for="group in groups" :key="group.date" class="card day">
-            <h2>{{ group.label }} {{ group.weekday }}</h2>
-            <AppListRow
-                v-for="report in group.reports"
-                :key="report.id"
-                clickable
-                tabindex="0"
-                @click="openDetail(report.id)"
-                @keydown="onRowKeydown($event, report.id)"
-            >
-                <div class="who">
-                    <strong>{{ report.member_name }}</strong>
-                    <span v-if="reportHeadline(report.parsed_json)">
-                        {{ reportHeadline(report.parsed_json) }}
-                    </span>
-                </div>
-                <template v-if="canManage(report)" #actions>
+        <section v-for="group in groups" :key="group.date" class="day">
+            <header class="day-head">
+                <h2>{{ group.label }} {{ group.weekday }}</h2>
+                <p class="day-point">{{ group.point }}</p>
+            </header>
+            <div class="reports">
+                <article
+                    v-for="report in group.reports"
+                    :key="report.id"
+                    class="report"
+                    tabindex="0"
+                    @click="openDetail(report.id)"
+                    @keydown="onRowKeydown($event, report.id)"
+                >
+                    <div class="chips">
+                        <span
+                            v-for="name in projectNamesOf(report)"
+                            :key="name"
+                            class="chip"
+                        >{{ name }}</span>
+                        <span v-if="projectNamesOf(report).length === 0" class="chip">프로젝트 없음</span>
+                    </div>
+                    <p class="person">{{ report.member_name }}</p>
+                    <p v-if="badgesOf(report).length" class="badges">
+                        <span
+                            v-for="badge in badgesOf(report)"
+                            :key="badge.key"
+                            class="badge"
+                            :class="badge.key"
+                        >{{ badge.label }}</span>
+                    </p>
                     <button
+                        v-if="canManage(report)"
                         type="button"
                         class="row-delete"
-                        @click="deleteProjectReport(report.id)"
+                        @click.stop="deleteProjectReport(report.id)"
                     >
                         삭제
                     </button>
-                </template>
-            </AppListRow>
+                </article>
+            </div>
         </section>
     </div>
 </template>
@@ -240,49 +275,132 @@ onMounted(() => {
 }
 
 .day {
-    margin-top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.day-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .day h2 {
-    margin: 0 0 4px;
-    font-size: 14px;
+    margin: 0;
+    font-size: 16px;
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }
 
-.who {
+.day-point {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.reports {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.report {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 8px;
     min-width: 0;
-}
-
-.who strong {
-    font-size: 15px;
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.who span {
-    font-size: 14px;
-    color: var(--text);
-    word-break: keep-all;
-}
-
-.row-delete {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0 8px;
-    border: 0;
-    background: transparent;
-    color: var(--danger-fg);
-    font: inherit;
-    font-size: 14px;
+    padding: 14px 44px 14px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
     cursor: pointer;
 }
 
+.report:hover {
+    border-color: var(--border-strong);
+    background: var(--accent-soft);
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    min-width: 0;
+}
+
+.chip {
+    display: inline-block;
+    color: var(--text-strong);
+    font-size: 15px;
+    font-weight: var(--fw-semibold);
+    line-height: 1.35;
+    white-space: nowrap;
+    word-break: keep-all;
+}
+
+.person {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text);
+}
+
+.badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+}
+
+.badge {
+    padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.badge.issues {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+}
+
+.row-delete {
+    position: absolute;
+    top: 10px;
+    right: 8px;
+    min-width: 32px;
+    min-height: 28px;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.row-delete:hover {
+    color: var(--danger-fg);
+}
+
+@media (min-width: 721px) {
+    .reports {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .report:only-child {
+        grid-column: 1 / -1;
+    }
+}
+
 .row-delete:focus-visible,
-.app-list-row:focus-visible,
+.report:focus-visible,
 .list-search .input:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;

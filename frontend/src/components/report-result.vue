@@ -6,14 +6,9 @@
                 <h1>{{ userName || "일일보고" }}</h1>
                 <span class="detail-date">{{ formatDotDate(reportDate) || "날짜 없음" }}</span>
             </div>
-            <div class="detail-actions">
-                <template v-if="canEdit">
-                    <button class="edit-quiet" type="button" @click="retryExtract" :disabled="aiLoading">
-                        {{ aiLoading ? "재추출 중..." : "재추출" }}
-                    </button>
-                </template>
-            </div>
         </header>
+
+     
 
         <Teleport to="body">
             <div
@@ -23,18 +18,30 @@
             >
                 <div class="card app-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-project-title">
                     <h2 id="edit-project-title" class="app-dialog-message">프로젝트</h2>
-                    <div class="edit-pick-list" role="listbox" aria-label="프로젝트 목록">
-                        <button
+                    <div class="edit-pick-list" role="listbox" aria-label="이 보고서의 프로젝트">
+                        <div
                             v-for="(project, index) in reportData?.projects || []"
-                            :key="`pick-${index}`"
-                            type="button"
-                            class="edit-pick"
-                            :class="{ 'is-on': index === activeIndex }"
-                            :aria-selected="index === activeIndex"
-                            @click="chooseProject(index)"
+                            :key="project._uid || index"
+                            class="edit-pick-row"
                         >
-                            {{ project.projectName || `프로젝트 ${index + 1}` }}
-                        </button>
+                            <button
+                                type="button"
+                                class="edit-pick"
+                                :class="{ 'is-on': index === activeIndex }"
+                                :aria-selected="index === activeIndex"
+                                @click="selectReportProject(index)"
+                            >
+                                {{ project.projectName || `프로젝트 ${index + 1}` }}
+                            </button>
+                            <button
+                                class="edit-drop"
+                                type="button"
+                                @click="deleteReportProject(index)"
+                            >
+                                삭제
+                            </button>
+                        </div>
+                        <p v-if="!(reportData?.projects || []).length" class="edit-empty">이 보고서에 프로젝트가 없습니다.</p>
                     </div>
                     <form class="edit-project-add" @submit.prevent="addNamedProject">
                         <input
@@ -46,14 +53,6 @@
                         />
                         <button class="btn" type="submit">추가</button>
                     </form>
-                    <button
-                        v-if="activeProject"
-                        class="edit-drop"
-                        type="button"
-                        @click="removeActiveProject"
-                    >
-                        이 프로젝트 삭제
-                    </button>
                     <div class="app-dialog-actions">
                         <button class="btn" type="button" @click="closeProjectPopup">닫기</button>
                     </div>
@@ -111,6 +110,95 @@
                 </div>
                 </template>
 
+                <template v-else-if="!isNarrow">
+                <div
+                    v-for="(project, projectIndex) in reportData.projects"
+                    :key="project._uid || projectIndex"
+                    :id="`project-${projectIndex}`"
+                    class="card projects-container"
+                    :data-accent="projectAccentIndex(projectIndex)"
+                >
+                    <div class="project-head">
+                        <i class="project-dot" aria-hidden="true"></i>
+                        <span
+                            v-if="reportData.projects.length > 1"
+                            class="project-kicker"
+                        >프로젝트 {{ projectIndex + 1 }}/{{ reportData.projects.length }}</span>
+                        <input
+                            class="input project-name-input"
+                            v-model="project.projectName"
+                            placeholder="프로젝트 이름"
+                        />
+                        <button
+                            class="btn"
+                            type="button"
+                            @click="openProjectPopup(projectIndex)"
+                        >
+                            고르기
+                        </button>
+                        <button
+                            class="btn btn-danger"
+                            type="button"
+                            @click="removeProject(projectIndex)"
+                        >
+                            삭제
+                        </button>
+                    </div>
+                    <div
+                        v-for="col in DESK_FIELDS"
+                        :key="col.key"
+                        class="field-group"
+                        :class="col.key"
+                    >
+                        <h2>{{ col.label }}</h2>
+                        <div
+                            v-for="(_item, itemIndex) in project[col.key] || []"
+                            :key="`${col.key}-${itemIndex}`"
+                            class="task-row"
+                        >
+                            <input
+                                class="input"
+                                v-model="project[col.key][itemIndex]"
+                                :aria-label="col.label"
+                            />
+                            <button
+                                class="btn remove-btn"
+                                type="button"
+                                aria-label="이 항목 삭제"
+                                @click="removeRow(project, col.key, itemIndex)"
+                            >
+                                삭제
+                            </button>
+                        </div>
+                        <p v-if="!(project[col.key] || []).length" class="empty-msg">{{ col.empty }}</p>
+                        <button class="btn add-btn" type="button" @click="addField(project, col.key)">
+                            항목 추가
+                        </button>
+                    </div>
+                </div>
+                <button class="btn add-project-btn" type="button" @click="openProjectPopup()">프로젝트 추가</button>
+                <div class="card save-bar">
+                    <div class="save-actions">
+                        <button
+                            class="btn btn-primary"
+                            @click="saveReport"
+                            :disabled="aiLoading || saving"
+                        >
+                            {{ saving ? "저장 중..." : savedReportId ? "수정 저장" : "저장하기" }}
+                        </button>
+                        <button
+                            v-if="rawData"
+                            class="btn reextract-btn"
+                            type="button"
+                            :disabled="aiLoading || saving"
+                            @click="retryExtract"
+                        >
+                            {{ aiLoading ? "재추출 중..." : "재추출" }}
+                        </button>
+                    </div>
+                </div>
+                </template>
+
                 <template v-else>
                 <div v-if="activeProject" class="card projects-container">
                     <div class="edit-current">
@@ -120,7 +208,7 @@
                             placeholder="프로젝트 이름"
                             aria-label="프로젝트 이름"
                         />
-                        <button type="button" class="edit-more" @click="openProjectPopup">더보기</button>
+                        <button type="button" class="edit-more" @click="openProjectPopup(activeIndex)">더보기</button>
                     </div>
                     <section
                         v-for="col in EDIT_COLUMNS"
@@ -191,13 +279,22 @@
                         >
                             {{ saving ? "저장 중..." : savedReportId ? "수정 저장" : "저장하기" }}
                         </button>
+                        <button
+                v-if="rawData"
+                class="btn reextract-btn"
+                type="button"
+                :disabled="aiLoading || saving"
+                @click="retryExtract"
+            >
+                {{ aiLoading ? "재추출 중..." : "재추출" }}
+            </button>
                     </div>
                 </div>
                 </template>
             </div>
 
-            <aside v-if="rawData" class="card raw-container">
-                <button type="button" class="raw-fold" @click="rawOpen = !rawOpen">
+            <aside v-if="rawData" class="card raw-container" >
+                <button type="button" class="raw-fold"  @click="rawOpen = !rawOpen">
                     {{ rawOpen ? "원본 접기" : "원본 보기" }}
                 </button>
                 <template v-if="rawOpen">
@@ -217,7 +314,7 @@
 </template>
 
 <script setup>
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
@@ -243,7 +340,7 @@ const saving = ref(false);
 const isLoading = ref(false);
 const savedReportId = ref(null);
 const savedMemberId = ref(null);
-const { postSaveReport, postReport, getUsers, getReportById } = useApi();
+const { postSaveReport, postReport, getUsers, getReportById, getProjectNames, postProjectName } = useApi();
 
 
 /** 읽기 모드에서 쓰는 순서. 편집 칸과 같은 키를 쓴다. */
@@ -263,10 +360,28 @@ const EDIT_COLUMNS = [
     { key: "nextPlans", label: "다음 계획", placeholder: "다음에 할 일" },
 ];
 
+const DESK_FIELDS = [
+    { key: "completedTasks", label: "완료된 업무", empty: "완료된 업무가 없습니다" },
+    { key: "inProgressTasks", label: "진행 중인 업무", empty: "진행 중인 업무가 없습니다" },
+    { key: "issues", label: "이슈", empty: "이슈가 없습니다" },
+    { key: "requests", label: "요청사항", empty: "요청사항이 없습니다" },
+    { key: "nextPlans", label: "다음 계획", empty: "다음 계획이 없습니다" },
+];
+
+const isNarrow = ref(
+    typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches,
+);
+let narrowQuery = null;
+const syncNarrow = () => {
+    isNarrow.value = Boolean(narrowQuery?.matches);
+};
+
 const activeIndex = ref(0);
+const knownProjects = ref([]);
 const editKind = ref(EDIT_COLUMNS[0].key);
 const draftText = ref("");
 const projectPopup = ref(false);
+const assignIndex = ref(null);
 const newProjectName = ref("");
 const rawOpen = ref(
     typeof window !== "undefined" && window.matchMedia("(min-width: 861px)").matches,
@@ -321,9 +436,28 @@ watch(
     { immediate: true },
 );
 
+const loadProjects = async () => {
+    try {
+        const names = await getProjectNames();
+        knownProjects.value = Array.isArray(names)
+            ? names.map((name) => String(name || "").trim()).filter(Boolean)
+            : [];
+    } catch {
+        knownProjects.value = [];
+    }
+};
+
+onMounted(() => {
+    narrowQuery = window.matchMedia("(max-width: 860px)");
+    syncNarrow();
+    narrowQuery.addEventListener("change", syncNarrow);
+    loadProjects();
+});
+
 onUnmounted(() => {
     pageTitleOverride.value = "";
     pageParentOverride.value = null;
+    narrowQuery?.removeEventListener("change", syncNarrow);
     window.removeEventListener("keydown", onEditKey);
     document.documentElement.classList.remove("is-overlay-open");
 });
@@ -465,31 +599,66 @@ watch(
     { immediate: true },
 );
 
-const addProject = () => {
-    reportData.value.projects.push({
-        projectName: "",
-        completedTasks: [],
-        inProgressTasks: [],
-        issues: [],
-        requests: [],
-        nextPlans: [],
-    });
-};
+const blankProject = (name = "") => ({
+    projectName: name,
+    completedTasks: [],
+    inProgressTasks: [],
+    issues: [],
+    requests: [],
+    nextPlans: [],
+});
 
-const chooseProject = (index) => {
+const focusProject = async (index) => {
     activeIndex.value = index;
-    closeProjectPopup();
+    await nextTick();
+    scrollToProject(index);
 };
 
-const openProjectPopup = () => {
+const chooseNamedProject = async (name) => {
+    const value = String(name || "").trim();
+    if (!value || !reportData.value) return;
+    const projects = reportData.value.projects;
+    const target = assignIndex.value;
+    if (target != null && projects[target]) {
+        const other = projects.findIndex(
+            (project, index) =>
+                index !== target && String(project.projectName || "").trim() === value,
+        );
+        if (other >= 0) {
+            closeProjectPopup();
+            await focusProject(other);
+            return;
+        }
+        projects[target].projectName = value;
+        closeProjectPopup();
+        await focusProject(target);
+        return;
+    }
+    const index = projects.findIndex(
+        (project) => String(project.projectName || "").trim() === value,
+    );
+    if (index >= 0) {
+        closeProjectPopup();
+        await focusProject(index);
+        return;
+    }
+    projects.push(blankProject(value));
+    closeProjectPopup();
+    await focusProject(projects.length - 1);
+};
+
+const openProjectPopup = (index = null) => {
+    assignIndex.value = Number.isInteger(index) ? index : null;
     newProjectName.value = "";
     projectPopup.value = true;
     document.documentElement.classList.add("is-overlay-open");
+    loadProjects();
 };
 
 const closeProjectPopup = () => {
     projectPopup.value = false;
     newProjectName.value = "";
+    assignIndex.value = null;
     document.documentElement.classList.remove("is-overlay-open");
 };
 
@@ -502,18 +671,33 @@ watch(projectPopup, (open) => {
     else window.removeEventListener("keydown", onEditKey);
 });
 
-const addNamedProject = () => {
-    const name = newProjectName.value.trim();
-    if (!name || !reportData.value) return;
-    addProject();
-    const projects = reportData.value.projects;
-    projects[projects.length - 1].projectName = name;
-    activeIndex.value = projects.length - 1;
-    closeProjectPopup();
+const registerProject = async (name) => {
+    const value = String(name || "").trim();
+    if (!value) return;
+    if (!knownProjects.value.includes(value)) {
+        knownProjects.value = [...knownProjects.value, value];
+    }
+    try {
+        await postProjectName(value, "");
+    } catch (error) {
+        if (error.response?.status !== 409) {
+            showAlert(error.response?.data?.detail || "프로젝트를 추가하지 못했습니다.");
+        }
+    }
 };
 
-const removeRow = (project, key, index) => {
+const addNamedProject = async () => {
+    const name = newProjectName.value.trim();
+    if (!name || !reportData.value) return;
+    await registerProject(name);
+    assignIndex.value = null;
+    await chooseNamedProject(name);
+};
+
+const removeRow = async (project, key, index) => {
+    if (!Array.isArray(project?.[key])) return;
     project[key].splice(index, 1);
+    if (savedReportId.value) await persistReport();
 };
 
 const addCurrentLine = () => {
@@ -521,6 +705,11 @@ const addCurrentLine = () => {
     if (!text || !activeProject.value) return;
     activeProject.value[editKind.value].push(text);
     draftText.value = "";
+};
+
+const addField = (project, key) => {
+    if (!Array.isArray(project[key])) project[key] = [];
+    project[key].push("");
 };
 
 const removeProject = async (index) => {
@@ -534,24 +723,35 @@ const removeProject = async (index) => {
     if (activeIndex.value >= reportData.value.projects.length) {
         activeIndex.value = Math.max(0, reportData.value.projects.length - 1);
     }
+    if (savedReportId.value) await persistReport();
 };
 
-const removeActiveProject = async () => {
-    const index = activeIndex.value;
+const selectReportProject = async (index) => {
+    closeProjectPopup();
+    await focusProject(index);
+};
+
+const deleteReportProject = async (index) => {
     closeProjectPopup();
     await removeProject(index);
 };
 
-const saveReport = async () => {
+let persistChain = Promise.resolve();
+
+const reportDateValue = () =>
+    reportDate.value ||
+    sessionStorage.getItem("reportDate") ||
+    (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    })();
+
+const writeReport = async (announce) => {
     if (!reportData.value) return;
     if (!canEdit.value) {
         showAlert("자신의 보고만 수정할 수 있습니다.");
         return;
     }
-    
-
-
-
     for (const project of reportData.value.projects) {
         for (const col of EDIT_COLUMNS) {
             project[col.key] = (project[col.key] || [])
@@ -559,36 +759,42 @@ const saveReport = async () => {
                 .filter(Boolean);
         }
     }
-
+    if (reportData.value.projects.some((project) => !String(project.projectName || "").trim())) {
+        showAlert("프로젝트 이름을 입력해주세요.");
+        return;
+    }
+    const wasSaved = Boolean(savedReportId.value);
     const jsonData = JSON.stringify(reportData.value, null, 2);
-    const dateValue =
-        reportDate.value ||
-        sessionStorage.getItem("reportDate") ||
-        (() => {
-            const d = new Date();
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        })();
+    const memberId =
+        savedMemberId.value ??
+        parseInt(localStorage.getItem("report-selectedUser") || "0", 10);
     saving.value = true;
     try {
-        if(reportData.value.projects.some((project) => project.projectName.trim() === "")) {
-            showAlert("프로젝트 이름을 입력해주세요.");
-            return;
-        }
-
-        
-        const memberId =
-            savedMemberId.value ??
-            parseInt(localStorage.getItem("report-selectedUser") || "0", 10);
-        await postSaveReport(jsonData, rawData.value, memberId, dateValue);
-        if (savedReportId.value) {
-            showAlert("보고서를 수정했습니다.");
-        } else {
+        const saved = await postSaveReport(
+            jsonData,
+            rawData.value,
+            memberId,
+            reportDateValue(),
+            wasSaved ? savedReportId.value : null,
+        );
+        if (!wasSaved && announce) {
             sessionStorage.removeItem("reportData");
             sessionStorage.removeItem("reportRaw");
             sessionStorage.removeItem("reportDate");
             showAlert("보고서를 저장했습니다.");
             router.push("/");
+            return;
         }
+        const nextId = saved?.id;
+        if (nextId && String(nextId) !== String(savedReportId.value || "")) {
+            savedReportId.value = nextId;
+            await router.replace({
+                name: "report-result",
+                params: { id: String(nextId) },
+                query: route.query,
+            });
+        }
+        if (announce) showAlert("보고서를 수정했습니다.");
     } catch (error) {
         console.error("보고서 저장 실패:", error);
         showAlert("보고서 저장에 실패했습니다. 다시 시도해주세요.");
@@ -596,6 +802,15 @@ const saveReport = async () => {
         saving.value = false;
     }
 };
+
+const persistReport = (options = {}) => {
+    const announce = Boolean(options.announce);
+    const job = persistChain.then(() => writeReport(announce));
+    persistChain = job.catch(() => {});
+    return job;
+};
+
+const saveReport = () => persistReport({ announce: true });
 
 const retryExtract = async () => {
     if (!canEdit.value) {
@@ -606,6 +821,11 @@ const retryExtract = async () => {
         showAlert("원문이 없어 재추출할 수 없습니다.");
         return;
     }
+    const ok = await askConfirm("지금 고친 내용은 바뀝니다. 저장하기 전까지는 반영되지 않습니다.", {
+        title: "원문으로 다시 정리할까요?",
+        confirmLabel: "재추출",
+    });
+    if (!ok) return;
     const userId = savedMemberId.value ?? getSelectedMemberId();
     if (userId === null) {
         showAlert("사용자 정보가 없습니다.");
@@ -675,11 +895,30 @@ const getSelectedMemberId = () => {
     color: var(--text);
 }
 
-.detail-actions {
+.reextract {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-2);
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.reextract p {
+    margin: 0;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text);
+    word-break: keep-all;
+}
+
+.reextract-btn {
+    flex: none;
+    width: auto;
 }
 
 /* 읽기 모드: 입력칸 대신 문서로 읽는다. */
@@ -692,16 +931,18 @@ const getSelectedMemberId = () => {
 }
 
 .read-block + .read-block {
-    margin-top: var(--space-4);
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
 }
 
 .read-block h3 {
     margin: 0 0 var(--space-2);
     font-family: var(--sans);
-    font-size: var(--fs-12);
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
-    letter-spacing: 0.4px;
-    color: var(--text);
+    letter-spacing: 0;
+    color: var(--text-strong);
 }
 
 .read-block h3.issues {
@@ -713,13 +954,13 @@ const getSelectedMemberId = () => {
     padding-left: var(--space-5);
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-2);
 }
 
 .read-list li {
-    font-size: var(--fs-14);
+    font-size: 15px;
     color: var(--text-strong);
-    line-height: var(--lh-base);
+    line-height: var(--lh-relaxed);
     word-break: keep-all;
 }
 
@@ -820,15 +1061,7 @@ const getSelectedMemberId = () => {
         font-size: 20px;
     }
 
-    .detail-actions {
-        display: flex;
-        width: auto;
-        gap: 8px;
-    }
-
-    .detail-actions .btn {
-        flex: none;
-        width: auto;
+    .reextract-btn {
         min-height: 44px;
     }
 
@@ -876,6 +1109,7 @@ const getSelectedMemberId = () => {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding-bottom: 15px;
 }
 
 .edit-current .input {
@@ -955,31 +1189,34 @@ const getSelectedMemberId = () => {
 
 .edit-kinds {
     display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-
-.edit-kinds::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
 }
 
 .edit-kinds button {
-    flex: none;
+    flex: 1 1 calc(33.33% - 8px);
+    min-width: 0;
     min-height: 44px;
-    padding: 0 12px;
+    padding: 0 8px;
     border: 1px solid #7a7268;
     border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--text-strong);
     font: inherit;
     font-size: 14px;
+    white-space: nowrap;
     cursor: pointer;
 }
 
 .edit-kinds button.is-on {
     border-color: var(--text-strong);
     background: var(--accent-soft);
+}
+
+.edit-kinds button:focus-visible {
+    outline: 2px solid var(--text-strong);
+    outline-offset: 2px;
 }
 
 .edit-entry {
@@ -1002,6 +1239,23 @@ const getSelectedMemberId = () => {
     max-height: 240px;
     margin-bottom: 12px;
     overflow: auto;
+}
+
+.edit-pick-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.edit-pick-row .edit-pick {
+    flex: 1;
+    min-width: 0;
+}
+
+.edit-pick-row .edit-drop {
+    flex: none;
+    margin: 0;
+    padding: 0 4px;
 }
 
 .edit-pick {

@@ -12,7 +12,7 @@ import {
     templateById,
 } from "../lib/reportTemplates";
 import { todayString } from "../lib/dateScope";
-import { onlyStructuredLineReport, LINE_KINDS } from "../lib/lineReport.js";
+import { onlyStructuredLineReport } from "../lib/lineReport.js";
 import LineWriter from "./ui/line-writer.vue";
 
 const {
@@ -22,7 +22,6 @@ const {
     postReportDraft,
     getUserActivities,
     getUsers,
-    getReports,
     getProjectNames,
     postProjectName,
 } = useApi();
@@ -41,13 +40,9 @@ const formError = ref("");
 const userName = ref("");
 const alreadySaved = ref(false);
 const elapsed = ref(0);
-const prevPlans = ref([]);
-const prevPlansDate = ref("");
 const isDragging = ref(false);
 const knownProjects = ref([]);
-const activeWriteProject = ref("");
-const newProjectName = ref("");
-const addingProject = ref(false);
+const lineWriter = ref(null);
 const isNarrow = ref(
     typeof window !== "undefined" &&
         window.matchMedia("(max-width: 860px)").matches,
@@ -104,7 +99,6 @@ const getSelectedMemberId = () => {
 const hasUser = computed(() => getSelectedMemberId() !== null);
 
 const activeTemplateId = ref("");
-
 const activeTemplate = computed(() => templateById(activeTemplateId.value));
 
 /** 이미 쓴 글이 있으면 말없이 덧붙이지 않는다.
@@ -190,65 +184,6 @@ const loadDraft = async () => {
     }
 };
 
-/** 로그인 사용자의 가장 최근 보고에서 '다음 계획'을 가져온다.
- *  오늘 보고를 쓸 때 어제 약속한 일부터 보여야 한다. */
-const loadPrevPlans = async () => {
-    prevPlans.value = [];
-    prevPlansDate.value = "";
-    const memberId = getSelectedMemberId();
-    if (memberId === null || !date.value) return;
-    try {
-        const rows = await getReports();
-        const mine = (rows || [])
-            .filter(
-                (row) =>
-                    String(row.member_id) === String(memberId) &&
-                    row.report_date &&
-                    row.report_date < date.value,
-            )
-            .sort((a, b) =>
-                String(b.report_date).localeCompare(String(a.report_date)),
-            );
-        const latest = mine[0];
-        if (!latest) return;
-        let parsed = latest.parsed_json;
-        if (typeof parsed === "string") {
-            try {
-                parsed = JSON.parse(parsed);
-            } catch {
-                return;
-            }
-        }
-        const items = [];
-        for (const project of parsed?.projects || []) {
-            for (const plan of project.nextPlans || []) {
-                const text = String(plan || "").trim();
-                if (!text) continue;
-                items.push({
-                    project: project.projectName || "미분류 프로젝트",
-                    text,
-                });
-            }
-        }
-        if (items.length) {
-            prevPlans.value = items;
-            prevPlansDate.value = latest.report_date;
-        }
-    } catch {
-        prevPlans.value = [];
-    }
-};
-
-const prevPlansLabel = computed(() => {
-    const count = prevPlans.value.length;
-    if (!count) return "";
-    const parts = String(prevPlansDate.value).split("-");
-    const month = Number(parts[1]);
-    const day = Number(parts[2]);
-    const when = month && day ? `${month}.${day}` : prevPlansDate.value;
-    return `${when} 계획 ${count}건`;
-});
-
 const statusLabel = computed(() => {
     if (alreadySaved.value) return "제출됨";
     if (draftSavedAt.value) return "초안 있음";
@@ -261,14 +196,6 @@ const statusDetail = computed(() => {
     return "";
 });
 
-const insertPrevPlans = () => {
-    const lines = prevPlans.value.map(
-        (item) => `- [${item.project}] ${item.text}`,
-    );
-    const base = input.value.trim() ? input.value.replace(/\s+$/, "") + "\n" : "";
-    input.value = base + lines.join("\n");
-};
-
 const loadProjects = async () => {
     try {
         const names = await getProjectNames();
@@ -278,9 +205,6 @@ const loadProjects = async () => {
     } catch {
         knownProjects.value = [];
     }
-    if (!knownProjects.value.includes(activeWriteProject.value)) {
-        activeWriteProject.value = knownProjects.value[0] || "";
-    }
 };
 
 const registerProject = async (name) => {
@@ -289,7 +213,6 @@ const registerProject = async (name) => {
     if (!knownProjects.value.includes(value)) {
         knownProjects.value = [...knownProjects.value, value];
     }
-    activeWriteProject.value = value;
     try {
         await postProjectName(value, "");
     } catch (error) {
@@ -299,47 +222,11 @@ const registerProject = async (name) => {
     }
 };
 
-const chooseWriteProject = (name) => {
-    activeWriteProject.value = name;
-    closeProjectPopup();
-};
-
-const addWriteProject = async () => {
-    const name = newProjectName.value.trim();
-    if (!name) return;
-    await registerProject(name);
-    newProjectName.value = "";
-};
-
-const openProjectPopup = () => {
-    newProjectName.value = "";
-    addingProject.value = true;
-    document.documentElement.classList.add("is-overlay-open");
-};
-
-const closeProjectPopup = () => {
-    addingProject.value = false;
-    newProjectName.value = "";
-    document.documentElement.classList.remove("is-overlay-open");
-};
-
-const onProjectKey = (event) => {
-    if (event.key === "Escape" && addingProject.value) closeProjectPopup();
-};
-
-const reportBody = () => {
-    const raw = input.value;
-    if (isNarrow.value || !activeWriteProject.value) return raw;
-    if (raw.includes("프로젝트 명:")) return raw;
-    const body = raw.trim();
-    if (!body) return raw;
-    return `프로젝트 명: ${activeWriteProject.value}\n\n${body}`;
-};
+const reportBody = () => input.value;
 
 const refreshMeta = async () => {
     await loadUserName();
     await loadSavedState();
-    await loadPrevPlans();
     await loadProjects();
 };
 
@@ -351,15 +238,13 @@ onMounted(async () => {
     narrowQuery = window.matchMedia("(max-width: 860px)");
     syncNarrow();
     narrowQuery.addEventListener("change", syncNarrow);
-    window.addEventListener("keydown", onProjectKey);
     await refreshMeta();
     await loadDraft();
 });
 onUnmounted(() => {
     stopElapsedTimer();
     narrowQuery?.removeEventListener("change", syncNarrow);
-    window.removeEventListener("keydown", onProjectKey);
-    if (addingProject.value || aiLoading.value) {
+    if (aiLoading.value) {
         document.documentElement.classList.remove("is-overlay-open");
     }
 });
@@ -368,7 +253,6 @@ watch(date, async () => {
     activeTemplateId.value = "";
     draftSavedAt.value = "";
     await loadSavedState();
-    await loadPrevPlans();
     await loadDraft();
 });
 watch(selectedUserId, async () => {
@@ -446,6 +330,14 @@ const saveDraft = async () => {
 };
 
 const sendReport = async () => {
+    if (isNarrow.value && buttonType.value === "text") {
+        const blocked = lineWriter.value?.commitPending() || "";
+        if (blocked) {
+            formError.value = blocked;
+            return;
+        }
+    }
+
     const memberId = getSelectedMemberId();
     if (memberId === null) {
         formError.value = "로그인이 필요합니다.";
@@ -500,9 +392,7 @@ const sendReport = async () => {
     } finally {
         stopElapsedTimer();
         aiLoading.value = false;
-        if (!addingProject.value) {
-            document.documentElement.classList.remove("is-overlay-open");
-        }
+        document.documentElement.classList.remove("is-overlay-open");
     }
 };
 </script>
@@ -521,7 +411,7 @@ const sendReport = async () => {
             class="card write-card"
             :class="{ 'is-lines': isNarrow && buttonType === 'text' }"
         >
-            <div class="write-head">
+            <div v-if="!(isNarrow && buttonType === 'text')" class="write-head">
                 <span class="write-author">{{ userName || "나" }}</span>
                 <input
                     type="date"
@@ -532,7 +422,6 @@ const sendReport = async () => {
                     required
                 />
                 <span
-                    v-if="!(isNarrow && buttonType === 'text')"
                     class="status-chip"
                     :class="alreadySaved ? 'is-saved' : 'is-draft'"
                     :title="statusDetail"
@@ -541,7 +430,6 @@ const sendReport = async () => {
                     <span v-if="statusDetail" class="status-chip-more"> · {{ statusDetail }}</span>
                 </span>
                 <button
-                    v-if="!(isNarrow && buttonType === 'text')"
                     type="button"
                     class="write-mode-link"
                     @click="selectType(buttonType === 'text' ? 'file' : 'text')"
@@ -552,87 +440,37 @@ const sendReport = async () => {
 
             <template v-if="buttonType === 'text' && isNarrow">
                 <LineWriter
+                    ref="lineWriter"
                     v-model="input"
                     :projects="knownProjects"
                     @add-project="registerProject"
-                />
-                <div class="form-actions line-send-row">
-                    <button
-                        class="btn btn-primary line-send"
-                        @click="sendReport"
-                        :disabled="aiLoading"
-                    >
-                        {{ aiLoading ? "제출 중" : "제출" }}
-                    </button>
-                </div>
+                >
+                    <template #date>
+                        <input
+                            type="date"
+                            id="date"
+                            class="input write-date"
+                            v-model="date"
+                            aria-label="보고 날짜"
+                            required
+                        />
+                    </template>
+                    <template #dock>
+                        <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
+                        <button
+                            v-if="input.trim()"
+                            type="button"
+                            class="btn btn-primary line-send"
+                            @click="sendReport"
+                            :disabled="aiLoading"
+                        >
+                            {{ aiLoading ? "제출 중" : "제출" }}
+                        </button>
+                    </template>
+                </LineWriter>
             </template>
 
             <div v-else-if="buttonType === 'text'" class="field write-field">
-                <div class="write-current">
-                    <p>{{ activeWriteProject || "프로젝트를 고르세요" }}</p>
-                    <button type="button" class="write-more" @click="openProjectPopup">더보기</button>
-                </div>
-                <Teleport to="body">
-                    <div
-                        v-if="addingProject"
-                        class="app-dialog-overlay"
-                        @click.self="closeProjectPopup"
-                    >
-                        <div
-                            class="card app-dialog project-dialog"
-                            role="dialog"
-                            aria-modal="true"
-                            aria-labelledby="write-project-title"
-                        >
-                            <h2 id="write-project-title" class="app-dialog-message">프로젝트</h2>
-                            <div class="write-pick-list" role="listbox" aria-label="프로젝트 목록">
-                                <button
-                                    v-for="name in knownProjects"
-                                    :key="name"
-                                    type="button"
-                                    class="write-pick"
-                                    :class="{ 'is-on': name === activeWriteProject }"
-                                    :aria-selected="name === activeWriteProject"
-                                    @click="chooseWriteProject(name)"
-                                >
-                                    {{ name }}
-                                </button>
-                            </div>
-                            <form class="write-project-add" @submit.prevent="addWriteProject">
-                                <input
-                                    id="write-new-project"
-                                    v-model="newProjectName"
-                                    class="input"
-                                    type="text"
-                                    placeholder="새 프로젝트 이름"
-                                    aria-label="새 프로젝트 이름"
-                                />
-                                <button class="btn" type="submit">추가</button>
-                            </form>
-                            <div class="app-dialog-actions">
-                                <button class="btn" type="button" @click="closeProjectPopup">닫기</button>
-                            </div>
-                        </div>
-                    </div>
-                </Teleport>
-                <div
-                    v-if="!input.trim()"
-                    class="write-preview"
-                    aria-label="내용이 없을 때 미리보기"
-                >
-                    <div v-for="kind in LINE_KINDS" :key="kind" class="write-preview-block">
-                        <h2>{{ kind }}</h2>
-                        <p>없음</p>
-                    </div>
-                </div>
-                <textarea
-                    id="report-input"
-                    v-model="input"
-                    :placeholder="activeTemplate?.hint || '오늘 한 일, 진행 상황, 이슈, 다음 계획을 자유롭게 쓰거나 붙여넣으세요.'"
-                    rows="10"
-                    class="textarea"
-                ></textarea>
-                <!-- 좁은 화면에서는 글을 먼저 보여주고, 형식은 한 줄로 옆으로 넘긴다. -->
                 <div class="write-helpers">
                     <span class="write-helpers-label">형식</span>
                     <div class="template-chips" role="group" aria-label="붙여넣기 형식">
@@ -649,16 +487,14 @@ const sendReport = async () => {
                             {{ template.label }}
                         </button>
                     </div>
-                    <button
-                        v-if="prevPlans.length"
-                        type="button"
-                        class="btn btn-small write-prev-plans"
-                        :title="`${prevPlansDate} 보고의 다음 계획 ${prevPlans.length}건을 붙입니다`"
-                        @click="insertPrevPlans"
-                    >
-                        {{ prevPlansLabel }}
-                    </button>
                 </div>
+                <textarea
+                    id="report-input"
+                    v-model="input"
+                    :placeholder="activeTemplate?.hint || '오늘 한 일, 이슈, 요청, 다음 계획을 쓰거나 붙여넣으세요.'"
+                    rows="10"
+                    class="textarea"
+                ></textarea>
             </div>
 
             <div
@@ -688,14 +524,13 @@ const sendReport = async () => {
                 </p>
             </div>
 
-            <p v-if="formError" class="form-error" role="alert">
+            <p v-if="formError && !(buttonType === 'text' && isNarrow)" class="form-error" role="alert">
                 {{ formError }}
             </p>
             <div v-if="!(buttonType === 'text' && isNarrow)" class="form-actions">
                 <span v-if="draftSavedAt" class="draft-note" role="status">
                     {{ draftSavedAt }} 초안 저장됨
                 </span>
-                <!-- AI를 돌리지 않고도 저장할 수 있어야 한다. 고칠 때마다 추출할 이유가 없다. -->
                 <button
                     v-if="buttonType === 'text'"
                     class="btn"
@@ -704,7 +539,6 @@ const sendReport = async () => {
                 >
                     {{ draftSaving ? "저장 중..." : "초안만 저장" }}
                 </button>
-          
                 <button
                     class="btn btn-primary"
                     @click="sendReport"
@@ -732,7 +566,7 @@ const sendReport = async () => {
                         {{ stage.label }}
                     </li>
                 </ol>
-                <p class="submit-wait-time">{{ elapsedLabel }} · 보통 1분에서 3분</p>
+                <p class="submit-wait-time">{{ elapsedLabel }} · 보통 10초에서 1분</p>
             </div>
         </div>
     </Teleport>
@@ -776,114 +610,6 @@ const sendReport = async () => {
     color: var(--text-strong);
 }
 
-/* 입력칸 위에 항상 보이는 보조 줄. 접어두면 아무도 못 찾는다. */
-.write-field {
-    display: flex;
-    flex-direction: column;
-}
-
-.write-current,
-.write-preview {
-    order: 0;
-}
-
-.write-current {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-height: 44px;
-    margin-bottom: 8px;
-}
-
-.write-current p {
-    margin: 0;
-    min-width: 0;
-    font-size: 16px;
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.write-more {
-    flex: none;
-    min-height: 44px;
-    padding: 0 4px;
-    border: 0;
-    background: transparent;
-    color: #007aff;
-    font: inherit;
-    font-size: 16px;
-    cursor: pointer;
-}
-
-.write-pick-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-height: 240px;
-    margin-bottom: 12px;
-    overflow: auto;
-}
-
-.write-pick {
-    min-height: 44px;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text-strong);
-    font: inherit;
-    font-size: 16px;
-    text-align: left;
-    cursor: pointer;
-}
-
-.write-pick.is-on {
-    border-color: var(--text-strong);
-    background: var(--accent-soft);
-}
-
-.write-project-add {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.write-project-add .input {
-    min-width: 0;
-    flex: 1;
-    min-height: 44px;
-}
-
-.write-preview {
-    margin-bottom: 12px;
-}
-
-.write-preview-block h2 {
-    margin: 10px 0 0;
-    font-size: 13px;
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.write-preview-block p {
-    margin: 2px 0 0;
-    font-size: 15px;
-    color: var(--text-muted);
-}
-
-.app-dialog h2 {
-    margin: 0 0 12px;
-}
-
-.app-dialog .input {
-    width: 100%;
-    min-height: 44px;
-    margin-bottom: 16px;
-    font-size: 16px;
-}
-
 .write-field .textarea {
     min-height: 320px;
 }
@@ -892,26 +618,14 @@ const sendReport = async () => {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    order: 1;
     gap: var(--space-2) var(--space-3);
     margin-bottom: var(--space-2);
-}
-
-.write-field .textarea {
-    order: 2;
 }
 
 .write-helpers-label {
     font-size: var(--fs-12);
     font-weight: var(--fw-semibold);
     color: var(--text);
-}
-
-.write-prev-plans {
-    margin-left: auto;
-    border-color: var(--accent-border);
-    background: var(--accent-soft);
-    color: var(--text-strong);
 }
 
 .template-chips {
@@ -1155,46 +869,10 @@ const sendReport = async () => {
         text-align: right;
     }
 
-    .write-field {
-        gap: 10px;
-    }
-
     .write-field .textarea {
-        order: 1;
         min-height: 42dvh;
         font-size: 16px;
         line-height: 1.5;
-    }
-
-    .write-helpers {
-        order: 2;
-        margin-bottom: 0;
-    }
-
-    .write-helpers {
-        flex-wrap: nowrap;
-        align-items: center;
-        gap: 8px;
-        margin: 0 -4px;
-        padding: 2px 4px 6px;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-    }
-
-    .write-helpers-label,
-    .template-chips,
-    .write-prev-plans {
-        flex: none;
-    }
-
-    .template-chips {
-        flex-wrap: nowrap;
-    }
-
-    .write-prev-plans {
-        margin-left: 0;
-        width: auto;
-        white-space: nowrap;
     }
 
     .file-drop-copy {
@@ -1227,34 +905,47 @@ const sendReport = async () => {
         flex: 1 1 100%;
     }
 
+
+    .page:has(.write-card.is-lines) {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        min-height: calc(
+            100dvh - var(--topbar-height) - env(safe-area-inset-top, 0px) - var(--bottom-nav-offset)
+        );
+        padding-bottom: 0;
+        background: var(--surface);
+    }
+
     .write-card.is-lines {
-        padding-bottom: 14px;
-    }
-
-    .form-actions.line-send-row {
-        position: static;
-        margin: 12px 0 0;
-        padding: 0;
-        border-top: none;
-    }
-
-    .form-actions.line-send-row .line-send {
-        flex: 1 1 auto;
-        min-height: 44px;
-        height: 44px;
-        color: var(--text-strong);
-    }
-
-    .form-actions.line-send-row .line-send:hover,
-    .form-actions.line-send-row .line-send:active {
-        background: var(--accent-soft);
-        border-color: var(--text-strong);
-        color: var(--text-strong);
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        margin-left: calc(-1 * max(14px, env(safe-area-inset-left, 0px)));
+        margin-right: calc(-1 * max(14px, env(safe-area-inset-right, 0px)));
+        margin-bottom: 0;
+        border-left: 0;
+        border-right: 0;
+        border-bottom: 0;
+        border-radius: 0;
+        padding-bottom: 16px;
+        background: var(--surface);
     }
 
     .draft-note {
         width: 100%;
         margin-right: 0;
     }
+}
+
+.line-dock-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.line-dock-actions .btn {
+    flex: 1;
+    min-height: 44px;
 }
 </style>

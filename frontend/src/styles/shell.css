@@ -251,6 +251,37 @@
     overflow-y: auto;
 }
 
+.write-backbar {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    min-height: 52px;
+    padding: env(safe-area-inset-top) var(--space-4) 0;
+    background: var(--bg);
+}
+
+.write-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 8px 0 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-strong);
+    font-size: 16px;
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
+}
+
+.write-back:hover {
+    color: var(--accent-hover);
+}
+
 .sidebar-footer {
     margin-top: auto;
     padding: 12px 8px 4px;

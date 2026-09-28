@@ -20,7 +20,7 @@ export const PASTE_TEMPLATES = [
     },
     {
         id: "scrum",
-        label: "어제/오늘/막힌 것",
+        label: "어제 · 오늘 · 막힘",
         hint: "스크럼 3문장",
         body: `
 프로젝트 명:
@@ -32,7 +32,7 @@ export const PASTE_TEMPLATES = [
     },
     {
         id: "office",
-        label: "성과/이슈/내일/특이",
+        label: "성과 · 이슈 · 내일",
         hint: "한국 회사 4칸",
         body: `
 프로젝트 명:
@@ -57,7 +57,7 @@ export const PASTE_TEMPLATES = [
     },
     {
         id: "requests",
-        label: "지시/건의",
+        label: "지시 · 건의",
         hint: "요청 칸 (이슈와 분리)",
         body: `
 프로젝트 명:

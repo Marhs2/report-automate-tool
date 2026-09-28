@@ -139,6 +139,11 @@ html.is-overlay-open .main-body {
         padding-bottom: var(--bottom-nav-offset);
     }
 
+    .main-content.is-focus-write {
+        height: 100vh;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
     .main-body {
         height: auto;
         min-height: 0;
