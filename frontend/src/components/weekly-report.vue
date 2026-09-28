@@ -237,9 +237,11 @@ weekDays.value = workdaysBetween(rangeStart.value, rangeEnd.value);
 
 const deleteWeekly = async (reportId) => {
     const report = (weeklyReport.value || []).find((row) => String(row.id) === String(reportId));
+    // 목록 API는 memberId다. member_id만 보면 본인 보고서도 소유자가 비어 삭제가 막힌다.
+    const ownerId = report?.memberId ?? report?.member_id;
     if (
         !report ||
-        (String(report.member_id) !== String(userId.value) && !isAdmin.value)
+        (String(ownerId) !== String(userId.value) && !isAdmin.value)
     ) {
         showAlert("자신의 주간 보고만 삭제할 수 있습니다.");
         return;
