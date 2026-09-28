@@ -1,3 +1,7 @@
+/* App shell: sidebar + topbar + scrolling body. Layout only; controls/cards live in components.css.
+   Every colour, gap, radius and size comes from tokens.css. Mobile (<=860px) overrides sit at the end;
+   responsive.css (loaded later) may refine them further and relies on the class names used here. */
+
 #app {
     display: flex;
     min-height: 100vh;
@@ -5,44 +9,45 @@
     color: var(--text);
 }
 
+/* ---------- Sidebar ---------- */
+
 .sidebar {
-    flex: 0 0 var(--sidebar-width);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px 14px 12px;
-    border-right: 1px solid var(--border);
-    background: var(--sidebar-bg, var(--surface-soft));
     position: sticky;
     top: 0;
+    display: flex;
+    flex: 0 0 var(--sidebar-width);
+    flex-direction: column;
+    gap: var(--space-2);
     height: 100vh;
+    padding: 0 var(--space-2) var(--space-3);
+    border-right: 1px solid var(--border);
+    background: var(--sidebar-bg, var(--bg));
     transition: flex-basis var(--dur) var(--ease);
 }
 
 .sidebar.is-collapsed {
     flex-basis: var(--sidebar-width-collapsed);
-    padding-left: var(--space-2);
-    padding-right: var(--space-2);
 }
 
+/* Brand row shares the topbar height so the collapse toggle sits on the same band as the page title. */
 .sidebar-brand {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
-    justify-content: right;
+    justify-content: flex-end;
     gap: var(--space-2);
-    min-height: 36px;
-    padding: 0 var(--space-1) 0 var(--space-2);
+    min-height: var(--topbar-height);
+    padding: 0 var(--space-1);
 }
 
 .sidebar.is-collapsed .sidebar-brand {
-    flex-direction: column;
     justify-content: center;
     padding: 0;
 }
 
 .sidebar-mark {
-    width: 36px;
-    height: 36px;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
     flex-shrink: 0;
     border-radius: var(--radius-sm);
     background: var(--accent);
@@ -50,16 +55,16 @@
 
 .sidebar-brand-text {
     display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
     flex: 1;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .sidebar-brand-name {
     font-family: var(--heading);
     font-size: var(--fs-14);
     font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
     color: var(--text-strong);
     white-space: nowrap;
 }
@@ -69,31 +74,25 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--fs-12);
-    line-height: 1.3;
-    color: var(--text);
-}
-
-.nav-group-label {
-    margin: 10px 12px 4px;
-    font-size: var(--fs-11);
-    font-weight: 650;
-    letter-spacing: 0.06em;
-    color: var(--text);
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
 }
 
 .sidebar-collapse-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
     padding: 0;
-    border: none;
+    border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-muted);
     cursor: pointer;
-    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    transition:
+        background var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
 }
 
 .sidebar-collapse-btn:hover {
@@ -101,54 +100,68 @@
     color: var(--text-strong);
 }
 
-.sidebar.is-collapsed .nav-link {
-    justify-content: center;
-    padding: var(--space-2);
+.sidebar-collapse-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
-.sidebar.is-collapsed .sidebar-user-meta {
-    display: none;
-}
-
-.sidebar.is-collapsed .sidebar-user {
-    justify-content: center;
-    padding: var(--space-2) 0;
-}
-
-.sidebar.is-collapsed .sidebar-logout {
-    justify-content: center;
-    padding: var(--space-2);
-}
-
-.sidebar.is-collapsed .sidebar-logout span {
-    display: none;
-}
-
+/* Nav: pill rows, one control height. Active = white + hairline, icon takes the accent. */
 .nav-links {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
     flex: 0 1 auto;
+    flex-direction: column;
+    gap: 1px;
     min-height: 0;
     overflow-y: auto;
+}
+
+.nav-group-label {
+    margin: var(--space-3) var(--space-3) var(--space-1);
+    font-size: var(--fs-11);
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.04em;
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
+}
+
+.nav-group-label:first-child {
+    margin-top: 0;
 }
 
 .nav-link {
     position: relative;
     display: flex;
+    flex-shrink: 0;
     align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
+    gap: var(--space-2);
+    min-height: var(--control-h-sm);
+    padding: 0 var(--space-3);
     border: 1px solid transparent;
     border-radius: var(--radius-pill);
     color: var(--text);
     text-decoration: none;
-    font-size: 14px;
+    font-size: var(--fs-14);
     font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
     transition:
-        background 0.15s,
-        color 0.15s,
-        border-color 0.15s;
+        background var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease);
+}
+
+.nav-link svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: color var(--dur-fast) var(--ease);
+}
+
+.nav-link-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .nav-link:hover {
@@ -156,16 +169,14 @@
     color: var(--text-strong);
 }
 
-.nav-link svg {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    opacity: 0.75;
-    transition: opacity 0.15s;
+.nav-link:hover svg {
+    color: inherit;
 }
 
-.nav-link:hover svg {
-    opacity: 1;
+.nav-link:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
 }
 
 .nav-link.router-link-exact-active {
@@ -176,73 +187,138 @@
 }
 
 .nav-link.router-link-exact-active svg {
-    opacity: 1;
+    color: var(--accent);
 }
 
+.sidebar.is-collapsed .nav-link {
+    justify-content: center;
+    padding: 0;
+}
 
-.main-content {
-    flex: 1;
+/* Footer: who is signed in, then a quiet logout row that shares the nav geometry. */
+.sidebar-footer {
+    display: flex;
+    flex-shrink: 0;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-top: auto;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+}
+
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     min-width: 0;
-    height: 100vh;
-    overflow: hidden;
+    padding: var(--space-1) var(--space-2);
+    color: var(--text);
+}
+
+.sidebar-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text-strong);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+}
+
+.sidebar-user-meta {
     display: flex;
     flex-direction: column;
-}
-
-.topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-    min-height: var(--topbar-height);
-    padding: 0 var(--space-7);
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
-    flex-shrink: 0;
-}
-
-.topbar-end {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    flex-shrink: 0;
-}
-
-.topbar-crumbs {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+    gap: var(--space-1);
     min-width: 0;
-    margin-right: auto;
 }
 
-.topbar-crumb {
-    color: var(--text-muted);
-    text-decoration: none;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    white-space: nowrap;
-}
-
-.topbar-crumb:hover {
-    color: var(--text-strong);
-}
-
-.topbar-crumb-sep {
-    color: var(--text-muted);
-    font-size: var(--fs-13);
-}
-
-.topbar-title {
-    margin: 0;
-    font-family: var(--heading);
-    font-size: var(--fs-16);
-    font-weight: var(--fw-medium);
-    line-height: var(--lh-tight);
-    color: var(--text-strong);
+.sidebar-user-name,
+.sidebar-user-team {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: var(--lh-tight);
+}
+
+.sidebar-user-name {
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.sidebar-user-team {
+    font-size: var(--fs-12);
+    color: var(--text-muted);
+}
+
+.sidebar-logout {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: var(--control-h-sm);
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    text-align: left;
+    cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
+}
+
+.sidebar-logout svg {
+    flex-shrink: 0;
+}
+
+.sidebar-logout:hover {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+}
+
+.sidebar-logout:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.sidebar.is-collapsed .sidebar-user {
+    justify-content: center;
+    padding: var(--space-1) 0;
+}
+
+.sidebar.is-collapsed .sidebar-user-meta {
+    display: none;
+}
+
+.sidebar.is-collapsed .sidebar-logout {
+    justify-content: center;
+    padding: 0;
+}
+
+.sidebar.is-collapsed .sidebar-logout span {
+    display: none;
+}
+
+/* ---------- Main column ---------- */
+
+.main-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .main-body {
@@ -251,126 +327,147 @@
     overflow-y: auto;
 }
 
-.write-backbar {
+/* Topbar: where you are on the left, the single CTA on the right. Same canvas colour, hairline below. */
+.topbar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    min-height: var(--topbar-height);
+    padding: 0 var(--space-7);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+}
+
+.topbar-crumbs {
     display: flex;
     align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    margin-right: auto;
+}
+
+.topbar-crumb {
+    display: inline-flex;
+    align-items: center;
     flex-shrink: 0;
+    min-height: var(--control-h-sm);
+    margin-left: calc(-1 * var(--space-2));
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+    transition:
+        background var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
+}
+
+.topbar-crumb:hover {
+    background: var(--surface-soft);
+    color: var(--text-strong);
+}
+
+.topbar-crumb:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.topbar-crumb-sep {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: var(--fs-13);
+    line-height: 1;
+}
+
+.topbar-title {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--heading);
+    font-size: var(--fs-16);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.topbar-end {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* Write/detail focus mode: the topbar gives way to a single back affordance of the same height. */
+.write-backbar {
     position: sticky;
     top: 0;
     z-index: 40;
-    min-height: 52px;
-    padding: env(safe-area-inset-top) var(--space-4) 0;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    min-height: var(--topbar-height);
+    padding: 0 var(--space-7);
+    border-bottom: 1px solid var(--border);
     background: var(--bg);
 }
 
 .write-back {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
-    min-height: 44px;
-    margin: 0;
-    padding: 0 8px 0 0;
+    gap: var(--space-1);
+    min-height: var(--control-h-touch);
+    margin: 0 0 0 calc(-1 * var(--space-2));
+    padding: 0 var(--space-3) 0 var(--space-2);
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-strong);
-    font-size: 16px;
-    font-weight: var(--fw-semibold);
+    font: inherit;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
     cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
+}
+
+.write-back svg {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: color var(--dur-fast) var(--ease);
 }
 
 .write-back:hover {
-    color: var(--accent-hover);
-}
-
-.sidebar-footer {
-    margin-top: auto;
-    padding: 12px 8px 4px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex-shrink: 0;
-}
-
-.sidebar-user {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 6px;
-    color: var(--text);
-    font-size: 13px;
-    min-width: 0;
-}
-
-.sidebar-user-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.sidebar-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
     background: var(--surface-soft);
-    color: var(--text-strong);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: var(--fw-bold);
-    flex-shrink: 0;
 }
 
-.sidebar-user-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    line-height: 1.3;
+.write-back:hover svg {
+    color: inherit;
 }
 
-.sidebar-user-team {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 12px;
-    color: var(--text);
-    line-height: 1.3;
+.write-back:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
-.sidebar-logout {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border: none;
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--text);
-    font-size: 13px;
-    cursor: pointer;
-    text-align: left;
-    transition:
-        background 0.15s,
-        color 0.15s;
-}
-
-.sidebar-logout:hover {
-    background: var(--danger-bg);
-    color: var(--danger-fg);
-}
+/* ---------- Page frame ---------- */
 
 .page {
-    max-width: var(--content-max);
-    margin: 0 auto;
-    padding: var(--space-6) var(--space-7) var(--space-8);
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
+    width: 100%;
+    max-width: var(--content-max);
     min-width: 0;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-7) var(--space-8);
 }
 
 .page.is-wide {
@@ -379,8 +476,8 @@
 
 .page-header {
     display: flex;
-    align-items: flex-end;
     flex-wrap: wrap;
+    align-items: flex-end;
     gap: var(--space-3) var(--space-4);
     margin-bottom: 0;
 }
@@ -402,6 +499,7 @@
 .page-title {
     margin: 0;
     font-size: var(--fs-24);
+    letter-spacing: -0.01em;
     line-height: var(--lh-tight);
     color: var(--text-strong);
 }
@@ -416,12 +514,21 @@
 .page-header-filters,
 .page-header-actions {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-2);
 }
 
-/* 좁은 화면은 사이드바 없이 하단 탭만 쓴다. 드로어 오버레이를 두지 않는다. */
+/* Small laptop: chrome padding follows the tighter page padding responsive.css applies here. */
+@media (max-width: 1100px) and (min-width: 861px) {
+    .topbar,
+    .write-backbar {
+        padding-left: var(--space-5);
+        padding-right: var(--space-5);
+    }
+}
+
+/* Narrow: no sidebar, bottom tab nav (styled in responsive.css) takes over. Document scrolls. */
 @media (max-width: 860px) {
     #app {
         display: block;
@@ -442,6 +549,17 @@
 
     .topbar {
         padding: 0 var(--space-4);
+    }
+
+    .write-backbar {
+        min-height: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-left: max(var(--space-3), env(safe-area-inset-left, 0px));
+        padding-right: max(var(--space-3), env(safe-area-inset-right, 0px));
+    }
+
+    .write-back {
+        margin-left: 0;
     }
 
     .page {

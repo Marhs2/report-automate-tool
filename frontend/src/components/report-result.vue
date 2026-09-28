@@ -885,8 +885,8 @@ const getSelectedMemberId = () => {
 .detail-title h1 {
     margin: 0;
     font-family: var(--heading);
-    font-size: 22px;
-    letter-spacing: -0.3px;
+    font-size: var(--fs-24);
+    letter-spacing: -0.02em;
     color: var(--text-strong);
 }
 
@@ -899,9 +899,9 @@ const getSelectedMemberId = () => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin: 0 0 12px;
-    padding: 10px 12px;
+    gap: var(--space-3);
+    margin: 0 0 var(--space-3);
+    padding: var(--space-3) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
@@ -910,7 +910,7 @@ const getSelectedMemberId = () => {
 .reextract p {
     margin: 0;
     min-width: 0;
-    font-size: 13px;
+    font-size: var(--fs-13);
     line-height: 1.45;
     color: var(--text);
     word-break: keep-all;
@@ -958,14 +958,14 @@ const getSelectedMemberId = () => {
 }
 
 .read-list li {
-    font-size: 15px;
+    font-size: var(--fs-14);
     color: var(--text-strong);
     line-height: var(--lh-relaxed);
     word-break: keep-all;
 }
 
 .projects-container {
-    scroll-margin-top: 72px;
+    scroll-margin-top: calc(var(--topbar-height) + var(--space-4));
 }
 
 .project-head {
@@ -975,8 +975,8 @@ const getSelectedMemberId = () => {
 
 .project-dot {
     flex-shrink: 0;
-    width: 8px;
-    height: 8px;
+    width: var(--space-2);
+    height: var(--space-2);
     border-radius: 50%;
     background: var(--project-accent, var(--accent));
 }
@@ -1006,7 +1006,7 @@ const getSelectedMemberId = () => {
     align-items: center;
     gap: var(--space-2);
     max-width: 240px;
-    height: 28px;
+    height: var(--control-h-sm);
     padding: 0 var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
@@ -1058,11 +1058,11 @@ const getSelectedMemberId = () => {
     }
 
     .detail-title h1 {
-        font-size: 20px;
+        font-size: var(--fs-20);
     }
 
     .reextract-btn {
-        min-height: 44px;
+        min-height: var(--control-h-lg);
     }
 
     .project-nav {
@@ -1080,23 +1080,22 @@ const getSelectedMemberId = () => {
     .project-nav-chip {
         flex: none;
         max-width: 220px;
-        min-height: 44px;
+        min-height: var(--control-h-lg);
     }
 }
 
 .report-doc .save-bar {
-    position: static;
-    bottom: auto;
+    margin-top: var(--space-2);
 }
 
 .edit-quiet {
-    min-height: 44px;
-    padding: 0 4px;
+    min-height: var(--control-h-lg);
+    padding: 0 var(--space-1);
     border: 0;
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-16);
     cursor: pointer;
 }
 
@@ -1108,37 +1107,43 @@ const getSelectedMemberId = () => {
 .edit-current {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding-bottom: 15px;
+    gap: var(--space-2);
+    padding-bottom: var(--space-4);
 }
 
 .edit-current .input {
     min-width: 0;
     flex: 1;
-    min-height: 44px;
-    font-size: 16px;
+    min-height: var(--control-h-lg);
+    font-size: var(--fs-16);
     font-weight: var(--fw-semibold);
 }
 
 .edit-more {
     flex: none;
-    min-height: 44px;
-    padding: 0 4px;
+    min-height: var(--control-h-lg);
+    padding: 0 var(--space-2);
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
-    color: #007aff;
+    color: var(--accent);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-16);
     cursor: pointer;
 }
 
+.edit-more:hover {
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+}
+
 .edit-bucket + .edit-bucket {
-    margin-top: 12px;
+    margin-top: var(--space-3);
 }
 
 .edit-bucket h2 {
-    margin: 0;
-    font-size: 13px;
+    margin: 5px 0;
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     color: var(--text);
 }
@@ -1146,104 +1151,113 @@ const getSelectedMemberId = () => {
 .edit-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 6px;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
 }
 
 .edit-row .input {
     min-width: 0;
     flex: 1;
-    min-height: 44px;
-    font-size: 16px;
+    min-height: var(--control-h-lg);
+    font-size: var(--fs-16);
 }
 
 .edit-remove {
     flex: none;
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0 8px;
+    min-width: var(--control-h-lg);
+    min-height: var(--control-h-lg);
+    padding: 0 var(--space-2);
     border: 0;
     background: transparent;
     color: var(--danger-fg);
     font: inherit;
-    font-size: 14px;
+    font-size: var(--fs-14);
     cursor: pointer;
 }
 
 .edit-empty {
     margin: 0;
-    min-height: 44px;
+    min-height: var(--control-h-lg);
     display: flex;
     align-items: center;
     border-top: 1px solid var(--border);
-    font-size: 15px;
+    font-size: var(--fs-14);
     color: var(--text-muted);
 }
 
 .edit-compose {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 16px;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
 }
 
 .edit-kinds {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-2);
     min-width: 0;
 }
 
 .edit-kinds button {
-    flex: 1 1 calc(33.33% - 8px);
+    flex: 1 1 calc(33.33% - var(--space-2));
     min-width: 0;
-    min-height: 44px;
-    padding: 0 8px;
-    border: 1px solid #7a7268;
+    min-height: var(--control-h-lg);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--text-strong);
     font: inherit;
-    font-size: 14px;
+    font-size: var(--fs-14);
     white-space: nowrap;
     cursor: pointer;
+    transition:
+        border-color var(--dur-fast) var(--ease),
+        background var(--dur-fast) var(--ease);
+}
+
+.edit-kinds button:hover {
+    border-color: var(--border-strong);
 }
 
 .edit-kinds button.is-on {
-    border-color: var(--text-strong);
+    border-color: var(--accent);
     background: var(--accent-soft);
+    color: var(--accent-hover);
+    font-weight: var(--fw-semibold);
 }
 
 .edit-kinds button:focus-visible {
-    outline: 2px solid var(--text-strong);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 .edit-entry {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     align-items: center;
 }
 
 .edit-entry .input {
     min-width: 0;
     flex: 1;
-    min-height: 44px;
-    font-size: 16px;
+    min-height: var(--control-h-lg);
+    font-size: var(--fs-16);
 }
 
 .edit-pick-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-2);
     max-height: 240px;
-    margin-bottom: 12px;
+    margin-bottom: var(--space-3);
     overflow: auto;
 }
 
 .edit-pick-row {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     align-items: center;
 }
 
@@ -1255,51 +1269,51 @@ const getSelectedMemberId = () => {
 .edit-pick-row .edit-drop {
     flex: none;
     margin: 0;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
 }
 
 .edit-pick {
-    min-height: 44px;
-    padding: 8px 12px;
+    min-height: var(--control-h-lg);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text-strong);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-16);
     text-align: left;
     cursor: pointer;
 }
 
 .edit-pick.is-on {
-    border-color: var(--text-strong);
+    border-color: var(--accent);
     background: var(--accent-soft);
 }
 
 .edit-project-add {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: var(--space-3);
 }
 
 .edit-project-add .input {
     min-width: 0;
     flex: 1;
-    min-height: 44px;
+    min-height: var(--control-h-lg);
 }
 
 .edit-drop {
     display: flex;
     align-items: center;
-    min-height: 44px;
-    margin: 0 0 8px;
+    min-height: var(--control-h-lg);
+    margin: 0 0 var(--space-2);
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--danger-fg);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-16);
     cursor: pointer;
 }
 
@@ -1308,13 +1322,13 @@ const getSelectedMemberId = () => {
 }
 
 .raw-fold {
-    min-height: 44px;
+    min-height: var(--control-h-lg);
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--text-strong);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-16);
     font-weight: var(--fw-semibold);
     cursor: pointer;
 }

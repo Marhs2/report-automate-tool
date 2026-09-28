@@ -270,7 +270,7 @@ onUnmounted(() => {
                 :title="collapsedEffective ? '로그아웃' : null"
                 @click="logout"
             >
-                <LogOut :size="14" />
+                <LogOut :size="16" />
                 <span>로그아웃</span>
             </button>
         </div>
@@ -279,7 +279,7 @@ onUnmounted(() => {
     <main class="main-content" :class="{ 'has-bottom-nav': isNarrow && !isWritePage, 'is-focus-write': isWritePage }">
         <div v-if="isWritePage" class="write-backbar">
             <button type="button" class="write-back" @click="goBack">
-                <ChevronLeft :size="22" />
+                <ChevronLeft :size="20" />
                 뒤로
             </button>
         </div>

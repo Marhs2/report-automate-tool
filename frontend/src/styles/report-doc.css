@@ -1,8 +1,14 @@
-/* Shared report document (daily detail, weekly detail, AI result) */
+/* ------------------------------------------------------------------
+   Shared report document (daily detail, weekly detail, AI result).
+   Card = one project. Inside it, .field-group is a soft tray (no border)
+   and the inputs are the only framed elements. Accent per project comes
+   from data-accent on .projects-container / .raw-hit.
+   ------------------------------------------------------------------ */
+
 .report-doc .content-container {
     display: grid;
     grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.85fr);
-    gap: 20px;
+    gap: var(--space-5);
     align-items: start;
 }
 
@@ -14,18 +20,20 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--space-4);
 }
+
+/* ---- Raw text aside ------------------------------------------------ */
 
 .report-doc .raw-container {
     min-width: 0;
     position: sticky;
-    top: 16px;
+    top: var(--space-4);
 }
 
 .report-doc .raw-container h2 {
-    margin-bottom: 12px;
-    padding-bottom: 8px;
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-2);
     border-bottom: 1px solid var(--border);
 }
 
@@ -36,8 +44,8 @@
     word-break: keep-all;
     overflow-wrap: anywhere;
     font-family: inherit;
-    font-size: 15px;
-    line-height: 1.75;
+    font-size: var(--fs-14);
+    line-height: var(--lh-relaxed);
     max-height: 80vh;
     overflow-y: auto;
     color: var(--text-strong);
@@ -46,21 +54,37 @@
 .report-doc .raw-toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
-    font-size: 12px;
-    color: var(--text);
+    gap: var(--space-2);
+    min-height: var(--control-h-sm);
+    margin-bottom: var(--space-2);
+    font-size: var(--fs-13);
+    color: var(--text-muted);
     cursor: pointer;
+    word-break: keep-all;
+}
+
+.report-doc .raw-summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.report-doc .raw-summary::-webkit-details-marker {
+    display: none;
 }
 
 .report-doc .raw-content .raw-hit {
     background: var(--project-accent-bg, var(--accent-soft));
     color: inherit;
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
     padding: 0 1px;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
 }
+
+/* ---- Project accent map ------------------------------------------- */
 
 .report-doc .projects-container,
 .report-doc .raw-hit {
@@ -104,16 +128,20 @@
     --project-accent-bg: var(--project-5-bg);
 }
 
+/* ---- Project card ------------------------------------------------- */
+
 .report-doc .projects-container {
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .report-doc .project-head {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    min-width: 0;
 }
 
 .report-doc .project-kicker {
@@ -128,21 +156,22 @@
     flex: 1;
     min-width: 0;
     margin: 0;
-    font-size: 16px;
-    font-weight: 500;
-    border-radius: var(--radius);
+    font-size: var(--fs-16);
+    font-weight: var(--fw-medium);
     color: var(--text-strong);
 }
 
+/* Soft tray: paper fill, no border. Inputs inside carry the hairline. */
 .report-doc .field-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 12px;
-    border: 1px solid var(--border);
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    border-radius: var(--radius-sm);
     background: var(--bg);
-    padding: 14px 16px;
-    border-radius: var(--radius);
+    min-width: 0;
 }
 
 .report-doc .field-group:last-of-type {
@@ -152,28 +181,29 @@
 .report-doc .field-group h2,
 .report-doc .field-group h3 {
     margin: 0;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
     color: var(--text-strong);
 }
 
 .report-doc .field-group .input,
 .report-doc .task-row .input {
-    line-height: 1.55;
+    line-height: var(--lh-base);
 }
 
 .report-doc .empty-msg {
     margin: 0;
-    font-size: 13px;
-    color: var(--text);
-    font-style: italic;
-    opacity: 0.7;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
 }
 
 .report-doc .task-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
+    min-width: 0;
 }
 
 .report-doc .task-row .input {
@@ -181,51 +211,83 @@
     min-width: 0;
 }
 
-.report-doc .remove-btn,
-.report-doc .add-btn {
+/* Row delete is a quiet control; it turns red only on hover. */
+.report-doc .remove-btn {
     flex-shrink: 0;
-    min-width: 36px;
-    padding: 5px 10px;
+    min-width: var(--control-h);
+    padding: 0 var(--space-3);
+    border-color: transparent;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--fs-13);
 }
 
-.report-doc .add-btn {
-    align-self: flex-start;
+.report-doc .remove-btn:hover {
+    border-color: transparent;
+    background: var(--danger-bg);
+    color: var(--danger-fg);
 }
+
+/* Add row: dashed ghost, left-aligned under the list. */
+.report-doc .add-btn {
+    flex-shrink: 0;
+    align-self: flex-start;
+    height: var(--control-h-sm);
+    padding: 0 var(--space-3);
+    border-style: dashed;
+    border-color: var(--border-strong);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-13);
+}
+
+.report-doc .add-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+}
+
+/* Add project: full-width dashed affordance between cards. */
+.report-doc .add-project-btn {
+    width: 100%;
+    height: var(--control-h-lg);
+    border-style: dashed;
+    border-color: var(--border-strong);
+    background: transparent;
+    color: var(--text);
+}
+
+.report-doc .add-project-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+}
+
+/* ---- Save bar ----------------------------------------------------- */
 
 .report-doc .save-bar {
     display: flex;
-    gap: 12px;
     align-items: center;
-    bottom: max(var(--space-3), var(--bottom-nav-offset));
+    gap: var(--space-3);
     position: sticky;
-    bottom: 0;
-    z-index: 30;
+    bottom: var(--space-3);
+    z-index: var(--z-sticky);
+    padding: var(--space-3) var(--space-4);
+    box-shadow: var(--shadow-1);
 }
 
 .report-doc .save-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     margin-left: auto;
 }
 
-.report-doc .raw-summary {
-    cursor: pointer;
-    list-style: none;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-strong);
-}
-
-.report-doc .raw-summary::-webkit-details-marker {
-    display: none;
-}
+/* ==== Mobile (<=860px) ============================================ */
 
 @media (max-width: 860px) {
-
-
     .report-doc .content-container {
         grid-template-columns: 1fr;
-        gap: 12px;
+        gap: var(--space-3);
     }
 
     .report-doc .raw-container {
@@ -242,58 +304,25 @@
         max-width: 100%;
     }
 
-    .report-doc .project-head {
-        display: flex;
-        flex-wrap: nowrap;
-        align-items: center;
-        gap: 8px;
-    }
-
     /* iOS는 input의 기본 너비를 줄이지 않아 삭제 버튼이 칸 밖으로 밀린다. */
-    .report-doc .project-name-input {
-        flex: 1 1 0%;
-        width: 0;
-        min-width: 0;
-        max-width: 100%;
-        min-height: 44px;
-        font-size: 16px;
-    }
-
-    .report-doc .project-head .btn-danger {
-        min-height: 44px;
-        min-width: 64px;
-        padding: 0 12px;
-        border-radius: 12px;
-    }
-
-    .report-doc .field-group {
-        padding: 14px;
-        gap: 10px;
-        margin-bottom: 10px;
-    }
-
-    .report-doc .field-group h2 {
-        font-size: 14px;
-        color: var(--text-strong);
-    }
-
     .report-doc .project-head,
     .report-doc .task-row {
         display: grid;
         grid-template-columns: minmax(0, 1fr) max-content;
         align-items: start;
-        gap: 8px;
+        gap: var(--space-2);
         width: 100%;
         min-width: 0;
     }
 
     .report-doc .task-row .input,
     .report-doc .project-name-input {
+        flex: 1 1 0%;
         width: 100%;
         min-width: 0;
         max-width: 100%;
-        min-height: 44px;
-        font-size: 16px;
+        min-height: var(--control-h-lg);
+        font-size: var(--fs-16);
         grid-column: 1;
     }
 
@@ -301,6 +330,13 @@
     .report-doc .project-head .btn {
         grid-column: 2;
         justify-self: end;
+    }
+
+    .report-doc .project-head .btn-danger {
+        min-height: var(--control-h-lg);
+        min-width: calc(var(--control-h-lg) + var(--space-5));
+        padding: 0 var(--space-3);
+        border-radius: var(--radius-sm);
     }
 
     .report-doc .task-row:has(.event-when) {
@@ -315,47 +351,60 @@
         text-align: left;
     }
 
+    .report-doc .field-group {
+        padding: var(--space-3);
+        gap: var(--space-2);
+        margin-bottom: var(--space-2);
+    }
+
+    .report-doc .field-group h2 {
+        font-size: var(--fs-14);
+        color: var(--text-strong);
+    }
+
     .report-doc .remove-btn {
         width: auto;
-        min-width: 56px;
-        height: 44px;
-        padding: 0 12px;
-        border-radius: 12px;
-        font-size: 13px;
+        min-width: calc(var(--control-h-lg) + var(--space-3));
+        height: var(--control-h-lg);
+        padding: 0 var(--space-3);
+        border-radius: var(--radius-sm);
+        font-size: var(--fs-13);
     }
 
     .report-doc .add-btn {
         width: 100%;
-        min-height: 44px;
-        padding: 0 14px;
+        height: auto;
+        min-height: var(--control-h-lg);
+        padding: 0 var(--space-4);
         align-self: stretch;
-        border-radius: 12px;
+        border-radius: var(--radius-sm);
+        font-size: var(--fs-14);
     }
 
     .report-doc .add-project-btn {
-        min-height: 44px;
+        min-height: var(--control-h-lg);
         width: 100%;
     }
 
     .report-doc .save-bar {
         position: sticky;
         bottom: var(--bottom-nav-offset);
-        z-index: 30;
-        margin-top: 8px;
-        padding: 10px 12px;
+        z-index: var(--z-sticky);
+        margin-top: var(--space-2);
+        padding: var(--space-3);
         flex-direction: column;
         align-items: stretch;
         background: var(--surface);
     }
 
     .report-doc .save-actions .btn {
-        min-height: 48px;
+        min-height: var(--control-h-lg);
         width: 100%;
     }
 
     .report-doc .raw-content {
-        font-size: 15px;
-        line-height: 1.65;
+        font-size: var(--fs-14);
+        line-height: var(--lh-relaxed);
         max-height: 50vh;
     }
 }

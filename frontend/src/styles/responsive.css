@@ -1,12 +1,18 @@
-/* 전화·좁은 태블릿. 860px 셸(드로어)과 겹쳐도 데스크톱 그리드는 건드리지 않는다. */
+/* ------------------------------------------------------------------
+   Breakpoints. Loaded after shell.css / components.css / report-doc.css.
+   Wide desktop lives in those files. This file only composes:
+   - small laptop (861–1100px)
+   - phone and narrow tablet (<=860px): bottom tab nav, 44px targets,
+     safe-area insets, no overflow-x clip on the document
+   Every size comes from tokens.css. Do not set overflow-x on
+   html, body, or #app — that traps vertical scroll.
+   ------------------------------------------------------------------ */
 
 :root {
     --bottom-nav-height: 0px;
     --bottom-nav-offset: 0px;
 }
 
-/* overflow-x: hidden/clip 을 html·body·#app 에 둘 수 없다.
-   한 축이 숨기면 다른 축도 auto가 되어 세로 스크롤이 잡힌다. */
 html.is-overlay-open .main-body {
     overflow: hidden;
 }
@@ -22,10 +28,10 @@ html.is-overlay-open .main-body {
     flex-shrink: 0;
 }
 
-/* 작은 노트북과 가로 태블릿. 데스크톱 3열이 비좁아지는 구간에 중간 상태를 둔다. */
+/* Small laptop: tighter page padding, list rows drop to two columns. */
 @media (max-width: 1100px) and (min-width: 861px) {
     .page {
-        padding: 20px 20px 40px;
+        padding: var(--space-5) var(--space-5) var(--space-7);
     }
 
     .app-list-row {
@@ -39,15 +45,20 @@ html.is-overlay-open .main-body {
 
 @media (max-width: 860px) {
     :root {
-        --topbar-height: 64px;
+        --topbar-height: calc(var(--control-h-lg) + var(--space-5));
         --content-max: 100%;
         --content-max-wide: 100%;
-        --bottom-nav-height: 72px;
+        --bottom-nav-height: calc(var(--control-h-lg) + var(--space-7));
         --bottom-nav-offset: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
     }
 
+    .main-content.is-focus-write {
+        --bottom-nav-height: 0px;
+        --bottom-nav-offset: env(safe-area-inset-bottom, 0px);
+    }
+
     html {
-        -webkit-tap-highlight-color: rgba(0, 117, 222, 0.15);
+        -webkit-tap-highlight-color: color-mix(in srgb, var(--accent) 15%, transparent);
     }
 
     html,
@@ -76,20 +87,23 @@ html.is-overlay-open .main-body {
     .topbar {
         position: sticky;
         top: 0;
-        z-index: 40;
-        padding-top: env(safe-area-inset-top);
-        padding-left: max(var(--space-3), env(safe-area-inset-left));
-        padding-right: max(var(--space-3), env(safe-area-inset-right));
-        min-height: calc(var(--topbar-height) + env(safe-area-inset-top));
+        z-index: var(--z-topbar);
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-left: max(var(--space-3), env(safe-area-inset-left, 0px));
+        padding-right: max(var(--space-3), env(safe-area-inset-right, 0px));
+        min-height: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
         gap: var(--space-2);
     }
 
+    .topbar { min-width: 0; max-width: 100%; }
+    .topbar-crumbs { flex: 1 1 auto; min-width: 0; }
+
     .topbar-title {
-        font-size: 20px;
+        font-size: var(--fs-20);
         font-weight: var(--fw-semibold);
     }
 
-    /* 하단 탭이 있으면 상위 경로는 자리를 뺏을 뿐이다. */
+    /* Bottom tabs already name the section. */
     .topbar-crumb,
     .topbar-crumb-sep {
         display: none;
@@ -98,11 +112,11 @@ html.is-overlay-open .main-body {
     .topbar .btn,
     .topbar-action {
         flex-shrink: 0;
-        height: 44px;
-        min-height: 44px;
-        padding-left: 16px;
-        padding-right: 16px;
-        font-size: 15px;
+        height: var(--control-h-lg);
+        min-height: var(--control-h-lg);
+        padding-left: var(--space-4);
+        padding-right: var(--space-4);
+        font-size: var(--fs-14);
     }
 
     .topbar-tool {
@@ -110,12 +124,12 @@ html.is-overlay-open .main-body {
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        min-height: 44px;
-        padding: 0 10px;
+        min-height: var(--control-h-lg);
+        padding: 0 var(--space-3);
         border-radius: var(--radius-sm);
         color: var(--text-strong);
         text-decoration: none;
-        font-size: 15px;
+        font-size: var(--fs-14);
         font-weight: var(--fw-semibold);
         word-break: keep-all;
     }
@@ -126,9 +140,9 @@ html.is-overlay-open .main-body {
     }
 
     .sidebar-avatar {
-        width: 36px;
-        height: 36px;
-        font-size: 14px;
+        width: var(--control-h);
+        height: var(--control-h);
+        font-size: var(--fs-14);
     }
 
     .main-content,
@@ -156,11 +170,11 @@ html.is-overlay-open .main-body {
         left: 0;
         right: 0;
         bottom: 0;
-        z-index: 45;
+        z-index: var(--z-nav);
         align-items: stretch;
         justify-content: space-around;
-        min-height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
-        padding: 8px 6px env(safe-area-inset-bottom, 0px);
+        min-height: var(--bottom-nav-offset);
+        padding: var(--space-2) var(--space-2) env(safe-area-inset-bottom, 0px);
         border-top: 1px solid var(--border);
         background: var(--surface);
     }
@@ -171,16 +185,16 @@ html.is-overlay-open .main-body {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 4px;
+        gap: var(--space-1);
         min-width: 0;
-        min-height: 64px;
-        padding: 6px 4px;
-        border-radius: 12px;
+        min-height: var(--control-h-lg);
+        padding: var(--space-1) var(--space-1);
+        border-radius: var(--radius);
         color: var(--text);
         text-decoration: none;
-        font-size: 13px;
+        font-size: var(--fs-12);
         font-weight: var(--fw-semibold);
-        line-height: 1.15;
+        line-height: var(--lh-tight);
     }
 
     .app-bottom-nav a span {
@@ -191,8 +205,8 @@ html.is-overlay-open .main-body {
     }
 
     .app-bottom-nav a svg {
-        width: 26px;
-        height: 26px;
+        width: var(--space-5);
+        height: var(--space-5);
         opacity: 0.7;
     }
 
@@ -207,16 +221,16 @@ html.is-overlay-open .main-body {
     }
 
     .page {
-        padding: 14px max(14px, env(safe-area-inset-right))
-            20px max(14px, env(safe-area-inset-left));
+        padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right, 0px))
+            var(--space-6) max(var(--space-4), env(safe-area-inset-left, 0px));
     }
 
     .page-title {
-        font-size: 20px;
+        font-size: var(--fs-20);
     }
 
     .page-subtitle {
-        font-size: 13px;
+        font-size: var(--fs-13);
     }
 
     .page-header,
@@ -246,7 +260,8 @@ html.is-overlay-open .main-body {
         scrollbar-width: none;
         margin-left: calc(var(--space-4) * -1);
         margin-right: calc(var(--space-4) * -1);
-        padding: 0 var(--space-4);
+        padding-left: var(--space-4);
+        padding-right: var(--space-4);
     }
 
     .app-tabs::-webkit-scrollbar {
@@ -255,7 +270,8 @@ html.is-overlay-open .main-body {
 
     .app-tab {
         flex-shrink: 0;
-        height: 40px;
+        height: var(--control-h-lg);
+        min-height: var(--control-h-lg);
         padding: 0 var(--space-4);
     }
 
@@ -263,8 +279,8 @@ html.is-overlay-open .main-body {
         display: grid;
         grid-template-columns: 1fr 1fr;
         align-items: stretch;
-        gap: 8px;
-        padding: 8px;
+        gap: var(--space-2);
+        padding: var(--space-2);
         border-radius: var(--radius);
     }
 
@@ -273,8 +289,8 @@ html.is-overlay-open .main-body {
         flex: unset;
         width: 100%;
         min-width: 0;
-        height: 44px;
-        font-size: 16px;
+        height: var(--control-h-lg);
+        font-size: var(--fs-16);
     }
 
     .filter-toolbar .input[type="text"],
@@ -297,21 +313,21 @@ html.is-overlay-open .main-body {
     }
 
     .select-card {
-        min-height: 56px;
-        padding: 12px 14px;
-        border-radius: 14px;
+        min-height: var(--control-h-lg);
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius);
     }
 
     .card {
-        padding: 14px;
-        border-radius: 14px;
+        padding: var(--space-4);
+        border-radius: var(--radius);
     }
 
     .app-list-row {
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 8px 10px;
-        padding: 12px 14px;
-        min-height: 64px;
+        gap: var(--space-2) var(--space-3);
+        padding: var(--space-3) var(--space-4);
+        min-height: calc(var(--control-h-lg) + var(--space-4));
         align-items: start;
     }
 
@@ -320,33 +336,33 @@ html.is-overlay-open .main-body {
     }
 
     .btn {
-        min-height: 44px;
+        min-height: var(--control-h-lg);
         height: auto;
-        padding-top: 10px;
-        padding-bottom: 10px;
+        padding-top: var(--space-2);
+        padding-bottom: var(--space-2);
     }
 
     .btn-small {
-        min-height: 40px;
+        min-height: var(--control-h-lg);
         height: auto;
     }
 
     .icon-btn {
-        width: 44px;
-        height: 44px;
+        width: var(--control-h-lg);
+        height: var(--control-h-lg);
     }
 
     .textarea,
     .field > textarea {
-        min-height: 160px;
-        font-size: 16px;
+        min-height: calc(var(--space-8) * 3 + var(--space-4));
+        font-size: var(--fs-16);
     }
 
     .field > input:not([type="checkbox"]):not([type="radio"]),
     .field > select,
     .input {
-        font-size: 16px;
-        min-height: 44px;
+        font-size: var(--fs-16);
+        min-height: var(--control-h-lg);
     }
 
     .app-dialog-overlay {
@@ -358,7 +374,7 @@ html.is-overlay-open .main-body {
         width: 100%;
         max-width: none;
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-        padding-bottom: max(var(--space-5), env(safe-area-inset-bottom));
+        padding-bottom: max(var(--space-5), env(safe-area-inset-bottom, 0px));
     }
 
     .app-dialog-actions {
@@ -403,21 +419,21 @@ html.is-overlay-open .main-body {
     }
 
     .report-doc .field-group {
-        padding: 12px;
+        padding: var(--space-3);
     }
 
     .detail-actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
         width: 100%;
-        gap: 8px;
+        gap: var(--space-2);
     }
 
     .detail-actions .btn {
         flex: none;
         width: 100%;
         min-width: 0;
-        min-height: 44px;
+        min-height: var(--control-h-lg);
     }
 
     .detail-actions .btn-primary {
@@ -445,19 +461,19 @@ html.is-overlay-open .main-body {
     }
 
     .cal-day {
-        min-height: 52px;
-        padding: 6px 4px;
-        gap: 4px;
-        border-radius: 10px;
+        min-height: calc(var(--control-h-lg) + var(--space-2));
+        padding: var(--space-2) var(--space-1);
+        gap: var(--space-1);
+        border-radius: var(--radius-sm);
     }
 
     .cal-day-num {
-        font-size: 14px;
+        font-size: var(--fs-14);
         font-weight: var(--fw-semibold);
     }
 
     .cal-day-ratio {
-        font-size: 10px;
+        font-size: var(--fs-11);
     }
 
     .calendar-workspace,
@@ -487,11 +503,29 @@ html.is-overlay-open .main-body {
     }
 
     .calendar-card {
-        padding: 12px;
+        padding: var(--space-3);
     }
 
     .project-nav-chip {
         max-width: 100%;
+    }
+
+    /* Page-level controls that are not .btn still have to clear 44px. */
+    .row-delete,
+    .line-pick,
+    .line-quiet,
+    .line-remove,
+    .line-kinds button,
+    .person-chip,
+    .more-people,
+    .day-cell {
+        min-height: var(--control-h-lg);
+    }
+
+    .row-delete,
+    .line-remove,
+    .icon-btn {
+        min-width: var(--control-h-lg);
     }
 }
 
@@ -508,17 +542,17 @@ html.is-overlay-open .main-body {
 @media (max-width: 480px) {
     .stat-grid {
         grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        gap: var(--space-2);
     }
 
     .stat-card {
-        padding: 12px 12px 10px;
-        gap: 4px;
-        border-radius: 12px;
+        padding: var(--space-3);
+        gap: var(--space-1);
+        border-radius: var(--radius);
     }
 
     .stat-value {
-        font-size: 22px;
+        font-size: var(--fs-20);
     }
 
     .report-headline {
@@ -528,16 +562,16 @@ html.is-overlay-open .main-body {
 
     .date-head {
         flex-wrap: wrap;
-        min-height: 48px;
+        min-height: var(--space-8);
     }
 
     .date-head em {
         width: 100%;
-        margin-left: 28px;
+        margin-left: calc(var(--space-6) + var(--space-1));
     }
 }
 
-/* 넘침 방지. 가로 스크롤 누수는 대부분 긴 문자열과 표에서 나온다. */
+/* Overflow comes from long strings and tables, not from clipping the page. */
 .page,
 .card,
 .app-list-row,

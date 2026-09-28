@@ -738,7 +738,7 @@ onMounted(() => {
 
 .project-name {
     margin: 0;
-    font-size: 15px;
+    font-size: var(--fs-14);
     font-weight: var(--fw-bold);
     color: var(--text-strong);
     line-height: 1.3;
@@ -786,8 +786,8 @@ onMounted(() => {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
+    width: var(--space-4);
+    height: var(--space-4);
     padding: 0;
     border: none;
     border-radius: var(--radius-pill);
@@ -812,7 +812,7 @@ onMounted(() => {
 
 .card-actions {
     display: flex;
-    gap: 2px;
+    gap: var(--space-1);
     flex-shrink: 0;
 }
 
@@ -857,7 +857,7 @@ onMounted(() => {
     background: none;
     color: var(--text-strong);
     font: inherit;
-    font-size: 15px;
+    font-size: var(--fs-14);
     font-weight: var(--fw-semibold);
     cursor: pointer;
     text-align: left;
@@ -952,7 +952,7 @@ onMounted(() => {
 
 .suggest-card-head h4 {
     margin: 0;
-    font-size: 15px;
+    font-size: var(--fs-14);
     font-weight: var(--fw-bold);
     color: var(--text-strong);
     line-height: 1.3;
@@ -969,7 +969,7 @@ onMounted(() => {
 @media (max-width: 860px) {
     .section-head {
         flex-wrap: wrap;
-        gap: 10px;
+        gap: var(--space-3);
     }
 
     .project-row-head {

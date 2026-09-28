@@ -571,10 +571,10 @@ onMounted(async () => {
                     이번 주로
                 </button>
                 <div class="week-nav-arrows">
-                    <button class="icon-btn" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
+                    <button type="button" class="icon-btn" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
                         <ChevronLeft :size="16" />
                     </button>
-                    <button class="icon-btn" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
+                    <button type="button" class="icon-btn" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
                         <ChevronRight :size="16" />
                     </button>
                 </div>
@@ -650,6 +650,7 @@ onMounted(async () => {
                 </div>
             </div>
             <button
+                type="button"
                 class="btn btn-primary create-week-btn"
                 @click="sendDates()"
                 :disabled="isLoading || selects.length === 0"
@@ -676,7 +677,7 @@ onMounted(async () => {
                         </button>
                         <button
                             type="button"
-                            class="row-delete"
+                            class="btn btn-small btn-danger row-delete"
                             @click="deleteWeekly(group.latest.id)"
                             :disabled="isLoading"
                         >
@@ -707,12 +708,12 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* 머리: 기간 제목 + 주 이동. 다른 화면의 page-header와 같은 리듬(제목 24 / 보조 14). */
 .week-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    width: 100%;
+    gap: var(--space-3) var(--space-4);
 }
 
 .week-head-text {
@@ -722,27 +723,23 @@ onMounted(async () => {
 
 .week-head h1 {
     margin: 0;
-    font-size: 22px;
-    font-weight: var(--fw-semibold);
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-    color: var(--text-strong);
+    font-size: var(--fs-24);
+    line-height: var(--lh-tight);
     white-space: nowrap;
 }
 
 .week-head p {
-    margin: 2px 0 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-    word-break: keep-all;
+    margin: var(--space-1) 0 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
 }
 
 .week-nav {
     display: flex;
     align-items: center;
+    flex-shrink: 0;
     gap: var(--space-2);
-    flex: 0 0 auto;
-    width: auto;
 }
 
 .week-nav-arrows {
@@ -751,50 +748,27 @@ onMounted(async () => {
     gap: var(--space-1);
 }
 
-.week-range {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 8px;
-}
-
-.week-range label {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-}
-
-.week-range span {
-    font-size: 13px;
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.week-range .input {
-    min-width: 0;
-    min-height: 44px;
-    font-size: 16px;
-}
-
 .icon-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
     padding: 0;
     border: 1px solid var(--border);
-    border-radius: 50%;
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
     cursor: pointer;
     transition:
         background var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease),
         color var(--dur-fast) var(--ease);
 }
 
 .icon-btn:hover {
     background: var(--surface-soft);
+    border-color: var(--border-strong);
     color: var(--text-strong);
 }
 
@@ -803,35 +777,45 @@ onMounted(async () => {
     cursor: not-allowed;
 }
 
-.icon-btn.is-danger {
-    border-color: transparent;
-    color: var(--text-muted);
+.icon-btn:disabled:hover {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
 }
 
-.icon-btn.is-danger:hover {
-    background: var(--danger-bg);
-    color: var(--danger-fg);
+/* 커스텀 컨트롤의 포커스는 하드 아웃라인 대신 공용 포커스 링을 쓴다. */
+.icon-btn:focus-visible,
+.day-chip:focus-visible,
+.week-fold-head:focus-visible,
+.report-main:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
 }
 
-.row-delete {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0 8px;
-    border: 0;
-    background: transparent;
-    color: var(--danger-fg);
-    font: inherit;
-    font-size: 14px;
-    cursor: pointer;
+/* 기간 입력: 두 날짜 필드를 제목 아래 왼쪽에 모아 둔다. */
+.week-range {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 200px));
+    gap: var(--space-3);
 }
 
-.row-delete:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.week-range label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
 }
 
-.weekly-report-page > .card {
-    margin-bottom: 0;
+.week-range span {
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.week-range .input {
+    min-width: 0;
+    height: var(--control-h);
 }
 
 .section-head {
@@ -845,54 +829,45 @@ onMounted(async () => {
 .section-head h2 {
     margin: 0;
     font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
+    line-height: var(--lh-tight);
 }
 
-.section-head p {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-/* 날짜 칩에 그날 제출 인원을 같이 적어 표를 펼치지 않아도 흐름이 보인다. */
-.day-chips {
+/* 주 단위 묶음. 데스크톱은 간격만, 좁은 화면(접힘)은 헤어라인으로 나눈다. */
+.week-folds {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: var(--space-2);
+    gap: var(--space-3);
 }
 
 .week-fold-head {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     width: 100%;
-    min-height: 52px;
-    padding: 8px 4px;
+    min-height: var(--control-h-touch);
+    margin: 0;
+    padding: var(--space-2) 0;
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-strong);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-14);
     font-weight: var(--fw-semibold);
     text-align: left;
+    word-break: keep-all;
     cursor: pointer;
-}
-
-.week-fold + .week-fold {
-    border-top: 1px solid var(--border);
 }
 
 .week-fold-meta {
     margin-left: auto;
-    font-size: 14px;
-    font-weight: var(--fw-regular, 400);
-    color: var(--text);
+    font-size: var(--fs-13);
+    font-weight: normal;
+    color: var(--text-muted);
 }
 
 .week-fold-head svg {
     flex: none;
-    color: var(--text);
+    color: var(--text-muted);
     transition: transform var(--dur-fast) var(--ease);
 }
 
@@ -900,38 +875,46 @@ onMounted(async () => {
     transform: rotate(180deg);
 }
 
+.week-fold-head + .day-chips {
+    margin-bottom: var(--space-3);
+}
+
+/* 날짜 타일: select-card와 같은 문법. hover는 accent-border, 선택은 accent 보더. */
+.day-chips {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-2);
+}
+
 .day-chip {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    justify-content: center;
-    gap: 4px;
-    min-height: 88px;
-    padding: 12px;
+    gap: var(--space-1);
+    margin: 0;
+    padding: var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
     font: inherit;
+    line-height: var(--lh-tight);
     text-align: left;
+    word-break: keep-all;
     cursor: pointer;
     transition:
         border-color var(--dur-fast) var(--ease),
         background var(--dur-fast) var(--ease);
 }
 
-.day-chip:hover {
-    border-color: var(--border-strong);
+.day-chip:not(:disabled):not(.on):hover {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
 }
 
 .day-chip.on {
     border-color: var(--accent);
     background: var(--accent-soft);
-    box-shadow: none;
-}
-
-.day-chip:disabled {
-    opacity: 1;
 }
 
 .day-chip-name {
@@ -940,62 +923,49 @@ onMounted(async () => {
     color: var(--text-strong);
 }
 
+.day-chip.on .day-chip-name {
+    color: var(--accent-hover);
+}
+
 .day-chip-date {
     font-size: var(--fs-12);
-    color: var(--text);
+    color: var(--text-muted);
 }
 
 .day-chip-state {
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
     color: var(--success-fg);
 }
 
+/* 일일보고가 없는 날은 고를 수 없다. 옅은 면으로 눕혀 둔다. */
 .day-chip.is-blank {
+    background: var(--surface-soft);
     cursor: not-allowed;
-    background: transparent;
 }
 
 .day-chip.is-blank .day-chip-name,
-.day-chip.is-blank .day-chip-date {
-    color: var(--text-muted);
-}
-
+.day-chip.is-blank .day-chip-date,
 .day-chip.is-blank .day-chip-state {
     color: var(--text-muted);
-    font-weight: var(--fw-medium);
-}
-
-.day-chip.is-blank:hover {
-    border-color: var(--border);
 }
 
 /* 아직 오지 않은 날. 켤 수는 있지만 끝난 날처럼 보이지 않게 흐리게 둔다. */
-.day-chip.is-future:not(.on) .day-chip-name,
-.day-chip.is-future:not(.on) .day-chip-date {
+.day-chip.is-future:not(.on) .day-chip-name {
     color: var(--text-muted);
 }
 
 .day-chip.is-future .day-chip-state {
     color: var(--text);
-    font-weight: var(--fw-medium);
 }
 
-.report-dupe {
-    color: var(--warning-fg);
-    font-weight: var(--fw-semibold);
+.create-week-btn {
+    display: flex;
+    width: fit-content;
+    margin: var(--space-4) 0 0 auto;
 }
 
-.week-hint {
-    margin-top: var(--space-3);
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.week-hint a {
-    color: var(--accent-hover);
-}
-
+/* 만든 보고서 목록: 카드 안에서 헤어라인으로만 행을 나눈다. */
 .report-list {
     list-style: none;
     margin: 0;
@@ -1010,152 +980,183 @@ onMounted(async () => {
     border-top: 1px solid var(--border);
 }
 
-.report-top {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    flex: 1;
-    min-width: 0;
+.report-row:first-child {
+    padding-top: 0;
+    border-top: 0;
 }
 
-.report-row:first-child {
-    border-top: none;
+.report-row:last-child {
+    padding-bottom: 0;
+}
+
+/* 데스크톱은 제목 · 내려받기 · 삭제 순으로 한 줄. 좁은 화면에서 다시 감싼다. */
+.report-top {
+    display: contents;
 }
 
 .report-main {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
     flex: 1;
+    flex-direction: column;
     min-width: 0;
-    margin: 0;
+    margin: 0 0 0 calc(-1 * var(--space-2));
     padding: var(--space-1) var(--space-2);
-    border: none;
+    border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
+    color: var(--text);
     font: inherit;
+    line-height: var(--lh-base);
     text-align: left;
+    word-break: keep-all;
     cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
 }
 
-.report-main:hover {
+.report-main:not(:disabled):hover {
     background: var(--surface-soft);
 }
 
 .report-main strong {
     font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }
 
 .report-main span {
-    font-size: var(--fs-12);
-    color: var(--text);
+    overflow: hidden;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .report-row-actions {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
     flex-shrink: 0;
+    order: 1;
+    gap: var(--space-2);
 }
 
-.create-week-btn {
-    display: flex;
-    width: 100%;
-    min-height: 44px;
-    margin-top: var(--space-4);
+/* 삭제는 ghost. 쉬고 있을 땐 조용히, hover에서만 danger로. */
+.row-delete {
+    order: 2;
+    color: var(--text-muted);
+}
+
+.row-delete:hover {
+    color: var(--danger-fg);
 }
 
 @media (max-width: 860px) {
     .week-head h1 {
-        font-size: 20px;
+        font-size: var(--fs-20);
     }
 
-    .week-nav .icon-btn {
-        width: 44px;
-        height: 44px;
+    .week-nav {
+        width: 100%;
+    }
+
+    .week-nav-arrows {
+        margin-left: auto;
+    }
+
+    .week-nav .btn {
+        min-height: var(--control-h-touch);
+    }
+
+    .icon-btn {
+        width: var(--control-h-touch);
+        height: var(--control-h-touch);
+    }
+
+    .week-range {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-2);
+    }
+
+    .week-range .input {
+        height: var(--control-h-touch);
+        font-size: var(--fs-16);
+    }
+
+    .week-folds {
+        gap: 0;
+    }
+
+    .week-fold + .week-fold {
+        border-top: 1px solid var(--border);
     }
 
     .day-chips {
         grid-template-columns: minmax(0, 1fr);
-        gap: 0;
     }
 
     .day-chip {
         flex-direction: row;
         align-items: center;
-        min-height: 52px;
-        padding: 8px 12px;
-        border-width: 0 0 1px;
-        border-radius: 0;
-        background: transparent;
-    }
-
-    .day-chip:last-child {
-        border-bottom: none;
-    }
-
-    .day-chip.on {
-        border-radius: 0;
-        border-color: transparent;
-        background: transparent;
-        box-shadow: inset 3px 0 0 var(--accent);
-    }
-
-    .day-chip-name {
-        font-size: 16px;
+        gap: var(--space-3);
+        min-height: var(--control-h-touch);
+        padding: var(--space-2) var(--space-3);
     }
 
     .day-chip-date {
-        font-size: 14px;
+        font-size: var(--fs-14);
+        color: var(--text);
     }
 
     .day-chip-state {
         margin-left: auto;
-        font-size: 14px;
+        font-size: var(--fs-13);
     }
 
     .create-week-btn {
-        min-height: 48px;
+        width: 100%;
+        min-height: var(--control-h-touch);
     }
 
     .report-row {
         flex-direction: column;
         align-items: stretch;
-        gap: 12px;
-        padding: 4px 0 8px;
+        gap: var(--space-2);
+        padding: var(--space-3) 0;
     }
 
     .report-top {
-        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
     }
 
     .report-main {
-        padding: 8px 0;
-        min-height: 44px;
+        min-height: var(--control-h-touch);
+        margin-left: 0;
+        padding: var(--space-2) 0;
     }
 
-    .report-main strong {
-        font-size: 16px;
+    .report-main:not(:disabled):hover {
+        background: transparent;
+    }
+
+    .row-delete {
+        min-height: var(--control-h-touch);
     }
 
     .report-row-actions {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         width: 100%;
-        gap: 8px;
+        gap: var(--space-2);
     }
 
-    .report-row-actions .cleanup-btn,
     .cleanup-btn {
         grid-column: 1 / -1;
     }
 
     .report-row-actions .btn {
-        min-height: 44px;
         width: 100%;
+        min-height: var(--control-h-touch);
     }
 }
-
 </style>

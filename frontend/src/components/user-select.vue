@@ -455,8 +455,8 @@ onMounted(async () => {
 .team-chip,
 .letter-chip {
     flex-shrink: 0;
-    min-height: 36px;
-    padding: 0 12px;
+    min-height: var(--control-h);
+    padding: 0 var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     background: var(--surface);
@@ -476,8 +476,8 @@ onMounted(async () => {
 
 .team-chip:focus-visible,
 .letter-chip:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 .team-gap {
@@ -525,10 +525,10 @@ onMounted(async () => {
 
 .user-row {
     display: grid;
-    grid-template-columns: 36px minmax(0, 1.2fr) minmax(160px, 220px) minmax(160px, 240px);
+    grid-template-columns: var(--control-h) minmax(0, 1.2fr) minmax(160px, 220px) minmax(160px, 240px);
     align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--border);
 }
 
@@ -561,8 +561,8 @@ onMounted(async () => {
 .user-row-team .input {
     width: 100%;
     min-width: 0;
-    height: 40px;
-    padding: 0 28px 0 12px;
+    height: var(--control-h-lg);
+    padding: 0 calc(var(--space-6) + var(--space-1)) 0 var(--space-3);
     font-size: var(--fs-14);
 }
 
@@ -577,14 +577,14 @@ onMounted(async () => {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     min-width: 0;
 }
 
 .user-row-temp .input {
     width: 100%;
     min-width: 0;
-    height: 40px;
+    height: var(--control-h-lg);
 }
 
 .sr-only {
@@ -600,19 +600,19 @@ onMounted(async () => {
 }
 
 .account-form + .account-form {
-    margin-top: 16px;
+    margin-top: var(--space-4);
 }
 
 .account-form-head h2 {
     margin: 0;
-    font-size: 16px;
+    font-size: var(--fs-16);
     color: var(--text-strong);
 }
 
 .account-form-head p,
 .account-form-note {
-    margin: 4px 0 0;
-    font-size: 13px;
+    margin: var(--space-1) 0 0;
+    font-size: var(--fs-13);
     color: var(--text);
     word-break: keep-all;
 }
@@ -620,24 +620,24 @@ onMounted(async () => {
 .account-form-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-    gap: 12px;
+    gap: var(--space-3);
     align-items: end;
-    margin-top: 14px;
+    margin-top: var(--space-4);
 }
 
 .account-form-grid :deep(.input) {
     width: 100%;
     min-width: 0;
-    height: 40px;
-    font-size: 15px;
+    height: var(--control-h-lg);
+    font-size: var(--fs-14);
 }
 
 .account-form-submit {
-    min-height: 40px;
+    min-height: var(--control-h-lg);
 }
 
 .account-form-note {
-    margin-top: 8px;
+    margin-top: var(--space-2);
 }
 
 @media (max-width: 860px) {
@@ -650,21 +650,21 @@ onMounted(async () => {
         flex-wrap: nowrap;
         overflow-x: auto;
         overscroll-behavior-x: contain;
-        margin-right: -4px;
-        padding-bottom: 4px;
+        margin-right: calc(var(--space-1) * -1);
+        padding-bottom: var(--space-1);
     }
 
     .team-chip,
     .letter-chip {
-        min-height: 44px;
-        font-size: 14px;
+        min-height: var(--control-h-lg);
+        font-size: var(--fs-14);
     }
 
     .user-row {
-        grid-template-columns: 36px minmax(0, 1fr);
+        grid-template-columns: var(--control-h) minmax(0, 1fr);
         align-items: center;
-        gap: 8px 10px;
-        padding: 12px;
+        gap: var(--space-2) var(--space-3);
+        padding: var(--space-3);
     }
 
     .user-row-team,
@@ -675,12 +675,12 @@ onMounted(async () => {
 
     .user-row-team .input,
     .user-row-temp .input {
-        height: 44px;
-        font-size: 16px;
+        height: var(--control-h-lg);
+        font-size: var(--fs-16);
     }
 
     .user-row-temp .btn {
-        min-height: 44px;
+        min-height: var(--control-h-lg);
     }
 
     .account-form-grid {
@@ -688,13 +688,13 @@ onMounted(async () => {
     }
 
     .account-form-grid :deep(.input) {
-        height: 44px;
-        font-size: 16px;
+        height: var(--control-h-lg);
+        font-size: var(--fs-16);
     }
 
     .account-form-submit {
         width: 100%;
-        min-height: 44px;
+        min-height: var(--control-h-lg);
     }
 }
 </style>

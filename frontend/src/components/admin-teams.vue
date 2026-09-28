@@ -173,12 +173,12 @@ onMounted(async () => {
 .team-board {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
+    gap: var(--space-3);
     margin-bottom: var(--space-5);
 }
 
 .team-board .select-card {
-    min-height: 64px;
+    min-height: calc(var(--control-h-lg) + var(--space-5));
     cursor: default;
 }
 
@@ -189,7 +189,7 @@ onMounted(async () => {
 
 .team-board .select-card-meta {
     flex-shrink: 0;
-    font-size: 13px;
+    font-size: var(--fs-13);
     color: var(--text);
 }
 
@@ -202,13 +202,13 @@ onMounted(async () => {
 .add-row .input {
     flex: 1;
     min-width: 0;
-    height: 40px;
-    font-size: 15px;
+    height: var(--control-h-lg);
+    font-size: var(--fs-14);
 }
 
 .add-row .btn {
     flex-shrink: 0;
-    min-height: 40px;
+    min-height: var(--control-h-lg);
 }
 
 @media (max-width: 860px) {
@@ -218,8 +218,8 @@ onMounted(async () => {
     }
 
     .team-toolbar .input {
-        height: 44px;
-        font-size: 16px;
+        height: var(--control-h-lg);
+        font-size: var(--fs-16);
     }
 
     .team-board {
@@ -227,7 +227,7 @@ onMounted(async () => {
     }
 
     .team-board .select-card {
-        min-height: 56px;
+        min-height: calc(var(--control-h-lg) + var(--space-3));
     }
 
     .add-row {
@@ -238,9 +238,9 @@ onMounted(async () => {
     .add-row .input,
     .add-row .btn {
         width: 100%;
-        height: 44px;
-        min-height: 44px;
-        font-size: 16px;
+        height: var(--control-h-lg);
+        min-height: var(--control-h-lg);
+        font-size: var(--fs-16);
     }
 }
 </style>

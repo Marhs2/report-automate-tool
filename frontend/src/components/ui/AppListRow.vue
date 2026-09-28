@@ -4,6 +4,7 @@ defineProps({
 });
 </script>
 
+<!-- One hairline-separated row: main | meta | actions (.app-list-row in components.css). -->
 <template>
     <div class="app-list-row" :class="{ 'is-clickable': clickable }">
         <div class="app-list-row-main">

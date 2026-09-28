@@ -261,7 +261,7 @@ onUnmounted(() => {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
     min-width: 0;
     min-height: 100%;
 }
@@ -269,8 +269,8 @@ onUnmounted(() => {
 .line-context {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    min-height: 44px;
+    gap: var(--space-2);
+    min-height: var(--control-h-lg);
 }
 
 .line-context :slotted(input) {
@@ -282,16 +282,16 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: var(--space-2);
     flex: 1;
     min-width: 0;
-    min-height: 44px;
+    min-height: var(--control-h-lg);
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--text-strong);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-16);
     font-weight: var(--fw-semibold);
     text-align: left;
     cursor: pointer;
@@ -318,33 +318,33 @@ onUnmounted(() => {
 .line-project-cue {
     flex: none;
     color: var(--accent);
-    font-size: 15px;
+    font-size: var(--fs-14);
     font-weight: var(--fw-semibold);
 }
 
 .line-project:focus-visible {
-    outline: 2px solid var(--text-strong);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 .line-pick-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-2);
     max-height: 240px;
-    margin-bottom: 12px;
+    margin-bottom: var(--space-3);
     overflow: auto;
 }
 
 .line-pick {
-    min-height: 44px;
-    padding: 8px 12px;
+    min-height: var(--control-h-lg);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text-strong);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-16);
     text-align: left;
     cursor: pointer;
 }
@@ -355,20 +355,20 @@ onUnmounted(() => {
 }
 
 .project-dialog .line-entry {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-3);
 }
 
 .line-kinds {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-2);
     min-width: 0;
 }
 
 .line-kinds button,
 .line-quiet {
-    min-height: 44px;
-    border: 1px solid #7a7268;
+    min-height: var(--control-h-lg);
+    border: 1px solid var(--border-strong);
     background: var(--surface);
     color: var(--text-strong);
     font: inherit;
@@ -376,11 +376,11 @@ onUnmounted(() => {
 }
 
 .line-kinds button {
-    flex: 1 1 calc(33.33% - 8px);
+    flex: 1 1 calc(33.33% - var(--space-2));
     min-width: 0;
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border-radius: var(--radius-pill);
-    font-size: 14px;
+    font-size: var(--fs-14);
     white-space: nowrap;
 }
 
@@ -392,8 +392,8 @@ onUnmounted(() => {
 .line-kinds button:focus-visible,
 .line-quiet:focus-visible,
 .line-remove:focus-visible {
-    outline: 2px solid var(--text-strong);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 .line-group {
@@ -412,18 +412,18 @@ onUnmounted(() => {
 
 .line-preview {
     margin: 0;
-    min-height: 44px;
+    min-height: var(--control-h-lg);
     display: flex;
     align-items: center;
     border-top: 1px solid var(--border);
-    font-size: 15px;
+    font-size: var(--fs-14);
     color: var(--text);
 }
 
 .line-group h2,
 .line-bucket h2 {
-    margin: 8px 0 0;
-    font-size: 13px;
+    margin: var(--space-2) 0 0;
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     color: var(--text);
 }
@@ -441,37 +441,37 @@ onUnmounted(() => {
 }
 
 .app-dialog h2 {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-3);
 }
 
 .app-dialog .input {
     width: 100%;
-    min-height: 44px;
-    margin-bottom: 16px;
-    font-size: 16px;
+    min-height: var(--control-h-lg);
+    margin-bottom: var(--space-4);
+    font-size: var(--fs-16);
 }
 
 .line-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 6px;
+    gap: var(--space-2);
     align-items: center;
-    min-height: 44px;
+    min-height: var(--control-h-lg);
     border-top: 1px solid var(--border);
-    font-size: 15px;
+    font-size: var(--fs-14);
     word-break: keep-all;
     color: var(--text-strong);
 }
 
 .line-remove {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0 8px;
+    min-width: var(--control-h-lg);
+    min-height: var(--control-h-lg);
+    padding: 0 var(--space-2);
     border: 0;
     background: transparent;
     color: var(--danger-fg);
     font: inherit;
-    font-size: 14px;
+    font-size: var(--fs-14);
     cursor: pointer;
 }
 
@@ -479,20 +479,20 @@ onUnmounted(() => {
     display: flex;
     flex: none;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
     margin-top: auto;
-    padding-top: 12px;
+    padding-top: var(--space-3);
     border-top: 1px solid var(--border);
 }
 
 .line-compose .input {
-    scroll-margin-bottom: calc(var(--bottom-nav-offset) + 16px);
+    scroll-margin-bottom: calc(var(--bottom-nav-offset) + var(--space-4));
 }
 
 .line-compose label {
     display: block;
     margin: 0;
-    font-size: 12px;
+    font-size: var(--fs-12);
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }
@@ -503,21 +503,21 @@ onUnmounted(() => {
 
 .line-compose :slotted(.line-send) {
     width: 100%;
-    min-height: 44px;
-    height: 44px;
+    min-height: var(--control-h-lg);
+    height: var(--control-h-lg);
 }
 
 .line-entry {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     align-items: center;
 }
 
 .line-entry .input {
     min-width: 0;
     width: 100%;
-    min-height: 44px;
-    font-size: 16px;
+    min-height: var(--control-h-lg);
+    font-size: var(--fs-16);
 }
 
 .line-entry .input::placeholder {
@@ -527,10 +527,10 @@ onUnmounted(() => {
 
 .line-quiet {
     flex: none;
-    height: 44px;
-    padding: 0 14px;
+    height: var(--control-h-lg);
+    padding: 0 var(--space-4);
     border-radius: var(--radius-pill);
-    font-size: 14px;
+    font-size: var(--fs-14);
 }
 
 .line-quiet:hover,

@@ -129,50 +129,50 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
 }
 
 .ios-title h1 {
     margin: 0;
-    font-size: 34px;
+    font-size: var(--fs-30);
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1;
-    color: #1c1c1e;
+    color: var(--text-strong);
 }
 
 .ios-title p {
-    margin: 4px 0 0;
-    font-size: 15px;
-    color: rgba(60, 60, 67, 0.6);
+    margin: var(--space-1) 0 0;
+    font-size: var(--fs-14);
+    color: var(--text-muted);
 }
 
 .ios-tools {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .ios-nav {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .ios-today,
 .ios-arrow {
     border: 0;
     background: transparent;
-    color: #007aff;
+    color: var(--accent);
     cursor: pointer;
 }
 
 .ios-today {
-    min-height: 44px;
-    padding: 0 8px;
+    min-height: var(--control-h-lg);
+    padding: 0 var(--space-2);
     font: inherit;
-    font-size: 17px;
+    font-size: var(--fs-16);
     font-weight: 400;
 }
 
@@ -180,32 +180,32 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
+    width: var(--control-h-lg);
+    height: var(--control-h-lg);
     border-radius: 50%;
 }
 
 .ios-arrow:hover,
 .ios-today:hover {
-    background: rgba(0, 122, 255, 0.08);
+    background: var(--accent-soft);
 }
 
 .team-filter {
-    height: 32px;
+    height: var(--control-h-sm);
     max-width: 160px;
-    padding: 0 28px 0 10px;
+    padding: 0 calc(var(--space-6) + var(--space-1)) 0 var(--space-3);
     border: 0;
-    border-radius: 8px;
-    background: rgba(120, 120, 128, 0.12);
-    color: #1c1c1e;
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+    color: var(--text-strong);
     font: inherit;
-    font-size: 15px;
+    font-size: var(--fs-14);
 }
 
 .ios-board {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: var(--space-5);
 }
 
 .ios-weekdays,
@@ -216,31 +216,31 @@
 
 .ios-weekdays span {
     text-align: center;
-    font-size: 13px;
+    font-size: var(--fs-13);
     font-weight: 600;
-    color: rgba(60, 60, 67, 0.6);
+    color: var(--text-muted);
 }
 
 .ios-weekdays .sun,
 .ios-num.sun,
 .ios-num.holiday,
 .ios-holiday {
-    color: #ff3b30;
+    color: var(--danger-fg);
 }
 
 .ios-weekdays .sat,
 .ios-num.sat {
-    color: #007aff;
+    color: var(--accent);
 }
 
 .ios-cell {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
-    min-height: 48px;
+    gap: var(--space-1);
+    min-height: var(--control-h-lg);
     margin: 0;
-    padding: 2px 0 4px;
+    padding: var(--space-1) 0 var(--space-1);
     border: 0;
     background: transparent;
     cursor: pointer;
@@ -250,44 +250,44 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
     border-radius: 50%;
-    font-size: 17px;
+    font-size: var(--fs-16);
     font-weight: 400;
     line-height: 1;
-    color: #1c1c1e;
+    color: var(--text-strong);
 }
 
 .ios-num.outside {
-    color: rgba(60, 60, 67, 0.3);
+    color: var(--text-muted);
 }
 
 .ios-num.outside.sun,
 .ios-num.outside.sat,
 .ios-num.outside.holiday {
-    color: rgba(60, 60, 67, 0.3);
+    color: var(--text-muted);
 }
 
 .ios-num.today {
-    background: #ff3b30;
-    color: #fff;
+    background: var(--danger-fg);
+    color: var(--text-on-accent);
     font-weight: 600;
 }
 
 .ios-num.selected:not(.today) {
-    background: #e5e5ea;
+    background: var(--border);
 }
 
 .ios-dot {
-    width: 5px;
-    height: 5px;
+    width: var(--space-1);
+    height: var(--space-1);
     border-radius: 50%;
-    background: #007aff;
+    background: var(--accent);
 }
 
 .ios-dot.full {
-    background: #34c759;
+    background: var(--success-fg);
 }
 
 .ios-dot.is-empty {
@@ -296,54 +296,54 @@
 
 .ios-agenda {
     min-width: 0;
-    padding: 4px 0 8px;
+    padding: var(--space-1) 0 var(--space-2);
 }
 
 .ios-agenda h2 {
     margin: 0;
-    font-size: 20px;
+    font-size: var(--fs-20);
     font-weight: 700;
     letter-spacing: -0.02em;
-    color: #1c1c1e;
+    color: var(--text-strong);
 }
 
 .ios-holiday,
 .ios-agenda-meta,
 .ios-empty {
-    margin: 4px 0 0;
-    font-size: 13px;
+    margin: var(--space-1) 0 0;
+    font-size: var(--fs-13);
 }
 
 .ios-agenda-meta,
 .ios-empty {
-    color: rgba(60, 60, 67, 0.6);
+    color: var(--text-muted);
 }
 
 .agenda-group {
-    margin-top: 16px;
+    margin-top: var(--space-4);
 }
 
 .agenda-group h3 {
-    margin: 0 0 4px;
-    font-size: 13px;
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-13);
     font-weight: 600;
-    color: rgba(60, 60, 67, 0.6);
+    color: var(--text-muted);
 }
 
 .agenda-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-3);
     width: 100%;
-    min-height: 44px;
+    min-height: var(--control-h-lg);
     margin: 0;
-    padding: 8px 0;
+    padding: var(--space-2) 0;
     border: 0;
-    border-top: 1px solid rgba(60, 60, 67, 0.12);
+    border-top: 1px solid var(--border);
     background: transparent;
     font: inherit;
     text-align: left;
-    color: #1c1c1e;
+    color: var(--text-strong);
 }
 
 .agenda-group .agenda-row:first-of-type {
@@ -355,30 +355,30 @@ button.agenda-row {
 }
 
 .agenda-row.is-missed {
-    color: rgba(60, 60, 67, 0.45);
+    color: var(--text-muted);
 }
 
 .agenda-mark {
-    width: 8px;
-    height: 8px;
+    width: var(--space-2);
+    height: var(--space-2);
     border-radius: 50%;
-    background: rgba(60, 60, 67, 0.28);
+    background: var(--border-strong);
     flex: 0 0 auto;
 }
 
 .agenda-mark.full {
-    background: #34c759;
+    background: var(--success-fg);
 }
 
 .agenda-name {
-    font-size: 17px;
+    font-size: var(--fs-16);
 }
 
 @media (min-width: 900px) {
     .ios-board {
         flex-direction: row;
         align-items: flex-start;
-        gap: 36px;
+        gap: var(--control-h);
     }
 
     .ios-month {
@@ -388,13 +388,13 @@ button.agenda-row {
 
     .ios-agenda {
         flex: 1;
-        padding-top: 28px;
+        padding-top: calc(var(--space-6) + var(--space-1));
     }
 }
 
 @media (max-width: 860px) {
     .ios-title h1 {
-        font-size: 32px;
+        font-size: var(--fs-30);
     }
 
     .ios-tools {
@@ -403,7 +403,7 @@ button.agenda-row {
 
     .team-filter {
         max-width: 140px;
-        font-size: 16px;
+        font-size: var(--fs-16);
     }
 }
 </style>

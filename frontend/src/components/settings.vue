@@ -70,8 +70,8 @@ const logout = async () => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-top: 16px;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
 }
 
 .account-name,
@@ -81,20 +81,20 @@ const logout = async () => {
 }
 
 .account-name {
-    font-size: 15px;
+    font-size: var(--fs-14);
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }
 
 .account-team {
-    margin-top: 2px;
-    font-size: 13px;
+    margin-top: var(--space-1);
+    font-size: var(--fs-13);
     color: var(--text);
 }
 
 .account-logout {
     flex-shrink: 0;
-    min-height: 44px;
+    min-height: var(--control-h-lg);
 }
 
 @media (max-width: 860px) {

@@ -410,19 +410,36 @@ const removeAt = (list, index) => {
     list.splice(index, 1);
 };
 
+/** 가드 DOM 키. 제목을 키로 쓰면 글자마다 카드가 다시 만들어져 입력 포커스가 풀린다. */
+const sectionKeys = new WeakMap();
+let sectionKeySeq = 0;
+const stableSectionKey = (section) => {
+    let key = sectionKeys.get(section);
+    if (!key) {
+        sectionKeySeq += 1;
+        key = `sec-${sectionKeySeq}`;
+        sectionKeys.set(section, key);
+    }
+    return key;
+};
+
 const projectBlocks = computed(() => {
     const data = reportData.value;
     if (!data) return [];
     const order = [];
     const seen = new Map();
     const add = (section, kind, index) => {
-        const key = section.title || `__blank_${kind}_${index}`;
-        if (!seen.has(key)) {
-            const block = { key, done: null, next: null };
-            seen.set(key, block);
+        const titleKey = section.title || `__blank_${kind}_${index}`;
+        if (!seen.has(titleKey)) {
+            const block = {
+                key: stableSectionKey(section),
+                done: null,
+                next: null,
+            };
+            seen.set(titleKey, block);
             order.push(block);
         }
-        seen.get(key)[kind] = section;
+        seen.get(titleKey)[kind] = section;
     };
     (data.done || []).forEach((section, index) => add(section, "done", index));
     (data.next || []).forEach((section, index) => add(section, "next", index));
@@ -860,8 +877,8 @@ const saveReport = async () => {
 .detail-title h1 {
     margin: 0;
     font-family: var(--heading);
-    font-size: 22px;
-    letter-spacing: -0.3px;
+    font-size: var(--fs-24);
+    letter-spacing: -0.02em;
     color: var(--text-strong);
 }
 
@@ -881,7 +898,7 @@ const saveReport = async () => {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .read-project-name {
@@ -991,7 +1008,7 @@ const saveReport = async () => {
 }
 
 .fold-count {
-    padding: 0 6px;
+    padding: 0 var(--space-2);
     border-radius: var(--radius-pill);
     background: var(--surface-soft);
     font-size: var(--fs-11);
@@ -1006,25 +1023,25 @@ const saveReport = async () => {
 }
 
 .fold-block+.fold-block {
-    margin-top: 12px;
+    margin-top: var(--space-3);
 }
 
 .notice-block {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
     min-width: 0;
-    padding: 12px;
+    padding: var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--bg);
+    border-radius: var(--radius);
+    background: var(--surface);
 }
 
 .fold-block-head {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     margin-bottom: 0;
     min-width: 0;
     width: 100%;
@@ -1038,9 +1055,9 @@ const saveReport = async () => {
 
 .fold-block-head .btn {
     width: auto;
-    min-width: 56px;
-    height: 44px;
-    padding: 0 12px;
+    min-width: calc(var(--control-h-lg) + var(--space-3));
+    height: var(--control-h);
+    padding: 0 var(--space-3);
 }
 
 .notice-block .add-btn {
@@ -1075,7 +1092,7 @@ const saveReport = async () => {
 }
 
 .support-chip {
-    height: 28px;
+    height: var(--control-h-sm);
     padding: 0 var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
@@ -1172,8 +1189,8 @@ const saveReport = async () => {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 28px;
-    height: 28px;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
     padding: 0;
     border: none;
     border-radius: 50%;
@@ -1234,6 +1251,11 @@ const saveReport = async () => {
     color: var(--text-strong);
 }
 
+.add-project-btn {
+    width: 100%;
+    border-style: dashed;
+}
+
 .split {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1250,7 +1272,7 @@ const saveReport = async () => {
 }
 
 .task-editor {
-    min-height: 36px;
+    min-height: var(--control-h);
     resize: none;
     overflow: hidden;
     line-height: var(--lh-relaxed);
@@ -1260,15 +1282,7 @@ const saveReport = async () => {
     overflow: hidden;
 }
 
-/* 항목이 길어도 스크롤 끝까지 내려가지 않고 저장할 수 있게 고정한다. */
-.save-bar {
-    position: sticky;
-    bottom: var(--space-3);
-    z-index: 5;
-    padding: var(--space-3) var(--space-4);
-    box-shadow: 0 2px 12px rgba(38, 37, 30, 0.08);
-}
-
+/* 고정 저장 바의 위치·테두리·그림자는 report-doc.css의 .report-doc .save-bar가 담당한다. */
 .save-note {
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
@@ -1295,14 +1309,14 @@ const saveReport = async () => {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         width: 100%;
-        gap: 8px;
+        gap: var(--space-2);
     }
 
     .detail-actions .btn,
     .detail-copy-col .btn {
         flex: none;
         width: 100%;
-        min-height: 44px;
+        min-height: var(--control-h-lg);
     }
 
     .meta-summary {
@@ -1315,16 +1329,12 @@ const saveReport = async () => {
     .fold-card>summary {
         flex-wrap: wrap;
         align-items: flex-start;
-        row-gap: 4px;
+        row-gap: var(--space-1);
     }
 
     .fold-hint {
         flex-basis: 100%;
         margin-left: 0;
-    }
-
-    .save-bar {
-        background: var(--surface);
     }
 
     .save-actions {
@@ -1339,8 +1349,8 @@ const saveReport = async () => {
     }
 
     .task-editor {
-        min-height: 44px;
-        font-size: 16px;
+        min-height: var(--control-h-lg);
+        font-size: var(--fs-16);
     }
 }
 </style>

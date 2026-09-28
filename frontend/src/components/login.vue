@@ -105,15 +105,15 @@ margin: 0 auto;
     margin: 0;
     font-size: var(--fs-12);
     font-weight: var(--fw-semibold);
-    letter-spacing: 0.6px;
+    letter-spacing: 0.04em;
     color: var(--text);
 }
 
 .login-card h1 {
     margin: 0;
     font-family: var(--heading);
-    font-size: 24px;
-    letter-spacing: -0.3px;
+    font-size: var(--fs-24);
+    letter-spacing: -0.01em;
     color: var(--text-strong);
 }
 
@@ -135,6 +135,6 @@ margin: 0 auto;
 
 .login-card .btn {
     margin-top: var(--space-2);
-    min-height: 44px;
+    min-height: var(--control-h-lg);
 }
 </style>

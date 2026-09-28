@@ -589,25 +589,29 @@ const sendReport = async () => {
 
 .write-date {
     width: auto;
-    height: 32px;
+    height: var(--control-h-sm);
     font-size: var(--fs-13);
 }
 
 .write-mode-link {
     margin-left: auto;
-    padding: 0;
+    padding: var(--space-1) var(--space-3);
     border: none;
+    border-radius: var(--radius-sm);
     background: none;
     font: inherit;
     font-size: var(--fs-13);
-    color: var(--text);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    font-weight: var(--fw-medium);
+    color: var(--accent);
     cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
 }
 
 .write-mode-link:hover {
-    color: var(--text-strong);
+    background: var(--accent-soft);
+    color: var(--accent-hover);
 }
 
 .write-field .textarea {
@@ -673,9 +677,9 @@ const sendReport = async () => {
     flex-direction: column;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-6) var(--space-5);
+    padding: var(--space-7) var(--space-5);
     border: 1px dashed var(--border-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     background: var(--bg);
     text-align: center;
     transition:
@@ -704,19 +708,23 @@ const sendReport = async () => {
 .file-drop-pick {
     display: inline-flex;
     align-items: center;
-    height: 32px;
+    height: var(--control-h-sm);
     padding: 0 var(--space-4);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     font-size: var(--fs-13);
     font-weight: var(--fw-medium);
     color: var(--text-strong);
     cursor: pointer;
+    transition:
+        border-color var(--dur-fast) var(--ease),
+        background var(--dur-fast) var(--ease);
 }
 
 .file-drop-pick:hover {
     border-color: var(--accent);
+    background: var(--accent-soft);
 }
 
 .file-drop-input {
@@ -747,9 +755,7 @@ const sendReport = async () => {
     font: inherit;
     font-size: var(--fs-12);
     font-weight: var(--fw-medium);
-    color: var(--text);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    color: var(--danger-fg);
     cursor: pointer;
 }
 
@@ -760,13 +766,13 @@ const sendReport = async () => {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 16px;
-    background: rgba(17, 17, 17, 0.32);
+    padding: var(--space-4);
+    background: var(--overlay);
 }
 
 .submit-wait-card {
     width: min(420px, 100%);
-    padding: 22px 20px 18px;
+    padding: var(--space-6) var(--space-5) var(--space-5);
     border-radius: var(--radius-lg);
     background: var(--surface);
     box-shadow: var(--shadow-2);
@@ -774,21 +780,21 @@ const sendReport = async () => {
 
 .submit-wait-date {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--fs-13);
     color: var(--text);
 }
 
 .submit-wait-card h2 {
-    margin: 6px 0 0;
-    font-size: 22px;
+    margin: var(--space-2) 0 0;
+    font-size: var(--fs-20);
     font-weight: var(--fw-semibold);
     letter-spacing: -0.02em;
     color: var(--text-strong);
 }
 
 .submit-meter {
-    height: 2px;
-    margin: 16px 0;
+    height: var(--space-1);
+    margin: var(--space-4) 0;
     background: var(--border);
 }
 
@@ -805,12 +811,12 @@ const sendReport = async () => {
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .submit-steps li {
-    min-height: 28px;
-    font-size: 15px;
+    min-height: var(--control-h-sm);
+    font-size: var(--fs-14);
     color: var(--text-muted);
 }
 
@@ -824,21 +830,21 @@ const sendReport = async () => {
 }
 
 .submit-wait-time {
-    margin: 14px 0 0;
-    font-size: 13px;
+    margin: var(--space-4) 0 0;
+    font-size: var(--fs-13);
     color: var(--text);
 }
 
 @media (max-width: 860px) {
     .write-card {
-        padding-bottom: 88px;
+        padding-bottom: calc(var(--control-h-lg) + var(--space-8));
     }
 
     .write-head {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
-        gap: 8px 12px;
+        gap: var(--space-2) var(--space-3);
     }
 
     .write-author {
@@ -848,9 +854,9 @@ const sendReport = async () => {
     .write-date {
         width: auto;
         min-width: 148px;
-        min-height: 44px;
-        height: 44px;
-        font-size: 16px;
+        min-height: var(--control-h-lg);
+        height: var(--control-h-lg);
+        font-size: var(--fs-16);
     }
 
     .status-chip {
@@ -865,40 +871,40 @@ const sendReport = async () => {
     .write-mode-link {
         margin-left: 0;
         justify-self: end;
-        min-height: 44px;
+        min-height: var(--control-h-lg);
         text-align: right;
     }
 
     .write-field .textarea {
         min-height: 42dvh;
-        font-size: 16px;
+        font-size: var(--fs-16);
         line-height: 1.5;
     }
 
     .file-drop-copy {
-        font-size: 14px;
+        font-size: var(--fs-14);
     }
 
     .file-drop-pick {
-        min-height: 44px;
-        height: 44px;
-        padding: 0 18px;
+        min-height: var(--control-h-lg);
+        height: var(--control-h-lg);
+        padding: 0 var(--space-5);
     }
 
     .form-actions {
         position: sticky;
-        bottom: calc(var(--bottom-nav-offset) + 8px);
+        bottom: calc(var(--bottom-nav-offset) + var(--space-2));
         z-index: 8;
         flex-wrap: wrap;
         justify-content: stretch;
-        margin: 16px -14px -14px;
-        padding: 10px 14px;
+        margin: var(--space-4) calc(var(--space-4) * -1) calc(var(--space-4) * -1);
+        padding: var(--space-3) var(--space-4);
         background: var(--surface);
         border-top: 1px solid var(--border);
     }
 
     .form-actions .btn {
-        flex: 1 1 calc(50% - 6px);
+        flex: 1 1 calc(50% - var(--space-2));
     }
 
     .form-actions .btn-primary {
@@ -922,14 +928,14 @@ const sendReport = async () => {
         display: flex;
         flex-direction: column;
         flex: 1;
-        margin-left: calc(-1 * max(14px, env(safe-area-inset-left, 0px)));
-        margin-right: calc(-1 * max(14px, env(safe-area-inset-right, 0px)));
+        margin-left: calc(-1 * max(var(--space-4), env(safe-area-inset-left, 0px)));
+        margin-right: calc(-1 * max(var(--space-4), env(safe-area-inset-right, 0px)));
         margin-bottom: 0;
         border-left: 0;
         border-right: 0;
         border-bottom: 0;
         border-radius: 0;
-        padding-bottom: 16px;
+        padding-bottom: var(--space-4);
         background: var(--surface);
     }
 
@@ -941,11 +947,11 @@ const sendReport = async () => {
 
 .line-dock-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .line-dock-actions .btn {
     flex: 1;
-    min-height: 44px;
+    min-height: var(--control-h-lg);
 }
 </style>

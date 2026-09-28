@@ -5,6 +5,7 @@ defineProps({
 });
 </script>
 
+<!-- Underline tabs on one hairline (.app-tabs / .app-tab in components.css). -->
 <template>
     <nav class="app-tabs" role="tablist">
         <router-link
@@ -14,6 +15,7 @@ defineProps({
             class="app-tab"
             role="tab"
             :aria-selected="active === tab.id"
+            :aria-current="active === tab.id ? 'page' : undefined"
             :class="{ 'is-active': active === tab.id }"
         >
             {{ tab.label }}

@@ -5,6 +5,7 @@ defineProps({
 });
 </script>
 
+<!-- Title/subtitle on the left, filters then actions on the right (.page-header in shell.css). -->
 <template>
     <header class="page-header">
         <div v-if="title || subtitle" class="page-header-text">

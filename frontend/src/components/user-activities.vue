@@ -710,24 +710,35 @@ const progressByMember = computed(() => {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
     padding: 0;
     border: 1px solid var(--border);
-    border-radius: 50%;
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
     cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
 }
 
 .icon-btn:hover {
     background: var(--surface-soft);
+    border-color: var(--border-strong);
     color: var(--text-strong);
+}
+
+.icon-btn:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
 }
 
 .team-filter {
     width: 180px;
-    height: 36px;
+    height: var(--control-h);
 }
 
 .activity-board {
@@ -765,10 +776,10 @@ const progressByMember = computed(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
-    min-height: 44px;
+    gap: var(--space-1);
+    min-height: var(--control-h-lg);
     margin: 0;
-    padding: 4px 0;
+    padding: var(--space-1) 0;
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -783,8 +794,8 @@ const progressByMember = computed(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
     border-radius: 50%;
     font-size: var(--fs-14);
     font-weight: var(--fw-medium);
@@ -808,13 +819,13 @@ const progressByMember = computed(() => {
 .day-num.selected {
     background: var(--accent);
     box-shadow: none;
-    color: #fff;
+    color: var(--text-on-accent);
     font-weight: var(--fw-semibold);
 }
 
 .day-dot {
-    width: 5px;
-    height: 5px;
+    width: var(--space-1);
+    height: var(--space-1);
     border-radius: 50%;
     background: var(--accent);
 }
@@ -876,22 +887,22 @@ const progressByMember = computed(() => {
 
 .agenda-search .input {
     width: 100%;
-    height: 36px;
+    height: var(--control-h);
 }
 
 .agenda-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-2);
 }
 
 .person-chip {
     display: inline-flex;
     align-items: center;
     max-width: 100%;
-    min-height: 32px;
+    min-height: var(--control-h-sm);
     margin: 0;
-    padding: 4px 10px;
+    padding: var(--space-1) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     background: var(--surface);
@@ -917,8 +928,8 @@ button.person-chip:hover {
 }
 
 .more-people {
-    margin-top: 8px;
-    padding: 4px 0;
+    margin-top: var(--space-2);
+    padding: var(--space-1) 0;
     border: 0;
     background: transparent;
     font: inherit;
@@ -943,7 +954,7 @@ button.person-chip:hover {
         top: var(--space-4);
         flex: 1;
         min-width: 0;
-        max-height: calc(100vh - var(--topbar-height) - 96px);
+        max-height: calc(100vh - var(--topbar-height) - calc(var(--space-8) * 2));
         overflow: auto;
     }
 }
@@ -965,24 +976,26 @@ button.person-chip:hover {
 
 @media (max-width: 860px) {
     .team-filter {
-        width: auto;
-        min-width: 160px;
-        height: 44px;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        height: var(--control-h-lg);
+        font-size: var(--fs-16);
     }
 
     .month-nav .icon-btn {
-        width: 44px;
-        height: 44px;
+        width: var(--control-h-lg);
+        height: var(--control-h-lg);
     }
 
     .agenda-search .input,
     .person-chip,
     .more-people {
-        min-height: 44px;
+        min-height: var(--control-h-lg);
     }
 
     .agenda-search .input {
-        height: 44px;
+        height: var(--control-h-lg);
     }
 }
 </style>

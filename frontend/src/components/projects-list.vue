@@ -243,11 +243,11 @@ onMounted(() => {
 .list-search {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 220px;
-    gap: 8px;
+    gap: var(--space-2);
     position: sticky;
-    top: 8px;
+    top: var(--space-2);
     z-index: 5;
-    padding: 8px;
+    padding: var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
@@ -255,8 +255,8 @@ onMounted(() => {
 
 .list-search .input {
     min-width: 0;
-    min-height: 44px;
-    font-size: 16px;
+    min-height: var(--control-h-lg);
+    font-size: var(--fs-16);
 }
 
 .list-search .input::placeholder {
@@ -266,7 +266,7 @@ onMounted(() => {
 
 .list-status {
     margin: 0;
-    font-size: 14px;
+    font-size: var(--fs-14);
     color: var(--text);
 }
 
@@ -277,26 +277,26 @@ onMounted(() => {
 .day {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-3);
 }
 
 .day-head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
 }
 
 .day h2 {
     margin: 0;
-    font-size: 16px;
+    font-size: var(--fs-16);
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }
 
 .day-point {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--fs-13);
     color: var(--text-muted);
     white-space: nowrap;
 }
@@ -304,16 +304,16 @@ onMounted(() => {
 .reports {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .report {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
     min-width: 0;
-    padding: 14px 44px 14px 14px;
+    padding: var(--space-4) var(--control-h-lg) var(--space-4) var(--space-4);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
@@ -328,14 +328,14 @@ onMounted(() => {
 .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 10px;
+    gap: var(--space-2) var(--space-3);
     min-width: 0;
 }
 
 .chip {
     display: inline-block;
     color: var(--text-strong);
-    font-size: 15px;
+    font-size: var(--fs-14);
     font-weight: var(--fw-semibold);
     line-height: 1.35;
     white-space: nowrap;
@@ -344,7 +344,7 @@ onMounted(() => {
 
 .person {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--fs-13);
     line-height: 1.4;
     color: var(--text);
 }
@@ -352,16 +352,16 @@ onMounted(() => {
 .badges {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-2);
     margin: 0;
 }
 
 .badge {
-    padding: 2px 7px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-pill);
     background: var(--surface-soft);
     color: var(--text);
-    font-size: 12px;
+    font-size: var(--fs-12);
     line-height: 1.4;
 }
 
@@ -372,16 +372,16 @@ onMounted(() => {
 
 .row-delete {
     position: absolute;
-    top: 10px;
-    right: 8px;
-    min-width: 32px;
-    min-height: 28px;
-    padding: 0 4px;
+    top: var(--space-3);
+    right: var(--space-2);
+    min-width: var(--control-h-sm);
+    min-height: var(--control-h-sm);
+    padding: 0 var(--space-1);
     border: 0;
     background: transparent;
     color: var(--text-muted);
     font: inherit;
-    font-size: 13px;
+    font-size: var(--fs-13);
     cursor: pointer;
 }
 
@@ -402,14 +402,19 @@ onMounted(() => {
 .row-delete:focus-visible,
 .report:focus-visible,
 .list-search .input:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 @media (max-width: 860px) {
     .list-search {
         grid-template-columns: minmax(0, 1fr);
-        top: 8px;
+        top: var(--space-2);
+    }
+
+    .row-delete {
+        min-width: var(--control-h-lg);
+        min-height: var(--control-h-lg);
     }
 }
 </style>

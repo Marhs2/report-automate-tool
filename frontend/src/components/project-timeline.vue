@@ -390,7 +390,6 @@ onMounted(() => {
         <h2>이슈</h2>
 
         <div v-if="issueBoard.open.length" class="issue-group">
-          <h3>막힌 일</h3>
           <button
             v-for="(item, index) in issueBoard.open"
             :key="`open-${item.member_id}-${item.firstDate}-${index}`"
@@ -487,25 +486,25 @@ onMounted(() => {
   align-items: end;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(168px, 0.7fr);
-  gap: 12px;
+  gap: var(--space-3);
   margin-bottom: 0;
 }
 
 .filter-select {
   width: 100%;
   min-width: 0;
-  height: 36px;
+  height: var(--control-h);
 }
 
 .view-chips {
   display: flex;
   gap: var(--space-1);
-  min-height: 36px;
+  min-height: var(--control-h);
 }
 
 .view-chips .btn {
   flex: 1;
-  height: 36px;
+  height: var(--control-h);
 }
 
 .view-chips .btn.is-active {
@@ -530,7 +529,7 @@ onMounted(() => {
 }
 
 .text-toggle {
-  min-height: 44px;
+  min-height: var(--control-h-lg);
   padding: 0;
   border: 0;
   background: none;
@@ -596,25 +595,25 @@ onMounted(() => {
 }
 
 .issue-row.is-open {
-  box-shadow: inset 3px 0 0 var(--danger-fg);
-  padding-left: 10px;
+  box-shadow: inset var(--space-1) 0 0 var(--danger-fg);
+  padding-left: var(--space-3);
 }
 
 .issue-row.is-done {
-  box-shadow: inset 3px 0 0 var(--success-fg);
-  padding-left: 10px;
+  box-shadow: inset var(--space-1) 0 0 var(--success-fg);
+  padding-left: var(--space-3);
 }
 
 .issue-row.is-quiet {
-  box-shadow: inset 3px 0 0 var(--border-strong);
-  padding-left: 10px;
+  box-shadow: inset var(--space-1) 0 0 var(--border-strong);
+  padding-left: var(--space-3);
 }
 
 .issue-copy {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .issue-text {
@@ -649,7 +648,7 @@ onMounted(() => {
 }
 
 .day-date {
-  font-size: 15px;
+  font-size: var(--fs-14);
   font-weight: var(--fw-semibold);
   color: var(--text-strong);
 }
@@ -670,7 +669,7 @@ onMounted(() => {
   display: block;
   width: 100%;
   margin: 0;
-  padding: 0 22px 0 0;
+  padding: 0 var(--space-6) 0 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -682,7 +681,7 @@ onMounted(() => {
 
 .entry-go {
   position: absolute;
-  top: 6px;
+  top: var(--space-2);
   right: 0;
   color: var(--text-muted);
 }
@@ -698,8 +697,8 @@ onMounted(() => {
 }
 
 .day-entry:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .entry-header {
@@ -710,8 +709,8 @@ onMounted(() => {
 }
 
 .avatar {
-  width: 28px;
-  height: 28px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   border-radius: var(--radius-sm);
   background: var(--surface-soft);
   color: var(--text-strong);
@@ -730,7 +729,7 @@ onMounted(() => {
 
 .row {
   display: grid;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: var(--control-h-lg) 1fr;
   gap: var(--space-2);
   align-items: start;
   padding: var(--space-1) 0;
@@ -740,7 +739,7 @@ onMounted(() => {
   font-size: var(--fs-12);
   font-weight: var(--fw-semibold);
   color: var(--text);
-  padding-top: 2px;
+  padding-top: var(--space-1);
 }
 
 .k.done {
@@ -778,34 +777,39 @@ onMounted(() => {
 
 @media (max-width: 860px) {
   .filters {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .filters > .field:first-child {
-    grid-column: 1 / -1;
+  .filters > .field, .filters > .field:first-child {
+    grid-column: auto;
+    min-width: 0;
+  }
+
+  .view-chips {
+    width: 100%;
   }
 
   .filter-select {
-    height: 44px;
-    font-size: 16px;
+    height: var(--control-h-lg);
+    font-size: var(--fs-16);
   }
 
   .view-chips,
   .view-chips .btn {
-    height: 44px;
-    min-height: 44px;
+    height: var(--control-h-lg);
+    min-height: var(--control-h-lg);
   }
 
   .row {
-    grid-template-columns: 36px 1fr;
+    grid-template-columns: var(--control-h) 1fr;
   }
 
   .day {
-    padding: 12px;
+    padding: var(--space-3);
   }
 
   .issue-row {
-    min-height: 52px;
+    min-height: calc(var(--control-h) + var(--space-4));
     align-items: flex-start;
   }
 
