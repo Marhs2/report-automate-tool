@@ -8,8 +8,12 @@ import { selectedUserId } from "../composables/useSelectedUser";
 import { todayString, weekdayLabelOf } from "../lib/dateScope";
 import { daySubmission } from "../lib/weekStatus";
 import { reportCounts, reportHeadline } from "../lib/reportSummary";
+import { COMPOSE_CHOICES } from "../lib/nav";
 
 const router = useRouter();
+const writeChoices = COMPOSE_CHOICES.map((item) =>
+    item.id === "daily" ? { ...item, label: "보고서 작성" } : item,
+);
 const { alert: showAlert, confirm: askConfirm } = useDialog();
 const { getReports, deleteReport, getUsers } = useApi();
 const members = ref([]);
@@ -188,6 +192,16 @@ onMounted(() => {
 
 <template>
     <div class="page">
+        <nav class="write-kinds" aria-label="작성">
+            <router-link
+                v-for="item in writeChoices"
+                :key="item.id"
+                class="btn btn-small"
+                :class="{ 'btn-primary': item.id === 'daily' }"
+                :to="item.to"
+            >{{ item.label }}</router-link>
+        </nav>
+
         <section v-if="todaySummary" class="card today-sum" aria-label="오늘 제출 현황">
             <div class="today-sum-head">
                 <h2>오늘 <span>{{ todaySummary.label }}</span></h2>
@@ -278,6 +292,12 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.write-kinds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
 .list-search {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 220px;

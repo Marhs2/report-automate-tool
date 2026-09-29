@@ -5,7 +5,6 @@ import {
     FileBarChart,
     GitGraph,
     LayoutDashboard,
-    PenLine,
     LogOut,
     Settings2,
     Shield,
@@ -13,10 +12,7 @@ import {
     PanelLeftOpen,
     ChevronLeft,
     ChevronRight,
-    FileText,
-    MessageSquare,
     MoreHorizontal,
-    TrendingUp,
     X,
 } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
@@ -27,7 +23,7 @@ import { selectedTeamId } from "./composables/useSelectedTeam";
 import { hasSession, isAdmin, sessionToken } from "./composables/useSession";
 import { useDialog } from "./composables/useDialog";
 import { useSidebar } from "./composables/useSidebar";
-import { COMPOSE_CHOICES, MOBILE_TABS, MORE_LINKS, PRIMARY_NAV } from "./lib/nav";
+import { MOBILE_TABS, MORE_LINKS, PRIMARY_NAV } from "./lib/nav";
 import { useMyWeek } from "./composables/useMyWeek";
 import { TODAY_LABELS } from "./lib/weekStatus";
 import { pageParentOverride, pageTitleOverride } from "./composables/usePageMeta";
@@ -53,7 +49,6 @@ const {
 
 const NAV_ICONS = {
     "/": LayoutDashboard,
-    "/compose": PenLine,
     "/reports": FolderKanban,
     "/weekly": FileBarChart,
     "/activities": CalendarDays,
@@ -85,11 +80,10 @@ const pageMeta = computed(() => ({
 
 const isNavActive = (to) => route.meta.navKey === to;
 
-/** 모바일 하단 탭: 현황 · 일일보고 · 작성 · 주간 · 더보기. 작성과 더보기는 시트를 연다. */
+/** 모바일 하단 탭: 현황 · 일일보고 · 주간 · 더보기. 더보기는 시트를 연다. */
 const TAB_ICONS = {
     home: LayoutDashboard,
     daily: FolderKanban,
-    write: PenLine,
     weekly: FileBarChart,
     more: MoreHorizontal,
 };
@@ -100,8 +94,6 @@ const bottomTabs = computed(() =>
         active: tab.navKeys.includes(String(route.meta.navKey || "")),
     })),
 );
-const COMPOSE_ICONS = { daily: FolderKanban, meeting: MessageSquare, general: FileText, sales: TrendingUp };
-const composeChoices = COMPOSE_CHOICES.map((item) => ({ ...item, icon: COMPOSE_ICONS[item.id] }));
 const moreLinks = computed(() => [
     ...MORE_LINKS,
     ...(isAdmin.value ? [{ to: "/admin", label: "관리자", hint: "사용자 · 부서" }] : []),
@@ -281,7 +273,7 @@ onUnmounted(() => {
                 <component :is="item.icon" :size="16" />
                 <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
                 <span
-                    v-if="item.to === '/compose' && todayMissing"
+                    v-if="item.to === '/reports' && todayMissing"
                     class="nav-badge"
                     :class="{ 'is-dot': collapsedEffective }"
                 >{{ collapsedEffective ? "" : todayLabel }}</span>
@@ -371,6 +363,7 @@ onUnmounted(() => {
             >
                 <component :is="tab.icon" :size="20" />
                 <span>{{ tab.label }}</span>
+                <i v-if="tab.id === 'daily' && todayMissing" class="tab-dot" aria-label="오늘 미제출"></i>
             </router-link>
             <button
                 v-else
@@ -382,7 +375,6 @@ onUnmounted(() => {
             >
                 <component :is="tab.icon" :size="20" />
                 <span>{{ tab.label }}</span>
-                <i v-if="tab.id === 'write' && todayMissing" class="tab-dot" aria-label="오늘 미제출"></i>
             </button>
         </template>
     </nav>
@@ -391,48 +383,27 @@ onUnmounted(() => {
             class="app-sheet"
             role="dialog"
             aria-modal="true"
-            :aria-label="openSheet === 'compose' ? '무엇을 쓸까요' : '더보기'"
+            aria-label="더보기"
         >
             <div class="app-sheet-head">
-                <h2>{{ openSheet === "compose" ? "무엇을 쓸까요?" : "더보기" }}</h2>
+                <h2>더보기</h2>
                 <button type="button" class="app-sheet-close" aria-label="닫기" @click="closeSheet">
                     <X :size="16" />
                 </button>
             </div>
-            <template v-if="openSheet === 'compose'">
-                <router-link
-                    v-for="(item, index) in composeChoices"
-                    :key="item.id"
-                    :to="item.to"
-                    class="app-sheet-row"
-                    :class="{ 'is-lead': index === 0 }"
-                >
-                    <span class="app-sheet-icon"><component :is="item.icon" :size="18" /></span>
-                    <span class="app-sheet-text">
-                        <span class="app-sheet-label">{{ item.label }}</span>
-                        <span
-                            class="app-sheet-hint"
-                            :class="{ 'is-alert': index === 0 && todayMissing }"
-                        >{{ index === 0 && todayLabel ? todayLabel : item.hint }}</span>
-                    </span>
-                    <ChevronRight :size="16" class="app-sheet-chevron" />
-                </router-link>
-            </template>
-            <template v-else>
-                <router-link v-for="item in moreLinks" :key="item.to" :to="item.to" class="app-sheet-row">
-                    <span class="app-sheet-text">
-                        <span class="app-sheet-label">{{ item.label }}</span>
-                        <span class="app-sheet-hint">{{ item.hint }}</span>
-                    </span>
-                    <ChevronRight :size="16" class="app-sheet-chevron" />
-                </router-link>
-                <button type="button" class="app-sheet-row is-danger" @click="logout">
-                    <span class="app-sheet-text">
-                        <span class="app-sheet-label">로그아웃</span>
-                        <span class="app-sheet-hint">{{ currentUser }} · {{ currentTeam || "부서 없음" }}</span>
-                    </span>
-                </button>
-            </template>
+            <router-link v-for="item in moreLinks" :key="item.to" :to="item.to" class="app-sheet-row">
+                <span class="app-sheet-text">
+                    <span class="app-sheet-label">{{ item.label }}</span>
+                    <span class="app-sheet-hint">{{ item.hint }}</span>
+                </span>
+                <ChevronRight :size="16" class="app-sheet-chevron" />
+            </router-link>
+            <button type="button" class="app-sheet-row is-danger" @click="logout">
+                <span class="app-sheet-text">
+                    <span class="app-sheet-label">로그아웃</span>
+                    <span class="app-sheet-hint">{{ currentUser }} · {{ currentTeam || "부서 없음" }}</span>
+                </span>
+            </button>
         </div>
     </div>
     </template>

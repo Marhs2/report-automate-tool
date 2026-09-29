@@ -20,7 +20,7 @@ const routes = [
     meta: {
       title: "내 현황",
       navKey: "/",
-      action: { to: "/compose", label: "작성" },
+      action: { to: "/report", label: "보고서 작성" },
     },
   },
   {
@@ -30,7 +30,6 @@ const routes = [
     meta: {
       title: "일일보고",
       navKey: "/reports",
-      action: { to: "/report", label: "보고서 작성" },
     },
   },
   {
@@ -39,14 +38,19 @@ const routes = [
     component: compose,
     meta: {
       title: "작성",
-      navKey: "/compose",
+      navKey: "/reports",
+      parent: { to: "/reports", label: "일일보고" },
     },
   },
   {
     path: "/report",
     name: "report",
     component: report,
-    meta: { title: "보고서 작성", navKey: "/report" },
+    meta: {
+      title: "보고서 작성",
+      navKey: "/reports",
+      parent: { to: "/reports", label: "일일보고" },
+    },
   },
   {
     path: "/report-result/:id?",

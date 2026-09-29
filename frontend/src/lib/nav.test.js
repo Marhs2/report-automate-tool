@@ -15,13 +15,14 @@ describe("primary navigation", () => {
     it("keeps the sidebar shorter than eight destinations", () => {
         assert.ok(primaryNavCount() < 8);
         assert.equal(PRIMARY_NAV.length, primaryNavCount());
+        assert.equal(PRIMARY_NAV.some((item) => item.to === "/compose"), false);
     });
 
     it("keeps the mobile tab bar at five tabs that all lead somewhere live", () => {
         assert.ok(MOBILE_TABS.length <= 5);
         const livePath = (to) => LIVE_ROUTE_PATHS.includes(String(to).split("?")[0]);
         for (const tab of MOBILE_TABS) {
-            assert.ok(tab.to ? livePath(tab.to) : ["compose", "more"].includes(tab.sheet));
+            assert.ok(tab.to ? livePath(tab.to) : tab.sheet === "more");
         }
         for (const item of [...COMPOSE_CHOICES, ...MORE_LINKS]) {
             assert.ok(livePath(item.to), `${item.label} path ${item.to} is not a live route`);
