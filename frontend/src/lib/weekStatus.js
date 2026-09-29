@@ -62,3 +62,23 @@ export const TODAY_LABELS = {
     draft: "오늘 초안",
     missing: "오늘 미제출",
 };
+
+/**
+ * 하루 제출 현황. 부서가 있는 실무자만 센다. 관리자 계정은 보고 대상이 아니다.
+ * 반환: { total, saved, missing: [이름...] }
+ */
+export function daySubmission(members, reports, day) {
+    const people = (members || []).filter(
+        (member) => member?.team_id != null && !member?.is_admin,
+    );
+    const savedIds = new Set(
+        (reports || [])
+            .filter((report) => String(report?.report_date) === String(day))
+            .map((report) => String(report.member_id)),
+    );
+    const missing = people
+        .filter((member) => !savedIds.has(String(member.id)))
+        .map((member) => String(member.name || ""))
+        .sort((a, b) => a.localeCompare(b, "ko"));
+    return { total: people.length, saved: people.length - missing.length, missing };
+}

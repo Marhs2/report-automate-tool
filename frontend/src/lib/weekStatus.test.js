@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { savedDatesOf, todayState, weekDays, weekStatus } from "./weekStatus.js";
+import { daySubmission, savedDatesOf, todayState, weekDays, weekStatus } from "./weekStatus.js";
 
 describe("weekDays", () => {
     it("returns Monday to Friday of the given day's week", () => {
@@ -56,5 +56,27 @@ describe("todayState", () => {
     it("does not nag on weekends", () => {
         assert.equal(todayState({ weekend: true }), null);
         assert.equal(todayState({ weekend: true, saved: true }), "saved");
+    });
+});
+
+describe("daySubmission", () => {
+    const members = [
+        { id: 1, name: "관리자", team_id: 1, is_admin: true },
+        { id: 5, name: "무소속", team_id: null },
+        { id: 2, name: "이하늘", team_id: 4 },
+        { id: 3, name: "김서연", team_id: 1 },
+        { id: 4, name: "박민준", team_id: 2 },
+    ];
+    const reports = [
+        { member_id: 3, report_date: "2026-07-17" },
+        { member_id: 2, report_date: "2026-07-16" },
+    ];
+
+    it("counts only non-admin people with a team and names who is missing", () => {
+        assert.deepEqual(daySubmission(members, reports, "2026-07-17"), {
+            total: 3,
+            saved: 1,
+            missing: ["박민준", "이하늘"],
+        });
     });
 });
