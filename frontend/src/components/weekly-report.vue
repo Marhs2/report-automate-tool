@@ -367,6 +367,24 @@ const weeklyGroups = computed(() => {
         .sort((a, b) => String(b.key).localeCompare(String(a.key)));
 });
 
+/** 고른 날들과 같은 주에 이미 만든 주간보고. 새로 만들면 덮어쓰게 되니 미리 알린다. */
+const existingWeekly = computed(() => {
+    const key = weekKeyOfDates(selects.value.length ? selects.value : weekDays.value);
+    if (!key) return null;
+    return weeklyGroups.value.find((group) => group.key === key) || null;
+});
+
+/** 지난 평일인데 일일보고가 없는 날. 초안에 '빠진 요일'로 적힌다. */
+const missingDayCount = computed(
+    () => weekDays.value.filter((day) => !hasMine(day) && !isFutureDay(day)).length,
+);
+
+const createSummary = computed(() => {
+    const bits = [`선택 ${selects.value.length}일`];
+    if (missingDayCount.value) bits.push(`빠진 날 ${missingDayCount.value}일은 초안에 표시돼요`);
+    return bits.join(" · ");
+});
+
 /** 같은 주에 남은 옛 문서를 한 번에 치운다. */
 const cleanupOlder = async (group) => {
     const ok = await askConfirm(
@@ -651,13 +669,28 @@ onMounted(async () => {
                     </div>
                 </div>
             </div>
+            <p class="create-summary">{{ createSummary }}</p>
+            <div v-if="existingWeekly" class="overwrite-notice" role="status">
+                <span>
+                    <b>이 주의 주간보고가 이미 있어요.</b>
+                    새로 만들면 초안을 저장할 때 이 주 보고를 바꿔요.
+                </span>
+                <button
+                    type="button"
+                    class="btn btn-small"
+                    :disabled="isLoading"
+                    @click="viewReport(existingWeekly.latest)"
+                >
+                    기존 보고 열기
+                </button>
+            </div>
             <button
                 type="button"
                 class="btn btn-primary create-week-btn"
                 @click="sendDates()"
                 :disabled="isLoading || selects.length === 0"
             >
-                {{ isLoading ? "만드는 중..." : "내 주간 보고서 만들기" }}
+                {{ isLoading ? "만드는 중..." : existingWeekly ? "새 초안 만들기" : "내 주간 보고서 만들기" }}
             </button>
         </section>
 
@@ -710,6 +743,32 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.create-summary {
+    margin: var(--space-3) 0 0;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.overwrite-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-sm);
+    background: var(--warning-bg);
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--warning-fg);
+}
+
+.overwrite-notice b {
+    font-weight: var(--fw-semibold);
+}
+
 /* 머리: 기간 제목 + 주 이동. 다른 화면의 page-header와 같은 리듬(제목 24 / 보조 14). */
 .week-head {
     display: flex;
