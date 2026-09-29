@@ -118,7 +118,7 @@
                         :key="col.key"
                         class="read-block"
                     >
-                        <h3 :class="col.key">{{ col.label }}</h3>
+                        <h3><span class="cat-tag" :class="CAT_TONES[col.key]">{{ col.label }}</span></h3>
                         <ul class="read-list">
                             <li v-for="(item, itemIndex) in col.items" :key="itemIndex">
                                 {{ item }}
@@ -166,33 +166,36 @@
                     <div
                         v-for="col in DESK_FIELDS"
                         :key="col.key"
-                        class="field-group"
+                        class="field-group is-row"
                         :class="col.key"
                     >
-                        <h2>{{ col.label }}</h2>
-                        <div
-                            v-for="(_item, itemIndex) in project[col.key] || []"
-                            :key="`${col.key}-${itemIndex}`"
-                            class="task-row"
-                        >
-                            <input
-                                class="input"
-                                v-model="project[col.key][itemIndex]"
-                                :aria-label="col.label"
-                            />
-                            <button
-                                class="btn remove-btn"
-                                type="button"
-                                aria-label="이 항목 삭제"
-                                @click="removeRow(project, col.key, itemIndex)"
+                        <h2><span class="cat-tag" :class="CAT_TONES[col.key]">{{ col.label }}</span></h2>
+                        <div class="field-body">
+                            <div
+                                v-for="(_item, itemIndex) in project[col.key] || []"
+                                :key="`${col.key}-${itemIndex}`"
+                                class="task-row"
                             >
-                                삭제
+                                <input
+                                    class="input"
+                                    v-model="project[col.key][itemIndex]"
+                                    :aria-label="col.label"
+                                />
+                                <button
+                                    class="btn remove-btn"
+                                    type="button"
+                                    :aria-label="`${col.label} 항목 삭제`"
+                                    title="삭제"
+                                    @click="removeRow(project, col.key, itemIndex)"
+                                >
+                                    <X :size="14" aria-hidden="true" />
+                                </button>
+                            </div>
+                            <p v-if="!(project[col.key] || []).length" class="empty-msg">없음</p>
+                            <button class="btn add-btn" type="button" @click="addField(project, col.key)">
+                                + 추가
                             </button>
                         </div>
-                        <p v-if="!(project[col.key] || []).length" class="empty-msg">{{ col.empty }}</p>
-                        <button class="btn add-btn" type="button" @click="addField(project, col.key)">
-                            항목 추가
-                        </button>
                     </div>
                 </div>
                 <button class="btn add-project-btn" type="button" @click="openProjectPopup()">프로젝트 추가</button>
@@ -234,7 +237,7 @@
                         :key="col.key"
                         class="edit-bucket"
                     >
-                        <h2>{{ col.label }}</h2>
+                        <h2><span class="cat-tag" :class="CAT_TONES[col.key]">{{ col.label }}</span></h2>
                         <div
                             v-for="(text, itemIndex) in activeProject[col.key]"
                             :key="`${col.key}-${itemIndex}`"
@@ -312,10 +315,13 @@
                 </template>
             </div>
 
-            <aside v-if="rawData" class="card raw-container" >
-                <button type="button" class="raw-fold"  @click="rawOpen = !rawOpen">
-                    {{ rawOpen ? "원문 접기" : "원문 보기" }}
-                </button>
+            <aside v-if="rawData" class="card raw-container">
+                <div class="raw-head">
+                    <h2>원문</h2>
+                    <button type="button" class="raw-fold" :aria-expanded="rawOpen" @click="rawOpen = !rawOpen">
+                        {{ rawOpen ? "접기" : "펼치기" }}
+                    </button>
+                </div>
                 <template v-if="rawOpen">
                     <label class="raw-toggle">
                         <input type="checkbox" v-model="highlightOn" />
@@ -346,6 +352,7 @@ import {
 } from "../lib/projectAccent";
 import { indexAfterCurrent } from "../lib/projectInsert";
 import { overwriteNote, reportSizeLabel } from "../lib/reportSummary";
+import { X } from "lucide-vue-next";
 
 const route = useRoute();
 const router = useRouter();
@@ -380,6 +387,15 @@ const READ_COLUMNS = [
     { key: "requests", label: "요청사항" },
     { key: "nextPlans", label: "다음 계획" },
 ];
+
+/** 분류별 태그 색. 모든 화면이 같은 색을 쓴다(components.css .cat-tag). */
+const CAT_TONES = {
+    completedTasks: "is-done",
+    inProgressTasks: "is-progress",
+    issues: "is-issue",
+    requests: "is-request",
+    nextPlans: "is-next",
+};
 
 const EDIT_COLUMNS = [
     { key: "completedTasks", label: "완료", placeholder: "오늘 마무리한 일" },
@@ -1045,23 +1061,23 @@ const getSelectedMemberId = () => {
     word-break: keep-all;
 }
 
+/* 읽기: 분류 태그 한 칸 + 항목 목록. 편집 화면과 같은 줄 구조다. */
+.read-block {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
+}
+
 .read-block + .read-block {
-    margin-top: var(--space-5);
-    padding-top: var(--space-4);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
     border-top: 1px solid var(--border);
 }
 
 .read-block h3 {
-    margin: 0 0 var(--space-2);
-    font-family: var(--sans);
+    margin: 2px 0 0;
     font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    letter-spacing: 0;
-    color: var(--text-strong);
-}
-
-.read-block h3.issues {
-    color: var(--danger-fg);
 }
 
 .read-list {
@@ -1436,15 +1452,36 @@ const getSelectedMemberId = () => {
     color: var(--danger-fg);
 }
 
-.raw-fold {
-    min-height: var(--control-h-lg);
+.raw-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+}
+
+.raw-container .raw-head h2 {
+    margin: 0;
     padding: 0;
     border: 0;
-    background: transparent;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-bold);
     color: var(--text-strong);
+}
+
+.raw-fold {
+    min-height: var(--control-h-sm);
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--accent);
     font: inherit;
-    font-size: var(--fs-16);
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     cursor: pointer;
+}
+
+.raw-fold:hover {
+    background: var(--accent-soft);
 }
 </style>

@@ -406,20 +406,22 @@ onMounted(async () => {
 
 <template>
     <div class="page">
-        <div class="kind-switch" role="tablist" aria-label="작성 형식">
-            <button
-                v-for="item in KINDS"
-                :key="item.id"
-                type="button"
-                class="btn"
-                :class="{ 'btn-primary': kind === item.id }"
-                role="tab"
-                :aria-selected="kind === item.id"
-                @click="switchKind(item.id)"
-            >
-                {{ item.label }}
-            </button>
-            <router-link class="btn" to="/report">일일보고</router-link>
+        <div class="kind-bar">
+            <div class="kind-switch" role="tablist" aria-label="작성 형식">
+                <button
+                    v-for="item in KINDS"
+                    :key="item.id"
+                    type="button"
+                    :class="{ 'is-on': kind === item.id }"
+                    role="tab"
+                    :aria-selected="kind === item.id"
+                    @click="switchKind(item.id)"
+                >
+                    {{ item.label }}
+                </button>
+            </div>
+            <span v-if="recordId || cardForm.id" class="state-chip is-success">저장됨 · 수정 중</span>
+            <router-link class="kind-daily" to="/report">일일보고 작성 →</router-link>
         </div>
 
         <p v-if="isLoading" class="list-status" role="status">불러오는 중</p>
@@ -617,10 +619,88 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.kind-switch {
+.kind-bar {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+}
+
+/* 형식 고르기는 한 줄 세그먼트. 일일보고 작성은 따로 있는 화면이라 링크로 둔다. */
+.kind-switch {
+    display: inline-flex;
+    flex-wrap: wrap;
+    padding: 2px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+}
+
+.kind-switch button {
+    height: 30px;
+    padding: 0 var(--space-4);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+}
+
+.kind-switch button.is-on {
+    background: var(--surface);
+    box-shadow: 0 0 0 1px var(--border);
+    color: var(--text-strong);
+    font-weight: var(--fw-semibold);
+}
+
+.kind-switch button:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.kind-daily {
+    margin-left: auto;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    text-decoration: none;
+}
+
+/* 라벨은 왼쪽, 입력은 오른쪽. 칸 사이는 가는 선. */
+.compose-layout form.card {
+    gap: 0;
+}
+
+.compose-layout form.card > .field {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: center;
+    padding: var(--space-3) 0;
+}
+
+.compose-layout form.card > .field + .field {
+    border-top: 1px solid var(--border);
+}
+
+.compose-layout form.card > .field:has(textarea) {
+    align-items: start;
+}
+
+.compose-layout form.card > .field :deep(.field-label) {
+    margin: 0;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+}
+
+.compose-layout form.card > .field:has(textarea) :deep(.field-label) {
+    padding-top: var(--space-2);
+}
+
+.compose-layout form.card > :not(.field) {
+    margin-top: var(--space-3);
 }
 
 .compose-layout {
@@ -681,11 +761,36 @@ onMounted(async () => {
     color: var(--danger-fg);
 }
 
-.side-list,
 .card-sales {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+}
+
+/* 내가 쓴 목록: 한 카드 안에서 줄로 나눈다. */
+.side-list {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.side-list > * + * {
+    border-top: 1px solid var(--border);
+}
+
+.side-list .side-label {
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
+}
+
+.side-list .list-status {
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--fs-13);
 }
 
 .side-item {
@@ -694,10 +799,12 @@ onMounted(async () => {
     align-items: flex-start;
     gap: var(--space-1);
     width: 100%;
-    padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    border-radius: 0;
     background: var(--surface);
+    font: inherit;
+    font-size: var(--fs-13);
     color: var(--text);
     text-align: left;
     text-decoration: none;
@@ -705,7 +812,12 @@ onMounted(async () => {
 }
 
 .side-item.is-current {
-    border-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.side-item:hover {
+    background: var(--surface-soft);
 }
 
 .side-item span:first-child {
@@ -716,6 +828,30 @@ onMounted(async () => {
 @media (max-width: 860px) {
     .compose-layout {
         grid-template-columns: 1fr;
+    }
+
+    .compose-layout form.card > .field {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-2);
+    }
+
+    .compose-layout form.card > .field:has(textarea) :deep(.field-label) {
+        padding-top: 0;
+    }
+
+    .kind-switch {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .kind-switch button {
+        min-height: var(--control-h-lg);
+        padding: 0;
+    }
+
+    .kind-daily {
+        margin-left: 0;
     }
 }
 </style>

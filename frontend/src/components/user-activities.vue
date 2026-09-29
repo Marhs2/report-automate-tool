@@ -9,7 +9,9 @@ import { AGENDA_NAME_LIMIT, dayCounts, previewPeople } from "../lib/dayStatus";
 
 const router = useRouter();
 const { alert: showAlert } = useDialog();
-const { getUserActivities, getReports, getHolidays, getTeams } = useApi();
+const { getUserActivities, getReports, getHolidays, getTeams, getUsers } = useApi();
+/** 관리자 계정 id. 보고를 안 쓰는 관리자는 미제출로 세지 않는다. */
+const adminIds = ref(new Set());
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -43,6 +45,10 @@ const startOfToday = () => {
 
 const fetchTeams = async () => {
     try {
+        const users = await getUsers().catch(() => []);
+        adminIds.value = new Set(
+            (users || []).filter((user) => user.is_admin).map((user) => String(user.id)),
+        );
         teams.value = await getTeams();
     } catch (error) {
         console.error("Error fetching teams:", error);
@@ -225,6 +231,11 @@ const orderedActivities = computed(() =>
             (activity) =>
                 filterTeam.value === "all" ||
                 String(activity.team_id) === String(filterTeam.value),
+        )
+        .filter(
+            (activity) =>
+                !adminIds.value.has(String(activity.member_id)) ||
+                Number(activity.total_count) > 0,
         )
         .map((activity) => ({
             ...activity,
@@ -542,6 +553,11 @@ const progressByMember = computed(() => {
                         <span class="day-dot" :class="dotKind(cell) || 'is-empty'"></span>
                     </button>
                 </div>
+                <p class="dot-legend">
+                    <span><i class="day-dot full" aria-hidden="true"></i>전원 제출</span>
+                    <span><i class="day-dot partial" aria-hidden="true"></i>일부 제출</span>
+                    <span>날짜를 누르면 누가 냈는지 보여요</span>
+                </p>
             </section>
 
             <section v-if="selectedCell && !isNarrow" class="card agenda" :aria-label="agendaTitle(selectedCell)">
@@ -555,6 +571,15 @@ const progressByMember = computed(() => {
                         · 미제출 {{ countsOf(selectedCell).missed }}
                     </template>
                 </p>
+                <div
+                    v-if="!selectedCell.isOffday && (countsOf(selectedCell).submitted + countsOf(selectedCell).missed)"
+                    class="agenda-bar"
+                    role="img"
+                    :aria-label="`제출 ${countsOf(selectedCell).submitted}명, 미제출 ${countsOf(selectedCell).missed}명`"
+                >
+                    <span class="is-saved" :style="{ flexGrow: countsOf(selectedCell).submitted }"></span>
+                    <span class="is-missing" :style="{ flexGrow: countsOf(selectedCell).missed }"></span>
+                </div>
 
                 <label v-if="showNameSearch(selectedCell)" class="agenda-search">
                     <input
@@ -572,7 +597,11 @@ const progressByMember = computed(() => {
                     :key="group.expandKey"
                     class="agenda-group"
                 >
-                    <h3>{{ group.label }} {{ group.people.length }}</h3>
+                    <h3>
+                        <span class="state-chip" :class="group.key === 'missed' ? 'is-danger' : 'is-success'">
+                            {{ group.label }} {{ group.people.length }}
+                        </span>
+                    </h3>
                     <div class="agenda-chips">
                         <button
                             v-for="entry in group.shown.filter((person) => person.submitted)"
@@ -634,6 +663,15 @@ const progressByMember = computed(() => {
                             · 미제출 {{ countsOf(selectedCell).missed }}
                         </template>
                     </p>
+                    <div
+                        v-if="!selectedCell.isOffday && (countsOf(selectedCell).submitted + countsOf(selectedCell).missed)"
+                        class="agenda-bar"
+                        role="img"
+                        :aria-label="`제출 ${countsOf(selectedCell).submitted}명, 미제출 ${countsOf(selectedCell).missed}명`"
+                    >
+                        <span class="is-saved" :style="{ flexGrow: countsOf(selectedCell).submitted }"></span>
+                        <span class="is-missing" :style="{ flexGrow: countsOf(selectedCell).missed }"></span>
+                    </div>
                     <label v-if="showNameSearch(selectedCell)" class="agenda-search">
                         <input
                             v-model="nameQuery"
@@ -649,7 +687,11 @@ const progressByMember = computed(() => {
                         :key="`sheet-${group.expandKey}`"
                         class="agenda-group"
                     >
-                        <h3>{{ group.label }} {{ group.people.length }}</h3>
+                        <h3>
+                        <span class="state-chip" :class="group.key === 'missed' ? 'is-danger' : 'is-success'">
+                            {{ group.label }} {{ group.people.length }}
+                        </span>
+                    </h3>
                         <div class="agenda-chips">
                             <button
                                 v-for="entry in group.shown.filter((person) => person.submitted)"
@@ -923,8 +965,53 @@ button.person-chip:hover {
 
 .person-chip.is-missed {
     border-color: transparent;
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+}
+
+.agenda-bar {
+    display: flex;
+    gap: 2px;
+    height: 8px;
+    margin-top: var(--space-3);
+    overflow: hidden;
+    border-radius: var(--radius-pill);
     background: var(--surface-soft);
+}
+
+.agenda-bar .is-saved {
+    background: var(--success-fg);
+}
+
+.agenda-bar .is-missing {
+    background: var(--danger-border);
+}
+
+.dot-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    margin: var(--space-3) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-12);
     color: var(--text-muted);
+}
+
+.dot-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dot-legend span:last-child {
+    margin-left: auto;
+}
+
+.dot-legend .day-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
 }
 
 .more-people {
@@ -975,6 +1062,22 @@ button.person-chip:hover {
 }
 
 @media (max-width: 860px) {
+    /* 달 이동은 제목 줄에, 팀 고르기는 그 아래 한 줄로. */
+    .page-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
+
+    .page-header :deep(.page-header-filters) {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .dot-legend span:last-child {
+        margin-left: 0;
+    }
+
     .team-filter {
         width: 100%;
         min-width: 0;

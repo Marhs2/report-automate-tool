@@ -386,29 +386,8 @@ onMounted(() => {
     font-weight: var(--fw-semibold);
 }
 
-.state-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: var(--chip-h);
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-pill);
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-}
 
-.state-chip::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: var(--radius-pill);
-    background: currentColor;
-}
 
-.state-chip.is-danger {
-    background: var(--danger-bg);
-    color: var(--danger-fg);
-}
 
 .list-status {
     margin: 0;

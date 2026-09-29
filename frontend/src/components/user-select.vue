@@ -87,7 +87,12 @@ const filteredUsers = computed(() => {
     );
 });
 
+/** 초성 묶음은 사람이 많을 때만 쓴다. 몇 명뿐이면 카드가 쪼개져 오히려 읽기 어렵다. */
+const GROUP_THRESHOLD = 12;
 const userGroups = computed(() => {
+    if (filteredUsers.value.length <= GROUP_THRESHOLD) {
+        return filteredUsers.value.length ? [{ letter: "", items: filteredUsers.value }] : [];
+    }
     const groups = new Map();
     for (const user of filteredUsers.value) {
         const letter = nameChosung(user.name);
@@ -293,7 +298,7 @@ onMounted(async () => {
                 :key="group.letter"
                 class="user-group"
             >
-                <h3 class="group-head">{{ group.letter }} <span>{{ group.items.length }}</span></h3>
+                <h3 v-if="group.letter" class="group-head">{{ group.letter }} <span>{{ group.items.length }}</span></h3>
                 <div class="user-rows">
                     <div
                         v-for="user in group.items"
@@ -304,7 +309,9 @@ onMounted(async () => {
                         <span class="avatar">{{ String(user.name || "?").slice(0, 1) }}</span>
                         <span class="user-row-name">
                             {{ user.name }}
-                            <em v-if="isUnassigned(user)">미지정</em>
+                            <span v-if="user.is_admin" class="state-chip is-plain is-accent">관리자</span>
+                            <span v-if="isUnassigned(user)" class="state-chip is-plain is-warning">부서 미지정</span>
+                            <span v-if="!user.has_password" class="state-chip is-plain is-danger">비밀번호 없음</span>
                         </span>
                         <label class="user-row-team">
                             <span class="sr-only">부서</span>
@@ -320,7 +327,7 @@ onMounted(async () => {
                                 </option>
                             </select>
                         </label>
-                        <span v-if="isMe(user)" class="user-row-now">로그인 중</span>
+                        <span v-if="isMe(user)" class="state-chip is-info user-row-now">로그인 중</span>
                         <div v-else-if="!user.has_password" class="user-row-temp">
                             <input
                                 class="input"
@@ -567,10 +574,13 @@ onMounted(async () => {
 }
 
 .user-row-now {
-    flex-shrink: 0;
+    justify-self: start;
+}
+
+.user-row-name .state-chip {
+    height: 20px;
+    padding: 0 var(--space-2);
     font-size: var(--fs-11);
-    font-weight: var(--fw-semibold);
-    color: var(--accent-hover);
 }
 
 .user-row-temp {

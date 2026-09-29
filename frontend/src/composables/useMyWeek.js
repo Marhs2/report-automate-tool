@@ -1,6 +1,7 @@
 import { computed, ref } from "vue";
 import useApi from "./useApi";
 import { selectedUserId } from "./useSelectedUser";
+import { isAdmin } from "./useSession";
 import { todayString } from "../lib/dateScope";
 import { savedDatesOf, todayState, weekDays, weekStatus } from "../lib/weekStatus";
 
@@ -41,10 +42,12 @@ const refresh = async () => {
     const weekday = new Date().getDay();
     today.value = iso;
     days.value = weekStatus(week, saved, iso);
+    // 이번 주 보고를 한 번도 안 쓴 관리자는 보고 대상이 아니다. 배지로 재촉하지 않는다.
+    const quietAdmin = Boolean(isAdmin.value) && saved.size === 0 && !hasDraft;
     state.value = todayState({
         saved: saved.has(iso),
         hasDraft,
-        weekend: weekday === 0 || weekday === 6,
+        weekend: weekday === 0 || weekday === 6 || quietAdmin,
     });
 };
 
