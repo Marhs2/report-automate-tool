@@ -5,7 +5,11 @@
             <div class="detail-title">
                 <h1>{{ userName || "일일보고" }}</h1>
                 <span class="detail-date">{{ formatDotDate(reportDate) || "날짜 없음" }}</span>
+                <span class="status-chip" :class="stateChip.tone">{{ stateChip.label }}</span>
             </div>
+            <p v-if="reportData && canEdit" class="detail-summary">
+                {{ sizeLabel }}<template v-if="!savedReportId"> · AI가 만든 초안이에요. 원문과 대조하고 고친 뒤 저장하세요.</template>
+            </p>
         </header>
 
      
@@ -64,6 +68,20 @@
 
         <div v-else-if="reportData" class="content-container">
             <div class="json-container">
+                <div
+                    v-if="canEdit && !reportData.projects.length"
+                    class="card empty-extract"
+                >
+                    <h2>업무 내용을 찾지 못했어요</h2>
+                    <p>
+                        AI는 원문에 없는 내용을 만들지 않아요. 업무가 아닌 글이면 결과가 비어 있어요.
+                        원문을 고치거나 프로젝트를 직접 추가하세요.
+                    </p>
+                    <div class="empty-extract-actions">
+                        <router-link v-if="!savedReportId" class="btn" to="/report">원문 고치기</router-link>
+                        <button class="btn" type="button" @click="openProjectPopup()">프로젝트 직접 추가</button>
+                    </div>
+                </div>
                 <div
                     v-if="!canEdit && reportData.projects.length > 1"
                     class="project-nav"
@@ -185,7 +203,7 @@
                             @click="saveReport"
                             :disabled="aiLoading || saving"
                         >
-                            {{ saving ? "저장 중..." : savedReportId ? "수정 저장" : "저장하기" }}
+                            {{ saveLabel }}
                         </button>
                         <button
                             v-if="rawData"
@@ -278,7 +296,7 @@
                             @click="saveReport"
                             :disabled="aiLoading || saving"
                         >
-                            {{ saving ? "저장 중..." : savedReportId ? "수정 저장" : "저장하기" }}
+                            {{ saveLabel }}
                         </button>
                         <button
                 v-if="rawData"
@@ -296,7 +314,7 @@
 
             <aside v-if="rawData" class="card raw-container" >
                 <button type="button" class="raw-fold"  @click="rawOpen = !rawOpen">
-                    {{ rawOpen ? "원본 접기" : "원본 보기" }}
+                    {{ rawOpen ? "원문 접기" : "원문 보기" }}
                 </button>
                 <template v-if="rawOpen">
                     <label class="raw-toggle">
@@ -327,6 +345,7 @@ import {
     projectAccentIndex,
 } from "../lib/projectAccent";
 import { indexAfterCurrent } from "../lib/projectInsert";
+import { overwriteNote, reportSizeLabel } from "../lib/reportSummary";
 
 const route = useRoute();
 const router = useRouter();
@@ -342,7 +361,15 @@ const saving = ref(false);
 const isLoading = ref(false);
 const savedReportId = ref(null);
 const savedMemberId = ref(null);
-const { postSaveReport, postReport, getUsers, getReportById, getProjectNames, postProjectName } = useApi();
+const {
+    postSaveReport,
+    postReport,
+    getUsers,
+    getReportById,
+    getProjectNames,
+    postProjectName,
+    getUserActivities,
+} = useApi();
 
 
 /** 읽기 모드에서 쓰는 순서. 편집 칸과 같은 키를 쓴다. */
@@ -411,6 +438,35 @@ const canEdit = computed(() => {
     if (!savedReportId.value) return true;
     return isMine.value || isAdmin.value;
 });
+
+/** 상태가 글보다 먼저 보여야 한다. 새 추출은 "검토 전"을 분명히 적는다. */
+const stateChip = computed(() => {
+    if (aiLoading.value) return { label: "재추출 중", tone: "is-info" };
+    if (!savedReportId.value) return { label: "AI 초안 · 검토 전", tone: "is-draft" };
+    return { label: canEdit.value ? "저장됨 · 수정 가능" : "저장됨", tone: "is-saved" };
+});
+
+const sizeLabel = computed(() => (reportData.value ? reportSizeLabel(reportData.value) : ""));
+
+const saveLabel = computed(() => {
+    if (saving.value) return "저장 중...";
+    return savedReportId.value ? "수정 저장" : "검토 완료 · 저장";
+});
+
+/** 같은 사람·같은 날 저장된 보고. 새로 저장하면 서버가 이것을 덮어쓴다. */
+const findSameDayReport = async (memberId, day) => {
+    const [year, month] = String(day).split("-").map(Number);
+    if (!year || !month) return null;
+    try {
+        const rows = await getUserActivities(year, month, day, day);
+        const mine = (rows || []).find((row) => String(row.member_id) === String(memberId));
+        const hit = (mine?.activities || []).find((a) => a.report_date === day && a.count > 0);
+        if (!hit?.report_id) return null;
+        return await getReportById(hit.report_id);
+    } catch {
+        return null;
+    }
+};
 
 const formatDotDate = (value) => {
     const [year, month, day] = String(value || "").split("-");
@@ -772,6 +828,21 @@ const writeReport = async (announce) => {
     const memberId =
         savedMemberId.value ??
         parseInt(localStorage.getItem("report-selectedUser") || "0", 10);
+    if (!wasSaved) {
+        const day = reportDateValue();
+        const existing = await findSameDayReport(memberId, day);
+        if (existing) {
+            const [, month, date] = day.split("-").map(Number);
+            const ok = await askConfirm(`${month}월 ${date}일 보고를 덮어쓸까요?`, {
+                title: "같은 날 저장된 보고가 있어요",
+                help: `${overwriteNote(existing.parsed_json, reportData.value)}\n덮어쓰면 저장된 보고는 되돌릴 수 없어요.`,
+                confirmLabel: "덮어쓰기",
+                cancelLabel: "취소",
+                danger: true,
+            });
+            if (!ok) return;
+        }
+    }
     saving.value = true;
     try {
         const saved = await postSaveReport(
@@ -897,6 +968,46 @@ const getSelectedMemberId = () => {
 .detail-date {
     font-size: var(--fs-13);
     color: var(--text);
+}
+
+.detail-title .status-chip {
+    align-self: center;
+    font-size: var(--fs-12);
+}
+
+.detail-summary {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.empty-extract {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    border-style: dashed;
+}
+
+.empty-extract h2 {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.empty-extract p {
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.empty-extract-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
 }
 
 .reextract {

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+    overwriteNote,
     reportCountLabel,
     reportCounts,
     reportHeadline,
+    reportSizeLabel,
     reportSummary,
 } from "./reportSummary.js";
 
@@ -82,5 +84,23 @@ describe("report summary", () => {
         assert.equal(summary.headline, "검색이 안 나옴");
         assert.equal(summary.counts.issues, 1);
         assert.match(summary.countLabel, /이슈 1/);
+    });
+});
+
+describe("overwriteNote", () => {
+    it("puts the saved and the new report side by side", () => {
+        const saved = { projects: [{ projectName: "A", completedTasks: ["x", "y"] }] };
+        const next = JSON.stringify({ projects: [
+            { projectName: "A", completedTasks: ["x"], issues: [{ content: "막힘" }] },
+            { projectName: "B", inProgressTasks: ["z"] },
+        ] });
+        assert.equal(
+            overwriteNote(saved, next),
+            "저장된 보고: 프로젝트 1 · 완료 2\n새로 저장: 프로젝트 2 · 완료 1 · 진행 1 · 이슈 1",
+        );
+    });
+
+    it("handles an empty or broken saved report", () => {
+        assert.equal(reportSizeLabel("{broken"), "프로젝트 0");
     });
 });

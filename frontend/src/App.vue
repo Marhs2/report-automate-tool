@@ -45,6 +45,7 @@ const {
     help: dialogHelp,
     confirmLabel: dialogConfirmLabel,
     cancelLabel: dialogCancelLabel,
+    danger: dialogDanger,
     alert: showAlert,
     accept: acceptDialog,
     reject: rejectDialog,
@@ -459,7 +460,8 @@ onUnmounted(() => {
                 </button>
                 <button
                     type="button"
-                    class="btn btn-primary"
+                    class="btn"
+                    :class="dialogDanger ? 'btn-danger-solid' : 'btn-primary'"
                     :disabled="dialogLocked"
                     @click="acceptDialog"
                 >

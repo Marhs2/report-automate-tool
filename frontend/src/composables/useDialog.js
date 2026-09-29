@@ -9,6 +9,8 @@ const message = ref("");
 const help = ref("");
 const confirmLabel = ref("확인");
 const cancelLabel = ref("취소");
+/** 되돌릴 수 없는 확인(덮어쓰기·삭제)은 확인 버튼을 위험 색으로 칠한다. */
+const danger = ref(false);
 
 let active = null;
 let unlockTimer = 0;
@@ -18,6 +20,7 @@ const resetLabels = () => {
     help.value = "";
     confirmLabel.value = "확인";
     cancelLabel.value = "취소";
+    danger.value = false;
 };
 
 const pump = async () => {
@@ -29,6 +32,7 @@ const pump = async () => {
     help.value = active.help || "";
     confirmLabel.value = active.confirmLabel || "확인";
     cancelLabel.value = active.cancelLabel || "취소";
+    danger.value = Boolean(active.danger);
     locked.value = true;
     open.value = true;
     await nextTick();
@@ -78,6 +82,7 @@ export function useDialog() {
                 help: options.help || "",
                 confirmLabel: options.confirmLabel || "확인",
                 cancelLabel: options.cancelLabel || "취소",
+                danger: Boolean(options.danger),
                 resolve,
             });
         });
@@ -91,6 +96,7 @@ export function useDialog() {
         help,
         confirmLabel,
         cancelLabel,
+        danger,
         alert,
         confirm,
         accept: () => close(true),
