@@ -1,5 +1,7 @@
 export const PRIMARY_NAV = [
-    { to: "/", label: "일일보고", shortLabel: "일일", group: "작업" },
+    { to: "/", label: "내 현황", shortLabel: "현황", group: "작업" },
+    { to: "/compose", label: "작성", shortLabel: "작성", group: "작업" },
+    { to: "/reports", label: "일일보고", shortLabel: "일일", group: "작업" },
     { to: "/weekly", label: "주간 보고서", shortLabel: "주간", group: "작업" },
     { to: "/activities", label: "사용자 활동", shortLabel: "활동", group: "작업" },
     { to: "/project-timeline", label: "프로젝트 흐름", shortLabel: "흐름", group: "작업" },
@@ -8,8 +10,10 @@ export const PRIMARY_NAV = [
 
 /** Capability → live route path. Keep these reachable even when not in PRIMARY_NAV. */
 export const CAPABILITIES = {
-    dailyList: "/",
+    dashboard: "/",
+    dailyList: "/reports",
     writeReport: "/report",
+    compose: "/compose",
     weekly: "/weekly",
     activities: "/activities",
     projectTimeline: "/project-timeline",
@@ -30,6 +34,9 @@ export const ADMIN_TABS = [
 
 export const LIVE_ROUTE_PATHS = [
     "/",
+    "/reports",
+    "/compose",
+    "/compose/:id",
     "/report",
     "/report-result/:id?",
     "/activities",

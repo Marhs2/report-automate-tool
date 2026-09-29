@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import report from "../components/report.vue";
 import reportResult from "../components/report-result.vue";
 import projectList from "../components/projects-list.vue";
+import dashboard from "../components/dashboard.vue";
+import compose from "../components/compose.vue";
 import activities from "../components/user-activities.vue";
 import weekly from "../components/weekly-report.vue";
 import weeklyDetail from "../components/weekly-detail.vue";
@@ -13,12 +15,31 @@ import login from "../components/login.vue";
 const routes = [
   {
     path: "/",
-    name: "",
+    name: "dashboard",
+    component: dashboard,
+    meta: {
+      title: "내 현황",
+      navKey: "/",
+      action: { to: "/compose", label: "작성" },
+    },
+  },
+  {
+    path: "/reports",
+    name: "reports",
     component: projectList,
     meta: {
       title: "일일보고",
-      navKey: "/",
+      navKey: "/reports",
       action: { to: "/report", label: "보고서 작성" },
+    },
+  },
+  {
+    path: "/compose/:id?",
+    name: "compose",
+    component: compose,
+    meta: {
+      title: "작성",
+      navKey: "/compose",
     },
   },
   {
@@ -32,11 +53,9 @@ const routes = [
     name: "report-result",
     component: reportResult,
     meta: {
-      // 저장된 보고를 읽을 때는 화면이 "일일보고 상세"로, 새 추출 초안일 때는
-      // "분석 결과"로 제목을 덮어쓴다(usePageMeta).
       title: "일일보고 상세",
-      navKey: "/",
-      parent: { to: "/", label: "일일보고" },
+      navKey: "/reports",
+      parent: { to: "/reports", label: "일일보고" },
     },
   },
   {

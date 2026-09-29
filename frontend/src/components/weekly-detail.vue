@@ -99,10 +99,6 @@
 
         <div v-else-if="reportData" class="content-container single">
             <div class="json-container">
-                <p v-if="reportData.carriedFromLastWeek" class="carry-hint" role="status">
-                    지난주 향후 {{ reportData.carriedCount }}건을 이번 주 향후일정에 남겨 두었습니다.
-                </p>
-
                 <details class="card meta-card">
                     <summary>
                         <span class="meta-summary">{{ metaSummary }}</span>
@@ -188,7 +184,13 @@
                     </div>
                 </details>
 
-                <div class="card project-block" v-for="block in projectBlocks" :key="block.key">
+                <div
+                    class="card project-block"
+                    v-for="block in projectBlocks"
+                    :key="block.key"
+                    :data-project-key="block.key"
+                    @focusin="rememberBlock(block)"
+                >
                     <div class="project-head">
                         <input class="input project-name-input" :value="blockTitle(block)" placeholder="프로젝트 이름"
                             @input="setBlockTitle(block, $event.target.value)" />
@@ -294,9 +296,12 @@ import {
     formatDeck,
     groupDoneItems,
     nextWeekLabel,
+    placeProjectSection,
+    projectSectionOrder,
     toWeeklyDeck,
     visibleConfirmQuestions,
 } from "../lib/weeklyDeck";
+import { copyText } from "../lib/copyText";
 import AppField from "./ui/AppField.vue";
 
 const route = useRoute();
@@ -423,28 +428,13 @@ const stableSectionKey = (section) => {
     return key;
 };
 
-const projectBlocks = computed(() => {
-    const data = reportData.value;
-    if (!data) return [];
-    const order = [];
-    const seen = new Map();
-    const add = (section, kind, index) => {
-        const titleKey = section.title || `__blank_${kind}_${index}`;
-        if (!seen.has(titleKey)) {
-            const block = {
-                key: stableSectionKey(section),
-                done: null,
-                next: null,
-            };
-            seen.set(titleKey, block);
-            order.push(block);
-        }
-        seen.get(titleKey)[kind] = section;
-    };
-    (data.done || []).forEach((section, index) => add(section, "done", index));
-    (data.next || []).forEach((section, index) => add(section, "next", index));
-    return order;
-});
+const projectBlocks = computed(() =>
+    projectSectionOrder(reportData.value).map((block) => ({
+        key: stableSectionKey(block.done || block.next),
+        done: block.done,
+        next: block.next,
+    })),
+);
 
 const blockTitle = (block) => block.done?.title || block.next?.title || "";
 
@@ -489,9 +479,24 @@ const removeProject = (block) => {
     }
 };
 
-const addProject = () => {
+const activeBlock = ref(null);
+
+const rememberBlock = (block) => {
+    activeBlock.value = block;
+};
+
+const addProject = async () => {
     if (!reportData.value) return;
-    reportData.value.done.push(emptySection());
+    const section = emptySection();
+    const block = activeBlock.value || projectBlocks.value[0] || null;
+    placeProjectSection(reportData.value, block, section);
+    const key = stableSectionKey(section);
+    await nextTick();
+    const card = document.querySelector(`[data-project-key="${key}"]`);
+    if (!(card instanceof HTMLElement)) return;
+    card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const input = card.querySelector("input");
+    if (input instanceof HTMLElement) input.focus();
 };
 
 /* 공지, 금월·익월 이벤트, 센터 협업. 비면 PPTX에서 그 슬라이드가 빠진다. */
@@ -765,7 +770,8 @@ const reextractReport = async () => {
 const copyReport = async () => {
     if (!reportData.value) return;
     try {
-        await navigator.clipboard.writeText(formatDeck(reportData.value));
+        const copied = await copyText(formatDeck(reportData.value));
+        if (!copied) throw new Error("copy failed");
         showAlert("보고서가 클립보드에 복사되었습니다.");
     } catch (error) {
         console.error("복사 실패:", error);
@@ -847,7 +853,7 @@ const saveReport = async () => {
         showAlert("저장할 주간 보고서 ID가 없습니다.");
         return;
     }
-    if (!(await askConfirmQuestions())) return;
+    if (isUnsaved.value && !(await askConfirmQuestions())) return;
     if (isUnsaved.value) {
         await createSavedReport();
         return;
@@ -1144,18 +1150,6 @@ const saveReport = async () => {
 
 .meta-card[open]>summary {
     margin-bottom: var(--space-4);
-}
-
-.carry-hint {
-    margin: 0;
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--warning-border);
-    border-radius: var(--radius);
-    background: var(--warning-bg);
-    color: var(--warning-fg);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    word-break: keep-all;
 }
 
 .json-container,

@@ -3,6 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from auth import hash_password
+from work_records import ensure_work_tables
 
 BASE_DIR = Path(__file__).parent
 
@@ -111,6 +112,8 @@ def create_tables(conn: sqlite3.Connection) -> None:
         FOREIGN KEY (member_id) REFERENCES members(id)
     )
     """)
+
+    ensure_work_tables(conn)
 
 
 def _team_id(conn: sqlite3.Connection) -> int:

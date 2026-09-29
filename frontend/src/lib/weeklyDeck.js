@@ -16,6 +16,62 @@ const texts = (values) => {
 };
 
 export const emptySection = () => ({ title: "", items: [""] });
+
+const sectionHasContent = (section) => {
+    if (!section || typeof section !== "object") return false;
+    if (String(section.title || "").trim()) return true;
+    return (section.items || []).some((item) => String(item || "").trim());
+};
+
+/** 제목도 내용도 없는 칸은 빼서, 화면을 열 때마다 빈 프로젝트가 생기지 않게 한다. */
+const keptSections = (list) =>
+    (Array.isArray(list) ? list : []).filter(sectionHasContent);
+
+const deckSections = (doneRaw, nextRaw) => {
+    const done = keptSections(doneRaw);
+    const next = keptSections(nextRaw);
+    if (!done.length && !next.length) return { done: [emptySection()], next: [] };
+    return { done, next };
+};
+
+/** 진행 현황을 먼저 보고, 제목이 없는 향후일정만 그 뒤에 붙인다. */
+export const projectSectionOrder = (data) => {
+    const order = [];
+    const seen = new Map();
+    const add = (section, kind, index) => {
+        const titleKey = section.title || `__blank_${kind}_${index}`;
+        if (!seen.has(titleKey)) {
+            const block = { done: null, next: null };
+            seen.set(titleKey, block);
+            order.push(block);
+        }
+        seen.get(titleKey)[kind] = section;
+    };
+    (data?.done || []).forEach((section, index) => add(section, "done", index));
+    (data?.next || []).forEach((section, index) => add(section, "next", index));
+    return order;
+};
+
+/** 기준 프로젝트 바로 뒤에 섹션을 넣는다. 기준이 없으면 진행 현황 끝에 붙인다. */
+export const placeProjectSection = (data, anchor, section) => {
+    if (!Array.isArray(data.done)) data.done = [];
+    if (anchor?.done) {
+        const index = data.done.indexOf(anchor.done);
+        if (index >= 0) {
+            data.done.splice(index + 1, 0, section);
+            return;
+        }
+    }
+    if (anchor?.next) {
+        if (!Array.isArray(data.next)) data.next = [];
+        const index = data.next.indexOf(anchor.next);
+        if (index >= 0) {
+            data.next.splice(index + 1, 0, section);
+            return;
+        }
+    }
+    data.done.push(section);
+};
 export const emptyEvent = () => ({ when: "", title: "" });
 export const emptyNotice = () => ({ title: "", body: [""] });
 export const COLLAB_CENTERS = ["AC", "BC", "DC", "TC", "CSC"];
@@ -183,8 +239,7 @@ export function toWeeklyDeck(report) {
             month_events: asEvents(data.month_events),
             next_month_events: asEvents(data.next_month_events),
             collab: asCollab(data.collab),
-            done: data.done.length ? data.done : [emptySection()],
-            next: data.next?.length ? data.next : [emptySection()],
+            ...deckSections(data.done, data.next),
         };
         deck.week_label_next =
             nextWeekLabel(deck.week_label_done, deck.report_date) ||
@@ -224,8 +279,7 @@ export function toWeeklyDeck(report) {
         month_events: asEvents(data.month_events),
         next_month_events: asEvents(data.next_month_events),
         collab: asCollab(data.collab),
-        done: done.length ? done : [emptySection()],
-        next: next.length ? next : [emptySection()],
+        ...deckSections(done, next),
         projects: data.projects || [],
         confirmQuestions: data.confirmQuestions || [],
     };

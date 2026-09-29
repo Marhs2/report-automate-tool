@@ -25,6 +25,19 @@ from weekly_deck import (
     pick_previous_weekly,
     replace_member_week,
 )
+from work_records import (
+    WorkRecordError,
+    build_dashboard,
+    delete_card,
+    delete_work_record,
+    ensure_work_tables,
+    get_card,
+    get_work_record,
+    list_cards,
+    list_work_records,
+    save_card,
+    save_work_record,
+)
 from pydantic import BaseModel
 
 load_dotenv()
@@ -497,6 +510,7 @@ def ensure_runtime_schema():
             )
             """
         )
+        ensure_work_tables(conn)
         conn.commit()
 
 
@@ -2978,3 +2992,110 @@ def save_projects(conn, report_data, member_id, report_date):
                 report_date,
             ),
         )
+
+
+def _raise_work(exc: WorkRecordError):
+    raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+
+
+@app.get("/dashboard")
+def my_dashboard(project: str = "", actor_id: int = Depends(current_member_id)):
+    with get_db() as conn:
+        return build_dashboard(conn, actor_id, project)
+
+
+@app.get("/work-records")
+def work_record_list(kind: str = "", actor_id: int = Depends(current_member_id)):
+    try:
+        with get_db() as conn:
+            return list_work_records(conn, actor_id, kind.strip() or None)
+    except WorkRecordError as exc:
+        _raise_work(exc)
+
+
+@app.post("/work-records")
+def create_work_record(data: dict, actor_id: int = Depends(current_member_id)):
+    try:
+        with get_db() as conn:
+            return save_work_record(conn, actor_id, data)
+    except WorkRecordError as exc:
+        _raise_work(exc)
+
+
+@app.get("/work-records/{record_id}")
+def read_work_record(record_id: int, actor_id: int = Depends(current_member_id)):
+    try:
+        with get_db() as conn:
+            return get_work_record(conn, actor_id, record_id)
+    except WorkRecordError as exc:
+        _raise_work(exc)
+
+
+@app.put("/work-records/{record_id}")
+def update_work_record(
+    record_id: int,
+    data: dict,
+    actor_id: int = Depends(current_member_id),
+):
+    try:
+        with get_db() as conn:
+            return save_work_record(conn, actor_id, data, record_id)
+    except WorkRecordError as exc:
+        _raise_work(exc)
+
+
+@app.delete("/work-records/{record_id}")
+def remove_work_record(record_id: int, actor_id: int = Depends(current_member_id)):
+    try:
+        with get_db() as conn:
+            delete_work_record(conn, actor_id, record_id)
+        return {"message": "삭제했습니다."}
+    except WorkRecordError as exc:
+        _raise_work(exc)
+
+
+@app.get("/business-cards")
+def business_card_list(actor_id: int = Depends(current_member_id)):
+    with get_db() as conn:
+        return list_cards(conn, actor_id)
+
+
+@app.post("/business-cards")
+def create_business_card(data: dict, actor_id: int = Depends(current_member_id)):
+    try:
+        with get_db() as conn:
+            return save_card(conn, actor_id, data)
+    except WorkRecordError as exc:
+        _raise_work(exc)
+
+
+@app.get("/business-cards/{card_id}")
+def read_business_card(card_id: int, actor_id: int = Depends(current_member_id)):
+    try:
+        with get_db() as conn:
+            return get_card(conn, actor_id, card_id)
+    except WorkRecordError as exc:
+        _raise_work(exc)
+
+
+@app.put("/business-cards/{card_id}")
+def update_business_card(
+    card_id: int,
+    data: dict,
+    actor_id: int = Depends(current_member_id),
+):
+    try:
+        with get_db() as conn:
+            return save_card(conn, actor_id, data, card_id)
+    except WorkRecordError as exc:
+        _raise_work(exc)
+
+
+@app.delete("/business-cards/{card_id}")
+def remove_business_card(card_id: int, actor_id: int = Depends(current_member_id)):
+    try:
+        with get_db() as conn:
+            delete_card(conn, actor_id, card_id)
+        return {"message": "명함을 삭제했습니다."}
+    except WorkRecordError as exc:
+        _raise_work(exc)

@@ -4,6 +4,8 @@ import {
     CalendarDays,
     FileBarChart,
     GitGraph,
+    LayoutDashboard,
+    PenLine,
     LogOut,
     Settings2,
     Shield,
@@ -41,7 +43,9 @@ const {
 } = useDialog();
 
 const NAV_ICONS = {
-    "/": FolderKanban,
+    "/": LayoutDashboard,
+    "/compose": PenLine,
+    "/reports": FolderKanban,
     "/weekly": FileBarChart,
     "/activities": CalendarDays,
     "/project-timeline": GitGraph,
@@ -65,7 +69,7 @@ const adminNavItems = computed(() =>
 /** 화면이 자기 제목·상위 위치를 덮어쓸 수 있다.
  *  같은 라우트라도 "읽는 중"과 "고치는 중"의 이름이 달라야 한다. */
 const pageMeta = computed(() => ({
-    title: pageTitleOverride.value || route.meta.title || "일일보고",
+    title: pageTitleOverride.value || route.meta.title || "내 현황",
     parent: pageParentOverride.value || route.meta.parent || null,
     action: route.meta.action || null,
 }));

@@ -117,6 +117,7 @@
                     :id="`project-${projectIndex}`"
                     class="card projects-container"
                     :data-accent="projectAccentIndex(projectIndex)"
+                    @focusin="activeIndex = projectIndex"
                 >
                     <div class="project-head">
                         <i class="project-dot" aria-hidden="true"></i>
@@ -325,6 +326,7 @@ import {
     highlightedRawHtml,
     projectAccentIndex,
 } from "../lib/projectAccent";
+import { indexAfterCurrent } from "../lib/projectInsert";
 
 const route = useRoute();
 const router = useRouter();
@@ -421,7 +423,7 @@ const formatDotDate = (value) => {
 const CRUMB_SOURCES = {
     activities: { to: "/activities", label: "사용자 활동" },
     timeline: { to: "/project-timeline", label: "프로젝트 흐름" },
-    list: { to: "/", label: "일일보고" },
+    list: { to: "/reports", label: "일일보고" },
 };
 
 watch(
@@ -614,7 +616,7 @@ const focusProject = async (index) => {
     scrollToProject(index);
 };
 
-const chooseNamedProject = async (name) => {
+const chooseNamedProject = async (name, insertAfter = null) => {
     const value = String(name || "").trim();
     if (!value || !reportData.value) return;
     const projects = reportData.value.projects;
@@ -642,9 +644,10 @@ const chooseNamedProject = async (name) => {
         await focusProject(index);
         return;
     }
-    projects.push(blankProject(value));
+    const at = indexAfterCurrent(projects.length, insertAfter, activeIndex.value);
+    projects.splice(at, 0, blankProject(value));
     closeProjectPopup();
-    await focusProject(projects.length - 1);
+    await focusProject(at);
 };
 
 const openProjectPopup = (index = null) => {
@@ -689,9 +692,10 @@ const registerProject = async (name) => {
 const addNamedProject = async () => {
     const name = newProjectName.value.trim();
     if (!name || !reportData.value) return;
+    const anchor = assignIndex.value;
     await registerProject(name);
     assignIndex.value = null;
-    await chooseNamedProject(name);
+    await chooseNamedProject(name, anchor);
 };
 
 const removeRow = async (project, key, index) => {
@@ -782,7 +786,7 @@ const writeReport = async (announce) => {
             sessionStorage.removeItem("reportRaw");
             sessionStorage.removeItem("reportDate");
             showAlert("보고서를 저장했습니다.");
-            router.push("/");
+            router.push("/reports");
             return;
         }
         const nextId = saved?.id;

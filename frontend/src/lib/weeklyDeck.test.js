@@ -6,6 +6,8 @@ import {
     groupDoneItems,
     humanizeConfirmText,
     nextWeekLabel,
+    placeProjectSection,
+    projectSectionOrder,
     toWeeklyDeck,
     visibleConfirmQuestions,
 } from "./weeklyDeck.js";
@@ -86,16 +88,31 @@ describe("toWeeklyDeck", () => {
         assert.deepEqual(deck.collab.done, ["펌웨어 지원"]);
     });
 
-    it("keeps last-week carry metadata", () => {
+    it("does not invent a blank project when the next list is empty", () => {
         const deck = toWeeklyDeck({
             schema: "weekly-deck-v1",
-            carriedFromLastWeek: true,
-            carriedCount: 2,
-            done: [{ title: "A", items: ["x"] }],
-            next: [{ title: "A", items: ["y"] }],
+            done: [{ title: "HD 현대건설기계", items: ["점검"] }],
+            next: [],
         });
-        assert.equal(deck.carriedFromLastWeek, true);
-        assert.equal(deck.carriedCount, 2);
+        assert.deepEqual(
+            projectSectionOrder(deck).map((block) => block.done?.title || block.next?.title),
+            ["HD 현대건설기계"],
+        );
+    });
+
+    it("drops a saved section that has neither a title nor text", () => {
+        const deck = toWeeklyDeck({
+            schema: "weekly-deck-v1",
+            done: [
+                { title: "내부 보고", items: ["정리"] },
+                { title: "", items: [""] },
+            ],
+            next: [{ title: "", items: [] }],
+        });
+        assert.deepEqual(
+            projectSectionOrder(deck).map((block) => block.done?.title || block.next?.title),
+            ["내부 보고"],
+        );
     });
 });
 
@@ -164,5 +181,41 @@ describe("splitting the merged 진행 현황 column", () => {
         assert.equal(filled.events, 1);
         assert.equal(filled.collab, 2);
         assert.equal(filled.total, 4);
+    });
+});
+
+describe("placeProjectSection", () => {
+    const section = (title) => ({ title, items: ["내용"] });
+    const titles = (data) =>
+        projectSectionOrder(data).map(
+            (block) => block.done?.title || block.next?.title || "",
+        );
+
+    it("inserts the new project after the one being edited", () => {
+        const first = section("가");
+        const middle = section("나");
+        const last = section("다");
+        const data = {
+            done: [first, middle, last],
+            next: [first, middle, last],
+        };
+        const added = section("");
+        placeProjectSection(data, projectSectionOrder(data)[1], added);
+        assert.deepEqual(titles(data), ["가", "나", "", "다"]);
+    });
+
+    it("keeps a next-only project after the inserted card", () => {
+        const first = section("가");
+        const tail = section("라");
+        const data = { done: [first], next: [first, tail] };
+        const added = section("");
+        placeProjectSection(data, projectSectionOrder(data)[0], added);
+        assert.deepEqual(titles(data), ["가", "", "라"]);
+    });
+
+    it("appends when nothing is selected and the list is empty", () => {
+        const data = { done: [], next: [] };
+        placeProjectSection(data, null, section("새"));
+        assert.deepEqual(titles(data), ["새"]);
     });
 });
