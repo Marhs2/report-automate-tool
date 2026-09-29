@@ -12,6 +12,12 @@ import {
     PanelLeftClose,
     PanelLeftOpen,
     ChevronLeft,
+    ChevronRight,
+    FileText,
+    MessageSquare,
+    MoreHorizontal,
+    TrendingUp,
+    X,
 } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -21,7 +27,9 @@ import { selectedTeamId } from "./composables/useSelectedTeam";
 import { hasSession, isAdmin, sessionToken } from "./composables/useSession";
 import { useDialog } from "./composables/useDialog";
 import { useSidebar } from "./composables/useSidebar";
-import { PRIMARY_NAV } from "./lib/nav";
+import { COMPOSE_CHOICES, MOBILE_TABS, MORE_LINKS, PRIMARY_NAV } from "./lib/nav";
+import { useMyWeek } from "./composables/useMyWeek";
+import { TODAY_LABELS } from "./lib/weekStatus";
 import { pageParentOverride, pageTitleOverride } from "./composables/usePageMeta";
 
 const router = useRouter();
@@ -76,11 +84,34 @@ const pageMeta = computed(() => ({
 
 const isNavActive = (to) => route.meta.navKey === to;
 
-/** 모바일은 하단 탭이 작업만 담당한다. 설정과 관리는 상단으로 올려 탭을 4개로 줄인다. */
-const topTools = computed(() =>
-    isNarrow.value ? [...settingsNavItems, ...adminNavItems.value] : [],
+/** 모바일 하단 탭: 현황 · 일일보고 · 작성 · 주간 · 더보기. 작성과 더보기는 시트를 연다. */
+const TAB_ICONS = {
+    home: LayoutDashboard,
+    daily: FolderKanban,
+    write: PenLine,
+    weekly: FileBarChart,
+    more: MoreHorizontal,
+};
+const bottomTabs = computed(() =>
+    MOBILE_TABS.map((tab) => ({
+        ...tab,
+        icon: TAB_ICONS[tab.id],
+        active: tab.navKeys.includes(String(route.meta.navKey || "")),
+    })),
 );
-const bottomNavItems = computed(() => (isNarrow.value ? mainNavItems : []));
+const COMPOSE_ICONS = { daily: FolderKanban, meeting: MessageSquare, general: FileText, sales: TrendingUp };
+const composeChoices = COMPOSE_CHOICES.map((item) => ({ ...item, icon: COMPOSE_ICONS[item.id] }));
+const moreLinks = computed(() => [
+    ...MORE_LINKS,
+    ...(isAdmin.value ? [{ to: "/admin", label: "관리자", hint: "사용자 · 부서" }] : []),
+]);
+const openSheet = ref(null);
+const closeSheet = () => {
+    openSheet.value = null;
+};
+
+const { todayState, todayMissing, refreshMyWeek } = useMyWeek();
+const todayLabel = computed(() => TODAY_LABELS[todayState.value] || "");
 
 const currentUser = ref("");
 const currentTeam = ref("");
@@ -147,6 +178,16 @@ watch(sessionToken, () => {
     loadCurrent();
 }, { immediate: true });
 
+/** 저장하고 돌아오면 배지가 바로 바뀌어야 한다. 화면을 옮길 때마다 다시 본다. */
+watch(
+    () => [route.name, selectedUserId.value],
+    () => {
+        closeSheet();
+        if (!isPublicPage.value && hasSession()) refreshMyWeek();
+    },
+    { immediate: true },
+);
+
 /** 사용자를 바꾸면 앞사람이 쓰던 임시 보고가 남아 있어서는 안 된다. */
 watch(selectedUserId, (id, previous) => {
     if (previous == null || String(id) === String(previous)) return;
@@ -209,6 +250,10 @@ onUnmounted(() => {
         :class="{ 'is-collapsed': collapsedEffective }"
     >
         <div class="sidebar-brand">
+            <router-link v-if="!collapsedEffective" to="/" class="sidebar-brand-link">
+                <span class="sidebar-mark" aria-hidden="true">보</span>
+                <span class="sidebar-brand-name">보고 취합</span>
+            </router-link>
             <button
                 type="button"
                 class="sidebar-collapse-btn"
@@ -234,6 +279,11 @@ onUnmounted(() => {
             >
                 <component :is="item.icon" :size="16" />
                 <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
+                <span
+                    v-if="item.to === '/compose' && todayMissing"
+                    class="nav-badge"
+                    :class="{ 'is-dot': collapsedEffective }"
+                >{{ collapsedEffective ? "" : todayLabel }}</span>
             </router-link>
             <p v-if="!collapsedEffective" class="nav-group-label">설정</p>
             <router-link
@@ -284,8 +334,9 @@ onUnmounted(() => {
         <div v-if="isWritePage" class="write-backbar">
             <button type="button" class="write-back" @click="goBack">
                 <ChevronLeft :size="20" />
-                뒤로
+                {{ pageMeta.parent?.label || "뒤로" }}
             </button>
+            <span class="write-backbar-title">{{ pageMeta.title }}</span>
         </div>
         <header v-else class="topbar">
             <nav class="topbar-crumbs" aria-label="현재 위치">
@@ -296,16 +347,6 @@ onUnmounted(() => {
                 <span class="topbar-title" aria-current="page">{{ pageMeta.title }}</span>
             </nav>
             <div class="topbar-end">
-                <router-link
-                    v-for="item in topTools"
-                    :key="item.to"
-                    class="topbar-tool"
-                    :class="{ 'is-active': isNavActive(item.to) }"
-                    :to="item.to"
-                    :aria-current="isNavActive(item.to) ? 'page' : null"
-                >
-                    {{ item.shortLabel || item.label }}
-                </router-link>
                 <router-link
                     v-if="pageMeta.action"
                     class="btn btn-primary btn-small topbar-action"
@@ -320,17 +361,79 @@ onUnmounted(() => {
         </div>
     </main>
     <nav v-if="isNarrow && !isWritePage" class="app-bottom-nav" aria-label="주요 메뉴">
-        <router-link
-            v-for="item in bottomNavItems"
-            :key="item.to"
-            :to="item.to"
-            :class="{ 'is-active': isNavActive(item.to) }"
-            :aria-current="isNavActive(item.to) ? 'page' : null"
-        >
-            <component :is="item.icon" :size="20" />
-            <span>{{ item.shortLabel || item.label }}</span>
-        </router-link>
+        <template v-for="tab in bottomTabs" :key="tab.id">
+            <router-link
+                v-if="tab.to"
+                :to="tab.to"
+                :class="{ 'is-active': tab.active }"
+                :aria-current="tab.active ? 'page' : null"
+            >
+                <component :is="tab.icon" :size="20" />
+                <span>{{ tab.label }}</span>
+            </router-link>
+            <button
+                v-else
+                type="button"
+                :class="{ 'is-active': tab.active || openSheet === tab.sheet }"
+                :aria-expanded="openSheet === tab.sheet"
+                aria-haspopup="dialog"
+                @click="openSheet = openSheet === tab.sheet ? null : tab.sheet"
+            >
+                <component :is="tab.icon" :size="20" />
+                <span>{{ tab.label }}</span>
+                <i v-if="tab.id === 'write' && todayMissing" class="tab-dot" aria-label="오늘 미제출"></i>
+            </button>
+        </template>
     </nav>
+    <div v-if="openSheet" class="app-sheet-overlay" @click.self="closeSheet">
+        <div
+            class="app-sheet"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="openSheet === 'compose' ? '무엇을 쓸까요' : '더보기'"
+        >
+            <div class="app-sheet-head">
+                <h2>{{ openSheet === "compose" ? "무엇을 쓸까요?" : "더보기" }}</h2>
+                <button type="button" class="app-sheet-close" aria-label="닫기" @click="closeSheet">
+                    <X :size="16" />
+                </button>
+            </div>
+            <template v-if="openSheet === 'compose'">
+                <router-link
+                    v-for="(item, index) in composeChoices"
+                    :key="item.id"
+                    :to="item.to"
+                    class="app-sheet-row"
+                    :class="{ 'is-lead': index === 0 }"
+                >
+                    <span class="app-sheet-icon"><component :is="item.icon" :size="18" /></span>
+                    <span class="app-sheet-text">
+                        <span class="app-sheet-label">{{ item.label }}</span>
+                        <span
+                            class="app-sheet-hint"
+                            :class="{ 'is-alert': index === 0 && todayMissing }"
+                        >{{ index === 0 && todayLabel ? todayLabel : item.hint }}</span>
+                    </span>
+                    <ChevronRight :size="16" class="app-sheet-chevron" />
+                </router-link>
+            </template>
+            <template v-else>
+                <router-link v-for="item in moreLinks" :key="item.to" :to="item.to" class="app-sheet-row">
+                    <span class="app-sheet-text">
+                        <span class="app-sheet-label">{{ item.label }}</span>
+                        <span class="app-sheet-hint">{{ item.hint }}</span>
+                    </span>
+                    <ChevronRight :size="16" class="app-sheet-chevron" />
+                </router-link>
+                <button type="button" class="app-sheet-row is-danger" @click="logout">
+                    <span class="app-sheet-text">
+                        <span class="app-sheet-label">로그아웃</span>
+                        <span class="app-sheet-hint">{{ currentUser }} · {{ currentTeam || "부서 없음" }}</span>
+                    </span>
+                </button>
+            </template>
+        </div>
+    </div>
     </template>
     <div
         v-if="dialogOpen"

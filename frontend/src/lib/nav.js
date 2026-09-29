@@ -8,6 +8,30 @@ export const PRIMARY_NAV = [
     { to: "/settings", label: "설정", shortLabel: "설정", group: "설정" },
 ];
 
+/** 모바일 하단 탭. 다섯 칸을 넘기지 않는다. 작성과 더보기는 시트를 연다. */
+export const MOBILE_TABS = [
+    { id: "home", to: "/", label: "현황", navKeys: ["/"] },
+    { id: "daily", to: "/reports", label: "일일보고", navKeys: ["/reports"] },
+    { id: "write", sheet: "compose", label: "작성", navKeys: ["/compose", "/report"] },
+    { id: "weekly", to: "/weekly", label: "주간", navKeys: ["/weekly"] },
+    { id: "more", sheet: "more", label: "더보기", navKeys: ["/activities", "/project-timeline", "/settings", "/admin"] },
+];
+
+/** 작성 시트의 선택지. 일일보고가 맨 위(가장 자주 쓰는 일)다. */
+export const COMPOSE_CHOICES = [
+    { id: "daily", to: "/report", label: "일일보고", hint: "원문을 붙이면 AI가 프로젝트별로 정리" },
+    { id: "meeting", to: "/compose?kind=meeting", label: "회의록", hint: "안건 · 결정 · 후속 할 일" },
+    { id: "general", to: "/compose?kind=general", label: "일반보고", hint: "제목과 본문" },
+    { id: "sales", to: "/compose?kind=sales", label: "영업보고", hint: "담당자 · 진행사항 · 추후 진행" },
+];
+
+/** 더보기 시트. 하단 탭에 못 들어간 화면. */
+export const MORE_LINKS = [
+    { to: "/activities", label: "사용자 활동", hint: "월 달력 · 제출과 미제출" },
+    { to: "/project-timeline", label: "프로젝트 흐름", hint: "프로젝트별 타임라인" },
+    { to: "/settings", label: "설정", hint: "내 부서 · 프로젝트명" },
+];
+
 /** Capability → live route path. Keep these reachable even when not in PRIMARY_NAV. */
 export const CAPABILITIES = {
     dashboard: "/",

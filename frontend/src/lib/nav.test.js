@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
     CAPABILITIES,
+    COMPOSE_CHOICES,
     LIVE_ROUTE_PATHS,
+    MOBILE_TABS,
+    MORE_LINKS,
     PRIMARY_NAV,
     capabilityPaths,
     primaryNavCount,
@@ -12,6 +15,18 @@ describe("primary navigation", () => {
     it("keeps the sidebar shorter than eight destinations", () => {
         assert.ok(primaryNavCount() < 8);
         assert.equal(PRIMARY_NAV.length, primaryNavCount());
+    });
+
+    it("keeps the mobile tab bar at five tabs that all lead somewhere live", () => {
+        assert.ok(MOBILE_TABS.length <= 5);
+        const livePath = (to) => LIVE_ROUTE_PATHS.includes(String(to).split("?")[0]);
+        for (const tab of MOBILE_TABS) {
+            assert.ok(tab.to ? livePath(tab.to) : ["compose", "more"].includes(tab.sheet));
+        }
+        for (const item of [...COMPOSE_CHOICES, ...MORE_LINKS]) {
+            assert.ok(livePath(item.to), `${item.label} path ${item.to} is not a live route`);
+        }
+        assert.equal(COMPOSE_CHOICES[0].to, CAPABILITIES.writeReport);
     });
 
     it("maps every required capability to a live route path", () => {
