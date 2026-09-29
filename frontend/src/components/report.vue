@@ -31,6 +31,8 @@ const { alert: showAlert, confirm: askConfirm } = useDialog();
 const input = ref("");
 const file = ref(null);
 const buttonType = ref("text");
+/** 좁은 화면 기본은 한 줄씩 쓰기. 메신저 대화를 통째로 붙이려면 붙여넣기로 바꾼다. */
+const pasteOnNarrow = ref(false);
 const date = ref(todayString());
 
 const aiLoading = ref(false);
@@ -49,6 +51,34 @@ const isNarrow = ref(
 );
 let narrowQuery = null;
 let elapsedTimer = null;
+const useLines = computed(
+    () => isNarrow.value && buttonType.value === "text" && !pasteOnNarrow.value,
+);
+const inputMode = computed(() => {
+    if (buttonType.value === "file") return "file";
+    return useLines.value ? "lines" : "paste";
+});
+const inputModes = computed(() =>
+    isNarrow.value
+        ? [
+              { id: "lines", label: "한 줄씩" },
+              { id: "paste", label: "붙여넣기" },
+              { id: "file", label: "PPTX" },
+          ]
+        : [
+              { id: "paste", label: "텍스트" },
+              { id: "file", label: "PPTX 올리기" },
+          ],
+);
+/** AI가 나누는 항목. 작성 화면 옆에서 무엇이 어떻게 나뉘는지 미리 보여 준다. */
+const EXTRACT_KINDS = [
+    { label: "프로젝트", hint: "정식명 · 별칭으로 묶음", tone: "neutral" },
+    { label: "완료", hint: "끝낸 일", tone: "success" },
+    { label: "진행 중", hint: "아직 하는 일", tone: "info" },
+    { label: "이슈", hint: "막힌 점", tone: "warning" },
+    { label: "협조 요청", hint: "필요한 도움", tone: "request" },
+    { label: "다음 계획", hint: "다음에 할 일", tone: "muted" },
+];
 
 const elapsedLabel = computed(() => {
     const minutes = Math.floor(elapsed.value / 60);
@@ -161,6 +191,14 @@ const loadSavedState = async () => {
     }
 };
 
+/** 서버 시각은 SQLite CURRENT_TIMESTAMP(UTC) "2026-09-29 05:40:12". 내 시간 "14:40"으로 바꾼다. */
+const draftTimeLabel = (value) => {
+    const text = String(value || "").trim();
+    const at = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(text) ? text : `${text.replace(" ", "T")}Z`);
+    if (Number.isNaN(at.getTime())) return "저장됨";
+    return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+};
+
 const loadDraft = async () => {
     const memberId = getSelectedMemberId();
     if (memberId === null || !date.value) return;
@@ -174,9 +212,15 @@ const loadDraft = async () => {
         const draft = await getReportDraft(memberId, date.value);
         if (alreadySaved.value || input.value.trim()) return;
         const raw = String(draft.raw_text || "");
-        input.value = isNarrow.value && buttonType.value === "text"
-            ? onlyStructuredLineReport(raw)
-            : raw;
+        if (raw.trim()) draftSavedAt.value = draftTimeLabel(draft.updated_at);
+        const structured = onlyStructuredLineReport(raw);
+        // 한 줄씩 칸에 못 옮기는 글(메신저 대화 등)은 숨기지 않고 붙여넣기로 연다.
+        if (useLines.value && raw.trim() && !structured.trim()) {
+            pasteOnNarrow.value = true;
+            input.value = raw;
+            return;
+        }
+        input.value = useLines.value ? structured : raw;
     } catch (error) {
         if (error.response?.status !== 404) {
             console.error("원문 초안 불러오기 실패:", error);
@@ -186,13 +230,13 @@ const loadDraft = async () => {
 
 const statusLabel = computed(() => {
     if (alreadySaved.value) return "제출됨";
-    if (draftSavedAt.value) return "초안 있음";
+    if (draftSavedAt.value) return `원문 초안 · ${draftSavedAt.value}`;
     return "미제출";
 });
 
 const statusDetail = computed(() => {
-    if (alreadySaved.value) return "다시 제출하면 덮어씀";
-    if (draftSavedAt.value) return "아직 미제출";
+    if (alreadySaved.value) return "다시 저장하면 덮어씀";
+    if (draftSavedAt.value) return "추출·검토 전";
     return "";
 });
 
@@ -263,7 +307,12 @@ watch(selectedUserId, async () => {
 });
 
 const selectType = (nextType) => {
-    buttonType.value = nextType;
+    if (nextType === "file") {
+        buttonType.value = "file";
+        return;
+    }
+    buttonType.value = "text";
+    pasteOnNarrow.value = nextType === "paste";
 };
 
 const acceptFile = (selected) => {
@@ -330,7 +379,7 @@ const saveDraft = async () => {
 };
 
 const sendReport = async () => {
-    if (isNarrow.value && buttonType.value === "text") {
+    if (useLines.value) {
         const blocked = lineWriter.value?.commitPending() || "";
         if (blocked) {
             formError.value = blocked;
@@ -398,7 +447,7 @@ const sendReport = async () => {
 </script>
 
 <template>
-    <div class="page">
+    <div class="page is-wide">
         <div v-if="!hasUser" class="card">
             <p class="form-hint">로그인이 필요합니다.</p>
             <div class="form-actions">
@@ -406,12 +455,12 @@ const sendReport = async () => {
             </div>
         </div>
 
+        <div v-else class="write-layout">
         <div
-            v-else
             class="card write-card"
-            :class="{ 'is-lines': isNarrow && buttonType === 'text' }"
+            :class="{ 'is-lines': useLines }"
         >
-            <div v-if="!(isNarrow && buttonType === 'text')" class="write-head">
+            <div class="write-head">
                 <span class="write-author">{{ userName || "나" }}</span>
                 <input
                     type="date"
@@ -423,38 +472,34 @@ const sendReport = async () => {
                 />
                 <span
                     class="status-chip"
-                    :class="alreadySaved ? 'is-saved' : 'is-draft'"
+                    :class="alreadySaved ? 'is-saved' : draftSavedAt ? 'is-draft' : 'is-danger'"
                     :title="statusDetail"
                 >
                     {{ statusLabel }}
                     <span v-if="statusDetail" class="status-chip-more"> · {{ statusDetail }}</span>
                 </span>
-                <button
-                    type="button"
-                    class="write-mode-link"
-                    @click="selectType(buttonType === 'text' ? 'file' : 'text')"
-                >
-                    {{ buttonType === "text" ? "PPTX 올리기" : "직접 입력하기" }}
-                </button>
+                <div class="write-modes" role="tablist" aria-label="입력 방식">
+                    <button
+                        v-for="mode in inputModes"
+                        :key="mode.id"
+                        type="button"
+                        role="tab"
+                        :aria-selected="inputMode === mode.id"
+                        :class="{ 'is-on': inputMode === mode.id }"
+                        @click="selectType(mode.id)"
+                    >
+                        {{ mode.label }}
+                    </button>
+                </div>
             </div>
 
-            <template v-if="buttonType === 'text' && isNarrow">
+            <template v-if="useLines">
                 <LineWriter
                     ref="lineWriter"
                     v-model="input"
                     :projects="knownProjects"
                     @add-project="registerProject"
                 >
-                    <template #date>
-                        <input
-                            type="date"
-                            id="date"
-                            class="input write-date"
-                            v-model="date"
-                            aria-label="보고 날짜"
-                            required
-                        />
-                    </template>
                     <template #dock>
                         <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
                         <button
@@ -464,7 +509,7 @@ const sendReport = async () => {
                             @click="sendReport"
                             :disabled="aiLoading"
                         >
-                            {{ aiLoading ? "제출 중" : "제출" }}
+                            {{ aiLoading ? "추출 중" : "AI로 추출" }}
                         </button>
                     </template>
                 </LineWriter>
@@ -524,10 +569,10 @@ const sendReport = async () => {
                 </p>
             </div>
 
-            <p v-if="formError && !(buttonType === 'text' && isNarrow)" class="form-error" role="alert">
+            <p v-if="formError && !useLines" class="form-error" role="alert">
                 {{ formError }}
             </p>
-            <div v-if="!(buttonType === 'text' && isNarrow)" class="form-actions">
+            <div v-if="!useLines" class="form-actions">
                 <span v-if="draftSavedAt" class="draft-note" role="status">
                     {{ draftSavedAt }} 초안 저장됨
                 </span>
@@ -537,16 +582,43 @@ const sendReport = async () => {
                     @click="saveDraft"
                     :disabled="aiLoading || draftSaving || !input.trim()"
                 >
-                    {{ draftSaving ? "저장 중..." : "초안만 저장" }}
+                    {{ draftSaving ? "저장 중..." : "원문만 초안 저장" }}
                 </button>
                 <button
                     class="btn btn-primary"
                     @click="sendReport"
                     :disabled="aiLoading"
                 >
-                    {{ aiLoading ? "제출 중" : "제출" }}
+                    {{ aiLoading ? "추출 중" : "AI로 추출" }}
                 </button>
             </div>
+            <p v-if="!useLines" class="write-footnote">
+                AI가 초안을 만들면 원문과 나란히 검토하고 저장해요.
+            </p>
+        </div>
+        <aside v-if="!isNarrow" class="write-aside">
+            <section class="card aside-card" aria-labelledby="kinds-title">
+                <h2 id="kinds-title">AI가 나누는 항목</h2>
+                <p class="aside-note">원문에 있는 내용만 옮기고 지어내지 않아요. 업무가 아닌 글은 빈 결과가 나와요.</p>
+                <ul class="kind-list">
+                    <li v-for="kind in EXTRACT_KINDS" :key="kind.label">
+                        <span class="kind-swatch" :class="`is-${kind.tone}`" aria-hidden="true"></span>
+                        <span class="kind-label">{{ kind.label }}</span>
+                        <span class="kind-hint">{{ kind.hint }}</span>
+                    </li>
+                </ul>
+            </section>
+            <section class="card aside-card" aria-labelledby="day-title">
+                <h2 id="day-title">{{ waitDateLabel }} 상태</h2>
+                <p class="aside-row"><span>저장된 보고</span><b>{{ alreadySaved ? "있음" : "없음" }}</b></p>
+                <p class="aside-row"><span>원문 초안</span><b>{{ draftSavedAt || "없음" }}</b></p>
+                <p class="aside-note">
+                    {{ alreadySaved
+                        ? "이 날짜 보고가 이미 있어요. 새로 저장하면 덮어쓰기 전에 한 번 더 물어요."
+                        : "같은 날 보고가 생기면 저장 직전에 덮어쓸지 물어요." }}
+                </p>
+            </section>
+        </aside>
         </div>
     </div>
     <Teleport to="body">
@@ -593,25 +665,143 @@ const sendReport = async () => {
     font-size: var(--fs-13);
 }
 
-.write-mode-link {
+.write-modes {
+    display: inline-flex;
     margin-left: auto;
-    padding: var(--space-1) var(--space-3);
-    border: none;
-    border-radius: var(--radius-sm);
-    background: none;
+    padding: 2px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+}
+
+.write-modes button {
+    height: 28px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--text-muted);
     font: inherit;
     font-size: var(--fs-13);
     font-weight: var(--fw-medium);
-    color: var(--accent);
     cursor: pointer;
     transition:
         background var(--dur-fast) var(--ease),
         color var(--dur-fast) var(--ease);
 }
 
-.write-mode-link:hover {
-    background: var(--accent-soft);
-    color: var(--accent-hover);
+.write-modes button.is-on {
+    background: var(--surface);
+    box-shadow: 0 0 0 1px var(--border);
+    color: var(--text-strong);
+    font-weight: var(--fw-semibold);
+}
+
+.write-modes button:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.write-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: var(--space-5);
+    align-items: start;
+}
+
+.write-footnote {
+    margin: var(--space-2) 0 0;
+    text-align: right;
+    font-size: var(--fs-12);
+    color: var(--text-muted);
+}
+
+.write-aside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.aside-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.aside-card h2 {
+    margin: 0;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
+}
+
+.aside-note {
+    margin: 0;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.aside-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.aside-row b {
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.kind-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: var(--space-1) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.kind-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--fs-13);
+}
+
+.kind-swatch {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 2px;
+}
+
+.kind-swatch.is-neutral { background: var(--text-strong); }
+.kind-swatch.is-success { background: var(--success-fg); }
+.kind-swatch.is-info { background: var(--info-fg); }
+.kind-swatch.is-warning { background: var(--warning-fg); }
+.kind-swatch.is-request { background: var(--project-4-fg); }
+.kind-swatch.is-muted { background: var(--text-muted); }
+
+.kind-label {
+    width: 64px;
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.kind-hint {
+    color: var(--text-muted);
+}
+
+@media (max-width: 1100px) {
+    .write-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .write-aside {
+        display: none;
+    }
 }
 
 .write-field .textarea {
@@ -868,11 +1058,20 @@ const sendReport = async () => {
         display: none;
     }
 
-    .write-mode-link {
+    .write-modes {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         margin-left: 0;
-        justify-self: end;
-        min-height: var(--control-h-lg);
-        text-align: right;
+    }
+
+    .write-modes button {
+        height: var(--control-h-sm);
+        font-size: var(--fs-14);
+    }
+
+    .write-footnote {
+        text-align: center;
     }
 
     .write-field .textarea {
