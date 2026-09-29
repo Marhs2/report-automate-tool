@@ -55,7 +55,6 @@ const todayCard = computed(() => {
             tone: "danger",
             chip: TODAY_LABELS.missing,
             title: "오늘 일일보고를 아직 쓰지 않았어요",
-            body: "메모, 메신저 대화, PPTX 무엇이든 붙여 넣으면 AI가 프로젝트별로 나눠 초안을 만들어요.",
             action: "작성하기",
         };
     }

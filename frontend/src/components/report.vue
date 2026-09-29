@@ -63,7 +63,6 @@ const inputModes = computed(() =>
         ? [
               { id: "lines", label: "한 줄씩" },
               { id: "paste", label: "붙여넣기" },
-              { id: "file", label: "PPTX" },
           ]
         : [
               { id: "paste", label: "텍스트" },
@@ -276,6 +275,11 @@ const refreshMeta = async () => {
 
 const syncNarrow = () => {
     isNarrow.value = Boolean(narrowQuery?.matches);
+    if (isNarrow.value && buttonType.value === "file") {
+        buttonType.value = "text";
+        pasteOnNarrow.value = false;
+        file.value = null;
+    }
 };
 
 onMounted(async () => {
@@ -308,6 +312,7 @@ watch(selectedUserId, async () => {
 
 const selectType = (nextType) => {
     if (nextType === "file") {
+        if (isNarrow.value) return;
         buttonType.value = "file";
         return;
     }
@@ -447,7 +452,7 @@ const sendReport = async () => {
 </script>
 
 <template>
-    <div class="page is-wide">
+    <div class="daily-write">
         <div v-if="!hasUser" class="card">
             <p class="form-hint">로그인이 필요합니다.</p>
             <div class="form-actions">
@@ -543,7 +548,7 @@ const sendReport = async () => {
             </div>
 
             <div
-                v-else
+                v-else-if="!isNarrow"
                 class="field file-drop-area"
                 :class="{ 'is-dragging': isDragging }"
                 @dragover="onDragOver"
@@ -599,7 +604,6 @@ const sendReport = async () => {
         <aside v-if="!isNarrow" class="write-aside">
             <section class="card aside-card" aria-labelledby="kinds-title">
                 <h2 id="kinds-title">AI가 나누는 항목</h2>
-                <p class="aside-note">원문에 있는 내용만 옮기고 지어내지 않아요. 업무가 아닌 글은 빈 결과가 나와요.</p>
                 <ul class="kind-list">
                     <li v-for="kind in EXTRACT_KINDS" :key="kind.label">
                         <span class="kind-swatch" :class="`is-${kind.tone}`" aria-hidden="true"></span>
@@ -612,11 +616,6 @@ const sendReport = async () => {
                 <h2 id="day-title">{{ waitDateLabel }} 상태</h2>
                 <p class="aside-row"><span>저장된 보고</span><b>{{ alreadySaved ? "있음" : "없음" }}</b></p>
                 <p class="aside-row"><span>원문 초안</span><b>{{ draftSavedAt || "없음" }}</b></p>
-                <p class="aside-note">
-                    {{ alreadySaved
-                        ? "이 날짜 보고가 이미 있어요. 새로 저장하면 덮어쓰기 전에 한 번 더 물어요."
-                        : "같은 날 보고가 생기면 저장 직전에 덮어쓸지 물어요." }}
-                </p>
             </section>
         </aside>
         </div>
@@ -734,12 +733,7 @@ const sendReport = async () => {
     color: var(--text-strong);
 }
 
-.aside-note {
-    margin: 0;
-    font-size: var(--fs-13);
-    line-height: var(--lh-base);
-    color: var(--text-muted);
-}
+
 
 .aside-row {
     display: flex;
@@ -1042,11 +1036,14 @@ const sendReport = async () => {
     }
 
     .write-date {
-        width: auto;
-        min-width: 148px;
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
         min-height: var(--control-h-lg);
         height: var(--control-h-lg);
         font-size: var(--fs-16);
+        overflow: hidden;
     }
 
     .status-chip {
@@ -1061,7 +1058,7 @@ const sendReport = async () => {
     .write-modes {
         grid-column: 1 / -1;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         margin-left: 0;
     }
 
@@ -1111,7 +1108,7 @@ const sendReport = async () => {
     }
 
 
-    .page:has(.write-card.is-lines) {
+    .daily-write:has(.write-card.is-lines) {
         height: 100%;
         display: flex;
         flex-direction: column;

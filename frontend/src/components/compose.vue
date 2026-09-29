@@ -1,38 +1,61 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
+import { selectedUserId } from "../composables/useSelectedUser";
 import AppField from "./ui/AppField.vue";
+import Report from "./report.vue";
+import { COMPOSE_CHOICES } from "../lib/nav";
 
 const KINDS = [
     { id: "meeting", label: "회의록" },
-    { id: "general", label: "일반보고" },
     { id: "sales", label: "영업보고" },
-    { id: "cards", label: "명함" },
 ];
+const KIND_LABELS = {
+    meeting: "회의록",
+    general: "일반보고",
+    sales: "영업보고",
+};
 
 const route = useRoute();
 const router = useRouter();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
 const {
-    getProjectNames,
     getWorkRecords,
     getWorkRecord,
     postWorkRecord,
     putWorkRecord,
     deleteWorkRecord,
-    getBusinessCards,
-    postBusinessCard,
-    putBusinessCard,
-    deleteBusinessCard,
+    getUsers,
 } = useApi();
 
-const kind = ref("meeting");
+/* 일일보고 탭과 같은 머리줄(작성자 · 날짜 · 상태)을 쓰려고 이름을 불러온다. */
+const userName = ref("");
+const loadUserName = async () => {
+    const id = selectedUserId.value;
+    if (!id) {
+        userName.value = "";
+        return;
+    }
+    try {
+        const users = await getUsers();
+        const found = (users || []).find((u) => String(u.id) === String(id));
+        userName.value = found ? found.name : "";
+    } catch {
+        userName.value = "";
+    }
+};
+
+const kindFromQuery = (value) => {
+    const next = String(value || "meeting");
+    if (next === "daily" || next === "general" || next === "cards") return "daily";
+    return KINDS.some((item) => item.id === next) ? next : "meeting";
+};
+
+const kind = ref(kindFromQuery(route.query.kind));
 const recordId = ref(null);
 const records = ref([]);
-const cards = ref([]);
-const projectNames = ref([]);
 const isLoading = ref(false);
 const isSaving = ref(false);
 const loadError = ref("");
@@ -66,40 +89,7 @@ const form = reactive({
     jobTitle: "",
     progress: "",
     nextSteps: "",
-    saveCard: true,
-    cardId: null,
 });
-
-const cardForm = reactive({
-    id: null,
-    name: "",
-    organization: "",
-    jobTitle: "",
-    phone: "",
-    email: "",
-    memo: "",
-});
-
-const digits = (value) => String(value || "").replace(/\D/g, "");
-
-const cardMatches = computed(() => {
-    const name = form.contactName.trim().toLowerCase();
-    if (!name) return [];
-    const phone = digits(form.phone);
-    const email = form.email.trim().toLowerCase();
-    return cards.value.filter((card) => {
-        if (String(card.name || "").trim().toLowerCase() !== name) return false;
-        const cardPhone = digits(card.phone);
-        const cardEmail = String(card.email || "").trim().toLowerCase();
-        const phoneHit = phone && cardPhone && phone === cardPhone;
-        const emailHit = email && cardEmail && email === cardEmail;
-        return phoneHit || emailHit;
-    });
-});
-
-const selectedCard = computed(() =>
-    cards.value.find((card) => card.id === cardForm.id) || null,
-);
 
 const errorText = (error, fallback) => {
     const detail = error?.response?.data?.detail;
@@ -125,8 +115,6 @@ const resetForm = () => {
     form.jobTitle = "";
     form.progress = "";
     form.nextSteps = "";
-    form.saveCard = true;
-    form.cardId = null;
     formError.value = "";
 };
 
@@ -157,34 +145,6 @@ const applyRecord = (row) => {
     form.jobTitle = row.jobTitle || "";
     form.progress = row.progress || "";
     form.nextSteps = row.nextSteps || "";
-    form.saveCard = row.saveCard !== false;
-    form.cardId = row.cardId || null;
-};
-
-const resetCardForm = () => {
-    cardForm.id = null;
-    cardForm.name = "";
-    cardForm.organization = "";
-    cardForm.jobTitle = "";
-    cardForm.phone = "";
-    cardForm.email = "";
-    cardForm.memo = "";
-    formError.value = "";
-};
-
-const applyCard = (card) => {
-    cardForm.id = card.id;
-    cardForm.name = card.name || "";
-    cardForm.organization = card.organization || "";
-    cardForm.jobTitle = card.jobTitle || "";
-    cardForm.phone = card.phone || "";
-    cardForm.email = card.email || "";
-    cardForm.memo = card.memo || "";
-    formError.value = "";
-};
-
-const loadCards = async () => {
-    cards.value = await getBusinessCards();
 };
 
 const loadRecords = async () => {
@@ -193,10 +153,6 @@ const loadRecords = async () => {
         return;
     }
     records.value = await getWorkRecords(kind.value);
-};
-
-const loadNames = async () => {
-    projectNames.value = await getProjectNames();
 };
 
 const loadFromRoute = async () => {
@@ -211,21 +167,24 @@ const loadFromRoute = async () => {
         if (id) {
             const row = await getWorkRecord(id);
             applyRecord(row);
-            if (row.kind === "sales") await loadCards();
             await loadRecords();
             return;
         }
         recordId.value = null;
         const next = String(route.query.kind || "meeting");
+        if (next === "daily" || next === "general" || next === "cards") {
+            kind.value = "daily";
+            records.value = [];
+            isLoading.value = false;
+            if (next !== "daily") {
+                loadedKey = "";
+                await router.replace({ path: "/compose", query: { kind: "daily" } });
+            }
+            return;
+        }
         kind.value = KINDS.some((item) => item.id === next) ? next : "meeting";
         resetForm();
-        if (kind.value === "cards") {
-            await loadCards();
-            records.value = [];
-        } else {
-            if (kind.value === "sales") await loadCards();
-            await loadRecords();
-        }
+        await loadRecords();
     } catch (error) {
         loadedKey = "";
         console.error("작성 화면 조회 실패:", error);
@@ -288,8 +247,6 @@ const payload = () => {
         jobTitle: form.jobTitle.trim(),
         progress: form.progress.trim(),
         nextSteps: form.nextSteps.trim(),
-        saveCard: form.saveCard,
-        cardId: form.cardId ? Number(form.cardId) : null,
     };
 };
 
@@ -301,8 +258,6 @@ const save = async () => {
         const saved = recordId.value
             ? await putWorkRecord(recordId.value, body)
             : await postWorkRecord(body);
-        await loadNames();
-        if (saved.kind === "sales") await loadCards();
         if (!recordId.value) {
             loadedKey = "";
             await router.replace(`/compose/${saved.id}`);
@@ -340,46 +295,6 @@ const removeFollowup = (index) => {
     if (form.followups.length === 0) form.followups.push(blankFollow());
 };
 
-const cardPayload = () => ({
-    name: cardForm.name.trim(),
-    organization: cardForm.organization.trim(),
-    jobTitle: cardForm.jobTitle.trim(),
-    phone: cardForm.phone.trim(),
-    email: cardForm.email.trim(),
-    memo: cardForm.memo.trim(),
-});
-
-const saveCard = async () => {
-    formError.value = "";
-    isSaving.value = true;
-    try {
-        const editing = Boolean(cardForm.id);
-        const saved = editing
-            ? await putBusinessCard(cardForm.id, cardPayload())
-            : await postBusinessCard(cardPayload());
-        await loadCards();
-        const fresh = cards.value.find((card) => card.id === saved.id) || saved;
-        applyCard(fresh);
-        showAlert(editing ? "명함을 수정했습니다." : "명함을 등록했습니다.");
-    } catch (error) {
-        formError.value = errorText(error, "명함을 저장하지 못했습니다.");
-    } finally {
-        isSaving.value = false;
-    }
-};
-
-const removeCard = async () => {
-    if (!cardForm.id) return;
-    if (!(await askConfirm("이 명함을 삭제할까요? 연결된 영업보고는 남습니다."))) return;
-    try {
-        await deleteBusinessCard(cardForm.id);
-        resetCardForm();
-        await loadCards();
-    } catch (error) {
-        formError.value = errorText(error, "명함을 삭제하지 못했습니다.");
-    }
-};
-
 const dotDate = (value) => {
     const [year, month, day] = String(value || "").split("T")[0].split("-");
     if (!year || !month || !day) return value || "";
@@ -393,215 +308,202 @@ watch(
     },
 );
 
-onMounted(async () => {
+onMounted(() => {
     document.title = "작성";
-    try {
-        await loadNames();
-    } catch (error) {
-        console.error("프로젝트명 조회 실패:", error);
-    }
     loadFromRoute();
+    loadUserName();
 });
+
+watch(selectedUserId, loadUserName);
 </script>
 
 <template>
-    <div class="page">
+    <div class="page" :class="{ 'is-wide': kind === 'daily' }">
         <div class="kind-bar">
-            <div class="kind-switch" role="tablist" aria-label="작성 형식">
-                <button
-                    v-for="item in KINDS"
+            <nav class="kind-switch" aria-label="작성">
+                <router-link
+                    v-for="item in COMPOSE_CHOICES"
                     :key="item.id"
-                    type="button"
+                    :to="item.to"
                     :class="{ 'is-on': kind === item.id }"
-                    role="tab"
-                    :aria-selected="kind === item.id"
-                    @click="switchKind(item.id)"
+                    :aria-current="kind === item.id ? 'page' : null"
                 >
                     {{ item.label }}
-                </button>
-            </div>
-            <span v-if="recordId || cardForm.id" class="state-chip is-success">저장됨 · 수정 중</span>
-            <router-link class="kind-daily" to="/report">일일보고 작성 →</router-link>
+                </router-link>
+            </nav>
         </div>
 
+        <Report v-if="kind === 'daily'" />
+        <template v-else>
         <p v-if="isLoading" class="list-status" role="status">불러오는 중</p>
         <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
 
-        <div v-else-if="kind === 'cards'" class="compose-layout">
-            <form class="card" @submit.prevent="saveCard">
-                <AppField label="이름" for-id="card-name">
-                    <input id="card-name" v-model="cardForm.name" class="input" type="text" required />
-                </AppField>
-                <AppField label="소속" for-id="card-org">
-                    <input id="card-org" v-model="cardForm.organization" class="input" type="text" />
-                </AppField>
-                <AppField label="직함" for-id="card-title">
-                    <input id="card-title" v-model="cardForm.jobTitle" class="input" type="text" />
-                </AppField>
-                <AppField label="전화번호" for-id="card-phone">
-                    <input id="card-phone" v-model="cardForm.phone" class="input" type="tel" />
-                </AppField>
-                <AppField label="이메일" for-id="card-email">
-                    <input id="card-email" v-model="cardForm.email" class="input" type="email" />
-                </AppField>
-                <AppField label="메모" for-id="card-memo">
-                    <textarea id="card-memo" v-model="cardForm.memo" class="textarea" rows="3" />
-                </AppField>
-                <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" :disabled="isSaving">
-                        {{ cardForm.id ? "명함 수정" : "명함 등록" }}
-                    </button>
-                    <button type="button" class="btn" @click="resetCardForm">새로 입력</button>
-                    <button v-if="cardForm.id" type="button" class="btn" @click="removeCard">삭제</button>
+        <div class="compose-layout">
+            <form class="card compose-card" @submit.prevent="save">
+                <!-- 일일보고 탭과 같은 머리줄: 누가 · 언제 · 저장됐는지. -->
+                <div class="write-head">
+                    <span class="write-author">{{ userName || "나" }}</span>
+                    <input
+                        id="work-date"
+                        v-model="form.reportDate"
+                        class="input write-date"
+                        type="date"
+                        aria-label="작성 날짜"
+                        required
+                    />
+                    <span class="status-chip" :class="{ 'is-saved': recordId }">
+                        {{ recordId ? "저장됨 · 수정 중" : `새 ${KIND_LABELS[kind]}` }}
+                    </span>
                 </div>
-                <div v-if="selectedCard && selectedCard.sales && selectedCard.sales.length" class="card-sales">
-                    <p class="side-label">이 명함의 영업 기록</p>
-                    <router-link
-                        v-for="sale in selectedCard.sales"
-                        :key="sale.id"
-                        class="side-item"
-                        :to="sale.href"
-                    >
-                        <span>{{ dotDate(sale.reportDate) }} · {{ sale.projectName }}</span>
-                        <span v-if="sale.progress">{{ sale.progress }}</span>
-                    </router-link>
-                </div>
-            </form>
-            <aside class="side-list">
-                <p class="side-label">등록된 명함</p>
-                <p v-if="cards.length === 0" class="list-status">등록된 명함이 없습니다.</p>
-                <button
-                    v-for="card in cards"
-                    :key="card.id"
-                    type="button"
-                    class="side-item"
-                    :class="{ 'is-current': card.id === cardForm.id }"
-                    @click="applyCard(card)"
-                >
-                    <span>{{ card.name }}</span>
-                    <span>{{ card.organization || card.phone || card.email }}</span>
-                </button>
-            </aside>
-        </div>
 
-        <div v-else class="compose-layout">
-            <form class="card" @submit.prevent="save">
-                <AppField label="날짜" for-id="work-date">
-                    <input id="work-date" v-model="form.reportDate" class="input" type="date" required />
-                </AppField>
-                <AppField label="제목" for-id="work-title">
-                    <input
-                        id="work-title"
-                        v-model="form.title"
-                        class="input"
-                        type="text"
-                        :placeholder="kind === 'general' ? '제목' : '비워 두면 내용으로 붙입니다'"
-                    />
-                </AppField>
-                <AppField
-                    :label="kind === 'sales' ? '프로젝트명' : '관련 프로젝트'"
-                    for-id="work-project"
-                >
-                    <input
-                        id="work-project"
-                        v-model="form.projectName"
-                        class="input"
-                        type="text"
-                        list="known-project-names"
-                        :required="kind === 'sales'"
-                    />
-                    <datalist id="known-project-names">
-                        <option v-for="name in projectNames" :key="name" :value="name" />
-                    </datalist>
-                </AppField>
+                <section class="form-section" aria-labelledby="sec-basic">
+                    <h2 id="sec-basic" class="section-title">기본 정보</h2>
+                    <div class="field-grid">
+                        <AppField label="제목" for-id="work-title" :class="{ 'span-2': kind === 'meeting' }">
+                            <input
+                                id="work-title"
+                                v-model="form.title"
+                                class="input"
+                                type="text"
+                                :placeholder="kind === 'general' ? '제목' : '비워 두면 내용으로 붙입니다'"
+                            />
+                        </AppField>
+                        <AppField
+                            :label="kind === 'sales' ? '프로젝트명' : '관련 프로젝트'"
+                            for-id="work-project"
+                        >
+                            <input
+                                id="work-project"
+                                v-model="form.projectName"
+                                class="input"
+                                type="text"
+                                :required="kind === 'sales'"
+                            />
+                        </AppField>
+                        <template v-if="kind === 'meeting'">
+                            <AppField label="일시" for-id="meeting-at">
+                                <input id="meeting-at" v-model="form.heldAt" class="input" type="datetime-local" />
+                            </AppField>
+                            <AppField label="장소" for-id="meeting-place">
+                                <input id="meeting-place" v-model="form.place" class="input" type="text" />
+                            </AppField>
+                            <AppField label="참석자" for-id="meeting-people">
+                                <input
+                                    id="meeting-people"
+                                    v-model="form.attendees"
+                                    class="input"
+                                    type="text"
+                                    placeholder="쉼표로 구분"
+                                />
+                            </AppField>
+                        </template>
+                    </div>
+                </section>
 
                 <template v-if="kind === 'meeting'">
-                    <AppField label="일시" for-id="meeting-at">
-                        <input id="meeting-at" v-model="form.heldAt" class="input" type="datetime-local" />
-                    </AppField>
-                    <AppField label="장소" for-id="meeting-place">
-                        <input id="meeting-place" v-model="form.place" class="input" type="text" />
-                    </AppField>
-                    <AppField label="참석자" for-id="meeting-people">
-                        <input id="meeting-people" v-model="form.attendees" class="input" type="text" />
-                    </AppField>
-                    <AppField label="안건" for-id="meeting-agenda">
-                        <textarea id="meeting-agenda" v-model="form.agenda" class="textarea" rows="4" />
-                    </AppField>
-                    <AppField label="결정" for-id="meeting-decisions">
-                        <textarea id="meeting-decisions" v-model="form.decisions" class="textarea" rows="4" />
-                    </AppField>
-                    <div class="followups">
-                        <p class="side-label">후속 할 일</p>
-                        <div v-for="(row, index) in form.followups" :key="index" class="follow-row">
-                            <input v-model="row.task" class="input" type="text" placeholder="할 일" aria-label="후속 할 일" />
-                            <input v-model="row.owner" class="input" type="text" placeholder="담당" aria-label="후속 담당" />
-                            <input v-model="row.due" class="input" type="date" aria-label="후속 기한" />
-                            <button type="button" class="btn btn-small" @click="removeFollowup(index)">빼기</button>
+                    <section class="form-section" aria-labelledby="sec-meeting">
+                        <h2 id="sec-meeting" class="section-title">회의 내용</h2>
+                        <AppField label="안건" for-id="meeting-agenda">
+                            <textarea id="meeting-agenda" v-model="form.agenda" class="textarea" rows="4" />
+                        </AppField>
+                        <AppField label="결정" for-id="meeting-decisions">
+                            <textarea id="meeting-decisions" v-model="form.decisions" class="textarea" rows="4" />
+                        </AppField>
+                    </section>
+
+                    <section class="form-section" aria-labelledby="sec-follow">
+                        <div class="section-head">
+                            <h2 id="sec-follow" class="section-title">후속 할 일</h2>
+                            <button type="button" class="btn btn-small" @click="addFollowup">할 일 추가</button>
                         </div>
-                        <button type="button" class="btn btn-small" @click="addFollowup">할 일 추가</button>
-                    </div>
+                        <div v-for="(row, index) in form.followups" :key="index" class="follow-row">
+                            <input
+                                v-model="row.task"
+                                class="input follow-task"
+                                type="text"
+                                placeholder="할 일"
+                                :aria-label="`후속 할 일 ${index + 1}`"
+                            />
+                            <input
+                                v-model="row.owner"
+                                class="input follow-owner"
+                                type="text"
+                                placeholder="담당"
+                                :aria-label="`후속 할 일 ${index + 1} 담당`"
+                            />
+                            <input
+                                v-model="row.due"
+                                class="input follow-due"
+                                type="date"
+                                :aria-label="`후속 할 일 ${index + 1} 기한`"
+                            />
+                            <button
+                                type="button"
+                                class="btn btn-small btn-danger follow-remove"
+                                :aria-label="`후속 할 일 ${index + 1} 빼기`"
+                                @click="removeFollowup(index)"
+                            >
+                                빼기
+                            </button>
+                        </div>
+                    </section>
                 </template>
 
-                <template v-else-if="kind === 'general'">
+                <section v-else-if="kind === 'general'" class="form-section" aria-labelledby="sec-body">
+                    <h2 id="sec-body" class="section-title">내용</h2>
                     <AppField label="본문" for-id="general-body">
                         <textarea id="general-body" v-model="form.body" class="textarea" rows="8" required />
                     </AppField>
-                </template>
+                </section>
 
                 <template v-else>
-                    <AppField label="담당자명" for-id="sales-name">
-                        <input id="sales-name" v-model="form.contactName" class="input" type="text" required />
-                    </AppField>
-                    <AppField label="전화번호" for-id="sales-phone">
-                        <input id="sales-phone" v-model="form.phone" class="input" type="tel" />
-                    </AppField>
-                    <AppField label="이메일" for-id="sales-email">
-                        <input id="sales-email" v-model="form.email" class="input" type="email" />
-                    </AppField>
-                    <AppField label="소속" for-id="sales-org">
-                        <input id="sales-org" v-model="form.organization" class="input" type="text" />
-                    </AppField>
-                    <AppField label="직함" for-id="sales-title">
-                        <input id="sales-title" v-model="form.jobTitle" class="input" type="text" />
-                    </AppField>
-                    <AppField label="진행사항" for-id="sales-progress">
-                        <textarea id="sales-progress" v-model="form.progress" class="textarea" rows="4" required />
-                    </AppField>
-                    <AppField label="추후 진행사항" for-id="sales-next">
-                        <textarea id="sales-next" v-model="form.nextSteps" class="textarea" rows="3" />
-                    </AppField>
-                    <label class="check">
-                        <input v-model="form.saveCard" type="checkbox" />
-                        명함으로도 등록
-                    </label>
-                    <p v-if="cardMatches.length" class="hint">
-                        같은 이름과 연락처의 명함이 있습니다. 등록하면 비어 있는 소속·직함·연락처만 채웁니다.
-                    </p>
-                    <AppField v-if="cardMatches.length" label="연결할 명함" for-id="sales-card">
-                        <select id="sales-card" v-model="form.cardId" class="input">
-                            <option :value="null">자동으로 연결</option>
-                            <option v-for="card in cardMatches" :key="card.id" :value="card.id">
-                                {{ card.name }} · {{ card.organization || card.phone || card.email }}
-                            </option>
-                        </select>
-                    </AppField>
+                    <section class="form-section" aria-labelledby="sec-contact">
+                        <h2 id="sec-contact" class="section-title">담당자</h2>
+                        <div class="field-grid">
+                            <AppField label="담당자명" for-id="sales-name">
+                                <input id="sales-name" v-model="form.contactName" class="input" type="text" required />
+                            </AppField>
+                            <AppField label="직함" for-id="sales-title">
+                                <input id="sales-title" v-model="form.jobTitle" class="input" type="text" />
+                            </AppField>
+                            <AppField label="소속" for-id="sales-org">
+                                <input id="sales-org" v-model="form.organization" class="input" type="text" />
+                            </AppField>
+                            <AppField label="전화번호" for-id="sales-phone">
+                                <input id="sales-phone" v-model="form.phone" class="input" type="tel" />
+                            </AppField>
+                            <AppField label="이메일" for-id="sales-email">
+                                <input id="sales-email" v-model="form.email" class="input" type="email" />
+                            </AppField>
+                        </div>
+                    </section>
+
+                    <section class="form-section" aria-labelledby="sec-progress">
+                        <h2 id="sec-progress" class="section-title">진행</h2>
+                        <AppField label="진행사항" for-id="sales-progress">
+                            <textarea id="sales-progress" v-model="form.progress" class="textarea" rows="4" required />
+                        </AppField>
+                        <AppField label="추후 진행사항" for-id="sales-next">
+                            <textarea id="sales-next" v-model="form.nextSteps" class="textarea" rows="3" />
+                        </AppField>
+                    </section>
                 </template>
 
                 <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" :disabled="isSaving">
-                        {{ recordId ? "수정" : "저장" }}
-                    </button>
+                    <button v-if="recordId" type="button" class="btn btn-danger" @click="remove">삭제</button>
                     <button v-if="recordId" type="button" class="btn" @click="startNew">새로 작성</button>
-                    <button v-if="recordId" type="button" class="btn" @click="remove">삭제</button>
+                    <button type="submit" class="btn btn-primary" :disabled="isSaving">
+                        {{ isSaving ? "저장 중" : recordId ? "수정" : "저장" }}
+                    </button>
                 </div>
             </form>
 
             <aside class="side-list">
-                <p class="side-label">내가 쓴 {{ KINDS.find((item) => item.id === kind)?.label }}</p>
-                <p v-if="records.length === 0" class="list-status">아직 없습니다.</p>
+                <p class="side-label">내가 쓴 {{ KIND_LABELS[kind] }}</p>
+                <p v-if="records.length === 0" class="list-status">
+                    아직 없어요. 왼쪽에서 저장하면 여기에 쌓여요.
+                </p>
                 <button
                     v-for="row in records"
                     :key="row.id"
@@ -615,6 +517,7 @@ onMounted(async () => {
                 </button>
             </aside>
         </div>
+        </template>
     </div>
 </template>
 
@@ -626,7 +529,7 @@ onMounted(async () => {
     gap: var(--space-2) var(--space-3);
 }
 
-/* 형식 고르기는 한 줄 세그먼트. 일일보고 작성은 따로 있는 화면이라 링크로 둔다. */
+/* 작성으로 들어온 뒤 형식을 고른다. 일일보고도 이 줄에 남는다. */
 .kind-switch {
     display: inline-flex;
     flex-wrap: wrap;
@@ -635,7 +538,11 @@ onMounted(async () => {
     background: var(--surface-soft);
 }
 
+.kind-switch a,
 .kind-switch button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     height: 30px;
     padding: 0 var(--space-4);
     border: 0;
@@ -645,9 +552,13 @@ onMounted(async () => {
     font: inherit;
     font-size: var(--fs-13);
     font-weight: var(--fw-medium);
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
     cursor: pointer;
 }
 
+.kind-switch a.is-on,
 .kind-switch button.is-on {
     background: var(--surface);
     box-shadow: 0 0 0 1px var(--border);
@@ -655,52 +566,96 @@ onMounted(async () => {
     font-weight: var(--fw-semibold);
 }
 
+.kind-switch a:focus-visible,
 .kind-switch button:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
 }
 
-.kind-daily {
-    margin-left: auto;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    text-decoration: none;
+/* 머리줄은 일일보고 탭(report.vue .write-head)과 같은 모양. 탭을 바꿔도 누가 · 언제 · 상태가 같은 자리에 있다. */
+.write-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
 }
 
-/* 라벨은 왼쪽, 입력은 오른쪽. 칸 사이는 가는 선. */
-.compose-layout form.card {
+.write-author {
+    font-size: var(--fs-16);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.write-date {
+    width: auto;
+    height: var(--control-h-sm);
+    font-size: var(--fs-13);
+}
+
+/* 섹션은 가는 선으로만 나눈다. 카드 안에 카드를 또 두지 않는다. */
+.compose-layout .compose-card {
     gap: 0;
 }
 
-.compose-layout form.card > .field {
-    display: grid;
-    grid-template-columns: 120px minmax(0, 1fr);
-    gap: var(--space-4);
-    align-items: center;
-    padding: var(--space-3) 0;
-}
-
-.compose-layout form.card > .field + .field {
+.form-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4) 0;
     border-top: 1px solid var(--border);
 }
 
-.compose-layout form.card > .field:has(textarea) {
-    align-items: start;
+.write-head + .form-section {
+    margin-top: var(--space-4);
 }
 
-.compose-layout form.card > .field :deep(.field-label) {
+.section-title {
     margin: 0;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
+    font-size: var(--fs-14);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
 }
 
-.compose-layout form.card > .field:has(textarea) :deep(.field-label) {
-    padding-top: var(--space-2);
+.section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
 }
 
-.compose-layout form.card > :not(.field) {
-    margin-top: var(--space-3);
+/* 짧은 값(프로젝트 · 일시 · 장소 · 연락처)은 두 칸씩 나란히. 긴 글은 전체 폭. */
+.field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-4);
+}
+
+.field-grid .span-2 {
+    grid-column: 1 / -1;
+}
+
+/* 폼 폭이 480px 안팎이라 한 줄 표로 두면 할 일이 잘린다. 할 일은 전체 폭, 담당 · 기한 · 빼기는 아래 줄. */
+.follow-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 150px auto;
+    grid-template-areas:
+        "task task task"
+        "owner due remove";
+    gap: var(--space-2);
+    align-items: center;
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.follow-task { grid-area: task; }
+.follow-owner { grid-area: owner; }
+.follow-due { grid-area: due; }
+.follow-remove { grid-area: remove; }
+
+.follow-row .input {
+    width: 100%;
+    min-width: 0;
 }
 
 .compose-layout {
@@ -716,33 +671,25 @@ onMounted(async () => {
     gap: var(--space-4);
 }
 
-.form-actions,
-.follow-row {
+/* 저장은 오른쪽 끝, 삭제는 왼쪽 끝. 손이 가는 순서와 되돌릴 수 없는 버튼을 떼어 둔다. */
+.form-actions {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
     align-items: center;
+    justify-content: flex-end;
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
 }
 
-.followups {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+.form-actions .btn-danger {
+    margin-right: auto;
 }
 
-.follow-row .input {
-    flex: 1 1 140px;
-    min-width: 0;
+.compose-card > .form-error {
+    margin-bottom: var(--space-3);
 }
 
-.check {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--fs-14);
-}
-
-.hint,
 .form-error,
 .list-status,
 .side-label {
@@ -750,7 +697,6 @@ onMounted(async () => {
     font-size: var(--fs-14);
 }
 
-.hint,
 .side-label,
 .list-status {
     color: var(--text-muted);
@@ -759,12 +705,6 @@ onMounted(async () => {
 .form-error,
 .list-status.is-error {
     color: var(--danger-fg);
-}
-
-.card-sales {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
 }
 
 /* 내가 쓴 목록: 한 카드 안에서 줄로 나눈다. */
@@ -830,28 +770,67 @@ onMounted(async () => {
         grid-template-columns: 1fr;
     }
 
-    .compose-layout form.card > .field {
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-2);
+    /* 날짜는 한 줄 전체, 44px 터치 높이. report.vue 모바일 머리줄과 같다. */
+    .write-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
     }
 
-    .compose-layout form.card > .field:has(textarea) :deep(.field-label) {
-        padding-top: 0;
+    .write-date {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+        height: var(--control-h-lg);
+        font-size: var(--fs-16);
+    }
+
+    .write-head .status-chip {
+        justify-self: start;
+    }
+
+    .field-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .section-head .btn,
+    .form-actions .btn {
+        min-height: var(--control-h-lg);
+    }
+
+    /* 좁은 화면: 기한 칸이 반 폭이면 날짜가 잘린다. 담당은 한 줄, 기한 옆에 빼기. */
+    .follow-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "task task"
+            "owner owner"
+            "due remove";
+    }
+
+    .follow-remove {
+        min-height: var(--control-h-lg);
+    }
+
+    .form-actions .btn-primary {
+        flex: 1 1 100%;
+        order: -1;
+    }
+
+    .kind-bar {
+        align-items: stretch;
     }
 
     .kind-switch {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        display: flex;
         width: 100%;
+        overflow-x: auto;
     }
 
+    .kind-switch a,
     .kind-switch button {
+        flex: 1 0 auto;
+        height: var(--control-h-lg);
         min-height: var(--control-h-lg);
-        padding: 0;
-    }
-
-    .kind-daily {
-        margin-left: 0;
+        padding: 0 var(--space-3);
     }
 }
 </style>

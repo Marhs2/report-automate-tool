@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from "vue-router";
-import report from "../components/report.vue";
 import reportResult from "../components/report-result.vue";
 import projectList from "../components/projects-list.vue";
 import dashboard from "../components/dashboard.vue";
@@ -38,19 +37,12 @@ const routes = [
     component: compose,
     meta: {
       title: "작성",
-      navKey: "/reports",
-      parent: { to: "/reports", label: "일일보고" },
+      navKey: "/compose",
     },
   },
   {
     path: "/report",
-    name: "report",
-    component: report,
-    meta: {
-      title: "보고서 작성",
-      navKey: "/reports",
-      parent: { to: "/reports", label: "일일보고" },
-    },
+    redirect: { path: "/compose", query: { kind: "daily" } },
   },
   {
     path: "/report-result/:id?",

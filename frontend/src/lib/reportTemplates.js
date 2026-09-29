@@ -21,18 +21,6 @@ export const PASTE_TEMPLATES = [
 `,
     },
     {
-        id: "scrum",
-        label: "어제 · 오늘 · 막힘",
-        hint: "스크럼 3문장",
-        body: `
-프로젝트 명:
-        
-어제:
-오늘:
-막힌 것:
-`,
-    },
-    {
         id: "office",
         label: "성과 · 이슈 · 내일",
         hint: "한국 회사 4칸",

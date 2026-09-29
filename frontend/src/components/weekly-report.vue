@@ -186,16 +186,6 @@ const dayState = (dayDate) => {
     return hasMine(dayDate) ? "작성함" : "보고 없음";
 };
 
-const myDayCount = computed(
-    () =>
-        weekDays.value.filter((day) => hasMine(day) && !isFutureDay(day)).length,
-);
-
-const headerSubtitle = computed(() => {
-    const week = isThisWeek.value ? "이번 주 · " : "";
-    return `${week}내 일일보고 ${myDayCount.value}일`;
-});
-
 const weekGroups = computed(() => {
     const groups = [];
     for (const day of weekDays.value) {
@@ -576,17 +566,13 @@ onMounted(async () => {
 <template>
     <div class="page weekly-report-page">
         <header class="week-head">
-            <div class="week-head-text">
-                <h1>{{ headerTitle }}</h1>
-                <p>{{ headerSubtitle }}</p>
-            </div>
+            <h1>{{ headerTitle }}</h1>
             <div class="week-nav">
                 <button
-                    v-if="!isThisWeek"
                     type="button"
                     class="btn btn-small"
                     @click="resetThisWeek"
-                    :disabled="isLoading"
+                    :disabled="isLoading || isThisWeek"
                 >
                     이번 주로
                 </button>
@@ -673,7 +659,6 @@ onMounted(async () => {
             <div v-if="existingWeekly" class="overwrite-notice" role="status">
                 <span>
                     <b>이 주의 주간보고가 이미 있어요.</b>
-                    새로 만들면 초안을 저장할 때 이 주 보고를 바꿔요.
                 </span>
                 <button
                     type="button"
@@ -732,7 +717,13 @@ onMounted(async () => {
                         <button type="button" class="btn btn-small" @click="downloadReport(group.latest)" :disabled="isLoading">
                             Word
                         </button>
-                        <button type="button" class="btn btn-small" @click="downloadPptx(group.latest)" :disabled="isLoading">
+                        <button
+                            v-if="!isNarrow"
+                            type="button"
+                            class="btn btn-small"
+                            @click="downloadPptx(group.latest)"
+                            :disabled="isLoading"
+                        >
                             PPT
                         </button>
                     </div>
@@ -772,35 +763,28 @@ onMounted(async () => {
 /* 머리: 기간 제목 + 주 이동. 다른 화면의 page-header와 같은 리듬(제목 24 / 보조 14). */
 .week-head {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-3) var(--space-4);
-}
-
-.week-head-text {
-    flex: 1;
+    gap: var(--space-3);
     min-width: 0;
 }
 
+/* 기간은 짧고 전부 보여야 한다. 줄이면 "9.28 ..."처럼 끝 날짜가 사라진다. */
 .week-head h1 {
+    flex-shrink: 0;
     margin: 0;
     font-size: var(--fs-24);
-    line-height: var(--lh-tight);
+    line-height: 1.2;
     white-space: nowrap;
-}
-
-.week-head p {
-    margin: var(--space-1) 0 0;
-    font-size: var(--fs-14);
-    line-height: var(--lh-base);
-    color: var(--text-muted);
 }
 
 .week-nav {
     display: flex;
     align-items: center;
-    flex-shrink: 0;
     gap: var(--space-2);
+}
+
+.week-nav .btn {
+    flex-shrink: 0;
 }
 
 .week-nav-arrows {
@@ -1111,15 +1095,15 @@ onMounted(async () => {
 }
 
 @media (max-width: 860px) {
+    .week-head {
+        gap: var(--space-2);
+    }
+
     .week-head h1 {
         font-size: var(--fs-20);
     }
 
     .week-nav {
-        width: 100%;
-    }
-
-    .week-nav-arrows {
         margin-left: auto;
     }
 
@@ -1138,8 +1122,12 @@ onMounted(async () => {
     }
 
     .week-range .input {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
         height: var(--control-h-touch);
         font-size: var(--fs-16);
+        overflow: hidden;
     }
 
     .week-folds {

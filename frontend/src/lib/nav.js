@@ -1,25 +1,26 @@
 export const PRIMARY_NAV = [
     { to: "/", label: "내 현황", shortLabel: "현황", group: "작업" },
     { to: "/reports", label: "일일보고", shortLabel: "일일", group: "작업" },
+    { to: "/compose", label: "작성", shortLabel: "작성", group: "작업" },
     { to: "/weekly", label: "주간 보고서", shortLabel: "주간", group: "작업" },
     { to: "/activities", label: "사용자 활동", shortLabel: "활동", group: "작업" },
     { to: "/project-timeline", label: "프로젝트 흐름", shortLabel: "흐름", group: "작업" },
     { to: "/settings", label: "설정", shortLabel: "설정", group: "설정" },
 ];
 
-/** 모바일 하단 탭. 다섯 칸을 넘기지 않는다. 더보기는 시트를 연다. */
+/** 모바일 하단 탭. 다섯 칸을 넘기지 않는다. 작성에서 일일·회의·영업으로 바로 간다. */
 export const MOBILE_TABS = [
     { id: "home", to: "/", label: "현황", navKeys: ["/"] },
-    { id: "daily", to: "/reports", label: "일일보고", navKeys: ["/reports", "/report", "/compose"] },
+    { id: "daily", to: "/reports", label: "일일", navKeys: ["/reports", "/report"] },
+    { id: "write", to: "/compose", label: "작성", navKeys: ["/compose"] },
     { id: "weekly", to: "/weekly", label: "주간", navKeys: ["/weekly"] },
     { id: "more", sheet: "more", label: "더보기", navKeys: ["/activities", "/project-timeline", "/settings", "/admin"] },
 ];
 
-/** 일일보고 화면의 작성 선택지. 일일보고가 맨 위(가장 자주 쓰는 일)다. */
+/** 작성 화면의 선택지. */
 export const COMPOSE_CHOICES = [
-    { id: "daily", to: "/report", label: "일일보고", hint: "원문을 붙이면 AI가 프로젝트별로 정리" },
+    { id: "daily", to: "/compose?kind=daily", label: "일일보고", hint: "원문을 붙여 넣으면 AI가 프로젝트별로 정리" },
     { id: "meeting", to: "/compose?kind=meeting", label: "회의록", hint: "안건 · 결정 · 후속 할 일" },
-    { id: "general", to: "/compose?kind=general", label: "일반보고", hint: "제목과 본문" },
     { id: "sales", to: "/compose?kind=sales", label: "영업보고", hint: "담당자 · 진행사항 · 추후 진행" },
 ];
 

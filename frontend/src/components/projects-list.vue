@@ -5,18 +5,12 @@ import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
 import { isAdmin } from "../composables/useSession";
 import { selectedUserId } from "../composables/useSelectedUser";
-import { todayString, weekdayLabelOf } from "../lib/dateScope";
-import { daySubmission } from "../lib/weekStatus";
+import { weekdayLabelOf } from "../lib/dateScope";
 import { reportCounts, reportHeadline } from "../lib/reportSummary";
-import { COMPOSE_CHOICES } from "../lib/nav";
 
 const router = useRouter();
-const writeChoices = COMPOSE_CHOICES.map((item) =>
-    item.id === "daily" ? { ...item, label: "보고서 작성" } : item,
-);
 const { alert: showAlert, confirm: askConfirm } = useDialog();
-const { getReports, deleteReport, getUsers } = useApi();
-const members = ref([]);
+const { getReports, deleteReport } = useApi();
 
 const reports = ref([]);
 const isLoading = ref(false);
@@ -28,12 +22,7 @@ const fetchReports = async () => {
     isLoading.value = true;
     loadError.value = "";
     try {
-        const [rows, users] = await Promise.all([
-            getReports(),
-            getUsers().catch(() => []),
-        ]);
-        reports.value = rows;
-        members.value = Array.isArray(users) ? users : [];
+        reports.value = await getReports();
     } catch (error) {
         console.error("Error fetching reports:", error);
         loadError.value = "보고서를 불러오지 못했습니다.";
@@ -41,17 +30,6 @@ const fetchReports = async () => {
         isLoading.value = false;
     }
 };
-
-/** 오늘 누가 냈고 누가 안 냈는지. 검색·필터 중에는 숨긴다(부분 목록과 섞이면 헷갈린다). */
-const today = todayString();
-const todaySummary = computed(() => {
-    if (query.value.trim() || filterProject.value || !members.value.length) return null;
-    const result = daySubmission(members.value, reports.value, today);
-    if (!result.total) return null;
-    const weekday = weekdayLabelOf(today);
-    const [, month, day] = today.split("-").map(Number);
-    return { ...result, label: `${month}월 ${day}일 ${weekday}` };
-});
 
 const isMine = (report) =>
     selectedUserId.value != null &&
@@ -192,36 +170,6 @@ onMounted(() => {
 
 <template>
     <div class="page">
-        <nav class="write-kinds" aria-label="작성">
-            <router-link
-                v-for="item in writeChoices"
-                :key="item.id"
-                class="btn btn-small"
-                :class="{ 'btn-primary': item.id === 'daily' }"
-                :to="item.to"
-            >{{ item.label }}</router-link>
-        </nav>
-
-        <section v-if="todaySummary" class="card today-sum" aria-label="오늘 제출 현황">
-            <div class="today-sum-head">
-                <h2>오늘 <span>{{ todaySummary.label }}</span></h2>
-                <p>{{ todaySummary.total }}명 중 {{ todaySummary.saved }}명 제출</p>
-            </div>
-            <div
-                class="today-sum-bar"
-                role="img"
-                :aria-label="`제출 ${todaySummary.saved}명, 미제출 ${todaySummary.missing.length}명`"
-            >
-                <span class="is-saved" :style="{ flexGrow: todaySummary.saved }"></span>
-                <span class="is-missing" :style="{ flexGrow: todaySummary.missing.length }"></span>
-            </div>
-            <p v-if="todaySummary.missing.length" class="today-sum-missing">
-                <span class="state-chip is-danger">미제출 {{ todaySummary.missing.length }}</span>
-                {{ todaySummary.missing.join(", ") }}
-            </p>
-            <p v-else class="today-sum-missing is-done">오늘은 모두 제출했어요.</p>
-        </section>
-
         <div class="list-search">
             <input
                 id="report-query"
@@ -292,12 +240,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.write-kinds {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-}
-
 .list-search {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 220px;
@@ -321,73 +263,6 @@ onMounted(() => {
     color: var(--text-muted);
     opacity: 1;
 }
-
-.today-sum {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-}
-
-.today-sum-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-2);
-}
-
-.today-sum-head h2 {
-    margin: 0;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.today-sum-head h2 span {
-    font-weight: var(--fw-regular);
-    color: var(--text-muted);
-}
-
-.today-sum-head p {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.today-sum-bar {
-    display: flex;
-    gap: 2px;
-    height: 8px;
-    overflow: hidden;
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-}
-
-.today-sum-bar .is-saved {
-    background: var(--success-fg);
-}
-
-.today-sum-bar .is-missing {
-    background: var(--danger-border);
-}
-
-.today-sum-missing {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: var(--fs-14);
-    color: var(--text);
-}
-
-.today-sum-missing.is-done {
-    color: var(--success-fg);
-    font-weight: var(--fw-semibold);
-}
-
-
-
 
 .list-status {
     margin: 0;
@@ -482,6 +357,7 @@ onMounted(() => {
 }
 
 .badge {
+    
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-pill);
     background: var(--surface-soft);

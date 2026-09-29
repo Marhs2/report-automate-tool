@@ -15,7 +15,10 @@ describe("primary navigation", () => {
     it("keeps the sidebar shorter than eight destinations", () => {
         assert.ok(primaryNavCount() < 8);
         assert.equal(PRIMARY_NAV.length, primaryNavCount());
-        assert.equal(PRIMARY_NAV.some((item) => item.to === "/compose"), false);
+        assert.equal(
+            PRIMARY_NAV.find((item) => item.label === "작성")?.to,
+            "/compose",
+        );
     });
 
     it("keeps the mobile tab bar at five tabs that all lead somewhere live", () => {
@@ -27,7 +30,8 @@ describe("primary navigation", () => {
         for (const item of [...COMPOSE_CHOICES, ...MORE_LINKS]) {
             assert.ok(livePath(item.to), `${item.label} path ${item.to} is not a live route`);
         }
-        assert.equal(COMPOSE_CHOICES[0].to, CAPABILITIES.writeReport);
+        assert.equal(COMPOSE_CHOICES[0].to, "/compose?kind=daily");
+        assert.equal(CAPABILITIES.writeReport, "/report");
     });
 
     it("maps every required capability to a live route path", () => {

@@ -6,6 +6,7 @@ import {
     GitGraph,
     LayoutDashboard,
     LogOut,
+    PenLine,
     Settings2,
     Shield,
     PanelLeftClose,
@@ -50,6 +51,7 @@ const {
 const NAV_ICONS = {
     "/": LayoutDashboard,
     "/reports": FolderKanban,
+    "/compose": PenLine,
     "/weekly": FileBarChart,
     "/activities": CalendarDays,
     "/project-timeline": GitGraph,
@@ -84,6 +86,7 @@ const isNavActive = (to) => route.meta.navKey === to;
 const TAB_ICONS = {
     home: LayoutDashboard,
     daily: FolderKanban,
+    write: PenLine,
     weekly: FileBarChart,
     more: MoreHorizontal,
 };
@@ -111,7 +114,7 @@ const currentTeam = ref("");
 
 const isPublicPage = computed(() => Boolean(route.meta.public));
 /** 작성·수정 화면은 메뉴와 제목 줄을 치우고 뒤로 가기만 남긴다. */
-const FOCUS_ROUTES = new Set(["report", "report-result", "weekly-detail"]);
+const FOCUS_ROUTES = new Set(["report-result", "weekly-detail"]);
 const isWritePage = computed(() => FOCUS_ROUTES.has(String(route.name || "")));
 
 const goBack = () => {
@@ -243,10 +246,6 @@ onUnmounted(() => {
         :class="{ 'is-collapsed': collapsedEffective }"
     >
         <div class="sidebar-brand">
-            <router-link v-if="!collapsedEffective" to="/" class="sidebar-brand-link">
-                <span class="sidebar-mark" aria-hidden="true">보</span>
-                <span class="sidebar-brand-name">보고 취합</span>
-            </router-link>
             <button
                 type="button"
                 class="sidebar-collapse-btn"

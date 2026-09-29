@@ -1,8 +1,7 @@
-"""회의록·일반보고·영업보고와 명함, 내 현황 조회.
+"""회의록·일반보고·영업보고와 내 현황 조회.
 
 일일보고 추출 스키마와 주간 병합에는 넣지 않는다.
-영업보고의 명함은 이름과 전화 또는 이메일이 같으면 잇고,
-이미 있는 소속·직함·연락처는 덮어쓰지 않는다.
+일반보고는 작성 화면에서 더는 따로 받지 않고, 일일보고로 남긴다.
 """
 
 from __future__ import annotations
@@ -208,8 +207,6 @@ def normalize_work(payload: dict) -> dict:
             "jobTitle": _limit(payload.get("jobTitle"), 80, "직함"),
             "progress": progress,
             "nextSteps": _limit(payload.get("nextSteps"), 4000, "추후 진행사항"),
-            "saveCard": bool(payload.get("saveCard", True)),
-            "cardId": _card_id(payload.get("cardId")),
         }
         body = progress
 
@@ -443,8 +440,6 @@ def save_work_record(conn, member_id: int, payload: dict, record_id: int | None 
     if record_id is not None:
         _own_record(conn, member_id, record_id)
     card_id = None
-    if data["kind"] == "sales":
-        card_id = link_card(conn, member_id, data["details"])
     if data["project_name"]:
         remember_project(conn, data["project_name"])
     blob = json.dumps(data["details"], ensure_ascii=False)

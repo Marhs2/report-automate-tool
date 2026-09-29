@@ -3,3 +3,56 @@
 @import "./styles/shell.css";
 @import "./styles/components.css";
 @import "./styles/report-doc.css";
+
+
+/* iOS Safari の自動ズーム防止（font-size 16px 未満で発生） */
+@media screen and (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* iOS Safari の date/time/month ピッカーの幅・高さ制御
+   https://note.com/nariaki/n/nb9be6302d2ca
+   flex/grid 자식의 기본 min-width:auto 가 피커 내부 UI 너비를 최소 너비로 삼아서
+   max-width:100% 만으로는 줄지 않는다. */
+input[type="date"],
+input[type="time"],
+input[type="month"],
+input[type="datetime-local"] {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  line-height: 1.25;
+  overflow: hidden;
+}
+
+/* 全フォーム要素のサイズ制御 */
+input, select, textarea {
+  box-sizing: border-box;
+  max-width: 100%;
+  line-height: 1.25;
+}
+
+/* textarea は可読性のため line-height をリセット */
+textarea {
+  line-height: 1.5;
+}
+
+/* grid/flex 内でのオーバーフロー防止 */
+.grid input,
+.grid select,
+.flex input,
+.flex select,
+.field > input,
+.field > select,
+.write-head > input,
+.week-range input,
+.follow-row input {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}

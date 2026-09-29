@@ -495,46 +495,6 @@ export default function useApi() {
     }
   };
 
-  const getBusinessCards = async () => {
-    try {
-      const response = await axios.get(`${baseURL}/business-cards`);
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching business cards:", error);
-      throw error;
-    }
-  };
-
-  const postBusinessCard = async (payload) => {
-    try {
-      const response = await axios.post(`${baseURL}/business-cards`, payload);
-      return response.data;
-    } catch (error) {
-      console.error("Error creating business card:", error);
-      throw error;
-    }
-  };
-
-  const putBusinessCard = async (id, payload) => {
-    try {
-      const response = await axios.put(`${baseURL}/business-cards/${id}`, payload);
-      return response.data;
-    } catch (error) {
-      console.error("Error updating business card:", error);
-      throw error;
-    }
-  };
-
-  const deleteBusinessCard = async (id) => {
-    try {
-      const response = await axios.delete(`${baseURL}/business-cards/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error("Error deleting business card:", error);
-      throw error;
-    }
-  };
-
   return {
     postReport,
     postReportPptx,
@@ -577,9 +537,5 @@ export default function useApi() {
     postWorkRecord,
     putWorkRecord,
     deleteWorkRecord,
-    getBusinessCards,
-    postBusinessCard,
-    putBusinessCard,
-    deleteBusinessCard,
   };
 }
