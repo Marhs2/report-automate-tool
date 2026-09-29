@@ -93,13 +93,13 @@ onMounted(async () => {
 
         </div>
 
-        <div v-if="isLoading" class="empty-state">부서을 불러오는 중...</div>
+        <div v-if="isLoading" class="empty-state">부서를 불러오는 중...</div>
         <div v-else-if="loadError" class="empty-state">{{ loadError }}</div>
         <div v-else-if="teams.length === 0" class="empty-state">
             등록된 부서가 없습니다.
         </div>
         <div v-else-if="filteredTeams.length === 0" class="empty-state">
-            '{{ query.trim() }}'에 해당하는 부서이 없습니다
+            '{{ query.trim() }}'에 해당하는 부서가 없습니다
         </div>
         <div v-else class="select-grid">
             <button
