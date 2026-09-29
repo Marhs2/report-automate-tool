@@ -282,6 +282,53 @@
     margin-left: auto;
 }
 
+/* Row layout (daily report edit): category tag on the left, items on the right,
+   hairlines between categories instead of grey trays. */
+.report-doc .field-group.is-row {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
+    margin: 0;
+    padding: var(--space-3) 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.report-doc .field-group.is-row + .field-group.is-row {
+    border-top: 1px solid var(--border);
+}
+
+.report-doc .field-group.is-row h2 {
+    padding-top: 8px;
+}
+
+.report-doc .field-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.report-doc .field-group.is-row .empty-msg {
+    padding: 6px 0 0;
+}
+
+.report-doc .field-group.is-row .remove-btn {
+    min-width: var(--control-h-sm);
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    padding: 0;
+}
+
+.report-doc .field-group.is-row .add-btn {
+    height: 28px;
+    padding: 0 var(--space-2);
+    border: 0;
+    color: var(--accent);
+    font-weight: var(--fw-semibold);
+}
+
 /* ==== Mobile (<=860px) ============================================ */
 
 @media (max-width: 860px) {

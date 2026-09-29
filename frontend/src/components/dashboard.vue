@@ -295,36 +295,9 @@ onMounted(() => {
     flex-shrink: 0;
 }
 
-.state-chip {
-    display: inline-flex;
-    flex-shrink: 0;
-    align-items: center;
-    gap: 6px;
-    height: var(--chip-h);
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-pill);
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    white-space: nowrap;
-}
 
-.state-chip::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: var(--radius-pill);
-    background: currentColor;
-}
 
-.state-chip.is-danger {
-    background: var(--danger-bg);
-    color: var(--danger-fg);
-}
 
-.state-chip.is-warning {
-    background: var(--warning-bg);
-    color: var(--warning-fg);
-}
 
 .dash-grid {
     display: grid;

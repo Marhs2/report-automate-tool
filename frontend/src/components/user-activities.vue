@@ -9,7 +9,9 @@ import { AGENDA_NAME_LIMIT, dayCounts, previewPeople } from "../lib/dayStatus";
 
 const router = useRouter();
 const { alert: showAlert } = useDialog();
-const { getUserActivities, getReports, getHolidays, getTeams } = useApi();
+const { getUserActivities, getReports, getHolidays, getTeams, getUsers } = useApi();
+/** 관리자 계정 id. 보고를 안 쓰는 관리자는 미제출로 세지 않는다. */
+const adminIds = ref(new Set());
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -43,6 +45,10 @@ const startOfToday = () => {
 
 const fetchTeams = async () => {
     try {
+        const users = await getUsers().catch(() => []);
+        adminIds.value = new Set(
+            (users || []).filter((user) => user.is_admin).map((user) => String(user.id)),
+        );
         teams.value = await getTeams();
     } catch (error) {
         console.error("Error fetching teams:", error);
@@ -225,6 +231,11 @@ const orderedActivities = computed(() =>
             (activity) =>
                 filterTeam.value === "all" ||
                 String(activity.team_id) === String(filterTeam.value),
+        )
+        .filter(
+            (activity) =>
+                !adminIds.value.has(String(activity.member_id)) ||
+                Number(activity.total_count) > 0,
         )
         .map((activity) => ({
             ...activity,
