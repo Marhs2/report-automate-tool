@@ -11,6 +11,9 @@ import {
   textsOf,
 } from "../lib/issueBoard";
 
+/** 보고 항목 분류 색. 모든 화면이 같은 태그(components.css .cat-tag)를 쓴다. */
+const KIND_TAGS = { 완료: "is-done", 진행: "is-progress", 이슈: "is-issue", 요청: "is-request", 다음: "is-next" };
+
 const router = useRouter();
 const { getProjectNames, getProjectTimeline, getUsers } = useApi();
 
@@ -390,6 +393,7 @@ onMounted(() => {
         <h2>이슈</h2>
 
         <div v-if="issueBoard.open.length" class="issue-group">
+          <h3><span class="state-chip is-warning">열린 이슈 {{ issueBoard.open.length }}</span></h3>
           <button
             v-for="(item, index) in issueBoard.open"
             :key="`open-${item.member_id}-${item.firstDate}-${index}`"
@@ -405,7 +409,7 @@ onMounted(() => {
         </div>
 
         <div v-if="issueBoard.unmentioned.length" class="issue-group">
-          <h3>이후 언급 없음</h3>
+          <h3><span class="state-chip">이후 언급 없음 {{ issueBoard.unmentioned.length }}</span></h3>
           <button
             v-for="(item, index) in issueBoard.unmentioned"
             :key="`omit-${item.member_id}-${item.firstDate}-${index}`"
@@ -421,7 +425,7 @@ onMounted(() => {
         </div>
 
         <div v-if="issueBoard.resolved.length" class="issue-group">
-          <h3>해결</h3>
+          <h3><span class="state-chip is-success">해결 {{ issueBoard.resolved.length }}</span></h3>
           <button
             v-for="(item, index) in issueBoard.resolved"
             :key="`done-${item.member_id}-${item.firstDate}-${index}`"
@@ -470,7 +474,7 @@ onMounted(() => {
                 :key="rowIndex"
                 class="row"
               >
-                <span class="k" :class="row.kind">{{ row.label }}</span>
+                <span class="k cat-tag" :class="KIND_TAGS[row.label]">{{ row.label }}</span>
                 <p class="v">{{ row.text }}</p>
               </div>
             </button>
@@ -736,18 +740,8 @@ onMounted(() => {
 }
 
 .k {
-  font-size: var(--fs-12);
-  font-weight: var(--fw-semibold);
-  color: var(--text);
-  padding-top: var(--space-1);
-}
-
-.k.done {
-  color: var(--success-fg);
-}
-
-.k.issue {
-  color: var(--danger-fg);
+  justify-self: start;
+  margin-top: 1px;
 }
 
 .v {
