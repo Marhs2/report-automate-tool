@@ -75,3 +75,18 @@ export function reportSummary(parsedJson) {
         countLabel: reportCountLabel(parsedJson),
     };
 }
+
+/** "프로젝트 2 · 완료 3 · 진행 1". 덮어쓰기 확인에서 두 보고를 나란히 적는다. */
+export function reportSizeLabel(parsedJson) {
+    const parsed = parseReportJson(parsedJson);
+    const projects = (parsed.projects || []).filter(
+        (project) => project && typeof project === "object",
+    ).length;
+    const counts = reportCountLabel(parsed);
+    return [`프로젝트 ${projects}`, counts].filter(Boolean).join(" · ");
+}
+
+/** 같은 날 보고를 덮어쓰기 전에 보여줄 비교 문장. */
+export function overwriteNote(savedJson, nextJson) {
+    return `저장된 보고: ${reportSizeLabel(savedJson)}\n새로 저장: ${reportSizeLabel(nextJson)}`;
+}
