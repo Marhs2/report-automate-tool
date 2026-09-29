@@ -348,11 +348,11 @@ onUnmounted(() => {
             </nav>
             <div class="topbar-end">
                 <router-link
-                    v-if="pageMeta.action"
+                    v-if="pageMeta.action && !isNarrow"
                     class="btn btn-primary btn-small topbar-action"
                     :to="pageMeta.action.to"
                 >
-                    {{ isNarrow ? "작성" : pageMeta.action.label }}
+                    {{ pageMeta.action.label }}
                 </router-link>
             </div>
         </header>
