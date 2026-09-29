@@ -5,17 +5,21 @@
             <div class="detail-title">
                 <h1>{{ userName || "주간 보고서" }}</h1>
                 <span class="detail-period">{{ periodLabel }}</span>
+                <span class="state-chip" :class="isUnsaved ? 'is-warning' : 'is-success'">
+                    {{ isUnsaved ? "AI 초안 · 저장 전" : "저장됨" }}
+                </span>
             </div>
             <div class="detail-actions">
                 <div class="detail-copy-col">
                     <button type="button" class="btn btn-small" @click="copyReport"
                         :disabled="isSaving || isReextracting">복사</button>
                 </div>
-                <button v-if="canEdit" type="button" class="btn btn-small" @click="toggleEditing"
-                    :disabled="isReextracting"
-                    :style="{ backgroundColor: !isEditing ? 'var(--accent)' : 'var(--surface)', color: !isEditing ? 'var(--surface)' : '' }">
-                    {{ isEditing ? "읽기" : "수정" }}
-                </button>
+                <div v-if="canEdit" class="mode-switch" role="group" aria-label="보기 방식">
+                    <button type="button" :class="{ 'is-on': !isEditing }" :aria-pressed="!isEditing"
+                        :disabled="isReextracting" @click="isEditing && toggleEditing()">읽기</button>
+                    <button type="button" :class="{ 'is-on': isEditing }" :aria-pressed="isEditing"
+                        :disabled="isReextracting" @click="!isEditing && toggleEditing()">수정</button>
+                </div>
                 <button v-if="canEdit && isEditing" type="button" class="btn btn-primary btn-small hide-on-narrow"
                     @click="saveReport" :disabled="isSaving || isReextracting">
                     {{ isSaving ? "저장 중..." : saveLabel }}
@@ -40,7 +44,10 @@
                             <!-- 슬라이드에서는 한 칸이지만 읽을 때는 완료 / 진행 / 이슈로 나눠 본다. -->
                             <div v-for="group in doneGroups(block)" :key="`${block.key}-${group.kind}`"
                                 class="read-kind">
-                                <h4 :class="group.kind">{{ group.label }} {{ group.items.length }}</h4>
+                                <h4>
+                                    <span class="cat-tag" :class="KIND_TONES[group.kind]">{{ group.label }}</span>
+                                    <span class="read-count">{{ group.items.length }}</span>
+                                </h4>
                                 <ul class="read-list">
                                     <li v-for="(item, index) in group.items" :key="index">{{ item }}</li>
                                 </ul>
@@ -145,11 +152,11 @@
                             <input class="input" v-model="notice.body[lineIndex]" placeholder="세부 내용 한 줄" />
                             <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
                                 @click="removeNoticeLine(notice, lineIndex)">
-                                삭제
+                                <X :size="14" aria-hidden="true" />
                             </button>
                         </div>
                         <button type="button" class="btn add-btn" @click="addNoticeLine(notice)">
-                            줄 추가
+                            + 줄 추가
                         </button>
                     </div>
                     <button type="button" class="btn add-project-btn add-notice-btn" @click="addNotice">
@@ -173,12 +180,12 @@
                                 <input class="input" v-model="event.title" placeholder="내용" />
                                 <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
                                     @click="removeEvent(list.key, eventIndex)">
-                                    삭제
+                                    <X :size="14" aria-hidden="true" />
                                 </button>
                             </div>
                             <p v-if="!eventsOf(list.key).length" class="empty-msg">항목이 없습니다</p>
                             <button type="button" class="btn add-btn" @click="addEvent(list.key)">
-                                항목 추가
+                                + 추가
                             </button>
                         </section>
                     </div>
@@ -209,14 +216,14 @@
                                     @input="growEditor" @keydown.enter.exact.prevent="$event.target.blur()" />
                                 <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
                                     @click="removeAt(block[col.kind].items, itemIndex)">
-                                    삭제
+                                    <X :size="14" aria-hidden="true" />
                                 </button>
                             </div>
                             <p v-if="!(block[col.kind]?.items || []).length" class="empty-msg">
                                 항목이 없습니다
                             </p>
                             <button type="button" class="btn add-btn" @click="addItem(block, col.kind)">
-                                항목 추가
+                                + 추가
                             </button>
                         </section>
                     </div>
@@ -249,11 +256,11 @@
                                 <input class="input" v-model="collab[col.kind][itemIndex]" placeholder="내용을 입력하세요" />
                                 <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
                                     @click="removeCollabItem(col.kind, itemIndex)">
-                                    삭제
+                                    <X :size="14" aria-hidden="true" />
                                 </button>
                             </div>
                             <button type="button" class="btn add-btn" @click="addCollabItem(col.kind)">
-                                항목 추가
+                                + 추가
                             </button>
                         </section>
                     </div>
@@ -303,6 +310,7 @@ import {
 } from "../lib/weeklyDeck";
 import { copyText } from "../lib/copyText";
 import AppField from "./ui/AppField.vue";
+import { X } from "lucide-vue-next";
 
 const route = useRoute();
 const router = useRouter();
@@ -315,6 +323,8 @@ const isReextracting = ref(false);
 const isEditing = ref(false);
 const selectedDates = ref([]);
 const isUnsaved = computed(() => String(route.params.id || "") === "new");
+/** 읽기 화면의 진행 현황 분류 색. 일일보고와 같은 태그를 쓴다. */
+const KIND_TONES = { done: "is-done", progress: "is-progress", issue: "is-issue", other: "is-next" };
 const saveLabel = computed(() => (isUnsaved.value ? "저장" : "수정 저장"));
 const isMine = computed(() => {
     if (ownerMemberId.value == null || selectedUserId.value == null) return false;
@@ -937,19 +947,53 @@ const saveReport = async () => {
 }
 
 .read-kind h4 {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
     margin: 0 0 var(--space-1);
-    font-family: var(--sans);
     font-size: var(--fs-12);
+}
+
+.read-count {
     font-weight: var(--fw-semibold);
-    color: var(--text);
+    color: var(--text-muted);
 }
 
-.read-kind h4.done {
-    color: var(--success-fg);
+.detail-title .state-chip {
+    align-self: center;
 }
 
-.read-kind h4.issue {
-    color: var(--danger-fg);
+/* 읽기 · 수정 전환. 한때 인라인 색으로 칠하던 버튼을 분명한 두 칸으로 바꿨다. */
+.mode-switch {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+}
+
+.mode-switch button {
+    height: 28px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+}
+
+.mode-switch button.is-on {
+    background: var(--surface);
+    box-shadow: 0 0 0 1px var(--border);
+    color: var(--text-strong);
+    font-weight: var(--fw-semibold);
+}
+
+.mode-switch button:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 .read-list {
@@ -1304,6 +1348,15 @@ const saveReport = async () => {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         width: 100%;
         gap: var(--space-2);
+    }
+
+    .mode-switch {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mode-switch button {
+        min-height: var(--control-h-lg);
     }
 
     .detail-actions .btn,

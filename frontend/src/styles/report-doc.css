@@ -211,11 +211,12 @@
     min-width: 0;
 }
 
-/* Row delete is a quiet control; it turns red only on hover. */
+/* Row delete is a quiet ✕ control; it turns red only on hover. */
 .report-doc .remove-btn {
     flex-shrink: 0;
     min-width: var(--control-h);
-    padding: 0 var(--space-3);
+    width: var(--control-h);
+    padding: 0;
     border-color: transparent;
     background: transparent;
     color: var(--text-muted);
@@ -228,17 +229,17 @@
     color: var(--danger-fg);
 }
 
-/* Add row: dashed ghost, left-aligned under the list. */
+/* Add row: a quiet accent text button under the list. */
 .report-doc .add-btn {
     flex-shrink: 0;
     align-self: flex-start;
-    height: var(--control-h-sm);
-    padding: 0 var(--space-3);
-    border-style: dashed;
-    border-color: var(--border-strong);
+    height: 28px;
+    padding: 0 var(--space-2);
+    border: 0;
     background: transparent;
-    color: var(--text);
+    color: var(--accent);
     font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
 }
 
 .report-doc .add-btn:hover {
@@ -410,8 +411,8 @@
     }
 
     .report-doc .remove-btn {
-        width: auto;
-        min-width: calc(var(--control-h-lg) + var(--space-3));
+        width: var(--control-h-lg);
+        min-width: var(--control-h-lg);
         height: var(--control-h-lg);
         padding: 0 var(--space-3);
         border-radius: var(--radius-sm);
@@ -419,11 +420,9 @@
     }
 
     .report-doc .add-btn {
-        width: 100%;
         height: auto;
         min-height: var(--control-h-lg);
-        padding: 0 var(--space-4);
-        align-self: stretch;
+        padding: 0 var(--space-2);
         border-radius: var(--radius-sm);
         font-size: var(--fs-14);
     }
