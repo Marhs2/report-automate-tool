@@ -113,6 +113,13 @@ feedback.md
 
 
 weekly-send-test/
+r2t2-live-test/
+
+# ── ASR server (runs on the GPU box) / recordings ───────
+asr-server/
+asr_sessions/
+*.pcm
+*.wav
 
 frontend/src/lib/*.test.js
 
