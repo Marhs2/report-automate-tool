@@ -298,7 +298,7 @@ onMounted(async () => {
                 :key="group.letter"
                 class="user-group"
             >
-                <h3 v-if="group.letter" class="group-head">{{ group.letter }} <span>{{ group.items.length }}</span></h3>
+                <h3 v-if="group.letter" class="letter-head">{{ group.letter }} <span>{{ group.items.length }}</span></h3>
                 <div class="user-rows">
                     <div
                         v-for="user in group.items"
@@ -509,14 +509,14 @@ onMounted(async () => {
     margin-bottom: var(--space-5);
 }
 
-.group-head {
+.letter-head {
     margin: 0 0 var(--space-2);
     font-size: var(--fs-12);
     font-weight: var(--fw-semibold);
     color: var(--text);
 }
 
-.group-head span {
+.letter-head span {
     font-weight: var(--fw-medium);
     color: var(--text-muted);
 }

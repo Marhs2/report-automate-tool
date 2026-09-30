@@ -325,13 +325,12 @@ onMounted(() => {
 
       <div class="field field-view">
         <label>보기</label>
-        <div class="view-chips" role="group" aria-label="보기">
+        <div class="seg view-chips" role="group" aria-label="보기">
           <button
             v-for="item in VIEWS"
             :key="item.id"
             type="button"
-            class="btn btn-small"
-            :class="{ 'is-active': view === item.id }"
+            :class="{ 'is-on': view === item.id }"
             :aria-pressed="view === item.id"
             @click="view = item.id"
           >
@@ -474,7 +473,7 @@ onMounted(() => {
               <div
                 v-for="(row, rowIndex) in compactRows(entry)"
                 :key="rowIndex"
-                class="row"
+                class="flow-line"
               >
                 <span class="k cat-tag" :class="KIND_TAGS[row.label]">{{ row.label }}</span>
                 <p class="v">{{ row.text }}</p>
@@ -504,19 +503,7 @@ onMounted(() => {
 
 .view-chips {
   display: flex;
-  gap: var(--space-1);
-  min-height: var(--control-h);
-}
-
-.view-chips .btn {
-  flex: 1;
-  height: var(--control-h);
-}
-
-.view-chips .btn.is-active {
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
-  color: var(--text-strong);
+  width: 100%;
 }
 
 .flow-meta {
@@ -717,7 +704,7 @@ onMounted(() => {
 .avatar {
   width: var(--control-h-sm);
   height: var(--control-h-sm);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   background: var(--surface-soft);
   color: var(--text-strong);
   display: inline-flex;
@@ -733,7 +720,7 @@ onMounted(() => {
   font-size: var(--fs-14);
 }
 
-.row {
+.flow-line {
   display: grid;
   grid-template-columns: var(--control-h-lg) 1fr;
   gap: var(--space-2);
@@ -790,13 +777,8 @@ onMounted(() => {
     font-size: var(--fs-16);
   }
 
-  .view-chips,
-  .view-chips .btn {
-    height: var(--control-h-lg);
-    min-height: var(--control-h-lg);
-  }
 
-  .row {
+  .flow-line {
     grid-template-columns: var(--control-h) 1fr;
   }
 
@@ -810,7 +792,7 @@ onMounted(() => {
   }
 
   .issue-text,
-  .row span {
+  .flow-line span {
     overflow-wrap: anywhere;
   }
 }

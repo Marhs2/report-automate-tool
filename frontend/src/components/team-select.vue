@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
+import { Check } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { selectedTeamId } from "../composables/useSelectedTeam.js";
 import { selectedUserId } from "../composables/useSelectedUser.js";
@@ -101,20 +102,27 @@ onMounted(async () => {
         <div v-else-if="filteredTeams.length === 0" class="empty-state">
             '{{ query.trim() }}'에 해당하는 부서가 없습니다
         </div>
-        <div v-else class="select-grid">
+        <div v-else class="group has-avatars" role="radiogroup" aria-label="부서">
             <button
                 v-for="team in filteredTeams"
                 :key="team.id"
                 type="button"
-                class="select-card"
-                :class="{ selected: isSelected(team.id) }"
+                class="row"
+                role="radio"
+                :aria-checked="isSelected(team.id)"
                 @click="assignTeam(team.id)"
             >
-                <span class="avatar">{{
+                <span class="avatar" :class="{ 'is-me': isSelected(team.id) }">{{
                     String(teamLabel(team) || "?").slice(0, 1)
                 }}</span>
-                <span class="select-card-name">{{ teamLabel(team) }}</span>
-                <span class="select-card-meta">{{ memberCountOf(team) }}명</span>
+                <span class="row-main">
+                    <span class="row-title">{{ teamLabel(team) }}</span>
+                    <span class="row-sub">{{ memberCountOf(team) }}명</span>
+                </span>
+                <span v-if="isSelected(team.id)" class="row-end team-on">
+                    <Check :size="18" />
+                    내 부서
+                </span>
             </button>
         </div>
     </div>
@@ -145,10 +153,9 @@ onMounted(async () => {
     color: var(--text);
 }
 
-.select-card-meta {
-    font-size: var(--fs-11);
+.team-on {
+    color: var(--accent);
     font-weight: var(--fw-semibold);
-    color: var(--text);
 }
 
 .team-note {
