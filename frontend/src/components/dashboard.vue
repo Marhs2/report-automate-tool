@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { ChevronRight } from "lucide-vue-next";
+import { Check, ChevronRight, CircleAlert, PenLine } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { useMyWeek } from "../composables/useMyWeek";
@@ -136,53 +136,47 @@ onMounted(() => {
 
 <template>
     <div class="page is-wide dash">
-        <header class="page-intro">
-            <div class="page-intro-text">
-                <h1>{{ todayHeading }}</h1>
-                <p>오늘 보고와 이번 주 제출, 내가 맡은 프로젝트를 한 곳에서 봐요.</p>
+        <header class="dash-head">
+            <div class="dash-head-text">
+                <p class="dash-date">{{ todayHeading }}</p>
+                <h1 class="t-title">{{ todayCard ? todayCard.title : "오늘은 보고하는 날이 아니에요" }}</h1>
+                <p v-if="todayCard?.body" class="t-desc">{{ todayCard.body }}</p>
+                <p v-else-if="todayCard && board.lastActivity" class="t-desc">
+                    마지막 업무 ·
+                    <router-link class="inline-link" :to="board.lastActivity.href">{{ board.lastActivity.title }}</router-link>
+                </p>
             </div>
-        </header>
-
-        <section class="card today" :class="todayCard && `is-${todayCard.tone}`" aria-label="오늘 보고">
-            <div v-if="todayCard" class="today-main">
-                <div class="today-copy">
-                    <span class="state-chip" :class="`is-${todayCard.tone}`">{{ todayCard.chip }}</span>
-                    <p class="today-title">{{ todayCard.title }}</p>
-                    <p v-if="todayCard.body" class="today-body">{{ todayCard.body }}</p>
-                    <p v-else-if="board.lastActivity" class="today-body">
-                        마지막 업무 ·
-                        <router-link :to="board.lastActivity.href">{{ board.lastActivity.title }}</router-link>
-                    </p>
-                </div>
-                <router-link v-if="todayCard.action" class="btn btn-primary today-action" :to="todayCard.to">
+            <div class="dash-head-side">
+                <span v-if="todayCard" class="state-chip" :class="`is-${todayCard.tone}`">{{ todayCard.chip }}</span>
+                <router-link v-if="todayCard?.action" class="btn btn-primary dash-cta" :to="todayCard.to">
+                    <PenLine :size="16" />
                     {{ todayCard.action }}
                 </router-link>
             </div>
-            <div v-else class="today-main">
-                <div class="today-copy">
-                    <span class="state-chip is-plain">주말</span>
-                    <p class="today-title">오늘은 보고하는 날이 아니에요</p>
-                </div>
-            </div>
+        </header>
 
-            <div v-if="weekCells.length" class="week">
-                <p class="week-label">이번 주</p>
-                <ol class="week-strip">
-                    <li
-                        v-for="day in weekCells"
-                        :key="day.date"
-                        class="week-cell"
-                        :class="`is-${day.tone}`"
-                        :aria-label="`${day.weekday}요일 ${day.label}`"
-                    >
-                        <span class="week-day">{{ day.weekday }} <b>{{ day.day }}</b></span>
-                        <span class="week-state"><i aria-hidden="true"></i>{{ day.label }}</span>
-                    </li>
-                </ol>
-                <p v-if="missingDays" class="week-note">
-                    빠진 날 {{ missingDays }}일은 주간 초안에 ‘빠진 요일’로 표시돼요.
-                </p>
-            </div>
+        <section v-if="weekCells.length" class="week" aria-labelledby="week-title">
+            <h2 id="week-title" class="sr-only">이번 주 제출</h2>
+            <ol class="week-strip">
+                <li
+                    v-for="day in weekCells"
+                    :key="day.date"
+                    class="week-cell"
+                    :class="`is-${day.tone}`"
+                    :aria-label="`${day.weekday}요일 ${day.label}`"
+                >
+                    <span class="week-day">{{ day.weekday }}</span>
+                    <span class="week-num">{{ day.day }}</span>
+                    <span class="week-state">
+                        <Check v-if="day.tone === 'success'" :size="14" :stroke-width="2.5" />
+                        <CircleAlert v-else-if="day.tone === 'danger'" :size="14" :stroke-width="2.25" />
+                        {{ day.label }}
+                    </span>
+                </li>
+            </ol>
+            <p v-if="missingDays" class="week-note">
+                빠진 날 {{ missingDays }}일은 주간 초안에 ‘빠진 요일’로 표시돼요.
+            </p>
         </section>
 
         <p v-if="isLoading" class="list-status" role="status">현황을 불러오는 중</p>
@@ -277,136 +271,141 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.today {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    padding: 0;
-    overflow: hidden;
+.dash {
+    gap: var(--space-6);
 }
 
-.today-main {
+/* 상태가 곧 제목이다. 카드로 감싸지 않고 페이지 머리에서 바로 말한다. */
+.dash-head {
     display: flex;
-    align-items: center;
-    gap: var(--space-5);
-    padding: var(--space-5) var(--space-6);
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-4) var(--space-6);
+    padding-bottom: var(--space-5);
+    border-bottom: 1px solid var(--border);
 }
 
-.today-copy {
+.dash-head-text {
     display: flex;
-    flex: 1;
     flex-direction: column;
-    align-items: flex-start;
     gap: var(--space-2);
     min-width: 0;
 }
 
-.today-title {
-    margin: 0;
-    font-size: var(--fs-20);
-    font-weight: var(--fw-bold);
-    line-height: var(--lh-tight);
-    color: var(--text-strong);
+.dash-head-text .t-title {
     word-break: keep-all;
 }
 
-.today-body {
+.dash-date {
     margin: 0;
-    font-size: var(--fs-14);
+    font: var(--type-caption);
     color: var(--text-muted);
-    word-break: keep-all;
+    font-variant-numeric: tabular-nums;
 }
 
-.today-body a {
+.inline-link {
     color: var(--accent);
-    text-decoration: none;
     font-weight: var(--fw-medium);
+    text-decoration: none;
 }
 
-.today-action {
+.inline-link:hover {
+    text-decoration: underline;
+}
+
+.dash-head-side {
+    display: flex;
     flex-shrink: 0;
-    min-height: var(--control-h-lg);
-    padding: 0 var(--space-6);
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-3);
 }
 
+.dash-cta {
+    height: var(--control-h-lg);
+    padding: 0 var(--space-5);
+}
+
+/* 이번 주: 달력 한 줄. 칸을 타일로 띄우지 않고 한 틀 안에서 세로선으로 나눈다. */
 .week {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: var(--space-2) var(--space-5);
-    padding: var(--space-4) var(--space-6);
-    border-top: 1px solid var(--border);
-    background: var(--bg);
-}
-
-.week-label {
-    margin: 0;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
 }
 
 .week-strip {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: var(--space-2);
     margin: 0;
     padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
     list-style: none;
 }
 
 .week-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+        "day num"
+        "state state";
+    align-items: baseline;
+    gap: var(--space-1) var(--space-2);
     min-width: 0;
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
+    padding: var(--space-3) var(--space-4);
+}
+
+.week-cell + .week-cell {
+    border-left: 1px solid var(--border);
 }
 
 .week-day {
-    font-size: var(--fs-12);
+    grid-area: day;
+    font: var(--type-caption);
     color: var(--text-muted);
 }
 
-.week-day b {
+.week-num {
+    grid-area: num;
+    font-size: var(--fs-20);
     font-weight: var(--fw-semibold);
+    line-height: 1;
     color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
 }
 
 .week-state {
+    grid-area: state;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     color: var(--text-muted);
 }
 
-.week-state i {
-    width: 6px;
-    height: 6px;
-    border-radius: var(--radius-pill);
-    background: var(--border-strong);
-}
-
 .week-cell.is-success .week-state { color: var(--success-fg); }
-.week-cell.is-success .week-state i { background: var(--success-fg); }
 .week-cell.is-danger .week-state { color: var(--danger-fg); }
-.week-cell.is-danger .week-state i { background: var(--danger-fg); }
-.week-cell.is-today { border-color: var(--accent-border); }
-.week-cell.is-today .week-state { color: var(--accent); }
-.week-cell.is-today .week-state i { background: var(--accent); }
-.week-cell.is-upcoming { background: transparent; border-style: dashed; }
+.week-cell.is-today { background: var(--accent-soft); }
+.week-cell.is-today .week-state { color: var(--accent-hover); }
+.week-cell.is-upcoming .week-num { color: var(--text-muted); }
 .week-cell.is-upcoming .week-state { font-weight: var(--fw-regular); }
 
 .week-note {
-    grid-column: 2;
     margin: 0;
-    font-size: var(--fs-12);
+    font: var(--type-desc);
     color: var(--text-muted);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
 }
 
 .list-status {
@@ -498,44 +497,46 @@ onMounted(() => {
 
 @media (max-width: 860px) {
     .dash {
-        gap: var(--space-4);
+        gap: var(--space-5);
     }
 
-    .today-main {
+    .dash-head {
         flex-direction: column;
         align-items: stretch;
-        gap: var(--space-4);
-        padding: var(--space-4);
+        padding-bottom: var(--space-4);
     }
 
-    .today-title {
-        font-size: var(--fs-16);
+    .dash-head .t-title {
+        font-size: var(--fs-20);
     }
 
-    .today-action {
-        width: 100%;
+    .dash-head-side {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
     }
 
-    .week {
-        grid-template-columns: minmax(0, 1fr);
-        padding: var(--space-3) var(--space-4) var(--space-4);
-    }
-
-    .week-note {
-        grid-column: 1;
-    }
-
-    .week-strip {
-        gap: var(--space-1);
+    .dash-cta {
+        flex: 1;
+        max-width: 60%;
     }
 
     .week-cell {
-        align-items: center;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "day"
+            "num"
+            "state";
+        justify-items: center;
         padding: var(--space-2) 0;
     }
 
+    .week-num {
+        font-size: var(--fs-16);
+    }
+
     .week-state {
-        font-size: var(--fs-12);
+        font-size: var(--fs-11);
     }
 
     .history-row {

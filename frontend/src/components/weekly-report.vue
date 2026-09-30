@@ -780,7 +780,7 @@ onMounted(async () => {
     align-items: center;
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     background: var(--surface);
 }
 
@@ -971,18 +971,22 @@ onMounted(async () => {
 .day-chips {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: var(--space-2);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
 }
 
+/* 한 틀 안의 달력 칸. 선택하면 칸 전체가 옅은 세이지로 차고 체크가 붙는다. */
 .day-chip {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-1);
     margin: 0;
-    padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    border-radius: 0;
     background: var(--surface);
     color: var(--text);
     font: inherit;
@@ -990,18 +994,29 @@ onMounted(async () => {
     text-align: left;
     word-break: keep-all;
     cursor: pointer;
-    transition:
-        border-color var(--dur-fast) var(--ease),
-        background var(--dur-fast) var(--ease);
+    transition: background var(--dur-fast) var(--ease);
+}
+
+.day-chip + .day-chip {
+    border-left: 1px solid var(--border);
+}
+
+.day-chip.on::after {
+    content: "";
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    width: 16px;
+    height: 16px;
+    border-radius: var(--radius-xs);
+    background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center / 12px no-repeat;
 }
 
 .day-chip:not(:disabled):not(.on):hover {
-    border-color: var(--accent-border);
-    background: var(--accent-soft);
+    background: var(--bg);
 }
 
 .day-chip.on {
-    border-color: var(--accent);
     background: var(--accent-soft);
 }
 
@@ -1090,6 +1105,17 @@ onMounted(async () => {
 
     .day-chips {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .day-chip + .day-chip {
+        border-left: 0;
+        border-top: 1px solid var(--border);
+    }
+
+    .day-chip.on::after {
+        position: static;
+        order: 3;
+        flex-shrink: 0;
     }
 
     .day-chip {

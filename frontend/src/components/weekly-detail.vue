@@ -967,7 +967,7 @@ const saveReport = async () => {
 .mode-switch {
     display: inline-flex;
     padding: 2px;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     background: var(--surface-soft);
 }
 
@@ -975,7 +975,7 @@ const saveReport = async () => {
     height: 28px;
     padding: 0 var(--space-3);
     border: 0;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-xs);
     background: transparent;
     color: var(--text-muted);
     font: inherit;
@@ -1059,7 +1059,7 @@ const saveReport = async () => {
 
 .fold-count {
     padding: 0 var(--space-2);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     background: var(--surface-soft);
     font-size: var(--fs-11);
     font-weight: var(--fw-semibold);
@@ -1076,15 +1076,14 @@ const saveReport = async () => {
     margin-top: var(--space-3);
 }
 
+/* 공지 하나 = 제목 줄 + 세부 줄. 카드 안에 또 카드를 두지 않고 가는 선으로만 나눈다. */
 .notice-block {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
     min-width: 0;
-    padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--border);
 }
 
 .fold-block-head {
@@ -1111,10 +1110,7 @@ const saveReport = async () => {
 }
 
 .notice-block .add-btn {
-    width: 100%;
-    align-self: stretch;
-    border-style: dashed;
-    background: transparent;
+    align-self: flex-start;
 }
 
 .fold-card .add-project,
@@ -1145,7 +1141,7 @@ const saveReport = async () => {
     height: var(--control-h-sm);
     padding: 0 var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     font: inherit;
     font-size: var(--fs-12);
@@ -1289,16 +1285,21 @@ const saveReport = async () => {
     color: var(--text-strong);
 }
 
-.add-project-btn {
-    width: 100%;
-    border-style: dashed;
-}
-
+/* 두 칸은 면 대신 가운데 세로선으로 나눈다. */
 .split {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--space-3);
+    gap: 0;
     align-items: stretch;
+}
+
+.split > .split-col + .split-col {
+    padding-left: var(--space-5);
+    border-left: 1px solid var(--border);
+}
+
+.split > .split-col:first-child {
+    padding-right: var(--space-5);
 }
 
 .split-col {
@@ -1339,6 +1340,16 @@ const saveReport = async () => {
     .meta-grid,
     .split {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .split > .split-col + .split-col {
+        padding-left: 0;
+        border-left: 0;
+        border-top: 1px solid var(--border);
+    }
+
+    .split > .split-col:first-child {
+        padding-right: 0;
     }
 }
 

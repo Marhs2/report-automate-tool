@@ -78,6 +78,8 @@ const EXTRACT_KINDS = [
     { label: "협조 요청", hint: "필요한 도움", tone: "request" },
     { label: "다음 계획", hint: "다음에 할 일", tone: "muted" },
 ];
+/** 분류 표시는 모든 화면이 같은 .cat-tag를 쓴다. */
+const KIND_CAT = { neutral: "", success: "is-done", info: "is-progress", warning: "is-issue", request: "is-request", muted: "is-next" };
 
 const elapsedLabel = computed(() => {
     const minutes = Math.floor(elapsed.value / 60);
@@ -602,24 +604,25 @@ const sendReport = async () => {
         </div>
         <aside v-if="!isNarrow" class="write-aside">
             
-            <section class="card aside-card" aria-labelledby="steps-title">
-                <h2 id="steps-title">저장까지 세 단계</h2>
+            <section class="aside-card" aria-labelledby="steps-title">
+                <h2 id="steps-title">저장까지</h2>
                 <ol class="step-list">
-                    <li class="is-on"><b>1</b><span>원문을 쓰거나 붙여 넣기</span></li>
-                    <li><b>2</b><span>AI가 프로젝트별 초안 만들기</span></li>
-                    <li><b>3</b><span>원문과 나란히 검토하고 저장</span></li>
+                    <li class="is-on"><b>지금</b><span>원문을 쓰거나 붙여 넣기</span></li>
+                    <li><b>다음</b><span>AI가 프로젝트별 초안 만들기</span></li>
+                    <li><b>마지막</b><span>원문과 나란히 검토하고 저장</span></li>
                 </ol>
                 <p class="aside-note">
                     {{ waitDateLabel }}에
                     {{ alreadySaved ? "저장된 보고가 있어요. 다시 저장하면 바꿀지 먼저 물어봐요." : "저장된 보고가 없어요." }}
                 </p>
             </section>
-            <section class="card aside-card" aria-labelledby="kinds-title">
+            <section class="aside-card" aria-labelledby="kinds-title">
                 <h2 id="kinds-title">AI가 나누는 항목</h2>
                 <ul class="kind-list">
                     <li v-for="kind in EXTRACT_KINDS" :key="kind.label">
-                        <span class="kind-swatch" :class="`is-${kind.tone}`" aria-hidden="true"></span>
-                        <span class="kind-label">{{ kind.label }}</span>
+                        <span class="kind-label">
+                            <span class="cat-tag" :class="KIND_CAT[kind.tone]">{{ kind.label }}</span>
+                        </span>
                         <span class="kind-hint">{{ kind.hint }}</span>
                     </li>
                 </ul>
@@ -690,10 +693,13 @@ const sendReport = async () => {
     gap: var(--space-4);
 }
 
+/* 옆 안내는 카드가 아니다. 가는 선 아래 글로만 둔다. */
 .aside-card {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+    padding: var(--space-4) 0 0;
+    border-top: 1px solid var(--border-strong);
 }
 
 .aside-card h2 {
@@ -722,17 +728,12 @@ const sendReport = async () => {
     color: var(--text);
 }
 
+/* 번호 원 대신 짧은 말머리. 지금 단계만 진하게. */
 .step-list b {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
+    flex: 0 0 40px;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
     color: var(--text-muted);
-    font-size: var(--fs-11);
 }
 
 .step-list li.is-on {
@@ -741,8 +742,8 @@ const sendReport = async () => {
 }
 
 .step-list li.is-on b {
-    background: var(--accent);
-    color: var(--text-on-accent);
+    color: var(--accent);
+    font-weight: var(--fw-semibold);
 }
 
 .aside-note {
@@ -799,7 +800,7 @@ const sendReport = async () => {
 .kind-swatch.is-muted { background: var(--text-muted); }
 
 .kind-label {
-    width: 64px;
+    flex: 0 0 76px;
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }

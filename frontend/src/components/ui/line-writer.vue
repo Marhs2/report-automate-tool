@@ -391,7 +391,7 @@ onUnmounted(() => {
     flex: 1 1 calc(33.33% - var(--space-2));
     min-width: 0;
     padding: 0 var(--space-2);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     font-size: var(--fs-14);
     white-space: nowrap;
 }
@@ -550,7 +550,7 @@ onUnmounted(() => {
     flex: none;
     height: var(--control-h-lg);
     padding: 0 var(--space-4);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     font-size: var(--fs-14);
 }
 

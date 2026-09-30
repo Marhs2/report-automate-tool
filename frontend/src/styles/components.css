@@ -4,6 +4,16 @@
    level, hairline borders, accent reserved for primary/selected/focus.
    ------------------------------------------------------------------ */
 
+/* ==== Type roles ==================================================
+   Title · Heading · Body · Description · Caption. Pages use these or the
+   matching tokens (--type-*) — never ad-hoc size/weight pairs. */
+
+.t-title { margin: 0; font: var(--type-title); letter-spacing: -0.01em; color: var(--text-strong); }
+.t-heading { margin: 0; font: var(--type-heading); color: var(--text-strong); }
+.t-body { margin: 0; font: var(--type-body); color: var(--text); }
+.t-desc { margin: 0; font: var(--type-desc); color: var(--text-muted); }
+.t-caption { margin: 0; font: var(--type-caption); color: var(--text-muted); }
+
 /* ==== Surfaces ==================================================== */
 
 .card {
@@ -390,25 +400,30 @@ input[type="file"]::file-selector-button:hover {
 }
 
 /* ==== Chips =======================================================
-   Static text chips are 24px pills. Interactive chips are .btn-small. */
+   .chip: 정적 라벨(프로젝트명 등). 모서리 3px의 옅은 면, 알약 아님.
+   .status-chip: state-chip과 같은 언어(아이콘 + 글자, 배경 없음). */
 
 .chip,
-.count-chip,
-.status-chip {
+.count-chip {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
     max-width: 100%;
-    padding: 2px var(--space-2);
+    height: 22px;
+    padding: 0 6px;
     border: 1px solid transparent;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-xs);
     background: var(--surface-soft);
     color: var(--text);
     font-size: var(--fs-12);
     font-weight: var(--fw-medium);
-    line-height: 18px;
+    line-height: 1;
     white-space: nowrap;
     word-break: keep-all;
+}
+
+.count-chip {
+    font-variant-numeric: tabular-nums;
 }
 
 .chip.is-accent,
@@ -424,32 +439,50 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .status-chip {
+    --state-icon: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-muted);
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
+    line-height: 1.2;
+    white-space: nowrap;
+    word-break: keep-all;
 }
 
-.status-chip.is-saved {
-    background: var(--success-bg);
-    border-color: var(--success-border);
-    color: var(--success-fg);
+.status-chip::before {
+    content: "";
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    background: currentColor;
+    -webkit-mask: var(--state-icon) center / contain no-repeat;
+    mask: var(--state-icon) center / contain no-repeat;
 }
 
-.status-chip.is-draft {
-    background: var(--warning-bg);
-    border-color: var(--warning-border);
-    color: var(--warning-fg);
+.status-chip:not(.is-saved):not(.is-draft):not(.is-info):not(.is-danger) {
+    height: 22px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-xs);
+    color: var(--text);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
 }
 
-.status-chip.is-info {
-    background: var(--info-bg);
-    border-color: var(--info-border);
-    color: var(--info-fg);
+.status-chip:not(.is-saved):not(.is-draft):not(.is-info):not(.is-danger)::before {
+    display: none;
 }
 
-.status-chip.is-danger {
-    background: var(--danger-bg);
-    border-color: var(--danger-border);
-    color: var(--danger-fg);
-}
+.status-chip.is-saved { --state-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9.5'/%3E%3Cpath d='m8.5 12.5 2.5 2.5 4.5-5'/%3E%3C/svg%3E"); color: var(--success-fg); }
+.status-chip.is-draft { --state-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h8'/%3E%3Cpath d='M16.4 3.6a2 2 0 0 1 2.9 2.9L7.5 18.3 3.5 19.5l1.2-4z'/%3E%3C/svg%3E"); color: var(--warning-fg); }
+.status-chip.is-info { --state-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9.5'/%3E%3Ccircle cx='12' cy='12' r='3' fill='black'/%3E%3C/svg%3E"); color: var(--info-fg); }
+.status-chip.is-danger { --state-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9.5'/%3E%3Cpath d='M12 7.5v5'/%3E%3Cpath d='M12 16.3h.01'/%3E%3C/svg%3E"); color: var(--danger-fg); }
 
 /* ==== Tabs ========================================================
    Underline tabs on a single hairline. No pills, no boxes. */
@@ -681,10 +714,32 @@ input[type="file"]::file-selector-button:hover {
     font-size: var(--fs-14);
     line-height: var(--lh-base);
     color: var(--text-muted);
-    border: 1px dashed var(--border-strong);
-    border-radius: var(--radius);
+    border: 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
     background: transparent;
     word-break: keep-all;
+}
+
+.empty-state .empty-title {
+    margin: 0;
+    font: var(--type-heading);
+    color: var(--text-strong);
+}
+
+.empty-state .empty-body {
+    max-width: 420px;
+    margin: 0;
+    font: var(--type-desc);
+    color: var(--text-muted);
+}
+
+.empty-state .empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
 }
 
 .empty-state svg {
@@ -777,17 +832,20 @@ input[type="file"]::file-selector-button:hover {
    cat-tag: 보고 항목 분류(완료·진행·이슈·요청·다음). 모든 화면이 같은 색을 쓴다.
    list-card: 한 카드 안에서 줄로 나눈 목록. 카드를 줄마다 쪼개지 않는다. */
 
+/* 상태 표시는 배경 없는 "아이콘 + 굵은 글자"다. 알약 모양과 점을 쓰지 않는다.
+   아이콘은 mask라 글자색(currentColor)을 그대로 따른다.
+   success 체크 · danger 느낌표 · warning 연필(초안) · info 채운 원(진행/로그인). */
 .state-chip {
+    --state-icon: none;
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     height: var(--chip-h);
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-    color: var(--text);
-    font-size: var(--fs-12);
+    padding: 0;
+    background: none;
+    color: var(--text-muted);
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     line-height: 1;
     white-space: nowrap;
@@ -795,27 +853,45 @@ input[type="file"]::file-selector-button:hover {
 
 .state-chip::before {
     content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: var(--radius-pill);
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
     background: currentColor;
+    -webkit-mask: var(--state-icon) center / contain no-repeat;
+    mask: var(--state-icon) center / contain no-repeat;
+}
+
+.state-chip.is-success { --state-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9.5'/%3E%3Cpath d='m8.5 12.5 2.5 2.5 4.5-5'/%3E%3C/svg%3E"); color: var(--success-fg); }
+.state-chip.is-danger { --state-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9.5'/%3E%3Cpath d='M12 7.5v5'/%3E%3Cpath d='M12 16.3h.01'/%3E%3C/svg%3E"); color: var(--danger-fg); }
+.state-chip.is-warning { --state-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h8'/%3E%3Cpath d='M16.4 3.6a2 2 0 0 1 2.9 2.9L7.5 18.3 3.5 19.5l1.2-4z'/%3E%3C/svg%3E"); color: var(--warning-fg); }
+.state-chip.is-info { --state-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9.5'/%3E%3Ccircle cx='12' cy='12' r='3' fill='black'/%3E%3C/svg%3E"); color: var(--info-fg); }
+.state-chip.is-accent { --state-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9.5'/%3E%3Ccircle cx='12' cy='12' r='3' fill='black'/%3E%3C/svg%3E"); color: var(--accent); }
+
+/* 중립 표시(주말 · 역할 등)는 아이콘 대신 가는 테두리 라벨. */
+.state-chip.is-plain {
+    height: 22px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-xs);
+    color: var(--text);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
 }
 
 .state-chip.is-plain::before { display: none; }
-.state-chip.is-success { background: var(--success-bg); color: var(--success-fg); }
-.state-chip.is-warning { background: var(--warning-bg); color: var(--warning-fg); }
-.state-chip.is-danger { background: var(--danger-bg); color: var(--danger-fg); }
-.state-chip.is-info { background: var(--info-bg); color: var(--info-fg); }
-.state-chip.is-accent { background: var(--accent-soft); color: var(--accent-hover); }
 
+/* 보고 분류(완료·진행·이슈·요청·다음): 채움 없는 테두리 라벨. 글자와 테두리만 분류색. */
 .cat-tag {
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
+    justify-content: center;
+    min-width: 36px;
     height: 20px;
-    padding: 0 6px;
+    padding: 0 5px;
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-xs);
-    background: var(--surface-soft);
+    background: transparent;
     color: var(--text);
     font-size: var(--fs-12);
     font-weight: var(--fw-semibold);
@@ -823,11 +899,11 @@ input[type="file"]::file-selector-button:hover {
     white-space: nowrap;
 }
 
-.cat-tag.is-done { background: var(--success-bg); color: var(--success-fg); }
-.cat-tag.is-progress { background: var(--info-bg); color: var(--info-fg); }
-.cat-tag.is-issue { background: var(--warning-bg); color: var(--warning-fg); }
-.cat-tag.is-request { background: var(--project-4-bg); color: var(--project-4-fg); }
-.cat-tag.is-next { background: var(--surface-soft); color: var(--text); }
+.cat-tag.is-done { border-color: var(--success-border); color: var(--success-fg); }
+.cat-tag.is-progress { border-color: var(--info-border); color: var(--info-fg); }
+.cat-tag.is-issue { border-color: var(--warning-border); color: var(--warning-fg); background: var(--warning-bg); }
+.cat-tag.is-request { border-color: var(--project-4-border); color: var(--project-4-fg); }
+.cat-tag.is-next { border-style: dashed; color: var(--text-muted); }
 
 .list-card {
     display: flex;
@@ -844,14 +920,12 @@ input[type="file"]::file-selector-button:hover {
 
 .section-title {
     margin: 0;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
+    font: var(--type-heading);
     color: var(--text-strong);
 }
 
 .section-note {
     margin: 0;
-    font-size: var(--fs-13);
-    line-height: var(--lh-base);
+    font: var(--type-desc);
     color: var(--text-muted);
 }

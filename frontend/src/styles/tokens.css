@@ -1,58 +1,69 @@
 /* ------------------------------------------------------------------
    Design tokens — the only place raw values live.
-   Light paper theme, one blue accent, hairline borders, no dark mode.
+   Report paper: cream canvas, ink text, one sage-forest accent,
+   terracotta for what is missing. Hairline borders, no dark mode.
+   Full rules: docs/design-system.md
    Every name here is a public hook: never rename or remove, only add.
-   Usage rules live in .omo/ui-redesign/design-spec.md
    ------------------------------------------------------------------ */
 :root {
     /* ---- Color: canvas & surfaces ------------------------------- */
-    --bg: #f6f5f4;              /* page canvas (warm paper) */
-    --surface: #ffffff;         /* cards, inputs, dialogs, sticky bars */
-    --surface-soft: #efedeb;    /* hover fill, trays, static chips, avatars */
-    --surface-press: #e6e3df;   /* pressed/active fill for neutral controls */
-    --sidebar-bg: #f6f5f4;
+    --bg: #f5f2ea;              /* page canvas: report paper */
+    --surface: #fffefb;         /* cards, inputs, dialogs, sticky bars */
+    --surface-soft: #eeeae0;    /* hover fill, trays, static chips, avatars */
+    --surface-press: #e4dfd2;   /* pressed/active fill for neutral controls */
+    --sidebar-bg: #efebe2;     /* a notch dimmer than the canvas so the work surface leads */
 
     /* ---- Color: lines --------------------------------------------- */
-    --border: #e7e5e2;          /* default hairline, warm to match canvas */
-    --border-strong: #d3cfc9;   /* hover border, dashed affordances */
+    --border: #e2dccf;          /* default hairline, warm to match canvas */
+    --border-strong: #c9c1ae;   /* hover border, dashed affordances */
 
     /* ---- Color: text ---------------------------------------------- */
-    --text-strong: #1c1b18;     /* headings, values, control labels */
-    --text: #37352f;            /* body */
-    --text-muted: #6f6e69;      /* secondary, field labels, placeholders */
+    --text-strong: #1d201a;     /* headings, values, control labels */
+    --text: #3a3e35;            /* body */
+    --text-muted: #6a6c60;      /* secondary, field labels, placeholders */
     --text-on-accent: #ffffff;
 
     /* ---- Color: the one accent ------------------------------------ */
-    --accent: #0075de;          /* primary CTA fill, links, active indicator */
-    --accent-hover: #005bab;
-    --accent-soft: #e8f1fc;     /* selected fill, count chips */
-    --accent-border: #b9d6f5;
-    --accent-ring: rgba(0, 117, 222, 0.2);
+    --accent: #4d6a39;          /* primary CTA fill, links, active indicator */
+    --accent-hover: #3c552c;
+    --accent-soft: #ebefe2;     /* selected fill, count chips */
+    --accent-border: #c3cfb2;
+    --accent-ring: rgba(77, 106, 57, 0.24);
 
     /* ---- Color: semantic (tinted chip/notice only) ---------------- */
-    --success-fg: #1a7f37;
-    --success-bg: #e6f4ea;
-    --success-border: #b7dbbf;
-    --warning-fg: #9a6700;
-    --warning-bg: #fef3c7;
-    --warning-border: #e6cfa3;
-    --danger-fg: #b3261e;
-    --danger-bg: #fbeae8;
-    --danger-border: #eec4bf;
-    --info-fg: #0b5cab;
-    --info-bg: #e8f1fc;
-    --info-border: #b9d6f5;
+    --success-fg: #3f6a31;
+    --success-bg: #e7eedd;
+    --success-border: #b9cca6;
+    --warning-fg: #8a5b0c;
+    --warning-bg: #f6ecd3;
+    --warning-border: #dfc591;
+    --danger-fg: #a5402a;
+    --danger-bg: #f7e5de;
+    --danger-border: #e3b9a9;
+    --info-fg: #37576f;
+    --info-bg: #e4eaee;
+    --info-border: #b6c6d2;
 
     /* Project accents 4/5 extend the report-doc palette past the 4 semantics. */
-    --project-4-fg: #5c5470;
-    --project-4-bg: #eeeaf3;
-    --project-4-border: #c9c1d8;
-    --project-5-fg: #3f6f68;
+    --project-4-fg: #684c60;
+    --project-4-bg: #f0e7ec;
+    --project-4-border: #d4bfcc;
+    --project-5-fg: #3b6863;
     --project-5-bg: #e6f0ee;
     --project-5-border: #b7d0cb;
 
+    /* ---- Color roles (aliases the components read) --------------
+       primary   : the one action on a screen (fill)
+       secondary : quiet sage for marks that decorate, never for text
+       attention : terracotta for "missing / not yet", same hue as danger */
+    --primary: var(--accent);
+    --primary-hover: var(--accent-hover);
+    --secondary: #8b9a6e;
+    --secondary-soft: #e6e9dc;
+    --attention: var(--danger-fg);
+
     /* ---- Overlay -------------------------------------------------- */
-    --overlay: rgba(28, 27, 24, 0.4);
+    --overlay: rgba(29, 32, 26, 0.36);
 
     /* ---- Spacing: 4px grid ---------------------------------------- */
     --space-1: 4px;
@@ -73,8 +84,8 @@
     --chip-h: 24px;             /* static text chips */
 
     /* ---- Type ----------------------------------------------------- */
-    --sans: "Inter", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
-    --heading: "Inter", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
+    --sans: "Pretendard Variable", "Pretendard", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    --heading: var(--sans);
     --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --fs-11: 11px;              /* micro labels, nav group caps */
     --fs-12: 12px;              /* chips, field labels, kickers */
@@ -93,16 +104,28 @@
     --fw-semibold: 600;
     --fw-bold: 700;
 
+    /* ---- Type roles: size / weight / leading in one place ---------- */
+    --type-title: var(--fw-bold) var(--fs-24) / var(--lh-tight) var(--sans);     /* page title */
+    --type-heading: var(--fw-semibold) var(--fs-16) / var(--lh-tight) var(--sans); /* section */
+    --type-body: var(--fw-regular) var(--fs-14) / var(--lh-base) var(--sans);    /* body */
+    --type-desc: var(--fw-regular) var(--fs-13) / var(--lh-base) var(--sans);    /* description */
+    --type-caption: var(--fw-medium) var(--fs-12) / var(--lh-tight) var(--sans); /* caption, labels */
+
+    /* ---- Spacing roles ---------------------------------------------- */
+    --gap-tight: var(--space-2);    /* inside a control group */
+    --gap: var(--space-4);          /* between related blocks */
+    --gap-section: var(--space-7);  /* between sections of a page */
+
     /* ---- Radii: nested surfaces step down one notch ---------------- */
-    --radius-xs: 4px;           /* code, text highlights */
-    --radius-sm: 8px;           /* controls, trays inside cards */
-    --radius: 12px;             /* cards, toolbars, empty states */
-    --radius-lg: 16px;          /* dialogs, bottom sheets */
+    --radius-xs: 3px;           /* code, text highlights */
+    --radius-sm: 6px;           /* controls, trays inside cards */
+    --radius: 8px;              /* cards, toolbars, empty states */
+    --radius-lg: 12px;          /* dialogs, bottom sheets */
     --radius-pill: 9999px;      /* chips, avatars */
 
     /* ---- Elevation: flat by default, shadow only when floating ----- */
-    --shadow-1: 0 1px 2px rgba(28, 27, 24, 0.04), 0 4px 12px rgba(28, 27, 24, 0.05);
-    --shadow-2: 0 8px 24px rgba(28, 27, 24, 0.08), 0 24px 48px rgba(28, 27, 24, 0.06);
+    --shadow-1: 0 1px 0 rgba(29, 32, 26, 0.05), 0 1px 3px rgba(29, 32, 26, 0.06);
+    --shadow-2: 0 2px 6px rgba(29, 32, 26, 0.06), 0 16px 40px rgba(29, 32, 26, 0.12);
     --focus-ring: 0 0 0 3px var(--accent-ring);
 
     /* ---- Motion --------------------------------------------------- */
@@ -125,5 +148,5 @@
     --bottom-nav-height: 0px;
     --bottom-nav-offset: 0px;
 
-    --scrollbar-thumb: rgba(28, 27, 24, 0.22);
+    --scrollbar-thumb: rgba(29, 32, 26, 0.22);
 }

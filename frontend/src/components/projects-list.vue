@@ -185,7 +185,7 @@ onMounted(() => {
                 v-model="query"
                 class="input"
                 type="search"
-                placeholder="이름, 프로젝트, 내용 검색"
+                placeholder="이름 · 프로젝트 검색"
                 aria-label="검색"
                 enterkeyhint="search"
             />
@@ -298,9 +298,10 @@ onMounted(() => {
     align-items: center;
     height: 18px;
     margin-left: var(--space-1);
-    padding: 0 6px;
-    border-radius: var(--radius-pill);
-    background: var(--accent-soft);
+    padding: 0 5px;
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-xs);
+    background: transparent;
     color: var(--accent-hover);
     font-size: var(--fs-11);
     font-weight: var(--fw-semibold);
@@ -316,7 +317,7 @@ onMounted(() => {
 
 @media (max-width: 860px) {
     .list-toolbar {
-        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
 
     .list-toolbar .input {
