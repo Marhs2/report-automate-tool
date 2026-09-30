@@ -976,7 +976,7 @@ onMounted(async () => {
     border-radius: var(--radius);
 }
 
-/* 한 틀 안의 달력 칸. 선택하면 칸 전체가 옅은 세이지로 차고 체크가 붙는다. */
+/* 한 틀 안의 달력 칸. 선택하면 칸 전체가 옅은 강조색으로 차고 체크가 붙는다. */
 .day-chip {
     position: relative;
     display: flex;
