@@ -466,7 +466,6 @@ const sendReport = async () => {
             :class="{ 'is-lines': useLines }"
         >
             <div class="write-head">
-                <span class="write-author">{{ userName || "나" }}</span>
                 <input
                     type="date"
                     id="date"
@@ -483,7 +482,7 @@ const sendReport = async () => {
                     {{ statusLabel }}
                     <span v-if="statusDetail" class="status-chip-more"> · {{ statusDetail }}</span>
                 </span>
-                <div class="write-modes" role="tablist" aria-label="입력 방식">
+                <div class="seg write-modes" role="tablist" aria-label="입력 방식">
                     <button
                         v-for="mode in inputModes"
                         :key="mode.id"
@@ -602,6 +601,19 @@ const sendReport = async () => {
             </p>
         </div>
         <aside v-if="!isNarrow" class="write-aside">
+            
+            <section class="card aside-card" aria-labelledby="steps-title">
+                <h2 id="steps-title">저장까지 세 단계</h2>
+                <ol class="step-list">
+                    <li class="is-on"><b>1</b><span>원문을 쓰거나 붙여 넣기</span></li>
+                    <li><b>2</b><span>AI가 프로젝트별 초안 만들기</span></li>
+                    <li><b>3</b><span>원문과 나란히 검토하고 저장</span></li>
+                </ol>
+                <p class="aside-note">
+                    {{ waitDateLabel }}에
+                    {{ alreadySaved ? "저장된 보고가 있어요. 다시 저장하면 바꿀지 먼저 물어봐요." : "저장된 보고가 없어요." }}
+                </p>
+            </section>
             <section class="card aside-card" aria-labelledby="kinds-title">
                 <h2 id="kinds-title">AI가 나누는 항목</h2>
                 <ul class="kind-list">
@@ -611,11 +623,6 @@ const sendReport = async () => {
                         <span class="kind-hint">{{ kind.hint }}</span>
                     </li>
                 </ul>
-            </section>
-            <section class="card aside-card" aria-labelledby="day-title">
-                <h2 id="day-title">{{ waitDateLabel }} 상태</h2>
-                <p class="aside-row"><span>저장된 보고</span><b>{{ alreadySaved ? "있음" : "없음" }}</b></p>
-                <p class="aside-row"><span>원문 초안</span><b>{{ draftSavedAt || "없음" }}</b></p>
             </section>
         </aside>
         </div>
@@ -652,11 +659,6 @@ const sendReport = async () => {
     margin-bottom: var(--space-4);
 }
 
-.write-author {
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
 
 .write-date {
     width: auto;
@@ -665,39 +667,7 @@ const sendReport = async () => {
 }
 
 .write-modes {
-    display: inline-flex;
     margin-left: auto;
-    padding: 2px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-}
-
-.write-modes button {
-    height: 28px;
-    padding: 0 var(--space-3);
-    border: 0;
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    cursor: pointer;
-    transition:
-        background var(--dur-fast) var(--ease),
-        color var(--dur-fast) var(--ease);
-}
-
-.write-modes button.is-on {
-    background: var(--surface);
-    box-shadow: 0 0 0 1px var(--border);
-    color: var(--text-strong);
-    font-weight: var(--fw-semibold);
-}
-
-.write-modes button:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
 }
 
 .write-layout {
@@ -734,6 +704,56 @@ const sendReport = async () => {
 }
 
 
+
+.step-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: var(--space-1) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.step-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--fs-13);
+    color: var(--text);
+}
+
+.step-list b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+    color: var(--text-muted);
+    font-size: var(--fs-11);
+}
+
+.step-list li.is-on {
+    color: var(--text-strong);
+    font-weight: var(--fw-semibold);
+}
+
+.step-list li.is-on b {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.aside-note {
+    margin: var(--space-1) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-12);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
 
 .aside-row {
     display: flex;
@@ -1031,12 +1051,7 @@ const sendReport = async () => {
         gap: var(--space-2) var(--space-3);
     }
 
-    .write-author {
-        min-width: 0;
-    }
-
     .write-date {
-        grid-column: 1 / -1;
         width: 100%;
         min-width: 0;
         max-width: 100%;
@@ -1057,14 +1072,7 @@ const sendReport = async () => {
 
     .write-modes {
         grid-column: 1 / -1;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
         margin-left: 0;
-    }
-
-    .write-modes button {
-        height: var(--control-h-sm);
-        font-size: var(--fs-14);
     }
 
     .write-footnote {
