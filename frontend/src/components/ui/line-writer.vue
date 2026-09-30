@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
+import { X } from "lucide-vue-next";
 import {
     KIND_FIELDS,
     LINE_KINDS,
@@ -36,6 +37,10 @@ const projectNames = computed(() => {
     for (const line of lines.value) add(line.project);
     return names;
 });
+
+/** 분류 색은 모든 화면이 같은 .cat-tag를 쓴다. */
+const KIND_TAG = { 완료: "is-done", 진행: "is-progress", 이슈: "is-issue", 요청: "is-request", "다음 계획": "is-next" };
+const filledKinds = computed(() => LINE_KINDS.filter((item) => rowsFor(item).length));
 
 const rowsFor = (item) =>
     lines.value.filter(
@@ -213,15 +218,22 @@ onUnmounted(() => {
         </Teleport>
 
         <section v-if="activeProject" class="line-group" :aria-label="activeProject">
-            <div v-for="item in LINE_KINDS" :key="item" class="line-bucket">
-                <h2>{{ item }}</h2>
+            <p v-if="filledKinds.length === 0" class="line-empty">
+                아래에서 종류를 고르고 한 줄씩 넣으세요.<br />넣은 줄은 여기에 종류별로 모여요.
+            </p>
+            <div v-for="item in filledKinds" :key="item" class="line-bucket">
+                <h2><span class="cat-tag" :class="KIND_TAG[item]">{{ item }}</span></h2>
                 <div v-for="line in rowsFor(item)" :key="line.id" class="line-row">
                     <span>{{ line.text }}</span>
-                    <button type="button" class="line-remove" @click="removeLine(line.id)">
-                        삭제
+                    <button
+                        type="button"
+                        class="line-remove"
+                        :aria-label="`${line.text} 빼기`"
+                        @click="removeLine(line.id)"
+                    >
+                        <X :size="16" />
                     </button>
                 </div>
-                <p v-if="!rowsFor(item).length" class="line-preview">없음</p>
             </div>
         </section>
 
@@ -379,7 +391,7 @@ onUnmounted(() => {
     flex: 1 1 calc(33.33% - var(--space-2));
     min-width: 0;
     padding: 0 var(--space-2);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     font-size: var(--fs-14);
     white-space: nowrap;
 }
@@ -405,19 +417,22 @@ onUnmounted(() => {
 
 .line-bucket {
     display: flex;
-    flex: 1;
     flex-direction: column;
-    justify-content: center;
+    gap: var(--space-1);
+    padding-top: var(--space-3);
 }
 
-.line-preview {
-    margin: 0;
-    min-height: var(--control-h-lg);
+.line-empty {
     display: flex;
+    flex: 1;
     align-items: center;
-    border-top: 1px solid var(--border);
+    justify-content: center;
+    margin: 0;
+    padding: var(--space-6) var(--space-4);
     font-size: var(--fs-14);
-    color: var(--text);
+    line-height: var(--lh-relaxed);
+    color: var(--text-muted);
+    text-align: center;
 }
 
 .line-group h2,
@@ -469,10 +484,16 @@ onUnmounted(() => {
     padding: 0 var(--space-2);
     border: 0;
     background: transparent;
-    color: var(--danger-fg);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
     font: inherit;
     font-size: var(--fs-14);
     cursor: pointer;
+}
+
+.line-remove:hover {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
 }
 
 .line-compose {
@@ -529,7 +550,7 @@ onUnmounted(() => {
     flex: none;
     height: var(--control-h-lg);
     padding: 0 var(--space-4);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     font-size: var(--fs-14);
 }
 

@@ -1140,7 +1140,7 @@ const getSelectedMemberId = () => {
     height: var(--control-h-sm);
     padding: 0 var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     font: inherit;
     font-size: var(--fs-12);
@@ -1336,7 +1336,7 @@ const getSelectedMemberId = () => {
     min-height: var(--control-h-lg);
     padding: 0 var(--space-2);
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text-strong);
     font: inherit;

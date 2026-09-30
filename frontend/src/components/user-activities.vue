@@ -946,7 +946,7 @@ const progressByMember = computed(() => {
     margin: 0;
     padding: var(--space-1) var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     font: inherit;
     font-size: var(--fs-13);
@@ -963,19 +963,20 @@ button.person-chip:hover {
     color: var(--accent);
 }
 
+/* 미제출은 면을 칠하지 않고 테두리와 글자색으로만 구분한다. */
 .person-chip.is-missed {
-    border-color: transparent;
-    background: var(--danger-bg);
+    border-color: var(--danger-border);
+    background: transparent;
     color: var(--danger-fg);
 }
 
 .agenda-bar {
     display: flex;
     gap: 2px;
-    height: 8px;
+    height: 6px;
     margin-top: var(--space-3);
     overflow: hidden;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-xs);
     background: var(--surface-soft);
 }
 

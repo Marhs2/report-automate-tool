@@ -790,7 +790,7 @@ onMounted(() => {
     height: var(--space-4);
     padding: 0;
     border: none;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text);
     cursor: pointer;
@@ -828,7 +828,7 @@ onMounted(() => {
     color: var(--text);
     opacity: 0.65;
     cursor: pointer;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm);
 }
 
 .btn-icon:hover {

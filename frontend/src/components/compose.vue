@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
@@ -54,6 +54,7 @@ const kindFromQuery = (value) => {
 };
 
 const kind = ref(kindFromQuery(route.query.kind));
+const currentChoice = computed(() => COMPOSE_CHOICES.find((item) => item.id === kind.value));
 const recordId = ref(null);
 const records = ref([]);
 const isLoading = ref(false);
@@ -318,9 +319,9 @@ watch(selectedUserId, loadUserName);
 </script>
 
 <template>
-    <div class="page" :class="{ 'is-wide': kind === 'daily' }">
+    <div class="page is-wide">
         <div class="kind-bar">
-            <nav class="kind-switch" aria-label="작성">
+            <nav class="seg kind-switch" aria-label="작성">
                 <router-link
                     v-for="item in COMPOSE_CHOICES"
                     :key="item.id"
@@ -331,6 +332,7 @@ watch(selectedUserId, loadUserName);
                     {{ item.label }}
                 </router-link>
             </nav>
+            <p class="kind-hint">{{ currentChoice?.hint }}</p>
         </div>
 
         <Report v-if="kind === 'daily'" />
@@ -342,7 +344,6 @@ watch(selectedUserId, loadUserName);
             <form class="card compose-card" @submit.prevent="save">
                 <!-- 일일보고 탭과 같은 머리줄: 누가 · 언제 · 저장됐는지. -->
                 <div class="write-head">
-                    <span class="write-author">{{ userName || "나" }}</span>
                     <input
                         id="work-date"
                         v-model="form.reportDate"
@@ -499,22 +500,31 @@ watch(selectedUserId, loadUserName);
                 </div>
             </form>
 
-            <aside class="side-list">
-                <p class="side-label">내가 쓴 {{ KIND_LABELS[kind] }}</p>
-                <p v-if="records.length === 0" class="list-status">
-                    아직 없어요. 왼쪽에서 저장하면 여기에 쌓여요.
-                </p>
-                <button
-                    v-for="row in records"
-                    :key="row.id"
-                    type="button"
-                    class="side-item"
-                    :class="{ 'is-current': row.id === recordId }"
-                    @click="openRecord(row.id)"
-                >
-                    <span>{{ dotDate(row.reportDate) }} · {{ row.title }}</span>
-                    <span v-if="row.projectName">{{ row.projectName }}</span>
-                </button>
+            <aside class="group-block side-list">
+                <div class="group-head">
+                    <h2>내가 쓴 {{ KIND_LABELS[kind] }}</h2>
+                    <span v-if="records.length" class="group-meta">{{ records.length }}건</span>
+                </div>
+                <div class="group">
+                    <p v-if="records.length === 0" class="group-empty">
+                        아직 없어요. 저장하면 여기에 쌓여요.
+                    </p>
+                    <button
+                        v-for="row in records"
+                        :key="row.id"
+                        type="button"
+                        class="row"
+                        :class="{ 'is-current': row.id === recordId }"
+                        @click="openRecord(row.id)"
+                    >
+                        <span class="row-main">
+                            <span class="row-title">{{ row.title }}</span>
+                            <span class="row-sub">
+                                {{ dotDate(row.reportDate) }}<template v-if="row.projectName"> · {{ row.projectName }}</template>
+                            </span>
+                        </span>
+                    </button>
+                </div>
             </aside>
         </div>
         </template>
@@ -529,47 +539,11 @@ watch(selectedUserId, loadUserName);
     gap: var(--space-2) var(--space-3);
 }
 
-/* 작성으로 들어온 뒤 형식을 고른다. 일일보고도 이 줄에 남는다. */
-.kind-switch {
-    display: inline-flex;
-    flex-wrap: wrap;
-    padding: 2px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-}
-
-.kind-switch a,
-.kind-switch button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 30px;
-    padding: 0 var(--space-4);
-    border: 0;
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--text-muted);
-    font: inherit;
+.kind-hint {
+    margin: 0;
     font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    line-height: 1;
-    text-decoration: none;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.kind-switch a.is-on,
-.kind-switch button.is-on {
-    background: var(--surface);
-    box-shadow: 0 0 0 1px var(--border);
-    color: var(--text-strong);
-    font-weight: var(--fw-semibold);
-}
-
-.kind-switch a:focus-visible,
-.kind-switch button:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
+    color: var(--text-muted);
+    word-break: keep-all;
 }
 
 /* 머리줄은 일일보고 탭(report.vue .write-head)과 같은 모양. 탭을 바꿔도 누가 · 언제 · 상태가 같은 자리에 있다. */
@@ -691,13 +665,11 @@ watch(selectedUserId, loadUserName);
 }
 
 .form-error,
-.list-status,
-.side-label {
+.list-status {
     margin: 0;
     font-size: var(--fs-14);
 }
 
-.side-label,
 .list-status {
     color: var(--text-muted);
 }
@@ -705,64 +677,6 @@ watch(selectedUserId, loadUserName);
 .form-error,
 .list-status.is-error {
     color: var(--danger-fg);
-}
-
-/* 내가 쓴 목록: 한 카드 안에서 줄로 나눈다. */
-.side-list {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-}
-
-.side-list > * + * {
-    border-top: 1px solid var(--border);
-}
-
-.side-list .side-label {
-    padding: var(--space-3) var(--space-4);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-bold);
-    color: var(--text-strong);
-}
-
-.side-list .list-status {
-    padding: var(--space-3) var(--space-4);
-    font-size: var(--fs-13);
-}
-
-.side-item {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-1);
-    width: 100%;
-    padding: var(--space-3) var(--space-4);
-    border: 0;
-    border-radius: 0;
-    background: var(--surface);
-    font: inherit;
-    font-size: var(--fs-13);
-    color: var(--text);
-    text-align: left;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.side-item.is-current {
-    background: var(--accent-soft);
-    box-shadow: inset 3px 0 0 var(--accent);
-}
-
-.side-item:hover {
-    background: var(--surface-soft);
-}
-
-.side-item span:first-child {
-    color: var(--text-strong);
-    font-weight: var(--fw-medium);
 }
 
 @media (max-width: 860px) {
@@ -815,22 +729,14 @@ watch(selectedUserId, loadUserName);
         order: -1;
     }
 
+
     .kind-bar {
-        align-items: stretch;
+        flex-direction: column;
+        gap: var(--space-2);
     }
 
-    .kind-switch {
-        display: flex;
-        width: 100%;
-        overflow-x: auto;
-    }
-
-    .kind-switch a,
-    .kind-switch button {
-        flex: 1 0 auto;
-        height: var(--control-h-lg);
-        min-height: var(--control-h-lg);
-        padding: 0 var(--space-3);
+    .kind-hint {
+        font-size: var(--fs-12);
     }
 }
 </style>

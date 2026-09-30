@@ -161,16 +161,16 @@
     color: var(--text-strong);
 }
 
-/* Soft tray: paper fill, no border. Inputs inside carry the hairline. */
+/* Column of items. No tray fill: the caption heading and the inputs carry the structure. */
 .report-doc .field-group {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
     margin-bottom: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2) 0;
     border: 0;
-    border-radius: var(--radius-sm);
-    background: var(--bg);
+    border-radius: 0;
+    background: transparent;
     min-width: 0;
 }
 
@@ -180,11 +180,10 @@
 
 .report-doc .field-group h2,
 .report-doc .field-group h3 {
-    margin: 0;
-    font-size: var(--fs-13);
+    margin: 0 0 var(--space-1);
+    font: var(--type-caption);
     font-weight: var(--fw-semibold);
-    line-height: var(--lh-tight);
-    color: var(--text-strong);
+    color: var(--text-muted);
 }
 
 .report-doc .field-group .input,
@@ -248,18 +247,25 @@
     color: var(--accent-hover);
 }
 
-/* Add project: full-width dashed affordance between cards. */
+/* Add project/notice: a quiet text action under the list, not a dashed box. */
 .report-doc .add-project-btn {
-    width: 100%;
-    height: var(--control-h-lg);
-    border-style: dashed;
-    border-color: var(--border-strong);
+    align-self: flex-start;
+    width: auto;
+    height: var(--control-h);
+    padding: 0 var(--space-2);
+    border: 0;
     background: transparent;
-    color: var(--text);
+    color: var(--accent);
+    font-weight: var(--fw-semibold);
+}
+
+.report-doc .add-project-btn::before {
+    content: "+";
+    font-size: var(--fs-16);
+    font-weight: var(--fw-regular);
 }
 
 .report-doc .add-project-btn:hover {
-    border-color: var(--accent);
     background: var(--accent-soft);
     color: var(--accent-hover);
 }
@@ -400,7 +406,7 @@
     }
 
     .report-doc .field-group {
-        padding: var(--space-3);
+        padding: var(--space-2) 0;
         gap: var(--space-2);
         margin-bottom: var(--space-2);
     }
@@ -429,7 +435,6 @@
 
     .report-doc .add-project-btn {
         min-height: var(--control-h-lg);
-        width: 100%;
     }
 
     .report-doc .save-bar {

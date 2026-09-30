@@ -19,7 +19,6 @@ const routes = [
     meta: {
       title: "내 현황",
       navKey: "/",
-      action: { to: "/report", label: "보고서 작성" },
     },
   },
   {
@@ -29,6 +28,7 @@ const routes = [
     meta: {
       title: "일일보고",
       navKey: "/reports",
+      action: { to: "/compose?kind=daily", label: "일일보고 쓰기" },
     },
   },
   {
@@ -61,7 +61,6 @@ const routes = [
     meta: {
       title: "사용자 활동",
       navKey: "/activities",
-      action: { to: "/report", label: "보고서 작성" },
     },
   },
   {

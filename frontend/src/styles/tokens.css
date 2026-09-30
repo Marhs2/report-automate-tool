@@ -51,6 +51,11 @@
     --project-5-bg: #e6f0ee;
     --project-5-border: #b7d0cb;
 
+    /* ---- Color roles: aliases only, no new colors ------------------ */
+    --primary: var(--accent);
+    --primary-hover: var(--accent-hover);
+    --attention: var(--danger-fg);
+
     /* ---- Overlay -------------------------------------------------- */
     --overlay: rgba(28, 27, 24, 0.4);
 
@@ -92,6 +97,18 @@
     --fw-medium: 500;
     --fw-semibold: 600;
     --fw-bold: 700;
+
+    /* ---- Type roles: size / weight / leading in one place ---------- */
+    --type-title: var(--fw-bold) var(--fs-24) / var(--lh-tight) var(--sans);
+    --type-heading: var(--fw-semibold) var(--fs-16) / var(--lh-tight) var(--sans);
+    --type-body: var(--fw-regular) var(--fs-14) / var(--lh-base) var(--sans);
+    --type-desc: var(--fw-regular) var(--fs-13) / var(--lh-base) var(--sans);
+    --type-caption: var(--fw-medium) var(--fs-12) / var(--lh-tight) var(--sans);
+
+    /* ---- Spacing roles ---------------------------------------------- */
+    --gap-tight: var(--space-2);
+    --gap: var(--space-4);
+    --gap-section: var(--space-7);
 
     /* ---- Radii: nested surfaces step down one notch ---------------- */
     --radius-xs: 4px;           /* code, text highlights */

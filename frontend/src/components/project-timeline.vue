@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref, computed } from "vue";
 import { ChevronRight } from "lucide-vue-next";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { isFutureDate } from "../lib/dateScope";
 import {
@@ -14,6 +14,7 @@ import {
 /** 보고 항목 분류 색. 모든 화면이 같은 태그(components.css .cat-tag)를 쓴다. */
 const KIND_TAGS = { 완료: "is-done", 진행: "is-progress", 이슈: "is-issue", 요청: "is-request", 다음: "is-next" };
 
+const route = useRoute();
 const router = useRouter();
 const { getProjectNames, getProjectTimeline, getUsers } = useApi();
 
@@ -31,8 +32,9 @@ const fetchInitialData = async () => {
   try {
     projectNames.value = await getProjectNames();
     // 들어오자마자 "프로젝트를 선택해주세요"만 있는 빈 화면을 보여주지 않는다.
+    const asked = String(route.query.project || "");
     if (!selectedProject.value && projectNames.value.length) {
-      selectedProject.value = projectNames.value[0];
+      selectedProject.value = projectNames.value.includes(asked) ? asked : projectNames.value[0];
       await fetchTimeline();
     }
   } catch (error) {
@@ -323,13 +325,12 @@ onMounted(() => {
 
       <div class="field field-view">
         <label>보기</label>
-        <div class="view-chips" role="group" aria-label="보기">
+        <div class="seg view-chips" role="group" aria-label="보기">
           <button
             v-for="item in VIEWS"
             :key="item.id"
             type="button"
-            class="btn btn-small"
-            :class="{ 'is-active': view === item.id }"
+            :class="{ 'is-on': view === item.id }"
             :aria-pressed="view === item.id"
             @click="view = item.id"
           >
@@ -472,7 +473,7 @@ onMounted(() => {
               <div
                 v-for="(row, rowIndex) in compactRows(entry)"
                 :key="rowIndex"
-                class="row"
+                class="flow-line"
               >
                 <span class="k cat-tag" :class="KIND_TAGS[row.label]">{{ row.label }}</span>
                 <p class="v">{{ row.text }}</p>
@@ -502,19 +503,7 @@ onMounted(() => {
 
 .view-chips {
   display: flex;
-  gap: var(--space-1);
-  min-height: var(--control-h);
-}
-
-.view-chips .btn {
-  flex: 1;
-  height: var(--control-h);
-}
-
-.view-chips .btn.is-active {
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
-  color: var(--text-strong);
+  width: 100%;
 }
 
 .flow-meta {
@@ -715,7 +704,7 @@ onMounted(() => {
 .avatar {
   width: var(--control-h-sm);
   height: var(--control-h-sm);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   background: var(--surface-soft);
   color: var(--text-strong);
   display: inline-flex;
@@ -731,7 +720,7 @@ onMounted(() => {
   font-size: var(--fs-14);
 }
 
-.row {
+.flow-line {
   display: grid;
   grid-template-columns: var(--control-h-lg) 1fr;
   gap: var(--space-2);
@@ -788,13 +777,8 @@ onMounted(() => {
     font-size: var(--fs-16);
   }
 
-  .view-chips,
-  .view-chips .btn {
-    height: var(--control-h-lg);
-    min-height: var(--control-h-lg);
-  }
 
-  .row {
+  .flow-line {
     grid-template-columns: var(--control-h) 1fr;
   }
 
@@ -808,7 +792,7 @@ onMounted(() => {
   }
 
   .issue-text,
-  .row span {
+  .flow-line span {
     overflow-wrap: anywhere;
   }
 }

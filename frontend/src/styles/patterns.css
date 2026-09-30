@@ -1,0 +1,344 @@
+/* ------------------------------------------------------------------
+   Page patterns shared by every screen.
+   - .page-intro   : large title + one line of context + actions
+   - .group        : inset grouped list (one white card, hairline rows)
+   - .row          : one tappable line inside a group
+   - .seg          : segmented control (2–4 choices, one on)
+   - .avatar       : initial in a circle
+   Values come from tokens.css only.
+   ------------------------------------------------------------------ */
+
+/* ---- Page intro ---------------------------------------------------- */
+
+.page-intro {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-4);
+}
+
+.page-intro-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.page-intro h1 {
+    margin: 0;
+    font: var(--type-title);
+    letter-spacing: -0.01em;
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.page-intro p {
+    margin: 0;
+    font: var(--type-desc);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+.page-intro-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* ---- Grouped list -------------------------------------------------- */
+
+.group-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.group-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 0 var(--space-1);
+}
+
+.group-head h2 {
+    margin: 0;
+    font: var(--type-heading);
+    font-size: var(--fs-14);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.group-head .group-meta {
+    flex-shrink: 0;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.group-foot {
+    margin: 0;
+    padding: 0 var(--space-1);
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 56px;
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
+}
+
+/* Hairline between rows, inset to where the text starts. */
+.row + .row::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--row-inset, var(--space-4));
+    right: 0;
+    border-top: 1px solid var(--border);
+}
+
+.group.has-avatars {
+    --row-inset: calc(var(--space-4) + var(--control-h-sm) + var(--space-3));
+}
+
+.row:hover {
+    background: var(--bg);
+}
+
+.row:focus-visible {
+    outline: none;
+    box-shadow: inset var(--focus-ring);
+}
+
+.row.is-current {
+    background: var(--accent-soft);
+}
+
+.row.is-static {
+    cursor: default;
+}
+
+.row.is-static:hover {
+    background: transparent;
+}
+
+.row-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.row-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.row-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.row-end {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--fs-13);
+}
+
+.row-chevron {
+    flex-shrink: 0;
+    color: var(--border-strong);
+}
+
+.row-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition:
+        opacity var(--dur-fast) var(--ease),
+        background var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
+}
+
+.row:hover .row-icon-btn,
+.row:focus-within .row-icon-btn {
+    opacity: 1;
+}
+
+.row-icon-btn:hover {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+}
+
+.row-icon-btn:focus-visible {
+    opacity: 1;
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.group-empty {
+    margin: 0;
+    padding: var(--space-5) var(--space-4);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* ---- Avatar -------------------------------------------------------- */
+
+.avatar {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+    color: var(--text-strong);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    line-height: 1;
+}
+
+.avatar.is-me {
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+}
+
+/* ---- Segmented control -------------------------------------------- */
+
+.seg {
+    display: inline-flex;
+    gap: 2px;
+    max-width: 100%;
+    padding: 2px;
+    border-radius: var(--radius);
+    background: var(--surface-press);
+}
+
+.seg > a,
+.seg > button {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--control-h-sm);
+    padding: 0 var(--space-4);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
+}
+
+.seg > a:hover,
+.seg > button:hover {
+    color: var(--text-strong);
+}
+
+.seg > .is-on {
+    background: var(--surface);
+    color: var(--text-strong);
+    font-weight: var(--fw-semibold);
+    box-shadow: var(--shadow-1);
+}
+
+.seg > a:focus-visible,
+.seg > button:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* ---- Mobile -------------------------------------------------------- */
+
+@media (max-width: 860px) {
+    .page-intro h1 {
+        font-size: var(--fs-20);
+    }
+
+    .page-intro-actions {
+        width: 100%;
+    }
+
+    .row {
+        min-height: 60px;
+    }
+
+    /* Touch: no hover, so the row action stays visible. */
+    .row-icon-btn {
+        opacity: 1;
+        width: var(--control-h-lg);
+        height: var(--control-h-lg);
+    }
+
+    .seg {
+        display: flex;
+        width: 100%;
+    }
+
+    .seg > a,
+    .seg > button {
+        min-height: var(--control-h);
+        padding: 0 var(--space-2);
+        font-size: var(--fs-14);
+    }
+}
