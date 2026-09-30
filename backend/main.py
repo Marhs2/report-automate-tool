@@ -4,6 +4,7 @@ import os
 import re
 import sqlite3
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from urllib.parse import quote, urlparse
 
@@ -24,6 +25,24 @@ from weekly_deck import (
     next_sections_of,
     pick_previous_weekly,
     replace_member_week,
+)
+from meeting_notes import (
+    ASR_BASE_URL,
+    MeetingError,
+    append_session_audio,
+    check_meeting_date,
+    check_transcript,
+    create_session,
+    delete_session,
+    diarize_session,
+    fix_batches,
+    fix_user_message,
+    merge_numbered_fix,
+    normalize_fix,
+    normalize_summary,
+    numbered_lines,
+    summary_user_message,
+    transcribe_audio,
 )
 from work_records import (
     WorkRecordError,
@@ -137,6 +156,12 @@ with open("./model_asset/weekly_json_schema.json", "r", encoding="utf-8") as f:
 with open("./model_asset/keyword_json_schema.json", "r", encoding="utf-8") as f:
     keyword_schema = json.load(f)
 
+with open("./model_asset/meeting_json_schema.json", "r", encoding="utf-8") as f:
+    meeting_schema = json.load(f)
+
+with open("./model_asset/transcript_fix_json_schema.json", "r", encoding="utf-8") as f:
+    transcript_fix_schema = json.load(f)
+
 MODEL_NAME = os.environ.get("REPORT_MODEL_NAME", "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL")
 LM_BASE_URL = os.environ.get("LM_BASE_URL", "http://127.0.0.1")
 LM_API_KEY = os.environ.get("LM_API_KEY", "")
@@ -148,6 +173,8 @@ KEYWORD_MAX_TOKENS = int(os.environ.get("KEYWORD_MAX_TOKENS", "32768"))
 DAILY_REASONING = os.environ.get("DAILY_REASONING", "none")
 WEEKLY_REASONING = os.environ.get("WEEKLY_REASONING", "none")
 KEYWORD_REASONING = os.environ.get("KEYWORD_REASONING", "none")
+MEETING_MAX_TOKENS = int(os.environ.get("MEETING_MAX_TOKENS", "8192"))
+MEETING_REASONING = os.environ.get("MEETING_REASONING", "none")
 THINKING_EFFORTS = {"xhigh", "medium", "low"}
 
 
@@ -194,6 +221,12 @@ def _is_allowed_lm_host(hostname: str | None) -> bool:
 if not _is_allowed_lm_host(urlparse(LM_BASE_URL).hostname):
     raise RuntimeError(
         "LM_BASE_URL은 localhost 또는 사설망(10/172.16-31/192.168) 주소만 사용할 수 있습니다."
+    )
+
+# 회의 녹음도 사내망 밖으로 나가지 않아야 한다. LLM과 같은 기준으로 막는다.
+if not _is_allowed_lm_host(urlparse(ASR_BASE_URL).hostname):
+    raise RuntimeError(
+        "ASR_BASE_URL은 localhost 또는 사설망(10/172.16-31/192.168) 주소만 사용할 수 있습니다."
     )
 
 
@@ -251,6 +284,11 @@ class ProjectNameRequest(BaseModel):
 
 class ProjectNameKeywordsRequest(BaseModel):
     keywords: str = ""
+
+
+class MeetingSummaryRequest(BaseModel):
+    transcript: str
+    meetingDate: str = ""
 
 
 class KeywordRecommendRequest(BaseModel):
@@ -3052,6 +3090,199 @@ def remove_work_record(record_id: int, actor_id: int = Depends(current_member_id
         return {"message": "삭제했습니다."}
     except WorkRecordError as exc:
         _raise_work(exc)
+
+
+def _raise_meeting(exc: MeetingError):
+    raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+
+
+@app.post("/meeting/sessions")
+def meeting_session_create(actor_id: int = Depends(current_member_id)):
+    """녹음 세션을 연다. 녹취록용 조각을 여기에 쌓아 두었다가 정지하면 회의 전체로 화자를 나눈다."""
+    try:
+        return {"id": create_session()}
+    except MeetingError as exc:
+        _raise_meeting(exc)
+
+
+class MeetingDiarizeRequest(BaseModel):
+    numSpeakers: int | None = None
+
+
+@app.post("/meeting/sessions/{session_id}/diarize")
+def meeting_session_diarize(
+    session_id: str,
+    data: MeetingDiarizeRequest,
+    actor_id: int = Depends(current_member_id),
+):
+    """세션 전체를 화자별로 나눠 받아 적고, 구간마다 사내 용어로 교정한다. 끝나면 세션을 지운다."""
+    num = data.numSpeakers if data.numSpeakers and 1 <= data.numSpeakers <= 20 else None
+    try:
+        result = diarize_session(session_id, num)
+    except MeetingError as exc:
+        _raise_meeting(exc)
+    segments = result["segments"]
+    if segments:
+        fixed = polish_segments([row["text"] for row in segments], meeting_vocabulary())
+        for row, text in zip(segments, fixed):
+            row["text"] = text
+    delete_session(session_id)
+    return result
+
+
+@app.delete("/meeting/sessions/{session_id}")
+def meeting_session_delete(session_id: str, actor_id: int = Depends(current_member_id)):
+    try:
+        delete_session(session_id)
+    except MeetingError as exc:
+        _raise_meeting(exc)
+    return {"deleted": session_id}
+
+
+@app.post("/meeting/transcribe")
+def meeting_transcribe(
+    file: UploadFile = File(...),
+    polish: bool = Form(False),
+    session: str = Form(""),
+    actor_id: int = Depends(current_member_id),
+):
+    """polish=true면 받아 적은 글의 이름 · 용어 · 약어 · 숫자 오타를 사내 용어로 교정한다.
+    녹취록용 긴 조각에만 쓴다. 화면용 5초 조각은 빨라야 해서 교정하지 않는다.
+    session이 있으면 그 조각을 녹음 세션에도 쌓는다(정지할 때 화자 분리에 쓴다)."""
+    try:
+        data = file.file.read()
+        if session:
+            text = append_session_audio(session, data, file.filename, file.content_type)
+        else:
+            text = transcribe_audio(data, file.filename, file.content_type)
+    except MeetingError as exc:
+        _raise_meeting(exc)
+    if polish and text:
+        text = call_transcript_fix(text, meeting_vocabulary())
+    return {"text": text}
+
+
+def meeting_vocabulary() -> list[str]:
+    """교정에 쓸 사내 용어: 구성원 이름, 등록 프로젝트 이름과 키워드."""
+    terms = []
+    with get_db() as conn:
+        terms += [row[0] for row in conn.execute("SELECT name FROM members").fetchall()]
+    for name, keywords in get_known_project_rows():
+        terms.append(name)
+        terms += split_project_keywords(keywords)
+    return terms
+
+
+def _transcript_fix_completion(text: str, vocabulary: list[str]):
+    client = OpenAI(
+        base_url=LM_BASE_URL,
+        api_key=LM_API_KEY,
+        timeout=LLM_TIMEOUT_SECONDS,
+    )
+    with open("./model_asset/transcript_fix_prompt.txt", "r", encoding="utf-8") as f:
+        system = f.read()
+    kwargs = dict(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": fix_user_message(text, vocabulary)},
+        ],
+        temperature=0,
+        max_tokens=MEETING_MAX_TOKENS,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "transcript_fix",
+                "strict": True,
+                "schema": transcript_fix_schema,
+            },
+        },
+    )
+    apply_reasoning(kwargs, MEETING_REASONING)
+    return read_completion(client.chat.completions.create(**kwargs), "transcript-fix")
+
+
+def call_transcript_fix(text: str, vocabulary: list[str]) -> str:
+    """받아 적은 글의 용어 · 약어 · 숫자 · 띄어쓰기 오타만 고친다. 실패하면 원문을 돌려준다."""
+    try:
+        return normalize_fix(_transcript_fix_completion(text, vocabulary), text)
+    except Exception as e:
+        print(f"[transcript-fix] kept original: {e}")
+        return text
+
+
+def polish_segments(texts: list[str], vocabulary: list[str]) -> list[str]:
+    """화자별 구간을 [번호] 줄로 묶어 교정한다. 묶음이 실패하면 그 묶음은 원문 그대로다."""
+    batches = fix_batches(texts)
+
+    def one(batch):
+        originals = [texts[i] for i in batch]
+        try:
+            raw = _transcript_fix_completion(numbered_lines(originals), vocabulary)
+            return merge_numbered_fix(raw, originals)
+        except Exception as e:
+            print(f"[transcript-fix] batch kept original: {e}")
+            return originals
+
+    out = list(texts)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for batch, fixed in zip(batches, pool.map(one, batches)):
+            for index, text in zip(batch, fixed):
+                out[index] = text
+    return out
+
+
+def call_meeting_model(transcript: str, meeting_date: str):
+    client = OpenAI(
+        base_url=LM_BASE_URL,
+        api_key=LM_API_KEY,
+        timeout=LLM_TIMEOUT_SECONDS,
+    )
+    with open("./model_asset/meeting_prompt.txt", "r", encoding="utf-8") as f:
+        system = f.read()
+    kwargs = dict(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": summary_user_message(transcript, meeting_date)},
+        ],
+        temperature=0.1,
+        max_tokens=MEETING_MAX_TOKENS,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "meeting_summary",
+                "strict": True,
+                "schema": meeting_schema,
+            },
+        },
+    )
+    apply_reasoning(kwargs, MEETING_REASONING)
+    completion = client.chat.completions.create(**kwargs)
+    return read_completion(completion, "meeting-summary")
+
+
+@app.post("/meeting/summarize")
+def meeting_summarize(data: MeetingSummaryRequest, actor_id: int = Depends(current_member_id)):
+    try:
+        transcript = check_transcript(data.transcript)
+        content = call_meeting_model(transcript, check_meeting_date(data.meetingDate))
+        return normalize_summary(content)
+    except MeetingError as exc:
+        _raise_meeting(exc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        resp = getattr(e, "response", None)
+        if resp is not None:
+            print(f"[meeting-summary] upstream status={resp.status_code} body={resp.text[:500]}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"AI 모델 호출 실패 (status={resp.status_code}). 다시 시도해주세요.",
+            )
+        print(f"[meeting-summary] error: {e}")
+        reason = str(e).strip().rstrip(".")
+        raise HTTPException(status_code=502, detail=f"AI 모델 호출 실패: {reason}. 다시 시도해주세요.")
 
 
 @app.get("/business-cards")

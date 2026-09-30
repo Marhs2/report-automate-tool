@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TranscriptFixResult",
+  "description": "음성 인식 결과에서 용어 · 약어 · 숫자 · 띄어쓰기 오타만 고친 글. 내용은 더하거나 빼지 않는다.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "text": {
+      "type": "string",
+      "description": "고친 글. 받아 적은 글과 같은 내용, 같은 순서.",
+      "maxLength": 20000
+    }
+  },
+  "required": ["text"]
+}

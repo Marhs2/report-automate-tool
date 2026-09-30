@@ -160,6 +160,8 @@ def normalize_work(payload: dict) -> dict:
             "agenda": _limit(payload.get("agenda"), 4000, "안건"),
             "decisions": _limit(payload.get("decisions"), 4000, "결정"),
             "followups": _followups(payload.get("followups")),
+            # 녹음으로 채운 회의록의 원문. 요약이 틀렸을 때 되짚어 볼 수 있게 남긴다.
+            "transcript": _limit(payload.get("transcript"), 100_000, "녹취록"),
         }
         if (
             not details["agenda"]

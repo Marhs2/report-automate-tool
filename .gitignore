@@ -115,3 +115,5 @@ feedback.md
 weekly-send-test/
 
 frontend/src/lib/*.test.js
+
+.codegraph/

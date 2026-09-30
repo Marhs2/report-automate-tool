@@ -495,6 +495,49 @@ export default function useApi() {
     }
   };
 
+  /**
+   * 녹음 조각 하나를 받아 적는다. 백엔드가 사내 음성 인식 서버(R2T2)로 넘긴다.
+   * polish면 이름 · 용어 · 약어 · 숫자 오타를 사내 용어로 교정한다(녹취록용 긴 조각에만).
+   */
+  const transcribeMeetingAudio = async (blob, { polish = false, session = "", filename = "meeting.wav" } = {}) => {
+    const formData = new FormData();
+    formData.append("file", blob, filename);
+    formData.append("polish", polish ? "true" : "false");
+    if (session) formData.append("session", session);
+    const response = await axios.post(`${baseURL}/meeting/transcribe`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  };
+
+  /** 녹음 세션을 연다. 녹취록용 조각을 쌓아 두었다가 정지하면 회의 전체로 말한 사람을 나눈다. */
+  const createMeetingSession = async () => {
+    const response = await axios.post(`${baseURL}/meeting/sessions`);
+    return response.data;
+  };
+
+  /** 세션 전체를 말한 사람별로 나눠 받아 적는다. 한 시간짜리면 몇 분 걸린다. */
+  const diarizeMeetingSession = async (sessionId, numSpeakers = null) => {
+    const response = await axios.post(`${baseURL}/meeting/sessions/${sessionId}/diarize`, {
+      numSpeakers,
+    });
+    return response.data;
+  };
+
+  const deleteMeetingSession = async (sessionId) => {
+    const response = await axios.delete(`${baseURL}/meeting/sessions/${sessionId}`);
+    return response.data;
+  };
+
+  /** 녹취록을 회의록 칸(제목 · 안건 · 결정 · 후속 할 일)으로 요약한다. */
+  const summarizeMeeting = async (transcript, meetingDate) => {
+    const response = await axios.post(`${baseURL}/meeting/summarize`, {
+      transcript,
+      meetingDate,
+    });
+    return response.data;
+  };
+
   return {
     postReport,
     postReportPptx,
@@ -537,5 +580,10 @@ export default function useApi() {
     postWorkRecord,
     putWorkRecord,
     deleteWorkRecord,
+    transcribeMeetingAudio,
+    createMeetingSession,
+    diarizeMeetingSession,
+    deleteMeetingSession,
+    summarizeMeeting,
   };
 }

@@ -598,9 +598,6 @@ const sendReport = async () => {
                     {{ aiLoading ? "추출 중" : "AI로 추출" }}
                 </button>
             </div>
-            <p v-if="!useLines" class="write-footnote">
-                AI가 초안을 만들면 원문과 나란히 검토하고 저장해요.
-            </p>
         </div>
         <aside v-if="!isNarrow" class="write-aside">
             

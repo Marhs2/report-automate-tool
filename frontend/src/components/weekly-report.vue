@@ -568,7 +568,6 @@ onMounted(async () => {
         <header class="page-intro">
             <div class="page-intro-text">
                 <h1>{{ headerTitle }}</h1>
-                <p>{{ isThisWeek ? "이번 주" : "지난 기간" }} · 일일보고를 골라 주간 초안을 만들어요</p>
             </div>
             <div class="page-intro-actions week-nav">
                 <div class="week-stepper" role="group" aria-label="주 이동">

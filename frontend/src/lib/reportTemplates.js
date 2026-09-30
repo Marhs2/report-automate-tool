@@ -33,29 +33,6 @@ export const PASTE_TEMPLATES = [
 4. 특이/외근/휴가
 `,
     },
-    {
-        id: "vs-yesterday",
-        label: "전일 대비",
-        hint: "계획 대비 실행",
-        body: `
-프로젝트 명:     
-
-전일 계획 대비 실행:
-금일:
-내일:
-`,
-    },
-    {
-        id: "requests",
-        label: "지시 · 건의",
-        hint: "요청 칸 (이슈와 분리)",
-        body: `
-프로젝트 명:
-
-지시/확인 부탁:
-건의:
-`,
-    },
 ];
 
 export function templateById(id) {
