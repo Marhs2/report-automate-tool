@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { ChevronRight, Trash2 } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
 import { isAdmin } from "../composables/useSession";
@@ -106,10 +107,18 @@ const groups = computed(() => {
     }));
 });
 
+const isoToday = () => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+};
+
 const formatDate = (value) => {
     const [year, month, day] = String(value || "").split("-");
     if (!year || !month || !day) return value || "";
-    return `${year}.${Number(month)}.${Number(day)}`;
+    if (value === isoToday()) return "오늘";
+    const thisYear = String(new Date().getFullYear()) === year;
+    return thisYear ? `${Number(month)}월 ${Number(day)}일` : `${year}년 ${Number(month)}월 ${Number(day)}일`;
 };
 
 const groupPoint = (rows) => {
@@ -125,10 +134,10 @@ const groupPoint = (rows) => {
 const badgesOf = (report) => {
     const counts = reportCounts(report.parsed_json);
     return [
-        counts.done && { key: "done", label: `완료 ${counts.done}` },
-        counts.progress && { key: "progress", label: `진행 ${counts.progress}` },
-        counts.issues && { key: "issues", label: `이슈 ${counts.issues}` },
-        counts.requests && { key: "requests", label: `요청 ${counts.requests}` },
+        counts.done && { key: "is-done", label: `완료 ${counts.done}` },
+        counts.progress && { key: "is-progress", label: `진행 ${counts.progress}` },
+        counts.issues && { key: "is-issue", label: `이슈 ${counts.issues}` },
+        counts.requests && { key: "is-request", label: `요청 ${counts.requests}` },
     ].filter(Boolean);
 };
 
@@ -170,13 +179,13 @@ onMounted(() => {
 
 <template>
     <div class="page">
-        <div class="list-search">
+        <div class="list-toolbar">
             <input
                 id="report-query"
                 v-model="query"
                 class="input"
                 type="search"
-                placeholder="이름, 프로젝트, 내용"
+                placeholder="이름, 프로젝트, 내용 검색"
                 aria-label="검색"
                 enterkeyhint="search"
             />
@@ -190,247 +199,154 @@ onMounted(() => {
 
         <p v-if="isLoading" class="list-status" role="status">보고서를 불러오는 중</p>
         <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
-        <p v-else-if="groups.length === 0" class="list-status">
-            {{ query.trim() || filterProject ? "검색 결과가 없습니다." : "보고서가 없습니다." }}
-        </p>
+        <div v-else-if="groups.length === 0" class="empty-state">
+            <p class="empty-title">
+                {{ query.trim() || filterProject ? "맞는 보고가 없어요" : "아직 저장된 일일보고가 없어요" }}
+            </p>
+            <p class="empty-body">
+                {{ query.trim() || filterProject ? "검색어나 프로젝트를 바꿔 보세요." : "원문을 붙여 넣으면 AI가 프로젝트별로 정리해 줘요." }}
+            </p>
+            <div v-if="!query.trim() && !filterProject" class="empty-actions">
+                <router-link class="btn btn-primary" to="/compose?kind=daily">일일보고 쓰기</router-link>
+            </div>
+        </div>
 
-        <section v-for="group in groups" :key="group.date" class="day">
-            <header class="day-head">
-                <h2>{{ group.label }} {{ group.weekday }}</h2>
-                <p class="day-point">{{ group.point }}</p>
+        <section v-for="group in groups" :key="group.date" class="group-block">
+            <header class="group-head">
+                <h2>{{ group.label }} <span class="day-weekday">{{ group.weekday }}</span></h2>
+                <span class="group-meta">{{ group.point }}</span>
             </header>
-            <div class="reports">
-                <article
+            <div class="group has-avatars">
+                <div
                     v-for="report in group.reports"
                     :key="report.id"
-                    class="report"
+                    class="row"
+                    role="link"
                     tabindex="0"
                     @click="openDetail(report.id)"
                     @keydown="onRowKeydown($event, report.id)"
                 >
-                    <div class="chips">
-                        <span
-                            v-for="name in projectNamesOf(report)"
-                            :key="name"
-                            class="chip"
-                        >{{ name }}</span>
-                        <span v-if="projectNamesOf(report).length === 0" class="chip">프로젝트 없음</span>
-                    </div>
-                    <p class="person">{{ report.member_name }}</p>
-                    <p v-if="badgesOf(report).length" class="badges">
-                        <span
-                            v-for="badge in badgesOf(report)"
-                            :key="badge.key"
-                            class="badge"
-                            :class="badge.key"
-                        >{{ badge.label }}</span>
-                    </p>
-                    <button
-                        v-if="canManage(report)"
-                        type="button"
-                        class="row-delete"
-                        @click.stop="deleteProjectReport(report.id)"
-                    >
-                        삭제
-                    </button>
-                </article>
+                    <span class="avatar" :class="{ 'is-me': isMine(report) }">
+                        {{ String(report.member_name || "?").slice(0, 1) }}
+                    </span>
+                    <span class="row-main">
+                        <span class="row-title">
+                            {{ report.member_name }}
+                            <span v-if="isMine(report)" class="me-mark">나</span>
+                        </span>
+                        <span class="row-sub">
+                            {{ projectNamesOf(report).join(" · ") || "프로젝트 없음" }}
+                        </span>
+                    </span>
+                    <span class="row-end">
+                        <span class="badges">
+                            <span
+                                v-for="badge in badgesOf(report)"
+                                :key="badge.key"
+                                class="cat-tag"
+                                :class="badge.key"
+                            >{{ badge.label }}</span>
+                        </span>
+                        <button
+                            v-if="canManage(report)"
+                            type="button"
+                            class="row-icon-btn"
+                            :aria-label="`${report.member_name} 보고 삭제`"
+                            title="삭제"
+                            @click.stop="deleteProjectReport(report.id)"
+                            @keydown.stop
+                        >
+                            <Trash2 :size="16" />
+                        </button>
+                        <ChevronRight :size="16" class="row-chevron" />
+                    </span>
+                </div>
             </div>
         </section>
     </div>
 </template>
 
 <style scoped>
-.list-search {
+.list-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 220px;
     gap: var(--space-2);
-    position: sticky;
-    top: var(--space-2);
-    z-index: 5;
-    padding: var(--space-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
 }
 
-.list-search .input {
+.list-toolbar .input {
     min-width: 0;
-    min-height: var(--control-h-lg);
-    font-size: var(--fs-16);
-}
-
-.list-search .input::placeholder {
-    color: var(--text-muted);
-    opacity: 1;
 }
 
 .list-status {
     margin: 0;
     font-size: var(--fs-14);
-    color: var(--text);
+    color: var(--text-muted);
 }
 
 .list-status.is-error {
     color: var(--danger-fg);
 }
 
-.day {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-}
-
-.day-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-3);
-}
-
-.day h2 {
-    margin: 0;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.day-point {
-    margin: 0;
-    font-size: var(--fs-13);
+.day-weekday {
+    margin-left: 2px;
+    font-weight: var(--fw-regular);
     color: var(--text-muted);
-    white-space: nowrap;
 }
 
-.reports {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--space-2);
-}
-
-.report {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    min-width: 0;
-    padding: var(--space-4) var(--control-h-lg) var(--space-4) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    cursor: pointer;
-}
-
-.report:hover {
-    border-color: var(--border-strong);
+.me-mark {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    margin-left: var(--space-1);
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
     background: var(--accent-soft);
-}
-
-.chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-3);
-    min-width: 0;
-}
-
-.chip {
-    display: inline-block;
-    color: var(--text-strong);
-    font-size: var(--fs-14);
+    color: var(--accent-hover);
+    font-size: var(--fs-11);
     font-weight: var(--fw-semibold);
-    line-height: 1.35;
-    white-space: nowrap;
-    word-break: keep-all;
-}
-
-.person {
-    margin: 0;
-    font-size: var(--fs-13);
-    line-height: 1.4;
-    color: var(--text);
+    vertical-align: 1px;
 }
 
 .badges {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
-    margin: 0;
-}
-
-.badge {
-    
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-    color: var(--text);
-    font-size: var(--fs-12);
-    line-height: 1.4;
-}
-
-.badge.done {
-    background: var(--success-bg);
-    color: var(--success-fg);
-}
-
-.badge.progress {
-    background: var(--info-bg);
-    color: var(--info-fg);
-}
-
-.badge.issues {
-    background: var(--warning-bg);
-    color: var(--warning-fg);
-}
-
-.badge.requests {
-    background: var(--project-4-bg);
-    color: var(--project-4-fg);
-}
-
-.row-delete {
-    position: absolute;
-    top: var(--space-3);
-    right: var(--space-2);
-    min-width: var(--control-h-sm);
-    min-height: var(--control-h-sm);
-    padding: 0 var(--space-1);
-    border: 0;
-    background: transparent;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: var(--fs-13);
-    cursor: pointer;
-}
-
-.row-delete:hover {
-    color: var(--danger-fg);
-}
-
-@media (min-width: 721px) {
-    .reports {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .report:only-child {
-        grid-column: 1 / -1;
-    }
-}
-
-.row-delete:focus-visible,
-.report:focus-visible,
-.list-search .input:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
+    justify-content: flex-end;
+    gap: var(--space-1);
 }
 
 @media (max-width: 860px) {
-    .list-search {
-        grid-template-columns: minmax(0, 1fr);
-        top: var(--space-2);
+    .list-toolbar {
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
     }
 
-    .row-delete {
-        min-width: var(--control-h-lg);
+    .list-toolbar .input {
         min-height: var(--control-h-lg);
+    }
+
+    /* 좁은 화면: 개수 태그는 이름 아래로 내려 제목이 잘리지 않게 한다. */
+    .row {
+        flex-wrap: wrap;
+        row-gap: var(--space-2);
+    }
+
+    .row-end {
+        order: 3;
+        width: 100%;
+        padding-left: calc(var(--control-h-sm) + var(--space-3));
+        justify-content: space-between;
+    }
+
+    .badges {
+        justify-content: flex-start;
+    }
+
+    .row-end .row-chevron {
+        display: none;
+    }
+
+    .row-icon-btn {
+        width: var(--control-h-sm);
+        height: var(--control-h-sm);
     }
 }
 </style>

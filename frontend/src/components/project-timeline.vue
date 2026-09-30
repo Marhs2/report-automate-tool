@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref, computed } from "vue";
 import { ChevronRight } from "lucide-vue-next";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { isFutureDate } from "../lib/dateScope";
 import {
@@ -14,6 +14,7 @@ import {
 /** 보고 항목 분류 색. 모든 화면이 같은 태그(components.css .cat-tag)를 쓴다. */
 const KIND_TAGS = { 완료: "is-done", 진행: "is-progress", 이슈: "is-issue", 요청: "is-request", 다음: "is-next" };
 
+const route = useRoute();
 const router = useRouter();
 const { getProjectNames, getProjectTimeline, getUsers } = useApi();
 
@@ -31,8 +32,9 @@ const fetchInitialData = async () => {
   try {
     projectNames.value = await getProjectNames();
     // 들어오자마자 "프로젝트를 선택해주세요"만 있는 빈 화면을 보여주지 않는다.
+    const asked = String(route.query.project || "");
     if (!selectedProject.value && projectNames.value.length) {
-      selectedProject.value = projectNames.value[0];
+      selectedProject.value = projectNames.value.includes(asked) ? asked : projectNames.value[0];
       await fetchTimeline();
     }
   } catch (error) {
