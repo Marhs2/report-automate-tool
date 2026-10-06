@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 import os
@@ -13,10 +14,11 @@ from db import get_db
 from init_db import ensure_default_admin
 from dotenv import load_dotenv
 from kr_holidays import kr_holiday_map
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from openai import OpenAI
+import websockets
 from pptx_fill import fill_weekly_pptx
 from pptx_to_text import extract_all_text_from_pptx
 from weekly_deck import (
@@ -29,20 +31,19 @@ from weekly_deck import (
 from meeting_notes import (
     ASR_BASE_URL,
     MeetingError,
-    append_session_audio,
+    asr_stream_url,
     check_meeting_date,
     check_transcript,
-    create_session,
-    delete_session,
-    diarize_session,
+    final_segment,
     fix_batches,
     fix_user_message,
     merge_numbered_fix,
     normalize_fix,
     normalize_summary,
     numbered_lines,
+    stream_config,
+    strip_context_echo,
     summary_user_message,
-    transcribe_audio,
 )
 from work_records import (
     WorkRecordError,
@@ -3096,70 +3097,115 @@ def _raise_meeting(exc: MeetingError):
     raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
 
 
-@app.post("/meeting/sessions")
-def meeting_session_create(actor_id: int = Depends(current_member_id)):
-    """녹음 세션을 연다. 녹취록용 조각을 여기에 쌓아 두었다가 정지하면 회의 전체로 화자를 나눈다."""
+ASR_UNREACHABLE = f"음성 인식 서버({ASR_BASE_URL})에 연결하지 못했습니다. 서버가 켜져 있는지 확인해주세요."
+
+
+@app.websocket("/meeting/stream")
+async def meeting_stream(ws: WebSocket):
+    """회의 녹음을 받아 적기 서버(Qwen3-ASR, qwen_live_server.py)로 흘려 보내고 받아 적은 글을 돌려준다.
+
+    브라우저 → 서버: 첫 메시지 {"token"}, 그다음 바이너리(16kHz 모노 16비트 PCM), 끝에 "end".
+    서버 → 브라우저: ready(받아 적기 서버에 붙음), partial {utt, text}(말하는 중), final {utt, start, end, text}.
+    "end" 뒤에는 polishing을 보내고, 발화마다 사내 용어로 교정한 done {segments, duration}으로 끝낸다.
+    """
+    await ws.accept()
+
+    async def send(payload: dict) -> bool:
+        try:
+            await ws.send_json(payload)
+            return True
+        except Exception:
+            return False
+
     try:
-        return {"id": create_session()}
-    except MeetingError as exc:
-        _raise_meeting(exc)
+        first = await asyncio.wait_for(ws.receive_json(), 15)
+        await asyncio.to_thread(current_member_id, str((first or {}).get("token") or ""))
+    except Exception:
+        await send({"type": "error", "message": "로그인이 만료되었습니다. 다시 로그인해 주세요."})
+        await ws.close(code=4401)
+        return
 
-
-class MeetingDiarizeRequest(BaseModel):
-    numSpeakers: int | None = None
-
-
-@app.post("/meeting/sessions/{session_id}/diarize")
-def meeting_session_diarize(
-    session_id: str,
-    data: MeetingDiarizeRequest,
-    actor_id: int = Depends(current_member_id),
-):
-    """세션 전체를 화자별로 나눠 받아 적고, 구간마다 사내 용어로 교정한다. 끝나면 세션을 지운다."""
-    num = data.numSpeakers if data.numSpeakers and 1 <= data.numSpeakers <= 20 else None
+    vocabulary = await asyncio.to_thread(meeting_vocabulary)
     try:
-        result = diarize_session(session_id, num)
-    except MeetingError as exc:
-        _raise_meeting(exc)
-    segments = result["segments"]
-    if segments:
-        fixed = polish_segments([row["text"] for row in segments], meeting_vocabulary())
-        for row, text in zip(segments, fixed):
-            row["text"] = text
-    delete_session(session_id)
-    return result
+        upstream = await websockets.connect(
+            asr_stream_url(), max_size=None, open_timeout=10, ping_interval=20, ping_timeout=120,
+        )
+        await upstream.send(json.dumps(stream_config(vocabulary), ensure_ascii=False))
+    except Exception as e:
+        print(f"[meeting-asr] connect error: {e!r}")
+        await send({"type": "error", "message": ASR_UNREACHABLE})
+        await ws.close()
+        return
+    await send({"type": "ready"})
 
+    segments = []
 
-@app.delete("/meeting/sessions/{session_id}")
-def meeting_session_delete(session_id: str, actor_id: int = Depends(current_member_id)):
+    async def browser_to_asr() -> bool:
+        """녹음을 넘긴다. "end"를 받았으면 True, 브라우저가 그냥 떠났으면 False."""
+        while True:
+            msg = await ws.receive()
+            if msg["type"] == "websocket.disconnect":
+                return False
+            if msg.get("bytes") is not None:
+                await upstream.send(msg["bytes"])
+            elif msg.get("text") == "end":
+                await upstream.send("end")
+                return True
+
+    async def asr_to_browser():
+        """받아 적은 글을 넘긴다. done 메시지가 오면 그것을, 그냥 끊기면 None을 돌려준다."""
+        async for raw in upstream:
+            data = json.loads(raw)
+            kind = data.get("type")
+            if kind == "done":
+                return data
+            if kind == "final":
+                seg = final_segment(data, vocabulary)
+                if seg:
+                    segments.append(seg)
+                    await send({"type": "final", "utt": data.get("utt"), **seg})
+            elif kind == "partial":
+                text = strip_context_echo(data.get("text"), vocabulary)
+                await send({"type": "partial", "utt": data.get("utt"), "text": text})
+        return None
+
+    sending = asyncio.create_task(browser_to_asr())
+    receiving = asyncio.create_task(asr_to_browser())
     try:
-        delete_session(session_id)
-    except MeetingError as exc:
-        _raise_meeting(exc)
-    return {"deleted": session_id}
-
-
-@app.post("/meeting/transcribe")
-def meeting_transcribe(
-    file: UploadFile = File(...),
-    polish: bool = Form(False),
-    session: str = Form(""),
-    actor_id: int = Depends(current_member_id),
-):
-    """polish=true면 받아 적은 글의 이름 · 용어 · 약어 · 숫자 오타를 사내 용어로 교정한다.
-    녹취록용 긴 조각에만 쓴다. 화면용 5초 조각은 빨라야 해서 교정하지 않는다.
-    session이 있으면 그 조각을 녹음 세션에도 쌓는다(정지할 때 화자 분리에 쓴다)."""
-    try:
-        data = file.file.read()
-        if session:
-            text = append_session_audio(session, data, file.filename, file.content_type)
+        await asyncio.wait({sending, receiving}, return_when=asyncio.FIRST_COMPLETED)
+        if not receiving.done():
+            if sending.exception() or not sending.result():
+                return
         else:
-            text = transcribe_audio(data, file.filename, file.content_type)
-    except MeetingError as exc:
-        _raise_meeting(exc)
-    if polish and text:
-        text = call_transcript_fix(text, meeting_vocabulary())
-    return {"text": text}
+            sending.cancel()
+        try:
+            result = await receiving
+        except Exception as e:
+            print(f"[meeting-asr] stream error: {e!r}")
+            result = None
+        if not result:
+            # 받아 적은 데까지는 브라우저가 final로 이미 받았다.
+            await send({"type": "error", "message": "음성 인식 서버와 연결이 끊겼습니다. 받아 적은 데까지만 남습니다."})
+            return
+        await send({"type": "polishing"})
+        if segments:
+            fixed = await asyncio.to_thread(polish_segments, [row["text"] for row in segments], vocabulary)
+            for row, text in zip(segments, fixed):
+                row["text"] = text
+        await send({"type": "done", "segments": segments, "duration": float(result.get("duration") or 0)})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        for task in (sending, receiving):
+            task.cancel()
+        try:
+            await upstream.close()
+        except Exception:
+            pass
+        try:
+            await ws.close()
+        except Exception:
+            pass
 
 
 def meeting_vocabulary() -> list[str]:

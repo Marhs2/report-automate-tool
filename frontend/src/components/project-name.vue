@@ -654,6 +654,7 @@ onMounted(() => {
 
 .section-head h2 {
     margin: 0;
+    font: var(--type-section);
 }
 
 .list-section {
@@ -703,25 +704,31 @@ onMounted(() => {
     flex-shrink: 0;
 }
 
+/* 다른 목록(.group)과 같이 바깥 박스 없이 위아래 선과 줄 사이 선만. */
 .project-list {
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
     background: var(--surface);
-    overflow: hidden;
 }
 
 .project-row {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-3) var(--space-2);
     border-bottom: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    transition: background var(--dur-fast) var(--ease);
 }
 
 .project-row:last-child {
     border-bottom: none;
+}
+
+.project-row:not(.editing):hover {
+    background: var(--surface-soft);
 }
 
 .project-row.editing {
@@ -833,8 +840,8 @@ onMounted(() => {
 
 .btn-icon:hover {
     opacity: 1;
-    background: var(--accent-soft);
-    color: var(--accent);
+    background: var(--surface-soft);
+    color: var(--text-strong);
     border-color: transparent;
 }
 
@@ -843,8 +850,14 @@ onMounted(() => {
     color: var(--danger-fg);
 }
 
+/* 접히는 보조 영역: 주간 상세의 공지사항 줄처럼 박스 없이 선 하나. */
 .recommend-card {
     padding: 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: transparent;
 }
 
 .recommend-toggle {
@@ -852,7 +865,7 @@ onMounted(() => {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-3) var(--space-2);
     border: none;
     background: none;
     color: var(--text-strong);
@@ -879,7 +892,7 @@ onMounted(() => {
 }
 
 .recommend-body {
-    padding: 0 var(--space-4) var(--space-4);
+    padding: 0 var(--space-2) var(--space-4);
 }
 
 .recommend-grid {

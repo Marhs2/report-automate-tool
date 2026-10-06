@@ -287,13 +287,13 @@ onMounted(() => {
 
 <template>
   <div class="page is-wide">
-    <div class="toolbar filters">
-      <div class="field">
-        <label for="timeline-project">프로젝트</label>
+    <!-- 일일보고 목록과 같은 한 줄 필터. 라벨 대신 첫 옵션이 무엇을 고르는지 말한다. -->
+    <div class="filters">
         <select
           id="timeline-project"
           v-model="selectedProject"
           class="input filter-select"
+          aria-label="프로젝트"
           @change="onProjectChange"
         >
           <option value="">프로젝트 선택</option>
@@ -301,15 +301,13 @@ onMounted(() => {
             {{ name }}
           </option>
         </select>
-      </div>
 
-      <div class="field">
         <!-- 전체 인원을 다 넣고, 이 프로젝트 보고 건수를 옆에 적는다. -->
-        <label for="timeline-member">보고자</label>
         <select
           id="timeline-member"
           v-model="selectedMember"
           class="input filter-select"
+          aria-label="보고자"
           :disabled="!selectedProject || isLoadingTimeline"
         >
           <option value="">전체 보고자</option>
@@ -321,10 +319,7 @@ onMounted(() => {
             {{ user.name }}{{ user.count ? ` (${user.count})` : " (보고 없음)" }}
           </option>
         </select>
-      </div>
 
-      <div class="field field-view">
-        <label>보기</label>
         <div class="seg view-chips" role="group" aria-label="보기">
           <button
             v-for="item in VIEWS"
@@ -337,7 +332,6 @@ onMounted(() => {
             {{ item.label }}
           </button>
         </div>
-      </div>
     </div>
 
     <div v-if="selectedProject && !isLoading" class="flow-meta">
@@ -447,13 +441,13 @@ onMounted(() => {
           <div v-if="group.gap" class="gap">{{ group.gap }}일 공백</div>
 
           <article class="day">
-            <div class="day-head">
-              <span class="day-date">{{ displayDate(group.date) }}</span>
-              <span class="day-week">{{ weekday(group.date) }}</span>
-              <span v-if="group.entries.length > 1" class="date-count">
+            <h2 class="date-head day-head">
+              {{ displayDate(group.date) }}
+              <span class="date-head-week">{{ weekday(group.date) }}</span>
+              <span v-if="group.entries.length > 1" class="date-head-meta">
                 {{ group.entries.length }}건
               </span>
-            </div>
+            </h2>
 
             <button
               v-for="entry in group.entries"
@@ -488,11 +482,10 @@ onMounted(() => {
 
 <style scoped>
 .filters {
-  align-items: end;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(168px, 0.7fr);
-  gap: var(--space-3);
-  margin-bottom: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(168px, auto);
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .filter-select {
@@ -503,7 +496,7 @@ onMounted(() => {
 
 .view-chips {
   display: flex;
-  width: 100%;
+  height: var(--control-h);
 }
 
 .flow-meta {
@@ -623,38 +616,24 @@ onMounted(() => {
 .flow {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
 }
 
+/* Notion page section: a hairline above each day, no box around it. */
 .day {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-4);
-  background: var(--surface);
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding: var(--space-4) 0;
+  background: transparent;
+}
+
+.flow > .day:first-child {
+  border-top: 0;
 }
 
 .day-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.day-date {
-  font-size: var(--fs-14);
-  font-weight: var(--fw-semibold);
-  color: var(--text-strong);
-}
-
-.day-week {
-  font-size: var(--fs-12);
-  color: var(--text);
-}
-
-.date-count {
-  margin-left: auto;
-  font-size: var(--fs-12);
-  color: var(--text);
+  margin-bottom: var(--space-3);
 }
 
 .day-entry {
@@ -763,13 +742,9 @@ onMounted(() => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .filters > .field, .filters > .field:first-child {
-    grid-column: auto;
-    min-width: 0;
-  }
-
   .view-chips {
     width: 100%;
+    height: auto;
   }
 
   .filter-select {
@@ -783,7 +758,7 @@ onMounted(() => {
   }
 
   .day {
-    padding: var(--space-3);
+    padding: var(--space-4) 0;
   }
 
   .issue-row {

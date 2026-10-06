@@ -229,17 +229,19 @@ onMounted(() => {
                     <span class="avatar" :class="{ 'is-me': isMine(report) }">
                         {{ String(report.member_name || "?").slice(0, 1) }}
                     </span>
-                    <span class="row-main">
-                        <span class="row-title">
-                            {{ report.member_name }}
+                    <!-- 누가 · 어느 프로젝트 → 무슨 일 → 건수. 위에서 아래로 한 칸 안에서 읽힌다. -->
+                    <span class="report-main">
+                        <span class="report-who">
+                            <span class="report-name">{{ report.member_name }}</span>
                             <span v-if="isMine(report)" class="me-mark">나</span>
+                            <span class="report-projects">
+                                {{ projectNamesOf(report).join(" · ") || "프로젝트 없음" }}
+                            </span>
                         </span>
-                        <span class="row-sub">
-                            {{ projectNamesOf(report).join(" · ") || "프로젝트 없음" }}
+                        <span v-if="reportHeadline(report.parsed_json)" class="report-headline">
+                            {{ reportHeadline(report.parsed_json) }}
                         </span>
-                    </span>
-                    <span class="row-end">
-                        <span class="badges">
+                        <span v-if="badgesOf(report).length" class="badges">
                             <span
                                 v-for="badge in badgesOf(report)"
                                 :key="badge.key"
@@ -247,6 +249,8 @@ onMounted(() => {
                                 :class="badge.key"
                             >{{ badge.label }}</span>
                         </span>
+                    </span>
+                    <span class="row-end">
                         <button
                             v-if="canManage(report)"
                             type="button"
@@ -299,20 +303,91 @@ onMounted(() => {
     height: 18px;
     margin-left: var(--space-1);
     padding: 0 5px;
-    border: 1px solid var(--accent-border);
-    border-radius: var(--radius-xs);
-    background: transparent;
+    border: 0;
+    border-radius: var(--radius-tag);
+    background: var(--accent-soft);
     color: var(--accent-hover);
     font-size: var(--fs-11);
     font-weight: var(--fw-semibold);
     vertical-align: 1px;
 }
 
+/* 날짜 머리는 스크롤해도 위에 붙어 있어 지금 어느 날을 보는지 잃지 않는다. */
+.group-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-2);
+    background: var(--bg);
+}
+
+.group-block {
+    gap: 0;
+}
+
+.row {
+    align-items: flex-start;
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-3);
+}
+
+.row .avatar {
+    margin-top: 1px;
+}
+
+.report-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.report-who {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.report-name {
+    flex-shrink: 0;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.report-projects {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.report-headline {
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 .badges {
     display: flex;
     flex-wrap: wrap;
-    justify-content: flex-end;
     gap: var(--space-1);
+    margin-top: 2px;
+}
+
+.row-end {
+    align-self: center;
 }
 
 @media (max-width: 860px) {
@@ -324,21 +399,8 @@ onMounted(() => {
         min-height: var(--control-h-lg);
     }
 
-    /* 좁은 화면: 개수 태그는 이름 아래로 내려 제목이 잘리지 않게 한다. */
-    .row {
-        flex-wrap: wrap;
-        row-gap: var(--space-2);
-    }
-
-    .row-end {
-        order: 3;
-        width: 100%;
-        padding-left: calc(var(--control-h-sm) + var(--space-3));
-        justify-content: space-between;
-    }
-
-    .badges {
-        justify-content: flex-start;
+    .group-head {
+        top: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
     }
 
     .row-end .row-chevron {

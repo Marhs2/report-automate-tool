@@ -1264,8 +1264,8 @@ const getSelectedMemberId = () => {
 }
 
 .edit-more:hover {
-    background: var(--accent-soft);
-    color: var(--accent-hover);
+    background: var(--surface-soft);
+    color: var(--text-strong);
 }
 
 .edit-bucket + .edit-bucket {
@@ -1482,6 +1482,6 @@ const getSelectedMemberId = () => {
 }
 
 .raw-fold:hover {
-    background: var(--accent-soft);
+    background: var(--surface-soft);
 }
 </style>

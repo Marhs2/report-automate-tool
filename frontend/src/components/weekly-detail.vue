@@ -1033,9 +1033,15 @@ const saveReport = async () => {
 }
 
 /* 접히는 보조 카드: 공지사항 · 주요 이벤트 · 센터 협업 현황.
-   비어 있을 때는 한 줄로 접어 두고, 내용이 있으면 펼친 상태로 연다. */
-.fold-card {
-    padding: var(--space-3) var(--space-4);
+   비어 있을 때는 한 줄로 접어 두고, 내용이 있으면 펼친 상태로 연다.
+   노션 토글처럼 박스 없이 줄 사이 선만 둔다. */
+.fold-card,
+.meta-card {
+    padding: var(--space-3) 0;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: transparent;
 }
 
 .fold-card>summary {
@@ -1160,10 +1166,6 @@ const saveReport = async () => {
     color: var(--accent-hover);
 }
 
-.meta-card {
-    padding: var(--space-3) var(--space-4);
-}
-
 .meta-card>summary {
     display: flex;
     align-items: center;
@@ -1280,8 +1282,8 @@ const saveReport = async () => {
 }
 
 .add-project:hover {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+    border-color: var(--border-strong);
+    background: var(--surface-soft);
     color: var(--text-strong);
 }
 

@@ -14,6 +14,9 @@ const danger = ref(false);
 
 let active = null;
 let unlockTimer = 0;
+/** performance.now() when the current dialog opened. Key events stamped earlier
+ *  belong to whatever opened it, not to the dialog. */
+let openedAt = 0;
 
 const resetLabels = () => {
     title.value = "";
@@ -34,6 +37,7 @@ const pump = async () => {
     cancelLabel.value = active.cancelLabel || "취소";
     danger.value = Boolean(active.danger);
     locked.value = true;
+    openedAt = performance.now();
     open.value = true;
     await nextTick();
     window.clearTimeout(unlockTimer);
@@ -48,8 +52,11 @@ const enqueue = (item) => {
     queueMicrotask(pump);
 };
 
-const close = (result) => {
-    if (!open.value || locked.value) return;
+/** Buttons wait out the lock so a double click can't confirm by accident.
+ *  The keyboard path filters by event time instead (see isFreshKey), so a quick
+ *  Enter right after the dialog appears still closes it on the first press. */
+const close = (result, { fromKey = false } = {}) => {
+    if (!open.value || (locked.value && !fromKey)) return;
     window.clearTimeout(unlockTimer);
     open.value = false;
     locked.value = false;
@@ -59,6 +66,9 @@ const close = (result) => {
     current?.resolve(result);
     queueMicrotask(pump);
 };
+
+/** A key press that started after the dialog opened and isn't auto-repeat. */
+const isFreshKey = (event) => !event.repeat && event.timeStamp >= openedAt;
 
 export function useDialog() {
     const alert = (text, options = {}) =>
@@ -101,5 +111,8 @@ export function useDialog() {
         confirm,
         accept: () => close(true),
         reject: () => close(false),
+        isFreshKey,
+        acceptKey: () => close(true, { fromKey: true }),
+        rejectKey: () => close(false, { fromKey: true }),
     };
 }

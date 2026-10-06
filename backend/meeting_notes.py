@@ -1,7 +1,7 @@
-"""회의 녹음 → 전사(R2T2) → 회의록 요약에 쓰는 도우미.
+"""회의 녹음 → 받아 적기(Qwen3-ASR) → 회의록 요약에 쓰는 도우미.
 
-라우트는 main.py에 있다. 여기에는 HTTP와 LLM 호출 없이 검사할 수 있는 부분과
-ASR 서버 호출만 둔다.
+라우트는 main.py에 있다. 여기에는 HTTP와 LLM 호출 없이 검사할 수 있는 부분을 둔다.
+받아 적기 서버는 GPU 서버의 qwen_live_server.py다(WebSocket /v1/stream).
 """
 
 import difflib
@@ -10,25 +10,25 @@ import os
 import re
 from datetime import date, timedelta
 
-import requests
 from dotenv import load_dotenv
 
 # main.py는 import가 끝난 뒤에 load_dotenv()를 부른다. 여기서 먼저 읽어야 .env의 ASR_* 값이 들어온다.
 load_dotenv()
 
 ASR_BASE_URL = os.environ.get("ASR_BASE_URL", "http://192.168.210.10:8889")
-ASR_MODEL = os.environ.get("ASR_MODEL", "r2t2")
-ASR_LANGUAGE = os.environ.get("ASR_LANGUAGE", "ko")
-ASR_TIMEOUT_SECONDS = float(os.environ.get("ASR_TIMEOUT_SECONDS", "120"))
-# 회의 전체 화자 분리는 한 시간짜리면 몇 분 걸린다.
-ASR_DIARIZE_TIMEOUT_SECONDS = float(os.environ.get("ASR_DIARIZE_TIMEOUT_SECONDS", "1200"))
-# serve_all.py를 ASR_API_KEY와 함께 띄웠으면 같은 값을 넣는다.
-ASR_API_KEY = os.environ.get("ASR_API_KEY", "")
-ASR_PATH = "/v1/audio/transcriptions"
-SESSION_ID = re.compile(r"^[0-9a-f]{32}$")
+# Qwen3-ASR은 언어 이름을 영어로 받는다("Korean"). auto면 자동 감지.
+ASR_LANGUAGE = os.environ.get("ASR_LANGUAGE", "Korean")
+ASR_STREAM_PATH = "/v1/stream"
+# 받아 적기 모델에 문맥(context)으로 사내 용어(이름 · 프로젝트)를 넘길지. Qwen3-ASR은 넘긴 용어 목록을
+# 말이 없는 곳에서 그대로 읽어 녹취록에 적는다("관리자, 박민준, 유시은, …"). 그래서 기본은 넘기지 않고,
+# 사내 용어 교정은 녹음을 멈춘 뒤 LLM 교정(polish_segments)에 맡긴다. 1이면 넘긴다.
+ASR_SEND_CONTEXT = os.environ.get("ASR_SEND_CONTEXT", "0") == "1"
+# 넘길 때 이 글자 수까지만.
+HOTWORD_CHARS = 600
+# 용어가 이만큼 이상 쉼표로 이어지면 모델이 문맥을 읽은 것으로 보고 지운다.
+# 사람이 프로젝트 이름 서너 개를 늘어놓는 말을 지우지 않도록 넉넉히 잡는다.
+ECHO_MIN_TERMS = 4
 
-# 프론트는 녹음을 5초 안팎 조각(16kHz 모노 WAV, 약 200KB)으로 보낸다. 넉넉히 잡아도 이 이상은 잘못 온 것이다.
-MAX_AUDIO_BYTES = 25 * 1024 * 1024
 MAX_TRANSCRIPT_CHARS = 100_000
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -39,132 +39,95 @@ class MeetingError(Exception):
         self.status = status
 
 
-def asr_url(base: str = ASR_BASE_URL) -> str:
-    base = base.rstrip("/")
-    return base if base.endswith(ASR_PATH) else base + ASR_PATH
+def asr_stream_url(base: str = ASR_BASE_URL) -> str:
+    """http(s)://host:port → ws(s)://host:port/v1/stream"""
+    base = base.rstrip("/").removesuffix(ASR_STREAM_PATH)
+    if base.startswith("https://"):
+        base = "wss://" + base[len("https://"):]
+    elif base.startswith("http://"):
+        base = "ws://" + base[len("http://"):]
+    return base + ASR_STREAM_PATH
 
 
 def clean_text(text) -> str:
     return re.sub(r"\s+", " ", str(text or "")).strip()
 
 
-def _asr_call(method: str, url: str, *, timeout: float = ASR_TIMEOUT_SECONDS, **kwargs) -> dict:
-    """음성 인식 서버를 부르고 JSON을 돌려준다. 실패는 사용자에게 보여 줄 MeetingError로 바꾼다."""
-    headers = {"X-API-Key": ASR_API_KEY} if ASR_API_KEY else {}
-    try:
-        res = getattr(requests, method)(url, headers=headers, timeout=timeout, **kwargs)
-    except requests.Timeout:
-        raise MeetingError("음성 인식 서버가 제때 답하지 않았습니다.", 504)
-    except requests.RequestException as e:
-        print(f"[meeting-asr] connect error: {e}")
-        raise MeetingError(
-            f"음성 인식 서버({ASR_BASE_URL})에 연결하지 못했습니다. 서버가 켜져 있는지 확인해주세요.",
-            502,
-        )
-    if res.status_code == 404 and "/v1/sessions" in url:
-        raise MeetingError("음성 인식 서버에 이 녹음 세션이 없습니다. 서버가 다시 켜졌거나 오래되어 지워졌습니다.", 404)
-    if res.status_code != 200:
-        print(f"[meeting-asr] upstream status={res.status_code} body={res.text[:500]}")
-        raise MeetingError(f"음성 인식 실패 (status={res.status_code}).", 502)
-    try:
-        body = res.json()
-    except ValueError:
-        raise MeetingError("음성 인식 서버의 응답을 읽지 못했습니다.", 502)
-    return body if isinstance(body, dict) else {}
-
-
-def _check_audio(data: bytes) -> None:
-    if not data:
-        raise MeetingError("녹음 조각이 비어 있습니다.")
-    if len(data) > MAX_AUDIO_BYTES:
-        raise MeetingError("녹음 조각이 25MB를 넘습니다.", 413)
-
-
-def transcribe_audio(data: bytes, filename: str, content_type: str) -> str:
-    _check_audio(data)
-    body = _asr_call(
-        "post",
-        asr_url(),
-        files={"file": (filename or "audio.wav", data, content_type or "audio/wav")},
-        data={"model": ASR_MODEL, "language": ASR_LANGUAGE},
-    )
-    return clean_text(body.get("text"))
-
-
-# ---- 녹음 세션: 조각을 서버에 쌓고, 정지하면 회의 전체로 화자를 나눈다 (asr-server/serve_all.py) ----
-
-def _session_url(session_id: str = "", tail: str = "") -> str:
-    if session_id and not SESSION_ID.match(session_id):
-        raise MeetingError("녹음 세션 번호가 올바르지 않습니다.")
-    url = ASR_BASE_URL.rstrip("/") + "/v1/sessions"
-    return f"{url}/{session_id}{tail}" if session_id else url
-
-
-def create_session() -> str:
-    session_id = str(_asr_call("post", _session_url()).get("id") or "")
-    if not SESSION_ID.match(session_id):
-        raise MeetingError("음성 인식 서버가 녹음 세션을 만들지 못했습니다.", 502)
-    return session_id
-
-
-def append_session_audio(session_id: str, data: bytes, filename: str, content_type: str) -> str:
-    """조각을 세션에 이어 붙이고, 같은 조각의 받아 적은 글을 돌려준다."""
-    _check_audio(data)
-    body = _asr_call(
-        "post",
-        _session_url(session_id, "/audio"),
-        files={"file": (filename or "audio.wav", data, content_type or "audio/wav")},
-        data={"transcribe": "true", "language": ASR_LANGUAGE},
-    )
-    return clean_text(body.get("text"))
-
-
-def diarize_session(session_id: str, num_speakers: int | None = None) -> dict:
-    data = {"language": ASR_LANGUAGE}
-    if num_speakers:
-        data["num_speakers"] = str(num_speakers)
-    body = _asr_call(
-        "post",
-        _session_url(session_id, "/diarize"),
-        data=data,
-        timeout=ASR_DIARIZE_TIMEOUT_SECONDS,
-    )
-    return normalize_diarization(body)
-
-
-def delete_session(session_id: str) -> None:
-    try:
-        _asr_call("delete", _session_url(session_id))
-    except MeetingError as e:
-        # 서버가 6시간 뒤에 지우므로, 못 지워도 사용자 흐름은 멈추지 않는다.
-        print(f"[meeting-asr] session delete skipped: {e}")
-
-
-def normalize_diarization(body: dict) -> dict:
-    """서버 결과를 앱이 쓰는 모양으로 맞춘다. 화자 번호는 나온 순서대로 0, 1, 2 …로 다시 매긴다."""
-    order = {}
-    segments = []
-    for row in body.get("segments") or []:
-        if not isinstance(row, dict):
+def hotwords(terms, limit: int = HOTWORD_CHARS) -> str:
+    """사내 용어를 "a, b, c"로 잇는다. 같은 말은 한 번만, 한 글자는 빼고, limit 글자까지."""
+    seen = set()
+    out = []
+    size = 0
+    for term in terms:
+        term = clean_text(term)
+        if len(term) < 2 or term in seen:
             continue
-        text = clean_text(row.get("text"))
-        if not text:
+        add = len(term) + (2 if out else 0)
+        if size + add > limit:
+            break
+        seen.add(term)
+        out.append(term)
+        size += add
+    return ", ".join(out)
+
+
+def stream_config(terms) -> dict:
+    """받아 적기 서버에 처음 보내는 설정. 브라우저는 16kHz 16비트 PCM을 보낸다."""
+    config = {"language": ASR_LANGUAGE, "format": "s16le"}
+    context = hotwords(terms) if ASR_SEND_CONTEXT else ""
+    if context:
+        config["context"] = context
+    return config
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"[\s.,!?·]", "", str(text or "")).lower()
+
+
+def _term_like(piece: str, terms: set) -> bool:
+    key = _squash(piece)
+    if not key:
+        return False
+    if key in terms:
+        return True
+    # 모델이 용어를 조금 틀리게 읽기도 한다("보고변합도구"). 비슷하면 용어로 본다.
+    return any(len(t) >= 3 and difflib.SequenceMatcher(None, key, t).ratio() >= 0.75 for t in terms)
+
+
+def strip_context_echo(text: str, terms) -> str:
+    """받아 적은 글에서 모델이 문맥(사내 용어 목록)을 그대로 읽은 부분을 지운다.
+    쉼표 · 마침표로 나눈 조각이 ECHO_MIN_TERMS개 이상 연달아 용어(또는 용어와 비슷한 말)뿐이면 그 묶음을 뺀다."""
+    keys = {_squash(t) for t in terms if _squash(t)}
+    if not text or not keys:
+        return clean_text(text)
+    parts = re.split(r"([,.，、]\s*)", str(text))
+    pieces = [(parts[i], parts[i + 1] if i + 1 < len(parts) else "") for i in range(0, len(parts), 2)]
+    like = [_term_like(p, keys) for p, _ in pieces]
+    drop = [False] * len(pieces)
+    i = 0
+    while i < len(pieces):
+        if not like[i]:
+            i += 1
             continue
-        speaker = order.setdefault(str(row.get("speaker") or ""), len(order))
-        segment = {
-            "start": float(row.get("start") or 0),
-            "end": float(row.get("end") or 0),
-            "speaker": speaker,
-            "text": text,
-        }
-        if row.get("overlap"):
-            segment["overlap"] = float(row["overlap"])
-        segments.append(segment)
-    return {
-        "segments": segments,
-        "speakerCount": len(order),
-        "failedSegments": int(body.get("failed_segments") or 0),
-    }
+        # 용어 묶음 사이에 모델이 알아보기 어렵게 읽은 조각 하나가 끼어도(앞뒤가 용어면) 같은 묶음으로 본다.
+        j, count = i, 0
+        while j < len(pieces) and (like[j] or (j + 1 < len(pieces) and like[j + 1] and like[j - 1])):
+            count += like[j]
+            j += 1
+        if count >= ECHO_MIN_TERMS:
+            for k in range(i, j):
+                drop[k] = True
+        i = j
+    kept = "".join(p + d for (p, d), gone in zip(pieces, drop) if not gone)
+    return clean_text(re.sub(r"[,\s]+$", "", re.sub(r"^[,.\s]+", "", kept)))
+
+
+def final_segment(msg: dict, terms=()) -> dict | None:
+    """서버의 final 메시지(확정된 발화 하나)를 앱이 쓰는 구간으로. 문맥을 읽은 부분은 빼고, 글이 없으면 None."""
+    text = strip_context_echo(msg.get("text"), terms)
+    if not text:
+        return None
+    return {"start": float(msg.get("start") or 0), "end": float(msg.get("end") or 0), "text": text}
 
 
 WEEKDAYS = "월화수목금토일"

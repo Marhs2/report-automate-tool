@@ -1,10 +1,14 @@
 /* ------------------------------------------------------------------
    Page patterns shared by every screen.
    - .page-intro   : large title + one line of context + actions
-   - .group        : inset grouped list (one white card, hairline rows)
+   - .group        : Notion list view (hairline rows, no outer box)
    - .row          : one tappable line inside a group
    - .seg          : segmented control (2–4 choices, one on)
    - .avatar       : initial in a circle
+   - .view-head    : section title + big period on the left, controls on the right
+   - .stepper      : ‹ 이번 주 › style prev / reset / next group
+   - .callout      : tinted notice box (is-danger · is-warning · is-success · is-info)
+   - .date-head    : date heading for date-grouped lists (18px date + muted weekday)
    Values come from tokens.css only.
    ------------------------------------------------------------------ */
 
@@ -28,6 +32,7 @@
 .page-intro h1 {
     margin: 0;
     font: var(--type-title);
+    font-size: var(--fs-20);
     letter-spacing: -0.01em;
     color: var(--text-strong);
     word-break: keep-all;
@@ -66,8 +71,7 @@
 
 .group-head h2 {
     margin: 0;
-    font: var(--type-heading);
-    font-size: var(--fs-14);
+    font: var(--type-section);
     color: var(--text-strong);
     word-break: keep-all;
 }
@@ -83,8 +87,10 @@
     flex-direction: column;
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
     background: var(--surface);
 }
 
@@ -102,9 +108,10 @@
     align-items: center;
     gap: var(--space-3);
     width: 100%;
-    min-height: 56px;
-    padding: var(--space-3) var(--space-4);
+    min-height: 44px;
+    padding: var(--space-2) var(--space-2);
     border: 0;
+    border-radius: var(--radius-xs);
     background: transparent;
     color: var(--text);
     font: inherit;
@@ -119,17 +126,17 @@
     content: "";
     position: absolute;
     top: 0;
-    left: var(--row-inset, var(--space-4));
+    left: var(--row-inset, var(--space-2));
     right: 0;
     border-top: 1px solid var(--border);
 }
 
 .group.has-avatars {
-    --row-inset: calc(var(--space-4) + var(--control-h-sm) + var(--space-3));
+    --row-inset: calc(var(--space-2) + var(--control-h-sm) + var(--space-3));
 }
 
 .row:hover {
-    background: var(--bg);
+    background: var(--surface-soft);
 }
 
 .row:focus-visible {
@@ -162,7 +169,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
+    font-weight: var(--fw-medium);
     line-height: var(--lh-tight);
     color: var(--text-strong);
 }
@@ -263,8 +270,8 @@
     gap: 2px;
     max-width: 100%;
     padding: 2px;
-    border-radius: var(--radius);
-    background: var(--surface-press);
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
 }
 
 .seg > a,
@@ -276,9 +283,9 @@
     min-height: var(--control-h-sm);
     padding: 0 var(--space-4);
     border: 0;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-xs);
     background: transparent;
-    color: var(--text);
+    color: var(--text-muted);
     font: inherit;
     font-size: var(--fs-13);
     font-weight: var(--fw-medium);
@@ -298,14 +305,177 @@
 .seg > .is-on {
     background: var(--surface);
     color: var(--text-strong);
-    font-weight: var(--fw-semibold);
-    box-shadow: var(--shadow-1);
+    box-shadow: 0 0 0 1px var(--border), var(--shadow-1);
 }
 
 .seg > a:focus-visible,
 .seg > button:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
+}
+
+/* ---- View head ----------------------------------------------------- */
+/* 기간이 있는 화면(주간 보고서 · 사용자 활동)의 머리. 왼쪽은 무엇을 보는지, 오른쪽은 옮기는 도구. */
+
+.view-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-4);
+}
+
+.view-head-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.view-period {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--fs-24);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.view-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* ---- Stepper ------------------------------------------------------- */
+
+.stepper {
+    display: inline-flex;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+}
+
+.stepper > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--control-h);
+    height: var(--control-h);
+    padding: 0 var(--space-2);
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+}
+
+.stepper > .stepper-reset {
+    padding: 0 var(--space-3);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+
+.stepper > button:hover:not(:disabled) {
+    background: var(--surface-soft);
+    color: var(--text-strong);
+}
+
+.stepper > button:disabled {
+    color: var(--text-muted);
+    cursor: default;
+}
+
+.stepper > button:focus-visible {
+    outline: none;
+    box-shadow: inset var(--focus-ring);
+}
+
+/* ---- Callout ------------------------------------------------------- */
+/* 노션 콜아웃: 테두리 없는 옅은 색 면 + 아이콘 + 글 + (선택) 버튼. 화면에서 먼저 읽혀야 하는 한 가지에만 쓴다. */
+
+.callout {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3) var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
+}
+
+.callout.is-danger { background: var(--danger-bg); }
+.callout.is-warning { background: var(--warning-bg); }
+.callout.is-success { background: var(--success-bg); }
+.callout.is-info { background: var(--info-bg); }
+
+.callout-icon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+.callout.is-danger .callout-icon { color: var(--danger-fg); }
+.callout.is-warning .callout-icon { color: var(--warning-fg); }
+.callout.is-success .callout-icon { color: var(--success-fg); }
+.callout.is-info .callout-icon { color: var(--info-fg); }
+
+.callout-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.callout-title {
+    margin: 0;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.callout-body {
+    margin: 0;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text);
+}
+
+.callout > .btn {
+    flex-shrink: 0;
+}
+
+/* ---- Date head ----------------------------------------------------- */
+
+.date-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--fs-18);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.date-head-week {
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+}
+
+.date-head-meta {
+    margin-left: auto;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
 }
 
 /* ---- Mobile -------------------------------------------------------- */
@@ -340,5 +510,33 @@
         min-height: var(--control-h);
         padding: 0 var(--space-2);
         font-size: var(--fs-14);
+    }
+
+    .view-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .view-period {
+        font-size: var(--fs-20);
+    }
+
+    .view-nav {
+        justify-content: space-between;
+    }
+
+    .stepper > button {
+        min-width: var(--control-h-touch);
+        height: var(--control-h-touch);
+    }
+
+    .callout {
+        flex-wrap: wrap;
+        padding: var(--space-4);
+    }
+
+    .callout > .btn {
+        width: 100%;
+        min-height: var(--control-h-touch);
     }
 }

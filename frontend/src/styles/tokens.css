@@ -1,54 +1,57 @@
 /* ------------------------------------------------------------------
    Design tokens — the only place raw values live.
-   Light paper theme, one blue accent, hairline borders, no dark mode.
+   Notion-style light theme: white page, warm-gray sidebar, one blue accent,
+   hairline borders, no dark mode.
    Every name here is a public hook: never rename or remove, only add.
    Usage rules live in .omo/ui-redesign/design-spec.md
    ------------------------------------------------------------------ */
 :root {
     /* ---- Color: canvas & surfaces ------------------------------- */
-    --bg: #f6f5f4;              /* page canvas (warm paper) */
+    --bg: #ffffff;              /* page canvas (Notion page white) */
     --surface: #ffffff;         /* cards, inputs, dialogs, sticky bars */
-    --surface-soft: #efedeb;    /* hover fill, trays, static chips, avatars */
-    --surface-press: #e6e3df;   /* pressed/active fill for neutral controls */
-    --sidebar-bg: #f6f5f4;
+    --surface-soft: #f1f1ef;    /* hover fill, trays, static chips, avatars */
+    --surface-press: #e8e7e4;
+    --input-bg: #f7f7f5;        /* Notion input well; turns white on focus */   /* pressed/active fill for neutral controls */
+    --sidebar-bg: #f7f7f5;      /* Notion sidebar gray */
+    --sidebar-hover: #ebebe9;   /* sidebar row hover / active fill */
 
     /* ---- Color: lines --------------------------------------------- */
-    --border: #e7e5e2;          /* default hairline, warm to match canvas */
-    --border-strong: #d3cfc9;   /* hover border, dashed affordances */
+    --border: #e9e9e7;          /* default hairline, Notion divider */
+    --border-strong: #d3d1cb;   /* hover border, dashed affordances */
 
     /* ---- Color: text ---------------------------------------------- */
-    --text-strong: #1c1b18;     /* headings, values, control labels */
+    --text-strong: #1f1e1b;     /* headings, values, control labels */
     --text: #37352f;            /* body */
-    --text-muted: #6f6e69;      /* secondary, field labels, placeholders */
+    --text-muted: #63625e;      /* secondary, labels; AA on sidebar-hover (5.1:1) */
     --text-on-accent: #ffffff;
 
     /* ---- Color: the one accent ------------------------------------ */
     --accent: #0075de;          /* primary CTA fill, links, active indicator */
     --accent-hover: #005bab;
-    --accent-soft: #e8f1fc;     /* selected fill, count chips */
-    --accent-border: #b9d6f5;
+    --accent-soft: #e7f3f8;     /* selected fill, count chips */
+    --accent-border: #b4d6ef;
     --accent-ring: rgba(0, 117, 222, 0.2);
 
     /* ---- Color: semantic (tinted chip/notice only) ---------------- */
     --success-fg: #1a7f37;
-    --success-bg: #e6f4ea;
+    --success-bg: #edf3ec;
     --success-border: #b7dbbf;
-    --warning-fg: #9a6700;
-    --warning-bg: #fef3c7;
+    --warning-fg: #8a5c00;
+    --warning-bg: #fbf3db;
     --warning-border: #e6cfa3;
     --danger-fg: #b3261e;
-    --danger-bg: #fbeae8;
+    --danger-bg: #fdebec;
     --danger-border: #eec4bf;
     --info-fg: #0b5cab;
-    --info-bg: #e8f1fc;
+    --info-bg: #e7f3f8;
     --info-border: #b9d6f5;
 
     /* Project accents 4/5 extend the report-doc palette past the 4 semantics. */
     --project-4-fg: #5c5470;
-    --project-4-bg: #eeeaf3;
+    --project-4-bg: #f6f3f9;
     --project-4-border: #c9c1d8;
     --project-5-fg: #3f6f68;
-    --project-5-bg: #e6f0ee;
+    --project-5-bg: #e8f2ef;
     --project-5-border: #b7d0cb;
 
     /* ---- Color roles: aliases only, no new colors ------------------ */
@@ -57,7 +60,7 @@
     --attention: var(--danger-fg);
 
     /* ---- Overlay -------------------------------------------------- */
-    --overlay: rgba(28, 27, 24, 0.4);
+    --overlay: rgba(15, 15, 15, 0.4);
 
     /* ---- Spacing: 4px grid ---------------------------------------- */
     --space-1: 4px;
@@ -70,11 +73,12 @@
     --space-8: 48px;
 
     /* ---- Control system: three heights, one horizontal padding scale */
-    --control-h: 36px;          /* default button / input / select */
-    --control-h-sm: 32px;       /* .btn-small, icon buttons, interactive chips */
+    --control-h: 32px;          /* default button / input / select */
+    --control-h-sm: 28px;       /* .btn-small, icon buttons, sidebar rows */
     --control-h-lg: 44px;       /* touch (<=860px) and hero CTAs */
     --control-h-touch: var(--control-h-lg);
     --control-px: var(--space-3);
+    --chip-h-sm: 20px;          /* Notion inline tags */
     --chip-h: 24px;             /* static text chips */
 
     /* ---- Type ----------------------------------------------------- */
@@ -83,12 +87,15 @@
     --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --fs-11: 11px;              /* micro labels, nav group caps */
     --fs-12: 12px;              /* chips, field labels, kickers */
-    --fs-13: 13px;              /* small buttons, meta, help */
-    --fs-14: 14px;              /* UI default: buttons, inputs, list text */
-    --fs-16: 16px;              /* section titles, dialog message, doc inputs */
+    --fs-13: 14px;              /* meta, help (name kept as a hook; 14px reads easier in Korean) */
+    --fs-14: 15px;              /* UI default: body, list text (hook name kept) */
+    --fs-16: 16px;
+    --fs-18: 18px;              /* section titles (Notion heading 3) */              /* section titles, dialog message, doc inputs */
     --fs-20: 20px;              /* mobile page title */
     --fs-24: 24px;              /* page title */
     --fs-30: 30px;              /* reserved: hero numbers only */
+    --fs-32: 32px;              /* page title */
+    --fs-40: 40px;              /* reserved */
     --lh-none: 1;
     --lh-tight: 1.25;
     --lh-base: 1.5;
@@ -101,6 +108,7 @@
     /* ---- Type roles: size / weight / leading in one place ---------- */
     --type-title: var(--fw-bold) var(--fs-24) / var(--lh-tight) var(--sans);
     --type-heading: var(--fw-semibold) var(--fs-16) / var(--lh-tight) var(--sans);
+    --type-section: var(--fw-semibold) var(--fs-18) / var(--lh-tight) var(--sans);
     --type-body: var(--fw-regular) var(--fs-14) / var(--lh-base) var(--sans);
     --type-desc: var(--fw-regular) var(--fs-13) / var(--lh-base) var(--sans);
     --type-caption: var(--fw-medium) var(--fs-12) / var(--lh-tight) var(--sans);
@@ -108,18 +116,19 @@
     /* ---- Spacing roles ---------------------------------------------- */
     --gap-tight: var(--space-2);
     --gap: var(--space-4);
-    --gap-section: var(--space-7);
+    --gap-section: var(--space-8);
 
     /* ---- Radii: nested surfaces step down one notch ---------------- */
     --radius-xs: 4px;           /* code, text highlights */
-    --radius-sm: 8px;           /* controls, trays inside cards */
-    --radius: 12px;             /* cards, toolbars, empty states */
-    --radius-lg: 16px;          /* dialogs, bottom sheets */
+    --radius-tag: 3px;          /* Notion select/status tags */
+    --radius-sm: 6px;           /* controls, trays inside cards */
+    --radius: 8px;              /* cards, toolbars, empty states */
+    --radius-lg: 12px;          /* dialogs, bottom sheets */
     --radius-pill: 9999px;      /* chips, avatars */
 
     /* ---- Elevation: flat by default, shadow only when floating ----- */
-    --shadow-1: 0 1px 2px rgba(28, 27, 24, 0.04), 0 4px 12px rgba(28, 27, 24, 0.05);
-    --shadow-2: 0 8px 24px rgba(28, 27, 24, 0.08), 0 24px 48px rgba(28, 27, 24, 0.06);
+    --shadow-1: 0 0.7px 1.5px rgba(0, 0, 0, 0.02), 0 3px 9px rgba(0, 0, 0, 0.03);
+    --shadow-2: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 6px rgba(15, 15, 15, 0.1), 0 9px 24px rgba(15, 15, 15, 0.2);
     --focus-ring: 0 0 0 3px var(--accent-ring);
 
     /* ---- Motion --------------------------------------------------- */
@@ -134,13 +143,13 @@
     --z-overlay: 90;
 
     /* ---- Shell geometry ------------------------------------------- */
-    --sidebar-width: 248px;
+    --sidebar-width: 240px;
     --sidebar-width-collapsed: 64px;
-    --topbar-height: 56px;
-    --content-max: 880px;
-    --content-max-wide: 1120px;
+    --topbar-height: 45px;
+    --content-max: 1040px;      /* one page column for every screen */
+    --content-max-wide: 1040px; /* kept as a hook; same column as .page */
     --bottom-nav-height: 0px;
     --bottom-nav-offset: 0px;
 
-    --scrollbar-thumb: rgba(28, 27, 24, 0.22);
+    --scrollbar-thumb: rgba(55, 53, 47, 0.2);
 }

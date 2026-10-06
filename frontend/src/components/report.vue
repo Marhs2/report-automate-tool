@@ -882,7 +882,7 @@ const sendReport = async () => {
     padding: var(--space-7) var(--space-5);
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius);
-    background: var(--bg);
+    background: var(--input-bg);
     text-align: center;
     transition:
         border-color var(--dur-fast) var(--ease),
@@ -925,8 +925,8 @@ const sendReport = async () => {
 }
 
 .file-drop-pick:hover {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+    border-color: var(--border-strong);
+    background: var(--surface-soft);
 }
 
 .file-drop-input {

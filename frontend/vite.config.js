@@ -10,6 +10,7 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+        ws: true, // 회의 녹음 스트림(/meeting/stream)
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },

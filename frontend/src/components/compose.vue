@@ -7,16 +7,30 @@ import { selectedUserId } from "../composables/useSelectedUser";
 import AppField from "./ui/AppField.vue";
 import Report from "./report.vue";
 import { COMPOSE_CHOICES } from "../lib/nav";
+import { Mic, Square } from "lucide-vue-next";
 import { useMeetingRecorder } from "../composables/useMeetingRecorder";
-import { formatClock, joinTranscript } from "../lib/meetingAudio";
+import { useMeetingStream } from "../composables/useMeetingStream";
+import { formatClock, joinTranscript, liveTranscript } from "../lib/meetingAudio";
 import { summaryNote, summaryToForm } from "../lib/meetingSummary";
-import {
-    attendeesFromNames,
-    labeledTranscript,
-    overlapCount,
-    speakerSummaries,
-    spokenDuration,
-} from "../lib/meetingSpeakers";
+
+/** 글 상자를 내용 높이에 맞춘다. 비어 있거나 짧으면 작게, 길어지면 늘어난다. */
+const fitHeight = (el) => {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+};
+const vAutosize = {
+    mounted(el) {
+        fitHeight(el);
+        el.addEventListener("input", () => fitHeight(el));
+    },
+    updated: fitHeight,
+};
+
+const narrowQuery = typeof window !== "undefined" ? window.matchMedia("(max-width: 860px)") : null;
+const isNarrow = ref(Boolean(narrowQuery?.matches));
+const onNarrowChange = (event) => {
+    isNarrow.value = event.matches;
+};
 
 const KINDS = [
     { id: "meeting", label: "회의록" },
@@ -38,10 +52,6 @@ const {
     putWorkRecord,
     deleteWorkRecord,
     getUsers,
-    transcribeMeetingAudio,
-    createMeetingSession,
-    diarizeMeetingSession,
-    deleteMeetingSession,
     summarizeMeeting,
 } = useApi();
 
@@ -315,104 +325,44 @@ const remove = async () => {
 };
 
 /*
- * 녹음으로 채우기: 녹음하는 동안 5초 안팎 초안 조각을 받아 적어 바로 보여 주고,
- * 같은 소리를 24~30초로 이은 조각을 다시 받아 적어 녹취록으로 쓴다(맥락이 길어 덜 틀린다).
- * 녹취록용 조각은 음성 인식 서버의 녹음 세션에도 쌓는다. 녹음을 멈추면 회의 전체로 말한 사람을 나누고,
- * 둘 이상이면 이름을 붙인 뒤 안건 · 결정 · 후속 할 일로 정리한다. 녹취록은 기록에 함께 저장된다.
- * 세션을 못 열면(서버가 화자 분리를 지원하지 않거나 꺼져 있음) 말한 사람 없이 이전처럼 정리한다.
+ * 녹음으로 채우기: 녹음하는 동안 소리를 받아 적기 서버(Qwen3-ASR)로 계속 흘려 보낸다. 서버는 말이 끊길 때마다
+ * 발화 하나를 확정해 돌려주고, 말하는 중인 발화도 미리 보여 준다. 녹음을 멈추면 남은 소리를 마저 적고
+ * 사내 용어로 교정한 뒤 안건 · 결정 · 후속 할 일로 정리한다. 녹취록은 기록에 함께 저장된다.
  */
-// 녹취록용(24~30초) 조각 중 아직 결과를 못 받은 수. 정리는 이것이 0이 된 뒤에 한다.
-const pendingPieces = ref(0);
-const failedPieces = ref([]);
 const voiceError = ref("");
 // 새 회의록은 녹음 단계(record)로 시작한다. 녹음을 멈추고 정리가 끝나면 양식(form)만 남는다.
 // 저장된 회의록을 열면 바로 양식이다.
 const meetingStage = ref("record");
 const showsForm = computed(() => kind.value !== "meeting" || meetingStage.value === "form");
-// 이번 녹음에서 녹취록용 조각으로 확정된 글과 그 끝 시각(초). 초안은 그 뒤 부분만 보여 준다.
-const liveFinal = ref("");
-const liveFinalEnd = ref(0);
-const liveDrafts = ref([]);
-const liveText = computed(() =>
-    liveDrafts.value
-        .filter((draft) => draft.start >= liveFinalEnd.value)
-        .reduce((text, draft) => joinTranscript(text, draft.text), liveFinal.value),
-);
 const summarizing = ref(false);
 const summarizeSeconds = ref(0);
 const summaryText = ref("");
-// 정리가 실패하면 받아 적은 글을 다시 보여 줘서 잃지 않게 한다.
+// 정리가 실패하거나 연결이 끊기면 받아 적은 글을 다시 보여 줘서 잃지 않게 한다.
 const showTranscript = ref(false);
-// 녹음 정지를 눌렀고, 남은 조각이 다 적히면 정리해야 한다.
-const summarizeWhenDone = ref(false);
-let pieceQueue = Promise.resolve();
-let draftQueue = Promise.resolve();
-// 음성 인식 서버의 녹음 세션. 없으면 말한 사람을 나누지 않는다.
-const sessionId = ref("");
-const speakerNote = ref("");
-const diarizing = ref(false);
-const diarizeSeconds = ref(0);
-// 둘 이상이 말했으면 정리 전에 이름을 붙인다. { segments, summaries }
-const speakerStep = ref(null);
-const speakerNames = reactive({});
-const memberNames = ref([]);
-let diarizeTimer = null;
-let overlapWarning = "";
-// 세션을 여는 중이면 녹취록용 조각은 그걸 기다린다. 첫 조각부터 세션에 들어가야 회의 전체를 나눈다.
-let sessionOpening = null;
 // 다른 기록을 열거나 새로 쓰면 올라간다. 늦게 온 결과가 엉뚱한 기록에 붙지 않게 한다.
 let voiceKey = 0;
 let summarizeTimer = null;
 
-/** 화면용 초안. 실패하거나 녹음이 끝난 뒤 도착하면 버린다. 녹취록에는 쓰지 않는다. */
-const transcribeDraft = (piece) => {
-    const key = voiceKey;
-    draftQueue = draftQueue.then(async () => {
-        if (key !== voiceKey || !recording.value) return;
-        try {
-            const { text } = await transcribeMeetingAudio(piece.blob);
-            if (key === voiceKey && recording.value) {
-                liveDrafts.value = [...liveDrafts.value, { start: piece.start, text }];
-            }
-        } catch {
-            // 초안은 화면 표시용이다. 같은 소리는 녹취록용 조각으로 다시 받아 적는다.
-        }
-    });
+/** 받아 적은 발화를 녹취록 뒤에 붙인다. 녹음을 끊었다 다시 하면 앞 녹음 뒤로 이어진다. */
+const appendTranscript = (segments) => {
+    form.transcript = segments.reduce((text, segment) => joinTranscript(text, segment.text), form.transcript);
 };
 
-/** 세션이 사라졌으면(서버 재시작 등) 이번 녹음은 말한 사람 없이 받아 적는다. */
-const transcribeFinal = async (blob) => {
-    if (sessionOpening) await sessionOpening;
-    if (!sessionId.value) return transcribeMeetingAudio(blob, { polish: true });
-    try {
-        return await transcribeMeetingAudio(blob, { polish: true, session: sessionId.value });
-    } catch (error) {
-        if (error?.response?.status !== 404) throw error;
-        sessionId.value = "";
-        speakerNote.value = "음성 인식 서버의 녹음 세션이 끊겨서 이번 녹음은 말한 사람을 나누지 않습니다.";
-        return transcribeMeetingAudio(blob, { polish: true });
-    }
-};
-
-const transcribePiece = (piece) => {
-    const key = voiceKey;
-    pendingPieces.value += 1;
-    pieceQueue = pieceQueue.then(async () => {
-        try {
-            const { text } = await transcribeFinal(piece.blob);
-            if (key !== voiceKey) return;
-            form.transcript = joinTranscript(form.transcript, text);
-            liveFinal.value = joinTranscript(liveFinal.value, text);
-            liveFinalEnd.value = Math.max(liveFinalEnd.value, piece.end);
-        } catch (error) {
-            if (key !== voiceKey) return;
-            failedPieces.value.push(piece);
-            voiceError.value = errorText(error, "받아 적지 못한 부분이 있습니다.");
-        } finally {
-            if (key === voiceKey) pendingPieces.value -= 1;
-        }
-    });
-};
+const voiceStream = useMeetingStream({
+    onDone: (result) => {
+        appendTranscript(result.segments || []);
+        summarize();
+    },
+    // 녹음 중 끊겼다. 받은 데까지는 녹취록에 남기고, 다시 녹음하거나 그대로 정리할 수 있게 한다.
+    onError: (message, kept) => {
+        stopRecording();
+        voiceError.value = message;
+        appendTranscript(kept);
+        if (form.transcript.trim()) showTranscript.value = true;
+    },
+});
+const streamPhase = voiceStream.phase;
+const liveText = computed(() => liveTranscript(voiceStream.segments.value, voiceStream.partial.value));
 
 const {
     recording,
@@ -422,79 +372,37 @@ const {
     start: startRecording,
     stop: stopRecording,
 } = useMeetingRecorder({
-    onDraft: (blob, start) => transcribeDraft({ blob, start }),
-    onFinal: (blob, start, end) => transcribePiece({ blob, start, end }),
+    onAudio: (pcm) => voiceStream.send(pcm),
 });
-
-const clearLive = () => {
-    liveFinal.value = "";
-    liveFinalEnd.value = 0;
-    liveDrafts.value = [];
-};
-
-const dropSession = () => {
-    if (sessionId.value) deleteMeetingSession(sessionId.value).catch(() => {});
-    sessionId.value = "";
-};
 
 function resetVoice() {
     voiceKey += 1;
     stopRecording();
-    dropSession();
-    speakerStep.value = null;
-    speakerNote.value = "";
-    overlapWarning = "";
-    for (const key of Object.keys(speakerNames)) delete speakerNames[key];
-    pendingPieces.value = 0;
-    failedPieces.value = [];
+    voiceStream.close();
     voiceError.value = "";
-    clearLive();
     summaryText.value = "";
     showTranscript.value = false;
-    summarizeWhenDone.value = false;
 }
 
 const toggleRecording = async () => {
     voiceError.value = "";
     if (recording.value) {
         stopRecording();
-        summarizeWhenDone.value = true;
+        voiceStream.finish();
         return;
     }
-    clearLive();
     summaryText.value = "";
     showTranscript.value = false;
-    speakerNote.value = "";
+    const key = voiceKey;
     try {
+        // 받아 적기 서버에 먼저 붙은 뒤 마이크를 연다. 첫마디가 서버에 닿기 전에 버려지지 않게 한다.
+        await voiceStream.open();
+        if (key !== voiceKey) return;
         await startRecording();
     } catch (error) {
+        voiceStream.close();
         voiceError.value = error.message;
-        return;
     }
-    // 녹음은 바로 시작하고, 세션은 그동안 연다. 첫 녹취록용 조각(24초 뒤)보다 먼저 끝난다.
-    // 이어서 다시 녹음하면 이전 세션을 이어 쓴다. 그래야 회의 전체로 말한 사람을 나눈다.
-    if (!sessionId.value) {
-        const key = voiceKey;
-        sessionOpening = createMeetingSession()
-            .then(({ id }) => {
-                if (key === voiceKey) sessionId.value = id;
-            })
-            .catch(() => {
-                if (key === voiceKey) {
-                    speakerNote.value = "음성 인식 서버가 말한 사람 나누기를 지원하지 않아서, 말한 사람 없이 받아 적었습니다.";
-                }
-            })
-            .finally(() => {
-                sessionOpening = null;
-            });
-    }
-};
-
-const retryFailed = () => {
-    const pieces = failedPieces.value;
-    failedPieces.value = [];
-    voiceError.value = "";
-    pieces.forEach(transcribePiece);
 };
 
 /** 마이크가 없거나 녹음하지 않을 때. 받아 적은 글이 있으면 녹취록으로 함께 저장된다. */
@@ -511,72 +419,8 @@ const startTimer = (counter) => {
     }, 1000);
 };
 
-/**
- * 녹음을 멈춘 뒤 할 일. 세션이 있으면 회의 전체로 말한 사람을 나누고, 둘 이상이면 이름 붙이기로 간다.
- * 나누기가 실패하면 받아 적은 그대로(말한 사람 없이) 정리한다.
- */
-const afterRecording = async () => {
-    summarizeWhenDone.value = false;
-    if (!sessionId.value) {
-        summarize();
-        return;
-    }
-    const key = voiceKey;
-    const id = sessionId.value;
-    diarizing.value = true;
-    diarizeTimer = startTimer(diarizeSeconds);
-    try {
-        const result = await diarizeMeetingSession(id);
-        if (key !== voiceKey) return;
-        // 서버가 나누고 나서 세션을 지운다.
-        sessionId.value = "";
-        const segments = result.segments || [];
-        const count = overlapCount(segments);
-        overlapWarning = count ? `여러 명이 동시에 말한 부분 ${count}곳은 받아 적은 글이 틀렸을 수 있습니다.` : "";
-        if ((result.speakerCount || 0) >= 2) {
-            speakerStep.value = { segments, summaries: speakerSummaries(segments) };
-            return;
-        }
-        summarize();
-    } catch (error) {
-        if (key !== voiceKey) return;
-        speakerNote.value = `말한 사람을 나누지 못해서 한 덩어리로 정리합니다. (${errorText(error, "음성 인식 서버 오류")})`;
-        dropSession();
-        summarize();
-    } finally {
-        clearInterval(diarizeTimer);
-        diarizing.value = false;
-    }
-};
-
-/** 이름을 붙였든 건너뛰었든, 말한 사람이 표시된 녹취록으로 정리한다. */
-const finishSpeakers = (useNames) => {
-    const step = speakerStep.value;
-    if (!step) return;
-    const names = useNames ? { ...speakerNames } : {};
-    form.transcript = labeledTranscript(step.segments, names);
-    if (!form.attendees.trim()) form.attendees = attendeesFromNames(names);
-    speakerStep.value = null;
-    summarize();
-};
-
-const loadMemberNames = async () => {
-    try {
-        memberNames.value = (await getUsers()).map((user) => user.name).filter(Boolean);
-    } catch {
-        memberNames.value = [];
-    }
-};
-
-/** 받아 적지 못한 조각을 버리고 적힌 것만으로 정리한다. */
-const skipFailed = () => {
-    failedPieces.value = [];
-    voiceError.value = "";
-};
-
 const summarize = async () => {
     const key = voiceKey;
-    summarizeWhenDone.value = false;
     voiceError.value = "";
     if (!form.transcript.trim()) {
         voiceError.value = "받아 적은 말이 없습니다. 마이크 막대가 움직이는지 보고 다시 녹음해 주세요.";
@@ -591,7 +435,7 @@ const summarize = async () => {
         const values = summaryToForm(form, result);
         Object.assign(form, values);
         showTranscript.value = false;
-        summaryText.value = [summaryNote(values), speakerNote.value, overlapWarning].filter(Boolean).join(" ");
+        summaryText.value = summaryNote(values);
         meetingStage.value = "form";
     } catch (error) {
         if (key !== voiceKey) return;
@@ -603,19 +447,12 @@ const summarize = async () => {
     }
 };
 
-// 녹음을 멈춘 뒤 남은 조각이 다 적히면 곧바로 정리한다. 실패한 조각이 있으면 사용자가 고를 때까지 기다린다.
-watch(
-    () => [summarizeWhenDone.value, recording.value, pendingPieces.value, failedPieces.value.length],
-    ([waiting, isRecording, pendingCount, failedCount]) => {
-        if (waiting && !isRecording && pendingCount === 0 && failedCount === 0) afterRecording();
-    },
-);
-
 const voiceStatus = computed(() => {
+    if (streamPhase.value === "connecting") return "음성 인식 서버에 연결하는 중";
     if (micStarting.value) return "마이크 여는 중";
     if (recording.value) return `녹음 중 ${formatClock(recordSeconds.value)}`;
-    if (pendingPieces.value) return "녹취록 마무리하는 중";
-    if (diarizing.value) return `말한 사람 나누는 중 ${diarizeSeconds.value}초`;
+    if (streamPhase.value === "finishing") return "녹취록 마무리하는 중";
+    if (streamPhase.value === "polishing") return "사내 용어로 다듬는 중";
     if (summarizing.value) return `정리하는 중 ${summarizeSeconds.value}초`;
     return "";
 });
@@ -628,18 +465,12 @@ watch(liveText, async () => {
 });
 
 const voiceBusy = computed(
-    () =>
-        recording.value ||
-        micStarting.value ||
-        pendingPieces.value > 0 ||
-        diarizing.value ||
-        summarizing.value ||
-        Boolean(speakerStep.value),
+    () => recording.value || micStarting.value || streamPhase.value !== "idle" || summarizing.value,
 );
 
 onBeforeUnmount(() => {
+    narrowQuery?.removeEventListener("change", onNarrowChange);
     clearInterval(summarizeTimer);
-    clearInterval(diarizeTimer);
 });
 
 const addFollowup = () => {
@@ -665,10 +496,10 @@ watch(
 );
 
 onMounted(() => {
+    narrowQuery?.addEventListener("change", onNarrowChange);
     document.title = "작성";
     loadFromRoute();
     loadUserName();
-    loadMemberNames();
 });
 
 watch(selectedUserId, loadUserName);
@@ -677,12 +508,13 @@ watch(selectedUserId, loadUserName);
 <template>
     <div class="page is-wide">
         <div class="kind-bar">
-            <nav class="seg kind-switch" aria-label="작성">
+            <nav class="app-tabs kind-switch" aria-label="작성">
                 <router-link
                     v-for="item in COMPOSE_CHOICES"
                     :key="item.id"
                     :to="item.to"
-                    :class="{ 'is-on': kind === item.id }"
+                    class="app-tab"
+                    :class="{ 'is-active': kind === item.id }"
                     :aria-current="kind === item.id ? 'page' : null"
                 >
                     {{ item.label }}
@@ -713,20 +545,34 @@ watch(selectedUserId, loadUserName);
                     </span>
                 </div>
 
-                <section v-if="!showsForm" class="form-section" aria-labelledby="sec-voice">
-                    <h2 id="sec-voice" class="section-title">회의 녹음</h2>
-                    <div v-if="!speakerStep" class="voice-controls">
+                <section
+                    v-if="!showsForm"
+                    class="form-section record-stage"
+                    :class="{ 'is-recording': recording }"
+                    aria-labelledby="sec-voice"
+                >
+                    <h2 id="sec-voice" class="sr-only">회의 녹음</h2>
+                    <!-- 녹음 단계의 주인공은 버튼 하나. 카드 가운데에 크게 두고, 나머지는 그 아래로 모은다. -->
+                    <div class="record-center">
                         <button
                             type="button"
-                            class="btn"
-                            :class="recording ? 'btn-danger' : 'btn-primary'"
+                            class="record-btn"
+                            :class="{ 'is-stop': recording }"
                             :disabled="micStarting || (!recording && voiceBusy)"
                             @click="toggleRecording"
                         >
-                            {{ recording ? "녹음 정지" : "녹음 시작" }}
+                            <span class="record-disc" aria-hidden="true">
+                                <Square v-if="recording" :size="26" fill="currentColor" />
+                                <Mic v-else :size="34" />
+                            </span>
+                            <span class="record-label">{{ recording ? "녹음 정지" : "녹음 시작" }}</span>
                         </button>
-                        <p v-if="voiceStatus" class="voice-status" :class="{ 'is-live': recording }" role="status">
-                            {{ voiceStatus }}
+                        <p v-if="recording" class="record-clock" role="timer">
+                            <span class="record-dot" aria-hidden="true" />{{ formatClock(recordSeconds) }}
+                        </p>
+                        <p v-else-if="voiceStatus" class="record-status" role="status">{{ voiceStatus }}</p>
+                        <p v-else class="record-help">
+                            회의를 시작하면서 누르세요. 정지하면 제목, 안건, 결정, 할 일을 채운 회의록이 열립니다.
                         </p>
                     </div>
                     <div v-if="recording" class="voice-meter" aria-hidden="true">
@@ -734,59 +580,16 @@ watch(selectedUserId, loadUserName);
                     </div>
                     <div v-if="recording" ref="liveBox" class="live-text" aria-live="polite">
                         <p v-if="liveText">{{ liveText }}</p>
-                        <p v-else class="live-empty">말하면 5초쯤 뒤부터 여기에 받아 적습니다.</p>
+                        <p v-else class="live-empty">말하면 1~2초 뒤부터 여기에 받아 적습니다.</p>
                     </div>
                     <div v-else-if="showTranscript" class="live-text">
                         <p>{{ form.transcript }}</p>
                     </div>
-                    <p v-if="speakerNote && !recording" class="field-help">{{ speakerNote }}</p>
 
-                    <!-- 둘 이상이 말했으면 정리 전에 누가 누구인지 고른다. 담당자와 참석자에 이름이 들어간다. -->
-                    <div v-if="speakerStep" class="speaker-step">
-                        <h3 class="speaker-title">말한 사람 {{ speakerStep.summaries.length }}명</h3>
-                        <p class="field-help">
-                            누구인지 고르면 후속 할 일 담당자와 참석자에 이름이 들어갑니다. 모르면 비워 두세요.
-                        </p>
-                        <datalist id="member-names">
-                            <option v-for="name in memberNames" :key="name" :value="name" />
-                        </datalist>
-                        <div v-for="item in speakerStep.summaries" :key="item.speaker" class="speaker-row">
-                            <div class="speaker-meta">
-                                <span class="speaker-label">{{ item.label }}</span>
-                                <span class="speaker-time">{{ spokenDuration(item.seconds) }}</span>
-                            </div>
-                            <p class="speaker-sample">“{{ item.sample }}”</p>
-                            <input
-                                v-model="speakerNames[item.speaker]"
-                                class="input speaker-name"
-                                type="text"
-                                list="member-names"
-                                placeholder="이름"
-                                :aria-label="`${item.label} 이름`"
-                                @keydown.enter.prevent="finishSpeakers(true)"
-                            />
-                        </div>
-                        <div class="speaker-actions">
-                            <button type="button" class="btn btn-ghost btn-small" @click="finishSpeakers(false)">
-                                이름 없이 정리
-                            </button>
-                            <button type="button" class="btn btn-primary" @click="finishSpeakers(true)">
-                                이 이름으로 정리하기
-                            </button>
-                        </div>
-                    </div>
                     <div v-if="voiceError" class="form-error voice-error" role="alert">
                         <span>{{ voiceError }}</span>
-                        <template v-if="failedPieces.length && !recording">
-                            <button type="button" class="btn btn-small" @click="retryFailed">
-                                {{ failedPieces.length }}조각 다시 받아 적기
-                            </button>
-                            <button v-if="summarizeWhenDone" type="button" class="btn btn-small" @click="skipFailed">
-                                빼고 정리
-                            </button>
-                        </template>
                         <button
-                            v-else-if="showTranscript && !summarizing"
+                            v-if="showTranscript && !summarizing && !recording"
                             type="button"
                             class="btn btn-small"
                             @click="summarize"
@@ -805,20 +608,24 @@ watch(selectedUserId, loadUserName);
                 </section>
 
                 <template v-if="showsForm">
-                <p v-if="summaryText" class="field-help voice-note" role="status">{{ summaryText }}</p>
+                <p v-if="summaryText" class="voice-note" role="status">{{ summaryText }}</p>
+
+                <!-- 제목이 이 기록의 머리글이다. 다른 칸보다 크게 둬서 무엇을 쓰는지 먼저 보이게 한다. -->
+                <input
+                    id="work-title"
+                    v-model="form.title"
+                    class="title-input"
+                    type="text"
+                    aria-label="제목"
+                    :required="kind === 'general'"
+                    :placeholder="kind === 'general' ? '제목' : '제목 (비워 두면 내용으로 붙입니다)'"
+                />
 
                 <section class="form-section" aria-labelledby="sec-basic">
-                    <h2 id="sec-basic" class="section-title">기본 정보</h2>
-                    <div class="field-grid">
-                        <AppField label="제목" for-id="work-title" :class="{ 'span-2': kind === 'meeting' }">
-                            <input
-                                id="work-title"
-                                v-model="form.title"
-                                class="input"
-                                type="text"
-                                :placeholder="kind === 'general' ? '제목' : '비워 두면 내용으로 붙입니다'"
-                            />
-                        </AppField>
+                    <h2 id="sec-basic" class="section-title">
+                        {{ kind === "meeting" ? "회의 정보" : kind === "sales" ? "프로젝트" : "기본 정보" }}
+                    </h2>
+                    <div class="detail-grid">
                         <AppField
                             :label="kind === 'sales' ? '프로젝트명' : '관련 프로젝트'"
                             for-id="work-project"
@@ -855,10 +662,24 @@ watch(selectedUserId, loadUserName);
                     <section class="form-section" aria-labelledby="sec-meeting">
                         <h2 id="sec-meeting" class="section-title">회의 내용</h2>
                         <AppField label="안건" for-id="meeting-agenda">
-                            <textarea id="meeting-agenda" v-model="form.agenda" class="textarea" rows="4" />
+                            <textarea
+                                id="meeting-agenda"
+                                v-model="form.agenda"
+                                v-autosize
+                                class="textarea grow"
+                                rows="3"
+                                placeholder="- 논의한 주제"
+                            />
                         </AppField>
                         <AppField label="결정" for-id="meeting-decisions">
-                            <textarea id="meeting-decisions" v-model="form.decisions" class="textarea" rows="4" />
+                            <textarea
+                                id="meeting-decisions"
+                                v-model="form.decisions"
+                                v-autosize
+                                class="textarea grow"
+                                rows="3"
+                                placeholder="- 정해진 것"
+                            />
                         </AppField>
                     </section>
 
@@ -867,35 +688,38 @@ watch(selectedUserId, loadUserName);
                             <h2 id="sec-follow" class="section-title">후속 할 일</h2>
                             <button type="button" class="btn btn-small" @click="addFollowup">할 일 추가</button>
                         </div>
-                        <div v-for="(row, index) in form.followups" :key="index" class="follow-row">
-                            <input
-                                v-model="row.task"
-                                class="input follow-task"
-                                type="text"
-                                placeholder="할 일"
-                                :aria-label="`후속 할 일 ${index + 1}`"
-                            />
-                            <input
-                                v-model="row.owner"
-                                class="input follow-owner"
-                                type="text"
-                                placeholder="담당"
-                                :aria-label="`후속 할 일 ${index + 1} 담당`"
-                            />
-                            <input
-                                v-model="row.due"
-                                class="input follow-due"
-                                type="date"
-                                :aria-label="`후속 할 일 ${index + 1} 기한`"
-                            />
-                            <button
-                                type="button"
-                                class="btn btn-small btn-danger follow-remove"
-                                :aria-label="`후속 할 일 ${index + 1} 빼기`"
-                                @click="removeFollowup(index)"
-                            >
-                                빼기
-                            </button>
+                        <!-- 한 할 일이 한 줄: 할 일 · 담당 · 기한 · 빼기. 좁은 화면에서는 두 줄. -->
+                        <div class="follow-list">
+                            <div v-for="(row, index) in form.followups" :key="index" class="follow-row">
+                                <input
+                                    v-model="row.task"
+                                    class="input follow-task"
+                                    type="text"
+                                    placeholder="할 일"
+                                    :aria-label="`후속 할 일 ${index + 1}`"
+                                />
+                                <input
+                                    v-model="row.owner"
+                                    class="input follow-owner"
+                                    type="text"
+                                    placeholder="담당"
+                                    :aria-label="`후속 할 일 ${index + 1} 담당`"
+                                />
+                                <input
+                                    v-model="row.due"
+                                    class="input follow-due"
+                                    type="date"
+                                    :aria-label="`후속 할 일 ${index + 1} 기한`"
+                                />
+                                <button
+                                    type="button"
+                                    class="btn btn-small btn-danger follow-remove"
+                                    :aria-label="`후속 할 일 ${index + 1} 빼기`"
+                                    @click="removeFollowup(index)"
+                                >
+                                    빼기
+                                </button>
+                            </div>
                         </div>
                     </section>
                 </template>
@@ -903,14 +727,14 @@ watch(selectedUserId, loadUserName);
                 <section v-else-if="kind === 'general'" class="form-section" aria-labelledby="sec-body">
                     <h2 id="sec-body" class="section-title">내용</h2>
                     <AppField label="본문" for-id="general-body">
-                        <textarea id="general-body" v-model="form.body" class="textarea" rows="8" required />
+                        <textarea id="general-body" v-model="form.body" v-autosize class="textarea grow" rows="6" required />
                     </AppField>
                 </section>
 
                 <template v-else>
                     <section class="form-section" aria-labelledby="sec-contact">
                         <h2 id="sec-contact" class="section-title">담당자</h2>
-                        <div class="field-grid">
+                        <div class="detail-grid">
                             <AppField label="담당자명" for-id="sales-name">
                                 <input id="sales-name" v-model="form.contactName" class="input" type="text" required />
                             </AppField>
@@ -932,10 +756,17 @@ watch(selectedUserId, loadUserName);
                     <section class="form-section" aria-labelledby="sec-progress">
                         <h2 id="sec-progress" class="section-title">진행</h2>
                         <AppField label="진행사항" for-id="sales-progress">
-                            <textarea id="sales-progress" v-model="form.progress" class="textarea" rows="4" required />
+                            <textarea
+                                id="sales-progress"
+                                v-model="form.progress"
+                                v-autosize
+                                class="textarea grow"
+                                rows="3"
+                                required
+                            />
                         </AppField>
                         <AppField label="추후 진행사항" for-id="sales-next">
-                            <textarea id="sales-next" v-model="form.nextSteps" class="textarea" rows="3" />
+                            <textarea id="sales-next" v-model="form.nextSteps" v-autosize class="textarea grow" rows="2" />
                         </AppField>
                     </section>
                 </template>
@@ -951,11 +782,12 @@ watch(selectedUserId, loadUserName);
                 </template>
             </form>
 
-            <aside class="group-block side-list">
-                <div class="group-head">
+            <!-- 넓은 화면에서는 옆에 펼쳐 두고, 좁은 화면에서는 접어서 양식 아래 한 줄로 둔다. -->
+            <details class="group-block side-list" :open="!isNarrow">
+                <summary class="group-head">
                     <h2>내가 쓴 {{ KIND_LABELS[kind] }}</h2>
                     <span v-if="records.length" class="group-meta">{{ records.length }}건</span>
-                </div>
+                </summary>
                 <div class="group">
                     <p v-if="records.length === 0" class="group-empty">
                         아직 없어요. 저장하면 여기에 쌓여요.
@@ -976,18 +808,18 @@ watch(selectedUserId, loadUserName);
                         </span>
                     </button>
                 </div>
-            </aside>
+            </details>
         </div>
         </template>
     </div>
 </template>
 
 <style scoped>
+/* 설정 화면과 같은 밑줄 탭. 설명은 탭 줄 아래 한 줄. */
 .kind-bar {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
+    flex-direction: column;
+    gap: var(--space-2);
 }
 
 .kind-hint {
@@ -1017,9 +849,44 @@ watch(selectedUserId, loadUserName);
     font-size: var(--fs-13);
 }
 
-/* 섹션은 가는 선으로만 나눈다. 카드 안에 카드를 또 두지 않는다. */
+/* 섹션은 가는 선으로만 나눈다. 카드 안에 카드를 또 두지 않는다.
+   container: 할 일 줄이 화면 폭이 아니라 이 양식의 폭을 보고 한 줄 · 두 줄을 고른다. */
 .compose-layout .compose-card {
+    --card-pad: var(--space-5);
     gap: 0;
+    padding: var(--card-pad);
+    container-type: inline-size;
+}
+
+/* 제목이 이 기록의 머리글. 테두리 상자 대신 큰 글자와 밑줄로 입력칸임을 보인다. */
+.title-input {
+    width: 100%;
+    min-width: 0;
+    margin: var(--space-4) 0 0;
+    padding: var(--space-1) 0 var(--space-2);
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    font: var(--fw-semibold) var(--fs-20) / var(--lh-tight) var(--sans);
+    color: var(--text-strong);
+    outline: none;
+}
+
+.title-input::placeholder {
+    color: var(--text-muted);
+    font-weight: var(--fw-medium);
+}
+
+.title-input:hover {
+    border-bottom-color: var(--border);
+}
+
+.title-input:focus-visible {
+    border-bottom-color: var(--accent);
+}
+
+.title-input + .form-section {
+    margin-top: var(--space-3);
 }
 
 .form-section {
@@ -1048,29 +915,33 @@ watch(selectedUserId, loadUserName);
     gap: var(--space-3);
 }
 
-/* 짧은 값(프로젝트 · 일시 · 장소 · 연락처)은 두 칸씩 나란히. 긴 글은 전체 폭. */
-.field-grid {
+/* 곁들이는 짧은 값(프로젝트 · 일시 · 장소 · 참석자 · 연락처). 넓으면 한 줄에 여럿, 좁아지면 저절로 줄을 바꾼다. */
+.detail-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
     gap: var(--space-3) var(--space-4);
 }
 
-.field-grid .span-2 {
-    grid-column: 1 / -1;
+/* 글 상자는 내용만큼만. 전역 최소 높이(200px) 때문에 두세 줄 글도 큰 빈 상자가 되던 것을 없앤다. */
+.textarea.grow {
+    min-height: 0;
+    overflow-y: hidden;
+    resize: none;
 }
 
-/* 폼 폭이 480px 안팎이라 한 줄 표로 두면 할 일이 잘린다. 할 일은 전체 폭, 담당 · 기한 · 빼기는 아래 줄. */
+/* 할 일 하나가 한 줄: 할 일 · 담당 · 기한 · 빼기. 줄 사이는 틈으로만 나눈다. */
+.follow-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
 .follow-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 150px auto;
-    grid-template-areas:
-        "task task task"
-        "owner due remove";
+    grid-template-columns: minmax(0, 1fr) minmax(0, 140px) 152px auto;
+    grid-template-areas: "task owner due remove";
     gap: var(--space-2);
     align-items: center;
-    padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
 }
 
 .follow-task { grid-area: task; }
@@ -1081,6 +952,23 @@ watch(selectedUserId, loadUserName);
 .follow-row .input {
     width: 100%;
     min-width: 0;
+}
+
+/* 양식이 좁으면(모바일 · 좁은 창) 할 일은 윗줄, 담당 · 기한은 아랫줄. 한 할 일이 두 줄을 넘지 않는다. */
+@container (max-width: 560px) {
+    .follow-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+        grid-template-areas:
+            "task task remove"
+            "owner due due";
+        padding-bottom: var(--space-2);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .follow-row:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+    }
 }
 
 .compose-layout {
@@ -1173,77 +1061,13 @@ watch(selectedUserId, loadUserName);
     color: var(--text-muted);
 }
 
-/* 말한 사람 이름 붙이기: 한 사람이 한 줄. 누구인지 알아보게 첫 말을 같이 보여 준다. */
-.speaker-step {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-}
-
-.speaker-title {
-    margin: 0;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.speaker-row {
-    display: grid;
-    grid-template-columns: 96px minmax(0, 1fr) 180px;
-    gap: var(--space-2) var(--space-3);
-    align-items: center;
-    padding: var(--space-3) 0;
-    border-top: 1px solid var(--border);
-}
-
-.speaker-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.speaker-label {
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.speaker-time {
-    font-size: var(--fs-12);
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-}
-
-.speaker-sample {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-    word-break: keep-all;
-    overflow-wrap: anywhere;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.speaker-name {
-    width: 100%;
-    min-width: 0;
-}
-
-.speaker-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    align-items: center;
-    gap: var(--space-2);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border);
-}
-
 /* 정리 결과 한 줄. 녹음 단계가 사라진 뒤 날짜 줄 바로 아래에 남는다. */
 .voice-note {
     margin: var(--space-3) 0 0;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text);
+    word-break: keep-all;
 }
 
 .voice-skip {
@@ -1254,15 +1078,182 @@ watch(selectedUserId, loadUserName);
     margin-top: var(--space-3);
 }
 
-/* 저장은 오른쪽 끝, 삭제는 왼쪽 끝. 손이 가는 순서와 되돌릴 수 없는 버튼을 떼어 둔다. */
+/* 녹음 단계: 버튼 하나가 카드 가운데. 녹음이 시작되면 시간 · 소리 막대 · 받아 적은 글이 그 아래로 붙는다. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.record-stage {
+    justify-content: center;
+    min-height: min(440px, 60vh);
+    gap: var(--space-4);
+}
+
+.record-stage.is-recording {
+    justify-content: flex-start;
+}
+
+.record-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    text-align: center;
+}
+
+.record-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--text-strong);
+    font: inherit;
+    cursor: pointer;
+}
+
+/* 누르는 동그라미. 녹음 버튼이 동그란 것은 장치에서 익숙한 모양이라서다. 빛 · 깜빡임은 넣지 않는다. */
+.record-disc {
+    display: grid;
+    place-items: center;
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--text-on-accent);
+    transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+
+.record-btn:hover:not(:disabled) .record-disc {
+    background: var(--accent-hover);
+}
+
+.record-btn:active:not(:disabled) .record-disc {
+    transform: scale(0.97);
+}
+
+.record-btn.is-stop .record-disc {
+    background: var(--danger-fg);
+}
+
+.record-btn:focus-visible {
+    outline: none;
+}
+
+.record-btn:focus-visible .record-disc {
+    box-shadow: 0 0 0 4px var(--surface), 0 0 0 7px var(--accent);
+}
+
+.record-btn:disabled {
+    cursor: default;
+}
+
+.record-btn:disabled .record-disc {
+    background: var(--surface-soft);
+    color: var(--text-muted);
+}
+
+.record-label {
+    font-size: var(--fs-16);
+    font-weight: var(--fw-semibold);
+}
+
+.record-clock {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--fs-24);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 점은 실제로 녹음 중일 때만 보인다. */
+.record-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--danger-fg);
+}
+
+.record-status,
+.record-help {
+    margin: 0;
+    max-width: 34em;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    word-break: keep-all;
+    text-wrap: balance;
+}
+
+.record-status {
+    color: var(--text-strong);
+    font-weight: var(--fw-medium);
+    font-variant-numeric: tabular-nums;
+}
+
+.record-stage .voice-meter {
+    width: min(320px, 100%);
+    align-self: center;
+}
+
+.record-stage .voice-error {
+    justify-content: center;
+    text-align: center;
+}
+
+.record-stage .voice-skip {
+    align-self: center;
+    min-height: var(--control-h-lg);
+    color: var(--text-muted);
+}
+
+/* 저장은 오른쪽 끝, 삭제는 왼쪽 끝. 손이 가는 순서와 되돌릴 수 없는 버튼을 떼어 둔다.
+   화면 아래에 붙어 있어서 긴 양식 중간에서도 저장할 수 있다. 모바일에서는 아래 탭 막대 위에 선다. */
 .form-actions {
+    position: sticky;
+    bottom: var(--bottom-nav-offset, 0px);
+    z-index: 2;
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
     align-items: center;
     justify-content: flex-end;
-    padding-top: var(--space-4);
+    margin: var(--space-2) calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
+    padding: var(--space-3) var(--card-pad);
     border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) var(--radius);
+    background: var(--surface);
+}
+
+/* 넓은 화면에서는 늘 펼쳐 둔다. 접는 것은 좁은 화면에서만. */
+.side-list > summary {
+    display: flex;
+    justify-content: flex-start;
+    gap: var(--space-2);
+    list-style: none;
+    pointer-events: none;
+}
+
+.side-list > summary .group-meta {
+    margin-left: auto;
+}
+
+.side-list > summary::-webkit-details-marker {
+    display: none;
 }
 
 .form-actions .btn-danger {
@@ -1311,26 +1302,38 @@ watch(selectedUserId, loadUserName);
         justify-self: start;
     }
 
-    .field-grid {
-        grid-template-columns: minmax(0, 1fr);
+    .compose-layout .compose-card {
+        --card-pad: var(--space-4);
     }
 
-    .speaker-row {
-        grid-template-columns: minmax(0, 1fr);
+    /* style.css가 767px 이하 입력칸을 16px !important로 묶는다(iOS 확대 방지).
+       제목은 16px보다 커서 확대가 일어나지 않으니 머리글 크기를 지킨다. */
+    .title-input {
+        font-size: var(--fs-20) !important;
+        margin-top: var(--space-3);
     }
 
-    .speaker-meta {
-        flex-direction: row;
-        align-items: baseline;
-        gap: var(--space-2);
-    }
-
-    .speaker-name {
+    /* 목록은 접어 두고 "내가 쓴 회의록 6건" 한 줄만. 누르면 펼친다. */
+    .side-list > summary {
+        pointer-events: auto;
+        cursor: pointer;
         min-height: var(--control-h-lg);
+        align-items: center;
     }
 
-    .speaker-actions .btn {
-        min-height: var(--control-h-lg);
+    .side-list > summary .group-meta {
+        margin-left: 0;
+    }
+
+    .side-list > summary::after {
+        content: "펼치기";
+        margin-left: auto;
+        font-size: var(--fs-12);
+        color: var(--text-muted);
+    }
+
+    .side-list[open] > summary::after {
+        content: "접기";
     }
 
     .section-head .btn,
@@ -1340,29 +1343,19 @@ watch(selectedUserId, loadUserName);
         min-height: var(--control-h-lg);
     }
 
-    /* 좁은 화면: 기한 칸이 반 폭이면 날짜가 잘린다. 담당은 한 줄, 기한 옆에 빼기. */
-    .follow-row {
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas:
-            "task task"
-            "owner owner"
-            "due remove";
-    }
-
     .follow-remove {
         min-height: var(--control-h-lg);
     }
 
+    /* 아래에 붙는 막대라 한 줄로 둔다. 두 줄이면 탭 막대와 합쳐 화면 1/4을 가린다. */
+    .form-actions {
+        flex-wrap: nowrap;
+    }
+
     .form-actions .btn-primary {
-        flex: 1 1 100%;
-        order: -1;
+        flex: 1 1 auto;
     }
 
-
-    .kind-bar {
-        flex-direction: column;
-        gap: var(--space-2);
-    }
 
     .kind-hint {
         font-size: var(--fs-12);

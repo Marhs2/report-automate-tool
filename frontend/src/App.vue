@@ -46,6 +46,9 @@ const {
     alert: showAlert,
     accept: acceptDialog,
     reject: rejectDialog,
+    isFreshKey: isFreshDialogKey,
+    acceptKey: acceptDialogKey,
+    rejectKey: rejectDialogKey,
 } = useDialog();
 
 const NAV_ICONS = {
@@ -210,17 +213,13 @@ const logout = async () => {
 };
 
 const onDialogKeydown = (event) => {
-    if (!dialogOpen.value || dialogLocked.value) return;
-    if (event.key === "Escape") {
-        event.preventDefault();
-        if (dialogMode.value === "confirm") rejectDialog();
-        else acceptDialog();
-        return;
-    }
-    if (event.key === "Enter") {
-        event.preventDefault();
-        acceptDialog();
-    }
+    if (!dialogOpen.value) return;
+    if (event.key !== "Escape" && event.key !== "Enter") return;
+    event.preventDefault();
+    // 대화상자를 연 그 키와 누르고 있는 키의 반복만 무시한다. 새로 누른 키는 한 번에 닫는다.
+    if (!isFreshDialogKey(event)) return;
+    if (event.key === "Escape" && dialogMode.value === "confirm") rejectDialogKey();
+    else acceptDialogKey();
 };
 
 onMounted(() => {
@@ -246,6 +245,10 @@ onUnmounted(() => {
         :class="{ 'is-collapsed': collapsedEffective }"
     >
         <div class="sidebar-brand">
+            <router-link v-if="!collapsedEffective" to="/" class="sidebar-brand-link">
+                <span class="sidebar-mark" aria-hidden="true">일</span>
+                <span class="sidebar-brand-name">{{ currentTeam || "일일보고" }}</span>
+            </router-link>
             <button
                 type="button"
                 class="sidebar-collapse-btn"
@@ -349,6 +352,9 @@ onUnmounted(() => {
             </div>
         </header>
         <div class="main-body">
+            <div v-if="!isWritePage" class="page-hero">
+                <h1 class="page-hero-title">{{ pageMeta.title }}</h1>
+            </div>
             <RouterView />
         </div>
     </main>

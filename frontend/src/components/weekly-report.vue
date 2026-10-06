@@ -7,7 +7,7 @@ import { useDialog } from "../composables/useDialog";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
-import { ChevronDown, ChevronLeft, ChevronRight, Trash2 } from "lucide-vue-next";
+import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Trash2 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import { projectsFromDeck, toWeeklyDeck } from "../lib/weeklyDeck";
 import { useSidebar } from "../composables/useSidebar";
@@ -180,6 +180,14 @@ const hasMine = (dayDate) => (myDays.value[dayDate] || 0) > 0;
 
 /** 아직 오지 않은 날. 월요일에 화~금이 기본으로 켜져 있으면 끝난 주처럼 보인다. */
 const isFutureDay = (dayDate) => isFutureDate(dayDate);
+
+/** 날짜 칸 상태 태그 색. 쓴 날은 완료색, 아직 안 온 날은 회색, 보고 없는 날은 표시만. */
+const dayTone = (dayDate) => {
+    if (isFutureDay(dayDate)) return "is-next";
+    return hasMine(dayDate) ? "is-done" : "is-muted";
+};
+
+const showRange = ref(false);
 
 const dayState = (dayDate) => {
     if (isFutureDay(dayDate)) return hasMine(dayDate) ? "예정 · 작성함" : "예정";
@@ -565,28 +573,43 @@ onMounted(async () => {
 
 <template>
     <div class="page weekly-report-page">
-        <header class="page-intro">
-            <div class="page-intro-text">
-                <h1>{{ headerTitle }}</h1>
-            </div>
-            <div class="page-intro-actions week-nav">
-                <div class="week-stepper" role="group" aria-label="주 이동">
-                    <button type="button" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
-                        <ChevronLeft :size="16" />
-                    </button>
-                    <button type="button" class="week-today" @click="resetThisWeek" :disabled="isLoading || isThisWeek">
-                        이번 주
-                    </button>
-                    <button type="button" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
-                        <ChevronRight :size="16" />
+        <!-- 1. 초안 만들기: 기간 → 날 고르기 → 만들기. 위에서 아래로 한 번에 끝난다. -->
+        <section class="wk-create" aria-labelledby="create-title">
+            <header class="view-head">
+                <div class="view-head-text">
+                    <h2 id="create-title" class="section-title">주간 초안 만들기</h2>
+                    <p class="view-period">
+                        {{ headerTitle }}
+                        <span v-if="isThisWeek" class="cat-tag is-progress">이번 주</span>
+                    </p>
+                </div>
+                <div class="view-nav">
+                    <div class="stepper" role="group" aria-label="주 이동">
+                        <button type="button" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
+                            <ChevronLeft :size="16" />
+                        </button>
+                        <button type="button" class="stepper-reset" @click="resetThisWeek" :disabled="isLoading || isThisWeek">
+                            이번 주
+                        </button>
+                        <button type="button" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
+                            <ChevronRight :size="16" />
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        class="btn btn-ghost btn-small range-toggle"
+                        :class="{ 'is-active': showRange }"
+                        :aria-expanded="showRange"
+                        aria-controls="week-range"
+                        @click="showRange = !showRange"
+                    >
+                        <CalendarRange :size="16" />
+                        기간 지정
                     </button>
                 </div>
-            </div>
-        </header>
+            </header>
 
-        <details class="range-fold">
-            <summary>기간 직접 지정</summary>
-            <div class="week-range">
+            <div v-if="showRange" id="week-range" class="week-range">
                 <label>
                     <span>시작</span>
                     <input
@@ -608,13 +631,9 @@ onMounted(async () => {
                     />
                 </label>
             </div>
-        </details>
 
-        <section class="card pick-card" aria-label="주간보고에 넣을 날">
-            <div class="section-head">
-                <h2>넣을 날 고르기</h2>
-                <span class="section-meta">일일보고가 있는 날만 고를 수 있어요</span>
-            </div>
+            <p class="wk-hint">일일보고를 쓴 날만 고를 수 있어요. 고른 날의 내용으로 초안을 만들어요.</p>
+
             <div class="week-folds">
                 <div v-for="group in weekGroups" :key="group.key" class="week-fold">
                     <button
@@ -651,37 +670,44 @@ onMounted(async () => {
                         >
                             <span class="day-chip-name">{{ weekdayName(dayDate) }}</span>
                             <span class="day-chip-date">{{ shortDay(dayDate) }}</span>
-                            <span class="day-chip-state">{{ dayState(dayDate) }}</span>
+                            <span class="cat-tag day-chip-state" :class="dayTone(dayDate)">{{ dayState(dayDate) }}</span>
                         </button>
                     </div>
                 </div>
             </div>
-            <div class="pick-foot">
-            <p class="create-summary">{{ createSummary }}</p>
-            <div v-if="existingWeekly" class="overwrite-notice" role="status">
-                <span>
-                    <b>이 주의 주간보고가 이미 있어요.</b>
-                </span>
+
+            <!-- 같은 주 보고가 이미 있으면 그걸 여는 게 먼저다. 새로 만들기는 보조 버튼으로 내린다. -->
+            <div v-if="existingWeekly" class="callout is-warning" role="status">
+                <FileText :size="20" class="callout-icon" aria-hidden="true" />
+                <div class="callout-text">
+                    <p class="callout-title">이 주의 주간보고가 이미 있어요</p>
+                    <p class="callout-body">새 초안을 만들면 기존 보고를 덮어써요.</p>
+                </div>
                 <button
                     type="button"
-                    class="btn btn-small"
+                    class="btn btn-primary"
                     :disabled="isLoading"
                     @click="viewReport(existingWeekly.latest)"
                 >
                     기존 보고 열기
                 </button>
             </div>
-            <button
-                type="button"
-                class="btn btn-primary create-week-btn"
-                @click="sendDates()"
-                :disabled="isLoading || selects.length === 0"
-            >
-                {{ isLoading ? "만드는 중..." : existingWeekly ? "새 초안 만들기" : "주간 초안 만들기" }}
-            </button>
+
+            <div class="wk-foot">
+                <p class="create-summary">{{ createSummary }}</p>
+                <button
+                    type="button"
+                    class="btn create-week-btn"
+                    :class="{ 'btn-primary': !existingWeekly }"
+                    @click="sendDates()"
+                    :disabled="isLoading || selects.length === 0"
+                >
+                    {{ isLoading ? "만드는 중..." : existingWeekly ? "새 초안으로 다시 만들기" : "주간 초안 만들기" }}
+                </button>
             </div>
         </section>
 
+        <!-- 2. 만든 보고서: 기간 · 프로젝트를 읽고, 내려받기는 바로 옆에서. -->
         <section class="group-block" aria-labelledby="made-title">
             <div class="group-head">
                 <h2 id="made-title">내가 만든 주간 보고서</h2>
@@ -695,11 +721,13 @@ onMounted(async () => {
                     v-for="group in weeklyGroups"
                     :key="group.key"
                     class="row made-row"
+                    :class="{ 'is-current': existingWeekly && group.key === existingWeekly.key }"
                     role="link"
                     tabindex="0"
                     @click="!isLoading && viewReport(group.latest)"
                     @keydown.enter="!isLoading && viewReport(group.latest)"
                 >
+                    <FileText :size="18" class="made-icon" aria-hidden="true" />
                     <span class="row-main">
                         <span class="row-title">{{ group.label }}</span>
                         <span class="row-sub">
@@ -710,14 +738,15 @@ onMounted(async () => {
                         <button
                             v-if="group.older.length"
                             type="button"
-                            class="btn btn-small"
+                            class="btn btn-ghost btn-small"
                             :disabled="isLoading"
                             :title="`같은 주 이전 초안 ${group.older.length}개 지우기`"
                             @click="cleanupOlder(group)"
                         >
-                            이전 초안 {{ group.older.length }} 정리
+                            이전 초안 {{ group.older.length }}개 정리
                         </button>
                         <button type="button" class="btn btn-small" @click="downloadReport(group.latest)" :disabled="isLoading">
+                            <Download :size="14" />
                             Word
                         </button>
                         <button
@@ -727,6 +756,7 @@ onMounted(async () => {
                             @click="downloadPptx(group.latest)"
                             :disabled="isLoading"
                         >
+                            <Download :size="14" />
                             PPT
                         </button>
                         <button
@@ -748,113 +778,37 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.create-summary {
-    margin: var(--space-3) 0 0;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.overwrite-notice {
+/* ---- 초안 만들기 ---------------------------------------------------- */
+.wk-create {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
-    margin-top: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--warning-border);
-    border-radius: var(--radius-sm);
-    background: var(--warning-bg);
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.wk-hint {
+    margin: 0;
     font-size: var(--fs-13);
-    line-height: var(--lh-base);
-    color: var(--warning-fg);
-}
-
-.overwrite-notice b {
-    font-weight: var(--fw-semibold);
-}
-
-.week-stepper {
-    display: inline-flex;
-    align-items: center;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-}
-
-.week-stepper button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: var(--control-h);
-    height: var(--control-h);
-    padding: 0 var(--space-2);
-    border: 0;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    cursor: pointer;
-}
-
-.week-stepper .week-today {
-    padding: 0 var(--space-3);
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-}
-
-.week-stepper button:hover:not(:disabled) {
-    background: var(--surface-soft);
-    color: var(--text-strong);
-}
-
-.week-stepper button:disabled {
     color: var(--text-muted);
-    cursor: default;
 }
 
-.week-stepper button:focus-visible,
 .day-chip:focus-visible,
 .week-fold-head:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
 }
 
-.range-fold summary {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    color: var(--accent);
-    cursor: pointer;
-    list-style: none;
+.range-toggle {
+    height: var(--control-h);
 }
 
-.range-fold summary::-webkit-details-marker {
-    display: none;
-}
-
-.range-fold summary::after {
-    content: "›";
-    transition: transform var(--dur-fast) var(--ease);
-}
-
-.range-fold[open] summary::after {
-    transform: rotate(90deg);
-}
-
-.range-fold[open] .week-range {
-    margin-top: var(--space-3);
-}
-
-/* 기간 입력: 접힌 칸을 열면 두 날짜 필드가 나온다. */
+/* 기간 입력: '기간 지정'을 누르면 두 날짜 필드가 나온다. */
 .week-range {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 200px));
     gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
 }
 
 .week-range label {
@@ -873,50 +827,7 @@ onMounted(async () => {
 .week-range .input {
     min-width: 0;
     height: var(--control-h);
-}
-
-.section-meta {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.pick-foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-    margin-top: var(--space-4);
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--border);
-}
-
-.pick-foot .create-summary {
-    flex: 1;
-    margin: 0;
-}
-
-.pick-foot .overwrite-notice {
-    flex-basis: 100%;
-    order: -1;
-    margin-top: 0;
-}
-
-.made-actions .btn-small {
-    height: 28px;
-}
-
-.section-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-}
-
-.section-head h2 {
-    margin: 0;
-    font-size: var(--fs-16);
-    line-height: var(--lh-tight);
+    background: var(--surface);
 }
 
 /* 주 단위 묶음. 데스크톱은 간격만, 좁은 화면(접힘)은 헤어라인으로 나눈다. */
@@ -966,16 +877,13 @@ onMounted(async () => {
     margin-bottom: var(--space-3);
 }
 
-/* 날짜 타일: select-card와 같은 문법. hover는 accent-border, 선택은 accent 보더. */
+/* 날짜 칸: 하나씩 떨어진 칸. 고른 날은 파란 테두리 + 체크, 못 고르는 날은 회색 면. */
 .day-chips {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    gap: var(--space-2);
 }
 
-/* 한 틀 안의 달력 칸. 선택하면 칸 전체가 옅은 강조색으로 차고 체크가 붙는다. */
 .day-chip {
     position: relative;
     display: flex;
@@ -984,8 +892,8 @@ onMounted(async () => {
     gap: var(--space-1);
     margin: 0;
     padding: var(--space-3) var(--space-4);
-    border: 0;
-    border-radius: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface);
     color: var(--text);
     font: inherit;
@@ -993,11 +901,9 @@ onMounted(async () => {
     text-align: left;
     word-break: keep-all;
     cursor: pointer;
-    transition: background var(--dur-fast) var(--ease);
-}
-
-.day-chip + .day-chip {
-    border-left: 1px solid var(--border);
+    transition:
+        background var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease);
 }
 
 .day-chip.on::after {
@@ -1005,79 +911,101 @@ onMounted(async () => {
     position: absolute;
     top: var(--space-3);
     right: var(--space-3);
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     border-radius: var(--radius-xs);
-    background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center / 12px no-repeat;
+    background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center / 13px no-repeat;
 }
 
 .day-chip:not(:disabled):not(.on):hover {
-    background: var(--bg);
+    border-color: var(--border-strong);
+    background: var(--surface-soft);
 }
 
 .day-chip.on {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
     background: var(--accent-soft);
 }
 
 .day-chip-name {
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.day-chip.on .day-chip-name {
-    color: var(--accent-hover);
-}
-
-.day-chip-date {
-    font-size: var(--fs-12);
+    font-size: var(--fs-13);
     color: var(--text-muted);
 }
 
+.day-chip-date {
+    font-size: var(--fs-20);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
 .day-chip-state {
-    font-size: var(--fs-12);
-    font-weight: var(--fw-medium);
-    color: var(--success-fg);
+    margin-top: var(--space-1);
+}
+
+.cat-tag.is-muted {
+    background: transparent;
+    color: var(--text-muted);
+    padding: 0;
 }
 
 /* 일일보고가 없는 날은 고를 수 없다. 옅은 면으로 눕혀 둔다. */
 .day-chip.is-blank {
+    border-color: transparent;
     background: var(--surface-soft);
     cursor: not-allowed;
 }
 
-.day-chip.is-blank .day-chip-name,
-.day-chip.is-blank .day-chip-date,
-.day-chip.is-blank .day-chip-state {
+.day-chip.is-blank .day-chip-date {
     color: var(--text-muted);
 }
 
 /* 아직 오지 않은 날. 켤 수는 있지만 끝난 날처럼 보이지 않게 흐리게 둔다. */
-.day-chip.is-future:not(.on) .day-chip-name {
+.day-chip.is-future:not(.on) .day-chip-date {
     color: var(--text-muted);
 }
 
-.day-chip.is-future .day-chip-state {
-    color: var(--text);
+.wk-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.create-summary {
+    flex: 1;
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
 }
 
 .create-week-btn {
     flex-shrink: 0;
+    height: var(--control-h-lg);
+    padding: 0 var(--space-5);
+}
+
+/* ---- 만든 보고서 ---------------------------------------------------- */
+.made-icon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+.made-actions .btn-small {
+    height: 28px;
+    gap: 4px;
 }
 
 @media (max-width: 860px) {
-    .week-nav {
-        width: auto;
-    }
-
-    .week-stepper button {
-        min-width: var(--control-h-touch);
+    .range-toggle {
         height: var(--control-h-touch);
     }
 
     .week-range {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: var(--space-2);
+        padding: var(--space-3);
     }
 
     .week-range .input {
@@ -1087,11 +1015,6 @@ onMounted(async () => {
         height: var(--control-h-touch);
         font-size: var(--fs-16);
         overflow: hidden;
-    }
-
-    .section-head {
-        flex-direction: column;
-        gap: var(--space-1);
     }
 
     .week-folds {
@@ -1104,17 +1027,7 @@ onMounted(async () => {
 
     .day-chips {
         grid-template-columns: minmax(0, 1fr);
-    }
-
-    .day-chip + .day-chip {
-        border-left: 0;
-        border-top: 1px solid var(--border);
-    }
-
-    .day-chip.on::after {
-        position: static;
-        order: 3;
-        flex-shrink: 0;
+        gap: var(--space-1);
     }
 
     .day-chip {
@@ -1125,14 +1038,26 @@ onMounted(async () => {
         padding: var(--space-2) var(--space-3);
     }
 
+    .day-chip.on::after {
+        position: static;
+        order: 3;
+        flex-shrink: 0;
+    }
+
+    .day-chip-name {
+        width: 2.5em;
+    }
+
     .day-chip-date {
-        font-size: var(--fs-14);
-        color: var(--text);
+        font-size: var(--fs-16);
     }
 
     .day-chip-state {
-        margin-left: auto;
-        font-size: var(--fs-13);
+        margin: 0 0 0 auto;
+    }
+
+    .create-summary {
+        flex-basis: 100%;
     }
 
     .create-week-btn {
@@ -1152,6 +1077,7 @@ onMounted(async () => {
 
     .made-actions {
         width: 100%;
+        padding-left: calc(18px + var(--space-3));
     }
 
     .made-actions .btn-small {

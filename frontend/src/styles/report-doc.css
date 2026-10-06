@@ -156,8 +156,8 @@
     flex: 1;
     min-width: 0;
     margin: 0;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-medium);
+    font-size: var(--fs-18);
+    font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }
 
@@ -210,6 +210,27 @@
     min-width: 0;
 }
 
+/* Notion inline editing: items read as plain text, a gray well on hover,
+   the regular input frame only while focused. */
+.report-doc .task-row .input,
+.report-doc .project-name-input {
+    border-color: transparent;
+    background: transparent;
+}
+
+.report-doc .task-row .input:hover,
+.report-doc .project-name-input:hover {
+    border-color: transparent;
+    background: var(--surface-soft);
+}
+
+.report-doc .task-row .input:focus,
+.report-doc .project-name-input:focus {
+    border-color: var(--accent);
+    background: var(--surface);
+    box-shadow: var(--focus-ring);
+}
+
 /* Row delete is a quiet ✕ control; it turns red only on hover. */
 .report-doc .remove-btn {
     flex-shrink: 0;
@@ -228,23 +249,23 @@
     color: var(--danger-fg);
 }
 
-/* Add row: a quiet accent text button under the list. */
+/* Add row: Notion "+ New" row, gray text that fills gray on hover. */
 .report-doc .add-btn {
     flex-shrink: 0;
     align-self: flex-start;
-    height: 28px;
+    height: var(--control-h-sm);
     padding: 0 var(--space-2);
     border: 0;
     background: transparent;
-    color: var(--accent);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+    font-size: var(--fs-14);
+    font-weight: var(--fw-regular);
 }
 
 .report-doc .add-btn:hover {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-    color: var(--accent-hover);
+    border-color: transparent;
+    background: var(--surface-soft);
+    color: var(--text-strong);
 }
 
 /* Add project/notice: a quiet text action under the list, not a dashed box. */
@@ -255,8 +276,8 @@
     padding: 0 var(--space-2);
     border: 0;
     background: transparent;
-    color: var(--accent);
-    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+    font-weight: var(--fw-regular);
 }
 
 .report-doc .add-project-btn::before {
@@ -266,8 +287,8 @@
 }
 
 .report-doc .add-project-btn:hover {
-    background: var(--accent-soft);
-    color: var(--accent-hover);
+    background: var(--surface-soft);
+    color: var(--text-strong);
 }
 
 /* ---- Save bar ----------------------------------------------------- */
@@ -280,7 +301,6 @@
     bottom: var(--space-3);
     z-index: var(--z-sticky);
     padding: var(--space-3) var(--space-4);
-    box-shadow: var(--shadow-1);
 }
 
 .report-doc .save-actions {
@@ -329,11 +349,22 @@
 }
 
 .report-doc .field-group.is-row .add-btn {
-    height: 28px;
+    height: var(--control-h-sm);
     padding: 0 var(--space-2);
     border: 0;
-    color: var(--accent);
-    font-weight: var(--fw-semibold);
+}
+
+/* Pointer devices: the ✕ appears with the row, like Notion's block handles. */
+@media (hover: hover) {
+    .report-doc .task-row .remove-btn {
+        opacity: 0;
+        transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+    }
+
+    .report-doc .task-row:hover .remove-btn,
+    .report-doc .task-row:focus-within .remove-btn {
+        opacity: 1;
+    }
 }
 
 /* ==== Mobile (<=860px) ============================================ */

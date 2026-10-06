@@ -187,7 +187,7 @@
 
 .ios-arrow:hover,
 .ios-today:hover {
-    background: var(--accent-soft);
+    background: var(--surface-soft);
 }
 
 .team-filter {

@@ -3,7 +3,6 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import useApi from "../composables/useApi";
-import AppPageHeader from "./ui/AppPageHeader.vue";
 import { useDialog } from "../composables/useDialog";
 import { AGENDA_NAME_LIMIT, dayCounts, previewPeople } from "../lib/dayStatus";
 
@@ -477,8 +476,15 @@ const progressByMember = computed(() => {
 
 <template>
     <div class="page">
-        <AppPageHeader :title="`${selectedYear}년 ${selectedMonth}월`">
-            <template #filters>
+        <!-- 주간 보고서와 같은 머리: 왼쪽은 보는 달, 오른쪽은 팀 고르기와 달 이동. -->
+        <header class="view-head">
+            <div class="view-head-text">
+                <p class="view-period">
+                    {{ selectedYear }}년 {{ selectedMonth }}월
+                    <span v-if="isThisMonth" class="cat-tag is-progress">이번 달</span>
+                </p>
+            </div>
+            <div class="view-nav">
                 <select
                     id="activity-filter-team"
                     class="input team-filter"
@@ -491,26 +497,19 @@ const progressByMember = computed(() => {
                         {{ team.team_name }}
                     </option>
                 </select>
-            </template>
-            <template #actions>
-                <button
-                    v-if="!isThisMonth"
-                    type="button"
-                    class="btn btn-small"
-                    @click="goThisMonth"
-                >
-                    이번 달
-                </button>
-                <div class="month-nav">
-                    <button type="button" class="icon-btn" aria-label="이전 달" @click="prevMonth">
+                <div class="stepper" role="group" aria-label="달 이동">
+                    <button type="button" aria-label="이전 달" @click="prevMonth">
                         <ChevronLeft :size="16" />
                     </button>
-                    <button type="button" class="icon-btn" aria-label="다음 달" @click="nextMonth">
+                    <button type="button" class="stepper-reset" :disabled="isThisMonth" @click="goThisMonth">
+                        이번 달
+                    </button>
+                    <button type="button" aria-label="다음 달" @click="nextMonth">
                         <ChevronRight :size="16" />
                     </button>
                 </div>
-            </template>
-        </AppPageHeader>
+            </div>
+        </header>
 
         <div v-if="orderedActivities.length === 0" class="empty-state">
             표시할 활동 기록이 없습니다
@@ -562,7 +561,7 @@ const progressByMember = computed(() => {
 
             <section v-if="selectedCell && !isNarrow" class="card agenda" :aria-label="agendaTitle(selectedCell)">
                 <div class="section-head">
-                    <h2>{{ agendaTitle(selectedCell) }}</h2>
+                    <h2 class="section-title">{{ agendaTitle(selectedCell) }}</h2>
                 </div>
                 <p v-if="selectedCell.holidayName" class="agenda-holiday">{{ selectedCell.holidayName }}</p>
                 <p class="agenda-meta">
@@ -654,7 +653,7 @@ const progressByMember = computed(() => {
                     :aria-label="agendaTitle(selectedCell)"
                 >
                     <div class="section-head">
-                        <h2>{{ agendaTitle(selectedCell) }}</h2>
+                        <h2 class="section-title">{{ agendaTitle(selectedCell) }}</h2>
                     </div>
                     <p v-if="selectedCell.holidayName" class="agenda-holiday">{{ selectedCell.holidayName }}</p>
                     <p class="agenda-meta">
@@ -742,42 +741,6 @@ const progressByMember = computed(() => {
 </template>
 
 <style scoped>
-.month-nav {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-}
-
-.icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--control-h-sm);
-    height: var(--control-h-sm);
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
-    cursor: pointer;
-    transition:
-        background var(--dur-fast) var(--ease),
-        border-color var(--dur-fast) var(--ease),
-        color var(--dur-fast) var(--ease);
-}
-
-.icon-btn:hover {
-    background: var(--surface-soft);
-    border-color: var(--border-strong);
-    color: var(--text-strong);
-}
-
-.icon-btn:focus-visible {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: var(--focus-ring);
-}
-
 .team-filter {
     width: 180px;
     height: var(--control-h);
@@ -894,9 +857,6 @@ const progressByMember = computed(() => {
 
 .section-head h2 {
     margin: 0;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
 }
 
 .agenda-holiday,
@@ -959,14 +919,14 @@ button.person-chip {
 }
 
 button.person-chip:hover {
-    border-color: var(--accent);
-    color: var(--accent);
+    border-color: var(--border-strong);
+    background: var(--surface-soft);
 }
 
-/* 미제출은 면을 칠하지 않고 테두리와 글자색으로만 구분한다. */
+/* 미제출은 다른 화면의 상태 태그처럼 옅은 빨간 면 + 빨간 글자. 누를 수 없으니 테두리도 없다. */
 .person-chip.is-missed {
-    border-color: var(--danger-border);
-    background: transparent;
+    border-color: transparent;
+    background: var(--danger-bg);
     color: var(--danger-fg);
 }
 
@@ -1063,18 +1023,6 @@ button.person-chip:hover {
 }
 
 @media (max-width: 860px) {
-    /* 달 이동은 제목 줄에, 팀 고르기는 그 아래 한 줄로. */
-    .page-header {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-    }
-
-    .page-header :deep(.page-header-filters) {
-        grid-column: 1 / -1;
-        grid-row: 2;
-    }
-
     .dot-legend span:last-child {
         margin-left: 0;
     }
@@ -1085,11 +1033,6 @@ button.person-chip:hover {
         max-width: none;
         height: var(--control-h-lg);
         font-size: var(--fs-16);
-    }
-
-    .month-nav .icon-btn {
-        width: var(--control-h-lg);
-        height: var(--control-h-lg);
     }
 
     .agenda-search .input,
