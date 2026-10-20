@@ -498,10 +498,11 @@
     padding-top: var(--space-6);
 }
 
+/* 섹션 사이는 DESIGN.md의 20~24px. 32px이면 탭 아래와 목록 위가 빈 띠처럼 보인다. */
 .page {
     display: flex;
     flex-direction: column;
-    gap: var(--space-7);
+    gap: var(--space-6);
     width: 100%;
     max-width: var(--content-max);
     min-width: 0;
@@ -615,6 +616,7 @@
     }
 
     .page {
+        gap: var(--space-5);
         padding: var(--space-5) var(--space-4) var(--space-8);
     }
 }
@@ -745,8 +747,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: var(--control-h-sm);
-    height: var(--control-h-sm);
+    width: var(--control-h-touch);
+    height: var(--control-h-touch);
     border: 0;
     border-radius: var(--radius-pill);
     background: var(--surface-press);

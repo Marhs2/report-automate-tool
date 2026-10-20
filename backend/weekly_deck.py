@@ -152,22 +152,44 @@ def _as_events(raw) -> list[dict]:
 
 
 def _as_collab(raw) -> dict:
+    """센터 협업 현황: 센터(AC·BC·DC·TC·CSC)마다 진행 현황(done) · 향후일정(next).
+
+    예전 모양({supports, done, next})은 항목이 어느 센터 것인지 모른다. 첫 지원 센터(없으면 AC) 칸으로 옮긴다.
+    """
     data = raw if isinstance(raw, dict) else {}
-    seen = set()
-    supports = []
-    for item in data.get("supports") or []:
-        code = str(item or "").strip().upper()
-        if code in COLLAB_CENTERS and code not in seen:
-            seen.add(code)
-            supports.append(code)
-    return {
-        "supports": supports,
-        "done": _texts(data.get("done")),
-        "next": _texts(data.get("next")),
-    }
+    centers = {code: {"done": [], "next": []} for code in COLLAB_CENTERS}
+    given = data.get("centers")
+    if isinstance(given, dict):
+        for key, row in given.items():
+            code = str(key or "").strip().upper()
+            if code in centers and isinstance(row, dict):
+                centers[code] = {"done": _texts(row.get("done")), "next": _texts(row.get("next"))}
+        return {"centers": centers}
+    supports = [str(item or "").strip().upper() for item in data.get("supports") or []]
+    target = next((code for code in supports if code in centers), COLLAB_CENTERS[0])
+    centers[target] = {"done": _texts(data.get("done")), "next": _texts(data.get("next"))}
+    return {"centers": centers}
 
 
-def section_lines(sections) -> list[str]:
+def collab_centers(collab) -> dict:
+    return _as_collab(collab)["centers"]
+
+
+def collab_has_content(collab) -> bool:
+    return any(row["done"] or row["next"] for row in collab_centers(collab).values())
+
+
+# 주요 업무 현황을 PPT에 그리는 형식. 작성할 때 고른다.
+#   numbered: "1. 프로젝트" / "   - 항목"   bracket: "[프로젝트]" / "항목"   rows: 프로젝트가 표의 행(구분 | 진행 | 향후)
+WEEKLY_LAYOUTS = ("numbered", "bracket", "rows")
+
+
+def deck_layout(deck) -> str:
+    value = str((deck or {}).get("layout") or "").strip()
+    return value if value in WEEKLY_LAYOUTS else WEEKLY_LAYOUTS[0]
+
+
+def section_lines(sections, layout: str = "numbered") -> list[str]:
     lines = []
     index = 0
     for section in sections or []:
@@ -176,6 +198,11 @@ def section_lines(sections) -> list[str]:
         if not title and not items:
             continue
         index += 1
+        if layout == "bracket":
+            if title:
+                lines.append(f"[{title}]")
+            lines.extend(items)
+            continue
         lines.append(f"{index}. {title}" if title else f"{index}.")
         for item in items:
             lines.append(f"   - {item}")
@@ -197,6 +224,9 @@ def from_legacy(
         data["collab"] = _as_collab(data.get("collab"))
         data["director"] = str(data.get("director") or "").strip()
         data.setdefault("next", [])
+        picked = sorted({d for d in (_as_date(raw) for raw in selected_dates or []) if d})
+        if not str(data.get("report_date") or "").strip() and picked:
+            data["report_date"] = format_dot_date(picked[-1])
         if selected_dates:
             done, nxt = week_labels(selected_dates)
             if not data.get("week_label_done"):

@@ -89,6 +89,19 @@ export default function useApi() {
     return response.data;
   };
 
+  /** 아직 제출 안 한 내 초안 목록: [{ report_date, updated_at, preview }] */
+  const getReportDrafts = async (memberId) => {
+    const response = await axios.get(`${baseURL}/report-drafts/${memberId}`);
+    return response.data;
+  };
+
+  const deleteReportDraft = async (memberId, reportDate) => {
+    const response = await axios.delete(
+      `${baseURL}/report-drafts/${memberId}/${reportDate}`,
+    );
+    return response.data;
+  };
+
   /** AI를 돌리지 않고 원문만 보관한다. 고치려고 다시 추출할 필요가 없다. */
   const postReportDraft = async (rawText, reportDate, memberId) => {
     try {
@@ -314,6 +327,14 @@ export default function useApi() {
     }
   };
 
+  /** 부서 팀장 지정. memberId가 null이면 팀장을 비운다. 관리자만. */
+  const postTeamLeader = async (teamId, memberId) => {
+    const response = await axios.post(`${baseURL}/teams/${teamId}/leader`, {
+      member_id: memberId,
+    });
+    return response.data;
+  };
+
   const setTeam = async (teamId, userId) => {
     try {
       const response = await axios.post(`${baseURL}/teams/set`, {
@@ -496,18 +517,33 @@ export default function useApi() {
   };
 
   /**
-   * 회의 녹음 스트림을 연다. 백엔드가 사내 받아 적기 서버(Qwen3-ASR)로 이어 준다.
-   * 열리면 로그인 토큰을 먼저 보낸다. 그다음 주고받는 메시지는 useMeetingStream.js에 있다.
+   * 회의 녹음 조각(WAV) 하나를 받아 적는다. 백엔드가 사내 받아 적기 서버(Qwen3-ASR)로 넘기고 사내 용어로 다듬는다.
+   * offset은 조각이 회의에서 시작한 시각(초). 돌려받는 값: {segments: [{start, end, text}], duration}
    */
-  const openMeetingStream = () => {
-    const url = new URL(`${baseURL}/meeting/stream`, window.location.href);
-    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(url);
-    socket.binaryType = "arraybuffer";
-    socket.addEventListener("open", () => {
-      socket.send(JSON.stringify({ token: sessionToken.value || "" }));
+  const transcribeMeetingChunk = async (wav, offset) => {
+    const formData = new FormData();
+    formData.append("file", new Blob([wav], { type: "audio/wav" }), "chunk.wav");
+    formData.append("offset", String(offset));
+    const response = await axios.post(`${baseURL}/meeting/transcribe`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
-    return socket;
+    return response.data;
+  };
+
+  /** 한 주(월요일 YYYY-MM-DD)의 전 팀 주간보고 제출 현황. */
+  const getWeeklyCollection = async (week) => {
+    const response = await axios.get(`${baseURL}/weekly-collection`, { params: { week } });
+    return response.data;
+  };
+
+  /** 전 팀 주간보고를 합친 PPT. partial이면 미제출자를 빼고 만든다. */
+  const downloadWeeklyCollectionPptx = async (week, partial = false) => {
+    const response = await axios.get(`${baseURL}/weekly-collection/pptx`, {
+      params: { week, partial: partial ? 1 : 0 },
+      responseType: "blob",
+      timeout: 180000,
+    });
+    return response.data;
   };
 
   /** 녹취록을 회의록 칸(제목 · 안건 · 결정 · 후속 할 일)으로 요약한다. */
@@ -523,6 +559,8 @@ export default function useApi() {
     postReport,
     postReportPptx,
     getReportDraft,
+    getReportDrafts,
+    deleteReportDraft,
     postReportDraft,
     postSaveReport,
     getReports,
@@ -561,7 +599,10 @@ export default function useApi() {
     postWorkRecord,
     putWorkRecord,
     deleteWorkRecord,
-    openMeetingStream,
+    transcribeMeetingChunk,
     summarizeMeeting,
+    getWeeklyCollection,
+    downloadWeeklyCollectionPptx,
+    postTeamLeader,
   };
 }

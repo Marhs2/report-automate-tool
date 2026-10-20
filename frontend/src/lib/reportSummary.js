@@ -23,6 +23,25 @@ export function parseReportJson(value) {
     return typeof value === "object" ? value : {};
 }
 
+/** 작성 화면 오른쪽 "내가 쓴 일일보고": 내 보고를 최신순으로, 회의록 · 영업보고 목록과 같은 모양(제목 + 날짜). */
+export function myRecentReports(reports, memberId, limit = 8) {
+    return (Array.isArray(reports) ? reports : [])
+        .filter((report) => String(report?.member_id) === String(memberId))
+        .sort((a, b) => String(b.report_date || "").localeCompare(String(a.report_date || "")))
+        .slice(0, limit)
+        .map((report) => {
+            const names = (parseReportJson(report.parsed_json).projects || [])
+                .map((project) => String(project?.projectName || "").trim())
+                .filter(Boolean);
+            const [year, month, day] = String(report.report_date || "").split("-");
+            return {
+                id: report.id,
+                title: names.length > 2 ? `${names.slice(0, 2).join(" · ")} 외 ${names.length - 2}` : names.join(" · ") || "일일보고",
+                date: year && month && day ? `${year}.${Number(month)}.${Number(day)}` : "",
+            };
+        });
+}
+
 export function reportCounts(parsedJson) {
     const parsed = parseReportJson(parsedJson);
     const counts = { done: 0, progress: 0, issues: 0, requests: 0, plans: 0 };

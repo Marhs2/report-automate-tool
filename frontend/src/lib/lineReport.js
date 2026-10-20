@@ -85,3 +85,60 @@ export function parseLineReport(raw) {
 
     return { lines, looseText: loose.join("\n\n").trim() };
 }
+
+const KIND_KEYS = {
+    "완료": "completedTasks",
+    "진행": "inProgressTasks",
+    "이슈": "issues",
+    "요청": "requests",
+    "다음 계획": "nextPlans",
+};
+
+/** 한 줄씩 쓴 보고는 사람이 이미 나눴다. AI 추출 없이 일일보고 스키마(json_Schema.json) 모양으로 바로 옮긴다. */
+export function linesToReportJson(lines) {
+    const projects = [];
+    for (const line of lines || []) {
+        const name = String(line?.project || "").trim();
+        const text = String(line?.text || "").trim();
+        const key = KIND_KEYS[line?.kind];
+        if (!name || !text || !key) continue;
+        let project = projects.find((item) => item.projectName === name);
+        if (!project) {
+            project = {
+                projectName: name,
+                completedTasks: [],
+                inProgressTasks: [],
+                issues: [],
+                requests: [],
+                nextPlans: [],
+            };
+            projects.push(project);
+        }
+        if (!project[key].includes(text)) project[key].push(text);
+    }
+    return { projects };
+}
+
+/** 내가 최근에 보고한 프로젝트를 앞에 둔다. 나머지는 원래 순서를 지킨다. */
+export function orderProjectsByRecent(names, reports, memberId) {
+    const mine = (reports || [])
+        .filter((report) => String(report?.member_id) === String(memberId))
+        .sort((a, b) => String(b?.report_date || "").localeCompare(String(a?.report_date || "")));
+    const recent = [];
+    for (const report of mine) {
+        let parsed = report?.parsed_json;
+        if (typeof parsed === "string") {
+            try {
+                parsed = JSON.parse(parsed);
+            } catch {
+                parsed = null;
+            }
+        }
+        for (const project of parsed?.projects || []) {
+            const name = String(project?.projectName || "").trim();
+            if (name && !recent.includes(name)) recent.push(name);
+        }
+    }
+    const known = (names || []).map((name) => String(name || "").trim()).filter(Boolean);
+    return [...recent, ...known.filter((name) => !recent.includes(name))];
+}

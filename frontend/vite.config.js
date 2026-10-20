@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+// 내부망 http 주소에서는 브라우저가 마이크를 막는다. 자체 서명 https로 연다.
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), basicSsl()],
   server: {
     host: true,
     port: 5173,

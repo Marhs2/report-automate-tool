@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
     deckExtrasCount,
+    deckForSave,
     doneKindMap,
     groupDoneItems,
     humanizeConfirmText,
+    layoutPreview,
     nextWeekLabel,
     placeProjectSection,
     projectSectionOrder,
@@ -84,8 +86,21 @@ describe("toWeeklyDeck", () => {
         assert.equal(deck.director, "김동심");
         assert.equal(deck.notices[0].title, "보안규정");
         assert.equal(deck.month_events[0].title, "월보고");
-        assert.deepEqual(deck.collab.supports, ["DC"]);
-        assert.deepEqual(deck.collab.done, ["펌웨어 지원"]);
+        // 예전 모양({supports, done, next})은 첫 지원 센터 칸으로 옮겨 읽는다.
+        assert.deepEqual(Object.keys(deck.collab.centers), ["AC", "BC", "DC", "TC", "CSC"]);
+        assert.deepEqual(deck.collab.centers.DC, { done: ["펌웨어 지원"], next: [] });
+        assert.deepEqual(deck.collab.centers.AC, { done: [], next: [] });
+    });
+
+    it("keeps per-center collab rows and drops blank items", () => {
+        const deck = toWeeklyDeck({
+            schema: "weekly-deck-v1",
+            done: [],
+            next: [],
+            collab: { centers: { bc: { done: ["매출현황 공유", ""], next: [" "] }, XX: { done: ["무시"] } } },
+        });
+        assert.deepEqual(deck.collab.centers.BC, { done: ["매출현황 공유"], next: [] });
+        assert.equal(deck.collab.centers.XX, undefined);
     });
 
     it("does not invent a blank project when the next list is empty", () => {
@@ -175,7 +190,7 @@ describe("splitting the merged 진행 현황 column", () => {
         const filled = deckExtrasCount({
             notices: [{ title: "보안규정", body: ["검토"] }],
             month_events: [{ when: "9/15", title: "월보고" }],
-            collab: { supports: ["DC"], done: ["펌웨어 지원"], next: [] },
+            collab: { centers: { DC: { done: ["펌웨어 지원"], next: ["점검"] } } },
         });
         assert.equal(filled.notices, 1);
         assert.equal(filled.events, 1);
@@ -217,5 +232,51 @@ describe("placeProjectSection", () => {
         const data = { done: [], next: [] };
         placeProjectSection(data, null, section("새"));
         assert.deepEqual(titles(data), ["새"]);
+    });
+});
+
+describe("layoutPreview", () => {
+    const deck = {
+        done: [
+            { title: "대한전선", items: ["경광등 설치", "모니터 연결", "세 번째"] },
+            { title: "TYM", items: ["점검"] },
+            { title: "잘림", items: ["x"] },
+        ],
+        next: [{ title: "TYM", items: ["후속"] }],
+    };
+
+    it("numbers projects and dashes items, two of each", () => {
+        const preview = layoutPreview(deck, "numbered");
+        assert.deepEqual(preview.done.map((line) => line.text), ["1. 대한전선", "- 경광등 설치", "- 모니터 연결", "2. TYM", "- 점검"]);
+        assert.deepEqual(preview.next.map((line) => line.head), [true, false]);
+    });
+
+    it("brackets project titles", () => {
+        assert.deepEqual(layoutPreview(deck, "bracket").done.slice(0, 2).map((line) => line.text), ["[대한전선]", "경광등 설치"]);
+    });
+
+    it("merges done and next into one row per project", () => {
+        assert.deepEqual(layoutPreview(deck, "rows").rows[1], { title: "TYM", done: ["- 점검"], next: ["- 후속"] });
+    });
+
+    it("falls back to a sample when the report is empty", () => {
+        assert.equal(layoutPreview({ done: [], next: [] }, "numbered").done[0].text, "1. 프로젝트 A");
+    });
+});
+
+describe("deckForSave", () => {
+    it("drops blank projects, items, notices and events but keeps real ones", () => {
+        const deck = {
+            done: [{ title: "권취 자동화", items: ["케이블 정렬", " "] }, { title: "", items: [""] }],
+            next: [],
+            notices: [{ title: "", body: [""] }, { title: "보안", body: ["점검", ""] }],
+            month_events: [{ when: "", title: "" }],
+            next_month_events: [],
+        };
+        const saved = deckForSave(deck);
+        assert.deepEqual(saved.done, [{ title: "권취 자동화", items: ["케이블 정렬"] }]);
+        assert.deepEqual(saved.notices, [{ title: "보안", body: ["점검"] }]);
+        assert.deepEqual(saved.month_events, []);
+        assert.equal(deck.done.length, 2);
     });
 });

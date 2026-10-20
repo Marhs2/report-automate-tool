@@ -1,13 +1,18 @@
 """회의 녹음 → 받아 적기(Qwen3-ASR) → 회의록 요약에 쓰는 도우미.
 
 라우트는 main.py에 있다. 여기에는 HTTP와 LLM 호출 없이 검사할 수 있는 부분을 둔다.
-받아 적기 서버는 GPU 서버의 qwen_live_server.py다(WebSocket /v1/stream).
+받아 적기 서버는 OpenAI 형식의 POST {ASR_BASE_URL}/audio/transcriptions다(Unsloth Studio의 Voice 모델).
+브라우저가 회의를 5분씩 잘라 WAV로 올리면 백엔드가 30초 안팎으로 다시 나눠 받아 적고,
+녹음이 끝나면 모은 녹취록을 한 번 요약한다.
 """
 
 import difflib
+import io
 import json
 import os
 import re
+import wave
+from array import array
 from datetime import date, timedelta
 
 from dotenv import load_dotenv
@@ -15,21 +20,44 @@ from dotenv import load_dotenv
 # main.py는 import가 끝난 뒤에 load_dotenv()를 부른다. 여기서 먼저 읽어야 .env의 ASR_* 값이 들어온다.
 load_dotenv()
 
-ASR_BASE_URL = os.environ.get("ASR_BASE_URL", "http://192.168.210.10:8889")
-# Qwen3-ASR은 언어 이름을 영어로 받는다("Korean"). auto면 자동 감지.
-ASR_LANGUAGE = os.environ.get("ASR_LANGUAGE", "Korean")
-ASR_STREAM_PATH = "/v1/stream"
+# 따로 정하지 않으면 보고서 LLM과 같은 서버(Unsloth Studio, …/v1)를 쓴다.
+ASR_BASE_URL = os.environ.get("ASR_BASE_URL") or os.environ.get("LM_BASE_URL") or "http://192.168.210.10:8888/v1"
+ASR_API_KEY = os.environ.get("ASR_API_KEY") or os.environ.get("LM_API_KEY", "")
+# Studio의 Settings → Voice에서 내려받은 모델만 받아 적기에 쓸 수 있다.
+ASR_MODEL = os.environ.get("ASR_MODEL", "qwen3-asr-1.7b")
+# OpenAI 형식이라 언어는 ISO 코드("ko")로 넘긴다. 비우면 자동 감지.
+# 자동 감지는 읽은 문장 벤치마크에서는 조금 나았지만(글자 오류율 16.5% → 16.2%), 실제 회의 녹음(43분)에서는
+# 15초 구간 236개 중 11개를 빈 글로 돌려주었다("ko"는 0개). 말을 통째로 잃지 않도록 "ko"를 기본으로 둔다.
+ASR_LANGUAGE = os.environ.get("ASR_LANGUAGE", "ko")
+ASR_TRANSCRIBE_PATH = "/audio/transcriptions"
+# Qwen3-ASR은 5분을 한 번에 받으면 같은 문장을 되풀이해 지어낸다(306초 → 문장 6배).
+# 30초 구간도 문장이 여럿 들면 한두 문장을 통째로 빼먹었다(실제 목소리 회의 dev 세트 clean 7.3%).
+# 15초로 줄이면 빠지는 문장이 거의 없다(clean 3.8%, 전체 19.4% → 16.5%). 10초부터는 다시 나빠진다.
+PIECE_SECONDS = 15
+# 말 한가운데를 자르지 않도록, 구간 끝 이 길이 안에서 가장 조용한 0.1초를 찾아 자른다.
+PIECE_WINDOW_SECONDS = 8
+# 이보다 조용한 구간(-50dBFS 안팎)은 보내지 않는다. 말이 없으면 모델이 없는 말을 지어낸다.
+SILENCE_RMS = 100
 # 받아 적기 모델에 문맥(context)으로 사내 용어(이름 · 프로젝트)를 넘길지. Qwen3-ASR은 넘긴 용어 목록을
 # 말이 없는 곳에서 그대로 읽어 녹취록에 적는다("관리자, 박민준, 유시은, …"). 그래서 기본은 넘기지 않고,
-# 사내 용어 교정은 녹음을 멈춘 뒤 LLM 교정(polish_segments)에 맡긴다. 1이면 넘긴다.
+# 사내 용어 교정은 조각마다 LLM 교정(polish_segments)에 맡긴다. 1이면 prompt로 넘긴다.
 ASR_SEND_CONTEXT = os.environ.get("ASR_SEND_CONTEXT", "0") == "1"
 # 넘길 때 이 글자 수까지만.
 HOTWORD_CHARS = 600
+# 잡음 속에서 모델이 같은 말을 끝없이 되풀이하기도 한다(15초 구간 하나에 "아들" 1,939번).
+# 구간 길이에 비례해 출력 토큰을 자른다. 실제 회의는 초당 8글자를 넘지 않아 두 배를 둔다.
+TOKENS_PER_SECOND = 16
+MIN_COMPLETION_TOKENS = 64
+# 단어 묶음이 이보다 많이 연달아 나오면 되풀이로 보고 한 번만 남긴다. 사람은 "네 네 네"처럼 세 번까지는 말한다.
+MAX_REPEATS = 3
+REPEAT_UNIT_WORDS = 6
 # 용어가 이만큼 이상 쉼표로 이어지면 모델이 문맥을 읽은 것으로 보고 지운다.
 # 사람이 프로젝트 이름 서너 개를 늘어놓는 말을 지우지 않도록 넉넉히 잡는다.
 ECHO_MIN_TERMS = 4
 
 MAX_TRANSCRIPT_CHARS = 100_000
+# 5분 조각(16kHz 16비트 모노 WAV)은 9.6MB다. 브라우저가 늦게 잘라도 받도록 넉넉히 잡는다.
+MAX_CHUNK_BYTES = 40 * 1024 * 1024
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -39,14 +67,12 @@ class MeetingError(Exception):
         self.status = status
 
 
-def asr_stream_url(base: str = ASR_BASE_URL) -> str:
-    """http(s)://host:port → ws(s)://host:port/v1/stream"""
-    base = base.rstrip("/").removesuffix(ASR_STREAM_PATH)
-    if base.startswith("https://"):
-        base = "wss://" + base[len("https://"):]
-    elif base.startswith("http://"):
-        base = "ws://" + base[len("http://"):]
-    return base + ASR_STREAM_PATH
+def asr_transcribe_url(base: str = ASR_BASE_URL) -> str:
+    """http://host:port 또는 http://host:port/v1 → http://host:port/v1/audio/transcriptions"""
+    base = base.rstrip("/").removesuffix(ASR_TRANSCRIBE_PATH)
+    if not base.endswith("/v1"):
+        base += "/v1"
+    return base + ASR_TRANSCRIBE_PATH
 
 
 def clean_text(text) -> str:
@@ -71,13 +97,79 @@ def hotwords(terms, limit: int = HOTWORD_CHARS) -> str:
     return ", ".join(out)
 
 
-def stream_config(terms) -> dict:
-    """받아 적기 서버에 처음 보내는 설정. 브라우저는 16kHz 16비트 PCM을 보낸다."""
-    config = {"language": ASR_LANGUAGE, "format": "s16le"}
+def transcribe_form(terms, seconds: float | None = None) -> dict:
+    """받아 적기 서버에 구간과 함께 보내는 폼 값. seconds를 주면 출력 토큰을 그 길이에 맞춰 자른다."""
+    form = {"model": ASR_MODEL}
+    if ASR_LANGUAGE:
+        form["language"] = ASR_LANGUAGE
+    if seconds is not None:
+        form["max_completion_tokens"] = str(max(MIN_COMPLETION_TOKENS, int(seconds * TOKENS_PER_SECOND)))
     context = hotwords(terms) if ASR_SEND_CONTEXT else ""
     if context:
-        config["context"] = context
-    return config
+        form["prompt"] = context
+    return form
+
+
+def check_chunk(data: bytes) -> bytes:
+    if not data:
+        raise MeetingError("녹음 조각이 비어 있습니다.")
+    if len(data) > MAX_CHUNK_BYTES:
+        raise MeetingError("녹음 조각이 너무 큽니다.", status=413)
+    return data
+
+
+def read_wav(data: bytes) -> tuple[array, int]:
+    """브라우저가 보낸 16비트 모노 WAV → (샘플, 샘플레이트)."""
+    try:
+        with wave.open(io.BytesIO(data)) as wav:
+            if wav.getnchannels() != 1 or wav.getsampwidth() != 2:
+                raise MeetingError("녹음 조각은 16비트 모노 WAV여야 합니다.")
+            rate = wav.getframerate()
+            frames = wav.readframes(wav.getnframes())
+    except (wave.Error, EOFError) as exc:
+        raise MeetingError("녹음 조각을 읽지 못했습니다.") from exc
+    samples = array("h")
+    samples.frombytes(frames[: len(frames) // 2 * 2])
+    return samples, rate
+
+
+def _rms(samples, start: int, end: int) -> float:
+    if end <= start:
+        return 0.0
+    return (sum(x * x for x in samples[start:end]) / (end - start)) ** 0.5
+
+
+def split_pieces(samples, rate: int, piece_seconds: float = PIECE_SECONDS,
+                 window_seconds: float = PIECE_WINDOW_SECONDS) -> list[tuple[int, int]]:
+    """조각을 piece_seconds 안팎의 (시작, 끝) 샘플 구간으로 나눈다.
+    구간 끝 window_seconds 안에서 가장 조용한 0.1초 가운데서 자르고, 말이 없는 구간은 뺀다."""
+    piece = int(piece_seconds * rate)
+    window = min(piece, int(window_seconds * rate))
+    frame = max(1, rate // 10)
+    spans, start, total = [], 0, len(samples)
+    while total - start > piece:
+        cut, best = start + piece, float("inf")
+        at = start + piece - window
+        while at + frame <= start + piece:
+            level = _rms(samples, at, at + frame)
+            if level <= best:
+                best, cut = level, at + frame // 2
+            at += frame
+        spans.append((start, cut))
+        start = cut
+    if total - start >= rate // 2:
+        spans.append((start, total))
+    return [(s, e) for s, e in spans if _rms(samples, s, e) >= SILENCE_RMS]
+
+
+def wav_bytes(samples, rate: int) -> bytes:
+    out = io.BytesIO()
+    with wave.open(out, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(rate)
+        wav.writeframes(samples.tobytes())
+    return out.getvalue()
 
 
 def _squash(text: str) -> str:
@@ -122,12 +214,52 @@ def strip_context_echo(text: str, terms) -> str:
     return clean_text(re.sub(r"[,\s]+$", "", re.sub(r"^[,.\s]+", "", kept)))
 
 
-def final_segment(msg: dict, terms=()) -> dict | None:
-    """서버의 final 메시지(확정된 발화 하나)를 앱이 쓰는 구간으로. 문맥을 읽은 부분은 빼고, 글이 없으면 None."""
+def final_segment(msg: dict, terms=(), offset: float = 0) -> dict | None:
+    """받아 적은 발화 하나를 앱이 쓰는 구간으로. 문맥을 읽은 부분은 빼고, 글이 없으면 None.
+    offset은 조각이 회의에서 시작한 시각(초)이다. 구간 시각을 회의 처음부터 센 값으로 바꾼다."""
     text = strip_context_echo(msg.get("text"), terms)
     if not text:
         return None
-    return {"start": float(msg.get("start") or 0), "end": float(msg.get("end") or 0), "text": text}
+    start = round(float(msg.get("start") or 0) + offset, 2)
+    end = round(float(msg.get("end") or 0) + offset, 2)
+    return {"start": start, "end": end, "text": text}
+
+
+def _repeat_run(keys: list[str], at: int) -> tuple[int, int]:
+    """keys[at]에서 시작해 연달아 되풀이되는 단어 묶음 (묶음 크기, 횟수). 가장 길게 덮는 것을 고른다."""
+    best = (1, 1)
+    for size in range(1, REPEAT_UNIT_WORDS + 1):
+        unit = keys[at:at + size]
+        if len(unit) < size:
+            break
+        count = 1
+        while keys[at + count * size:at + (count + 1) * size] == unit:
+            count += 1
+        if count > 1 and size * count > best[0] * best[1]:
+            best = (size, count)
+    return best
+
+
+def collapse_repeats(text: str) -> str:
+    """같은 단어 묶음이 MAX_REPEATS번보다 많이 연달아 나오면 한 번만 남긴다. 문장부호는 비교에서 버린다."""
+    words = str(text or "").split()
+    keys = [re.sub(r"[.,?!·]", "", w) for w in words]
+    out, at = [], 0
+    while at < len(words):
+        size, count = _repeat_run(keys, at)
+        if count > MAX_REPEATS:
+            out += words[at:at + size]
+            at += size * count
+        else:
+            out.append(words[at])
+            at += 1
+    return " ".join(out)
+
+
+def piece_segment(result: dict, start: float, end: float, terms=(), offset: float = 0) -> dict | None:
+    """구간 하나를 받아 적은 결과({text})를 구간 시각이 붙은 발화로. 되풀이는 접고, 글이 없으면 None."""
+    text = collapse_repeats((result or {}).get("text"))
+    return final_segment({"start": start, "end": end, "text": text}, terms, offset)
 
 
 WEEKDAYS = "월화수목금토일"

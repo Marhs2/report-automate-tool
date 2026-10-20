@@ -1,0 +1,328 @@
+.write-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+
+.write-date {
+    width: auto;
+    height: var(--control-h-sm);
+    font-size: var(--fs-13);
+}
+
+.write-modes {
+    margin-left: auto;
+}
+
+.write-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+    gap: var(--space-4);
+    align-items: start;
+}
+
+.write-footnote {
+    margin: var(--space-2) 0 0;
+    text-align: right;
+    font-size: var(--fs-12);
+    color: var(--text-muted);
+}
+
+.aside-more {
+    text-decoration: none;
+}
+
+.aside-more:hover {
+    color: var(--accent);
+}
+
+@media (max-width: 860px) {
+    .write-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .write-aside {
+        display: none;
+    }
+}
+
+.write-field .textarea {
+    min-height: 320px;
+}
+
+.write-helpers {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-2);
+}
+
+.write-helpers-label {
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+}
+
+.template-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.template-chips .on {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--text-strong);
+}
+
+.form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+}
+
+.draft-note {
+    margin-right: auto;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--success-fg);
+}
+
+.form-error {
+    margin-top: var(--space-3);
+    color: var(--danger-fg);
+    font-size: var(--fs-13);
+}
+
+.form-hint {
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text);
+}
+
+/* 드래그해서 놓는 칸. 파일 입력은 숨기고 라벨을 버튼처럼 쓴다. */
+.file-drop-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-7) var(--space-5);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--input-bg);
+    text-align: center;
+    transition:
+        border-color var(--dur-fast) var(--ease),
+        background var(--dur-fast) var(--ease);
+}
+
+.file-drop-area svg {
+    color: var(--text);
+}
+
+.file-drop-area:hover,
+.file-drop-area:focus-within,
+.file-drop-area.is-dragging {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.file-drop-copy {
+    margin: 0;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.file-drop-pick {
+    display: inline-flex;
+    align-items: center;
+    height: var(--control-h-sm);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    cursor: pointer;
+    transition:
+        border-color var(--dur-fast) var(--ease),
+        background var(--dur-fast) var(--ease);
+}
+
+.file-drop-pick:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-soft);
+}
+
+.file-drop-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.file-name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.file-clear {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
+    color: var(--danger-fg);
+    cursor: pointer;
+}
+
+
+@media (max-width: 860px) {
+    .write-card {
+        padding-bottom: calc(var(--control-h-lg) + var(--space-8));
+    }
+
+    .write-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .write-mode-switch {
+        margin-left: auto;
+        min-height: var(--control-h-lg);
+    }
+
+    .write-date {
+        flex: 0 1 auto;
+        width: auto;
+        min-width: 0;
+        max-width: 100%;
+        min-height: var(--control-h-lg);
+        height: var(--control-h-lg);
+        font-size: var(--fs-16);
+        overflow: hidden;
+    }
+
+    .status-chip {
+        justify-self: start;
+        max-width: 100%;
+    }
+
+    .status-chip-more {
+        display: none;
+    }
+
+    .write-modes {
+        grid-column: 1 / -1;
+        margin-left: 0;
+    }
+
+    .write-footnote {
+        text-align: center;
+    }
+
+    .write-field .textarea {
+        min-height: 42dvh;
+        font-size: var(--fs-16);
+        line-height: 1.5;
+    }
+
+    .file-drop-copy {
+        font-size: var(--fs-14);
+    }
+
+    .file-drop-pick {
+        min-height: var(--control-h-lg);
+        height: var(--control-h-lg);
+        padding: 0 var(--space-5);
+    }
+
+    .form-actions {
+        position: sticky;
+        bottom: calc(var(--bottom-nav-offset) + var(--space-2));
+        z-index: 8;
+        flex-wrap: wrap;
+        justify-content: stretch;
+        margin: var(--space-4) calc(var(--space-4) * -1) calc(var(--space-4) * -1);
+        padding: var(--space-3) var(--space-4);
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+    }
+
+    .form-actions .btn {
+        flex: 1 1 calc(50% - var(--space-2));
+    }
+
+    .form-actions .btn-primary {
+        flex: 1 1 100%;
+    }
+
+
+    .daily-write:has(.write-card.is-lines) {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        min-height: calc(
+            100dvh - var(--topbar-height) - env(safe-area-inset-top, 0px) - var(--bottom-nav-offset)
+        );
+        padding-bottom: 0;
+        background: var(--surface);
+    }
+
+    /* 카드가 화면 아래까지 차야 입력 영역이 처음부터 엄지 자리(하단)에 있다. */
+    .daily-write:has(.write-card.is-lines) .write-layout {
+        flex: 1;
+        align-items: stretch;
+    }
+
+    .write-card.is-lines {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        margin-left: calc(-1 * max(var(--space-4), env(safe-area-inset-left, 0px)));
+        margin-right: calc(-1 * max(var(--space-4), env(safe-area-inset-right, 0px)));
+        margin-bottom: 0;
+        border-left: 0;
+        border-right: 0;
+        border-bottom: 0;
+        border-radius: 0;
+        padding-bottom: var(--space-4);
+        background: var(--surface);
+    }
+
+    .draft-note {
+        width: 100%;
+        margin-right: 0;
+    }
+}
+
+.line-dock-actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.line-dock-actions .btn {
+    flex: 1;
+    min-height: var(--control-h-lg);
+}

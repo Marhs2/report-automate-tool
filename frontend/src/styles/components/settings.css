@@ -1,0 +1,57 @@
+.account-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.account-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h-lg);
+    height: var(--control-h-lg);
+    flex-shrink: 0;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+}
+
+.account-copy {
+    flex: 1;
+    min-width: 0;
+}
+
+.account-name,
+.account-team {
+    margin: 0;
+    word-break: keep-all;
+}
+
+.account-name {
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.account-team {
+    margin-top: var(--space-1);
+    font-size: var(--fs-13);
+    color: var(--text);
+}
+
+.account-logout {
+    flex-shrink: 0;
+    min-height: var(--control-h-lg);
+}
+
+@media (max-width: 860px) {
+    .account-card {
+        flex-wrap: wrap;
+    }
+
+    .account-logout {
+        width: 100%;
+    }
+}

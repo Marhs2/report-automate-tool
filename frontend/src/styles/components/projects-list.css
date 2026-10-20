@@ -1,0 +1,154 @@
+.list-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 220px;
+    gap: var(--space-2);
+}
+
+.list-toolbar .input {
+    min-width: 0;
+}
+
+.filter-active {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text);
+}
+
+.list-status {
+    margin: 0;
+    font-size: var(--fs-14);
+    color: var(--text-muted);
+}
+
+.list-status.is-error {
+    color: var(--danger-fg);
+}
+
+.day-weekday {
+    margin-left: 2px;
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+}
+
+.me-mark {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    margin-left: var(--space-1);
+    padding: 0 5px;
+    border: 0;
+    border-radius: var(--radius-tag);
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+    font-size: var(--fs-11);
+    font-weight: var(--fw-semibold);
+    vertical-align: 1px;
+}
+
+/* 날짜 머리는 스크롤해도 위에 붙어 있어 지금 어느 날을 보는지 잃지 않는다. */
+.group-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-3);
+    background: var(--bg);
+}
+
+.group-block {
+    gap: 0;
+}
+
+/* 날짜 묶음끼리는 크게 띄운다. 붙어 있으면 어느 날 보고인지 한눈에 안 나뉜다. */
+.group-block + .group-block {
+    margin-top: var(--space-6);
+}
+
+.row {
+    align-items: flex-start;
+    padding-top: var(--space-4);
+    padding-bottom: var(--space-4);
+}
+
+.row .avatar {
+    margin-top: 1px;
+}
+
+.report-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.report-who {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.report-name {
+    flex-shrink: 0;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.report-projects {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.report-headline {
+    font-size: var(--fs-16);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.row-end {
+    align-self: center;
+}
+
+@media (max-width: 860px) {
+    .list-toolbar {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .list-toolbar .input {
+        min-height: var(--control-h-lg);
+    }
+
+    .group-head {
+        top: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
+    }
+
+    .row-end .row-chevron {
+        display: none;
+    }
+
+    .row-icon-btn {
+        width: var(--control-h-sm);
+        height: var(--control-h-sm);
+    }
+}

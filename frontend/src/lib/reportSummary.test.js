@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+    myRecentReports,
     overwriteNote,
     reportCountLabel,
     reportCounts,
@@ -8,6 +9,21 @@ import {
     reportSizeLabel,
     reportSummary,
 } from "./reportSummary.js";
+
+describe("myRecentReports", () => {
+    it("내 보고만 최신순으로, 프로젝트가 많으면 줄여서", () => {
+        const rows = [
+            { id: 1, member_id: 3, report_date: "2026-10-01", parsed_json: "{\"projects\":[{\"projectName\":\"MES\"}]}" },
+            { id: 2, member_id: 9, report_date: "2026-10-20", parsed_json: {} },
+            { id: 3, member_id: 3, report_date: "2026-10-15", parsed_json: { projects: [{ projectName: "A" }, { projectName: "B" }, { projectName: "C" }] } },
+            { id: 4, member_id: 3, report_date: "2026-10-09", parsed_json: "깨진" },
+        ];
+        assert.deepEqual(myRecentReports(rows, 3, 2), [
+            { id: 3, title: "A · B 외 1", date: "2026.10.15" },
+            { id: 4, title: "일일보고", date: "2026.10.9" },
+        ]);
+    });
+});
 
 const PARSED = {
     projects: [

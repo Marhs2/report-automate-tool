@@ -1,0 +1,381 @@
+.team-filter {
+    width: auto;
+    min-width: 8rem;
+}
+
+.grid-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    margin-bottom: var(--space-3);
+    font-size: var(--fs-13);
+}
+
+.grid-summary p {
+    margin: 0;
+}
+
+.summary-today {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    color: var(--danger-fg);
+    word-break: keep-all;
+}
+
+.summary-today.is-done {
+    color: var(--success-fg);
+}
+
+.summary-rate {
+    color: var(--text-muted);
+}
+
+.grid-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.name-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+}
+
+.name-search svg {
+    position: absolute;
+    left: 10px;
+    pointer-events: none;
+}
+
+.name-search .input {
+    width: 10rem;
+    height: var(--control-h);
+    padding-left: 30px;
+    font-size: var(--fs-13);
+}
+
+.grid-summary .btn.on {
+    border-color: var(--text-strong);
+    background: var(--accent-soft);
+}
+
+.grid-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+/* 표 안에서 스크롤해야 날짜 머리줄(위)과 이름 열(왼쪽)이 둘 다 고정된다. */
+.grid-scroll {
+    max-height: max(320px, calc(100dvh - 300px));
+    overflow: auto;
+}
+
+thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--surface);
+    box-shadow: inset 0 -1px 0 var(--border);
+}
+
+thead th.col-who {
+    z-index: 3;
+}
+
+.sub-grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-13);
+}
+
+.sub-grid th,
+.sub-grid td {
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+}
+
+.col-who {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    min-width: 5.5rem;
+    padding: 0 var(--space-3) !important;
+    background: var(--surface);
+    text-align: left !important;
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    white-space: nowrap;
+}
+
+thead .col-who,
+thead .col-day,
+thead .col-rate {
+    height: 48px;
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+}
+
+.col-day {
+    min-width: 36px;
+}
+
+.is-week .col-day {
+    min-width: 52px;
+}
+
+.day-week,
+.day-num {
+    display: block;
+    line-height: 1.3;
+}
+
+.day-num {
+    color: var(--text-strong);
+}
+
+thead .col-day.is-today {
+    background: var(--accent-soft);
+}
+
+thead .col-day.is-holiday .day-num {
+    color: var(--danger-fg);
+}
+
+.col-day.is-today {
+    background: var(--accent-soft);
+}
+
+.col-rate {
+    min-width: 3.5rem;
+    padding: 0 var(--space-3) !important;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.col-rate.has-missed {
+    color: var(--danger-fg);
+    font-weight: var(--fw-semibold);
+}
+
+.team-row th,
+.team-row td {
+    height: 36px;
+    background: var(--surface-soft);
+    font-size: var(--fs-12);
+}
+
+.team-row .col-who {
+    padding: 0 var(--space-2) !important;
+}
+
+.team-row .col-day.is-today {
+    background: var(--accent-soft);
+}
+
+.team-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 32px;
+    padding: 0 var(--space-1);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font: inherit;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.team-toggle:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.team-size {
+    font-weight: var(--fw-regular, 400);
+    color: var(--text-muted);
+}
+
+.team-meta {
+    padding: 0 var(--space-3) !important;
+    text-align: left !important;
+    color: var(--text-muted);
+}
+
+.team-count {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.team-count.is-done {
+    color: var(--success-fg);
+    font-weight: var(--fw-semibold);
+}
+
+.team-count.is-missed {
+    color: var(--danger-fg);
+    font-weight: var(--fw-semibold);
+}
+
+tbody tr:not(.team-row) {
+    height: 40px;
+}
+
+.cell-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font: inherit;
+    font-size: var(--fs-12);
+    color: var(--text-muted);
+}
+
+.is-done .cell-mark {
+    background: var(--success-bg);
+    color: var(--success-fg);
+    cursor: pointer;
+}
+
+.is-done .cell-mark:hover {
+    outline: 1px solid var(--success-fg);
+}
+
+.is-done .cell-mark:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.is-missed .cell-mark {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+}
+
+.is-off .cell-mark {
+    color: var(--danger-fg);
+}
+
+.grid-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--fs-12);
+    color: var(--text-muted);
+}
+
+.grid-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.legend-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    font-style: normal;
+    font-size: 11px;
+}
+
+.legend-mark.is-done {
+    background: var(--success-bg);
+    color: var(--success-fg);
+}
+
+.legend-mark.is-missed {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+}
+
+.legend-mark.is-text {
+    width: auto;
+    padding: 0 2px;
+    white-space: nowrap;
+}
+
+.legend-mark.is-off {
+    color: var(--danger-fg);
+}
+
+@media (max-width: 860px) {
+    .view-nav {
+        flex-wrap: wrap;
+    }
+
+    .team-filter {
+        flex: 1;
+        min-height: var(--control-h-lg);
+        font-size: var(--fs-16);
+    }
+
+    .grid-summary .btn {
+        min-height: var(--control-h-lg);
+    }
+
+    .grid-tools {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .name-search {
+        flex: 1;
+    }
+
+    .name-search .input {
+        width: 100%;
+        height: var(--control-h-lg);
+        font-size: var(--fs-16);
+    }
+
+    .grid-scroll {
+        max-height: max(300px, calc(100dvh - 380px));
+    }
+
+    tbody tr:not(.team-row) {
+        height: 44px;
+    }
+
+    .team-row th,
+    .team-row td {
+        height: 44px;
+    }
+
+    .is-week .col-day {
+        min-width: 40px;
+    }
+
+    .col-who {
+        min-width: 4.25rem;
+        padding: 0 var(--space-2) !important;
+    }
+
+    .col-rate {
+        min-width: 2.75rem;
+        padding: 0 var(--space-2) !important;
+    }
+
+    .cell-mark {
+        width: 32px;
+        height: 32px;
+    }
+}

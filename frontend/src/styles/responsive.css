@@ -198,7 +198,7 @@ html.is-overlay-open .main-body {
         font-family: inherit;
         cursor: pointer;
         text-decoration: none;
-        font-size: var(--fs-11);
+        font-size: var(--fs-12);
         font-weight: var(--fw-semibold);
         line-height: var(--lh-tight);
     }

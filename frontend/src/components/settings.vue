@@ -17,9 +17,6 @@ const accountName = ref("");
 const accountTeam = ref("");
 
 /** 탭마다 이 화면이 무엇을 바꾸는지 한 줄로 알려 준다. */
-const TAB_NOTES = {
-};
-
 const tab = computed(() => {
     const value = String(route.params.tab || "teams");
     return SETTINGS_TABS.some((item) => item.id === value) ? value : "teams";
@@ -68,68 +65,9 @@ const logout = async () => {
             <button type="button" class="btn account-logout" @click="logout">로그아웃</button>
         </section>
         <AppTabs :tabs="SETTINGS_TABS" :active="tab" />
-        <p class="section-note">{{ TAB_NOTES[tab] }}</p>
         <TeamSelect v-if="tab === 'teams'" embedded />
         <ProjectName v-else embedded />
     </div>
 </template>
 
-<style scoped>
-.account-card {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-}
-
-.account-avatar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--control-h-lg);
-    height: var(--control-h-lg);
-    flex-shrink: 0;
-    border-radius: var(--radius-pill);
-    background: var(--accent-soft);
-    color: var(--accent-hover);
-    font-size: var(--fs-16);
-    font-weight: var(--fw-bold);
-}
-
-.account-copy {
-    flex: 1;
-    min-width: 0;
-}
-
-.account-name,
-.account-team {
-    margin: 0;
-    word-break: keep-all;
-}
-
-.account-name {
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.account-team {
-    margin-top: var(--space-1);
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.account-logout {
-    flex-shrink: 0;
-    min-height: var(--control-h-lg);
-}
-
-@media (max-width: 860px) {
-    .account-card {
-        flex-wrap: wrap;
-    }
-
-    .account-logout {
-        width: 100%;
-    }
-}
-</style>
+<style scoped src="../styles/components/settings.css"></style>

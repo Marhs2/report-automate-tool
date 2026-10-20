@@ -9,7 +9,7 @@ defineProps({
     embedded: { type: Boolean, default: false },
 });
 
-const { getTeams, postTeams, getUsers } = useApi();
+const { getTeams, postTeams, getUsers, postTeamLeader } = useApi();
 const { alert: showAlert } = useDialog();
 
 const teams = ref([]);
@@ -22,9 +22,35 @@ const loadError = ref("");
 
 const teamLabel = (team) => team?.team_name || team?.name || "";
 
-const memberCountOf = (team) =>
-    members.value.filter((member) => String(member.team_id) === String(team.id))
-        .length;
+const membersOf = (team) =>
+    members.value.filter((member) => String(member.team_id) === String(team.id));
+const memberCountOf = (team) => membersOf(team).length;
+
+/** 다른 부서로 옮긴 사람은 팀장이 아니다(서버도 같은 기준). */
+const leaderValue = (team) =>
+    membersOf(team).some((member) => String(member.id) === String(team.leader_id))
+        ? String(team.leader_id)
+        : "";
+
+const leaderSaving = ref(null);
+const setLeader = async (team, value) => {
+    const memberId = value ? Number(value) : null;
+    leaderSaving.value = team.id;
+    try {
+        await postTeamLeader(team.id, memberId);
+        teams.value = teams.value.map((row) =>
+            row.id === team.id ? { ...row, leader_id: memberId } : row,
+        );
+    } catch (error) {
+        const detail = error?.response?.data?.detail;
+        showAlert(
+            typeof detail === "string" && detail.trim() ? detail : "팀장을 바꾸지 못했습니다.",
+        );
+        teams.value = await getTeams().catch(() => teams.value);
+    } finally {
+        leaderSaving.value = null;
+    }
+};
 
 const filteredTeams = computed(() => {
     const q = query.value.trim().toLowerCase();
@@ -111,6 +137,18 @@ onMounted(async () => {
                 }}</span>
                 <span class="select-card-name">{{ teamLabel(team) }}</span>
                 <span class="select-card-meta">{{ memberCountOf(team) }}명</span>
+                <select
+                    class="input team-leader"
+                    :value="leaderValue(team)"
+                    :disabled="leaderSaving === team.id || !memberCountOf(team)"
+                    :aria-label="`${teamLabel(team)} 팀장`"
+                    @change="setLeader(team, $event.target.value)"
+                >
+                    <option value="">팀장 없음</option>
+                    <option v-for="member in membersOf(team)" :key="member.id" :value="String(member.id)">
+                        팀장 · {{ member.name }}
+                    </option>
+                </select>
             </div>
         </div>
 
@@ -138,109 +176,4 @@ onMounted(async () => {
     </div>
 </template>
 
-<style scoped>
-.settings-pane {
-    min-width: 0;
-}
-
-.team-toolbar {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-}
-
-.team-toolbar .input {
-    flex: 1;
-    min-width: 0;
-}
-
-.team-count {
-    flex-shrink: 0;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.add-card {
-    margin-top: var(--space-5);
-}
-
-.add-card h2 {
-    margin: 0 0 var(--space-3);
-}
-
-.team-board {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: var(--space-3);
-    margin-bottom: var(--space-5);
-}
-
-.team-board .select-card {
-    min-height: calc(var(--control-h-lg) + var(--space-5));
-    cursor: default;
-}
-
-.team-board .select-card-name {
-    flex: 1;
-    min-width: 0;
-}
-
-.team-board .select-card-meta {
-    flex-shrink: 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.add-row {
-    display: flex;
-    gap: var(--space-2);
-    align-items: center;
-}
-
-.add-row .input {
-    flex: 1;
-    min-width: 0;
-    height: var(--control-h-lg);
-    font-size: var(--fs-14);
-}
-
-.add-row .btn {
-    flex-shrink: 0;
-    min-height: var(--control-h-lg);
-}
-
-@media (max-width: 860px) {
-    .team-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .team-toolbar .input {
-        height: var(--control-h-lg);
-        font-size: var(--fs-16);
-    }
-
-    .team-board {
-        grid-template-columns: 1fr;
-    }
-
-    .team-board .select-card {
-        min-height: calc(var(--control-h-lg) + var(--space-3));
-    }
-
-    .add-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .add-row .input,
-    .add-row .btn {
-        width: 100%;
-        height: var(--control-h-lg);
-        min-height: var(--control-h-lg);
-        font-size: var(--fs-16);
-    }
-}
-</style>
+<style scoped src="../styles/components/admin-teams.css"></style>

@@ -3,7 +3,7 @@
 export const PASTE_TEMPLATES = [
     {
         id: "basic",
-        label: "기본 5칸",
+        label: "완료 · 진행 · 요청 · 이슈 · 내일",
         hint: "완료 · 진행 · 요청 · 이슈 · 내일",
         body: `
 프로젝트 명:

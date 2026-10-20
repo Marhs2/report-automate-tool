@@ -1,0 +1,379 @@
+/* ---- 카드 세 개(만들기 · 만든 보고서 · 취합)가 같은 틀 -------------------- */
+.wk-card {
+    min-width: 0;
+    padding: var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.wk-head,
+.wk-collect :deep(.group-head) {
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 0;
+}
+
+.wk-head h2 {
+    flex-shrink: 0;
+}
+
+.wk-period {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-right: auto;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.wk-head-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* 넓은 화면: 만들기 | 만든 보고서, 취합은 아래 전체 폭. */
+@media (min-width: 1200px) {
+    .page.weekly-report-page {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        grid-template-areas:
+            "create made"
+            "collect collect";
+        align-items: start;
+    }
+
+    .wk-create {
+        grid-area: create;
+    }
+
+    .wk-made {
+        grid-area: made;
+    }
+
+    .wk-collect {
+        grid-area: collect;
+    }
+}
+
+/* ---- 초안 만들기 ---------------------------------------------------- */
+.wk-create {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.wk-hint {
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.day-chip:focus-visible,
+.week-fold-head:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.range-toggle {
+    height: var(--control-h);
+}
+
+/* 기간 입력: '기간 지정'을 누르면 두 날짜 필드가 나온다. */
+.week-range {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 200px));
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
+}
+
+.week-range label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.week-range span {
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.week-range .input {
+    min-width: 0;
+    height: var(--control-h);
+    background: var(--surface);
+}
+
+/* 주 단위 묶음. 데스크톱은 간격만, 좁은 화면(접힘)은 헤어라인으로 나눈다. */
+.week-folds {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.week-fold-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: var(--control-h-touch);
+    margin: 0;
+    padding: var(--space-2) 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-strong);
+    font: inherit;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    text-align: left;
+    word-break: keep-all;
+    cursor: pointer;
+}
+
+.week-fold-meta {
+    margin-left: auto;
+    font-size: var(--fs-13);
+    font-weight: normal;
+    color: var(--text-muted);
+}
+
+.week-fold-head svg {
+    flex: none;
+    color: var(--text-muted);
+    transition: transform var(--dur-fast) var(--ease);
+}
+
+.week-fold-head svg.is-open {
+    transform: rotate(180deg);
+}
+
+.week-fold-head + .day-chips {
+    margin-bottom: var(--space-3);
+}
+
+/* 날짜 칸: 하나씩 떨어진 칸. 고른 날은 파란 테두리 + 체크, 못 고르는 날은 회색 면. */
+.day-chips {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-2);
+}
+
+.day-chip {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    line-height: var(--lh-tight);
+    text-align: left;
+    word-break: keep-all;
+    cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease);
+}
+
+.day-chip.on::after {
+    content: "";
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    width: 18px;
+    height: 18px;
+    border-radius: var(--radius-xs);
+    background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center / 13px no-repeat;
+}
+
+.day-chip:not(:disabled):not(.on):hover {
+    border-color: var(--border-strong);
+    background: var(--surface-soft);
+}
+
+.day-chip.on {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    background: var(--accent-soft);
+}
+
+.day-chip-name {
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.day-chip-date {
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.day-chip-state {
+    margin-top: var(--space-1);
+}
+
+.cat-tag.is-muted {
+    background: transparent;
+    color: var(--text-muted);
+    padding: 0;
+}
+
+/* 일일보고가 없는 날은 고를 수 없다. 옅은 면으로 눕혀 둔다. */
+.day-chip.is-blank {
+    border-color: transparent;
+    background: var(--surface-soft);
+    cursor: not-allowed;
+}
+
+.day-chip.is-blank .day-chip-date {
+    color: var(--text-muted);
+}
+
+/* 아직 오지 않은 날. 켤 수는 있지만 끝난 날처럼 보이지 않게 흐리게 둔다. */
+.day-chip.is-future:not(.on) .day-chip-date {
+    color: var(--text-muted);
+}
+
+.wk-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.create-summary {
+    flex: 1;
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.create-week-btn {
+    flex-shrink: 0;
+    height: var(--control-h-lg);
+    padding: 0 var(--space-5);
+}
+
+/* ---- 만든 보고서 ---------------------------------------------------- */
+.made-icon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+.made-actions .btn-small {
+    height: 28px;
+    gap: 4px;
+}
+
+@media (max-width: 860px) {
+    .range-toggle {
+        height: var(--control-h-touch);
+    }
+
+    .week-range {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-2);
+        padding: var(--space-3);
+    }
+
+    .week-range .input {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        height: var(--control-h-touch);
+        font-size: var(--fs-16);
+        overflow: hidden;
+    }
+
+    .week-folds {
+        gap: 0;
+    }
+
+    .week-fold + .week-fold {
+        border-top: 1px solid var(--border);
+    }
+
+    .day-chips {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-1);
+    }
+
+    .day-chip {
+        flex-direction: row;
+        align-items: center;
+        gap: var(--space-3);
+        min-height: var(--control-h-touch);
+        padding: var(--space-2) var(--space-3);
+    }
+
+    .day-chip.on::after {
+        position: static;
+        order: 3;
+        flex-shrink: 0;
+    }
+
+    .day-chip-name {
+        width: 2.5em;
+    }
+
+    .day-chip-date {
+        font-size: var(--fs-16);
+    }
+
+    .day-chip-state {
+        margin: 0 0 0 auto;
+    }
+
+    .create-summary {
+        flex-basis: 100%;
+    }
+
+    .create-week-btn {
+        width: 100%;
+        min-height: var(--control-h-touch);
+    }
+
+    .wk-card {
+        padding: var(--space-4);
+    }
+
+    .made-actions .btn-small {
+        height: var(--control-h);
+    }
+}
+
+/* 폰과 PC 옆 칸(340px)에서는 행 버튼을 이름 아래 한 줄로 내린다. */
+@media (max-width: 860px), (min-width: 1200px) {
+    .made-row {
+        flex-wrap: wrap;
+        row-gap: var(--space-2);
+    }
+
+    .made-row .row-chevron {
+        display: none;
+    }
+
+    .made-actions {
+        width: 100%;
+        padding-left: calc(18px + var(--space-3));
+    }
+
+    .made-actions .row-icon-btn {
+        margin-left: auto;
+        width: var(--control-h);
+        height: var(--control-h);
+    }
+}

@@ -128,41 +128,4 @@ onMounted(async () => {
     </div>
 </template>
 
-<style scoped>
-.settings-pane {
-    min-width: 0;
-}
-
-/* 카드 그리드(.select-grid/.select-card)는 components.css 전역 규칙을 쓴다. */
-.team-toolbar {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-}
-
-.team-toolbar .input {
-    flex: 1;
-    min-width: 0;
-}
-
-.team-count {
-    flex-shrink: 0;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.team-on {
-    color: var(--accent);
-    font-weight: var(--fw-semibold);
-}
-
-.team-note {
-    margin: var(--space-3) 0 var(--space-5);
-    font-size: var(--fs-12);
-    color: var(--text);
-    word-break: keep-all;
-}
-
-</style>
+<style scoped src="../styles/components/team-select.css"></style>

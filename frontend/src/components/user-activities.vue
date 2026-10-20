@@ -1,1048 +1,385 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ChevronLeft, ChevronRight } from "lucide-vue-next";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
-import { AGENDA_NAME_LIMIT, dayCounts, previewPeople } from "../lib/dayStatus";
+import { isAdmin, leaderTeamId } from "../composables/useSession";
+import {
+    buildRows,
+    dayHeader,
+    periodDays,
+    periodLabel,
+    shiftAnchor,
+    todayIso,
+} from "../lib/submissionGrid";
 
 const router = useRouter();
 const { alert: showAlert } = useDialog();
-const { getUserActivities, getReports, getHolidays, getTeams, getUsers } = useApi();
-/** 관리자 계정 id. 보고를 안 쓰는 관리자는 미제출로 세지 않는다. */
-const adminIds = ref(new Set());
+const { getUserActivities, getHolidays, getTeams, getUsers } = useApi();
 
-const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+const MODES = [
+    { id: "week", label: "주", current: "이번 주" },
+    { id: "month", label: "월", current: "이번 달" },
+];
 
-const userActivities = ref([]);
-const holidayNames = ref({});
+const today = todayIso();
+/** 이보다 많으면 처음에 부서를 접고 이름 검색을 둔다. */
+const MANY_PEOPLE = 12;
+const TODAY_NAME_LIMIT = 6;
+const mode = ref("week");
+const anchor = ref(today);
+// 팀장은 자기 부서부터 본다. 다른 부서도 고를 수 있다.
+const filterTeam = ref(!isAdmin.value && leaderTeamId.value ? String(leaderTeamId.value) : "all");
+const missedFirst = ref(false);
+const query = ref("");
+const onlyMissed = ref(false);
+const collapsed = ref(new Set());
+let collapseReady = false;
 
-const currentDate = new Date();
-const selectedYear = ref(currentDate.getFullYear());
-const selectedMonth = ref(currentDate.getMonth() + 1);
-const selectedDate = ref("");
-
+const activities = ref([]);
+const holidays = ref({});
 const teams = ref([]);
-const filterTeam = ref("all");
-const nameQuery = ref("");
-const expandedGroups = ref({});
+const adminIds = ref(new Set());
+const isLoading = ref(false);
+const loadError = ref("");
 
-const parseDate = (dateStr) => new Date(`${dateStr}T00:00:00`);
+const days = computed(() => periodDays(mode.value, anchor.value));
+const headers = computed(() => days.value.map((date) => dayHeader(date, holidays.value)));
+const label = computed(() => periodLabel(mode.value, days.value));
+const isCurrent = computed(() => days.value.includes(today) || periodLabel(mode.value, periodDays(mode.value, today)) === label.value);
+const currentLabel = computed(() => MODES.find((item) => item.id === mode.value)?.current || "");
 
-const formatDate = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-};
-
-const startOfToday = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
-};
-
-const fetchTeams = async () => {
-    try {
-        const users = await getUsers().catch(() => []);
-        adminIds.value = new Set(
-            (users || []).filter((user) => user.is_admin).map((user) => String(user.id)),
-        );
-        teams.value = await getTeams();
-    } catch (error) {
-        console.error("Error fetching teams:", error);
-        showAlert("팀을 불러오지 못했습니다.");
-    }
-};
-
-
-function metaFor(dateStr) {
-    const date = parseDate(dateStr);
-    const weekDay = date.getDay();
-    const today = startOfToday();
-    const holidayName = holidayNames.value[dateStr] || "";
-    const isWeekend = weekDay === 0 || weekDay === 6;
-    const isHoliday = Boolean(holidayName);
-    return {
-        date: dateStr,
-        day: date.getDate(),
-        weekday: weekDay,
-        weekLabel: WEEKDAY_LABELS[weekDay],
-        holidayName,
-        isWeekend,
-        isHoliday,
-        isOffday: isWeekend || isHoliday,
-        isToday: date.getTime() === today.getTime(),
-        isFuture: date.getTime() > today.getTime(),
-    };
-}
-
-const formatDotDate = (dateStr) => {
-    const [year, month, day] = String(dateStr).split("-");
-    if (!year || !month || !day) return dateStr;
-    return `${year}.${month}.${day}`;
-};
-
-const canOpenCell = (item) => Boolean(item?.count > 0);
-
-const openCell = async (activity, item) => {
-    if (!canOpenCell(item)) return;
-    let reportId = item.report_id;
-    if (!reportId) {
-        try {
-            const reports = await getReports();
-            const found = (reports || []).find(
-                (report) =>
-                    String(report.member_id) === String(activity.member_id) &&
-                    report.report_date === item.report_date,
-            );
-            reportId = found?.id;
-        } catch (error) {
-            console.error("보고서 찾기 실패:", error);
-        }
-    }
-    if (!reportId) return;
-    // 어디서 왔는지 남긴다. 달력에서 열었으면 크럼도 "사용자 활동"이어야 한다.
-    router.push({
-        name: "report-result",
-        params: { id: reportId },
-        query: { from: "activities" },
-    });
-};
-
-async function fetchHolidaysForView() {
-    const map = {};
-    const rows = await getHolidays(selectedYear.value);
-    for (const row of rows || []) {
-        if (row?.date) map[row.date] = row.name;
-    }
-    holidayNames.value = map;
-}
-
-async function fetchUserActivities() {
-    await fetchHolidaysForView();
-    userActivities.value = await getUserActivities(
-        selectedYear.value,
-        selectedMonth.value,
-    );
-    selectDefaultDay();
-}
-
-function selectDefaultDay() {
-    const today = formatDate(startOfToday());
-    const { start, end } = rangeBounds.value;
-    const todayTime = parseDate(today).getTime();
-    const todayInView =
-        todayTime >= start.getTime() && todayTime <= end.getTime();
-    const fallback = todayInView ? today : formatDate(start);
-    if (!selectedDate.value) {
-        selectedDate.value = fallback;
-        return;
-    }
-    const selectedTime = parseDate(selectedDate.value).getTime();
-    if (selectedTime < start.getTime() || selectedTime > end.getTime()) {
-        selectedDate.value = fallback;
-    }
-}
-
-const isThisMonth = computed(
-    () =>
-        selectedYear.value === currentDate.getFullYear() &&
-        selectedMonth.value === currentDate.getMonth() + 1,
+const teamNames = computed(() =>
+    Object.fromEntries(teams.value.map((team) => [String(team.id), team.team_name])),
 );
 
-function prevMonth() {
-    closeAgenda();
-    if (selectedMonth.value === 1) {
-        selectedMonth.value = 12;
-        selectedYear.value--;
-    } else {
-        selectedMonth.value--;
-    }
-    fetchUserActivities();
-}
-
-function nextMonth() {
-    closeAgenda();
-    if (selectedMonth.value === 12) {
-        selectedMonth.value = 1;
-        selectedYear.value++;
-    } else {
-        selectedMonth.value++;
-    }
-    fetchUserActivities();
-}
-
-function goThisMonth() {
-    closeAgenda();
-    selectedYear.value = currentDate.getFullYear();
-    selectedMonth.value = currentDate.getMonth() + 1;
-    fetchUserActivities();
-}
-
-const isNarrow = ref(
-    typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches,
+const baseOptions = computed(() => ({
+    today,
+    holidays: holidays.value,
+    adminIds: adminIds.value,
+    teamNames: teamNames.value,
+    teamFilter: filterTeam.value,
+    missedFirst: missedFirst.value,
+}));
+/** 검색 · 미제출만과 상관없는 전체. 요약 줄과 인원 수는 이것으로 센다. */
+const allRows = computed(() => buildRows(activities.value, days.value, baseOptions.value));
+const rows = computed(() =>
+    buildRows(activities.value, days.value, {
+        ...baseOptions.value,
+        query: query.value,
+        onlyMissed: onlyMissed.value,
+    }),
 );
-const agendaOpen = ref(false);
-let narrowQuery = null;
+const peopleCount = computed(() => allRows.value.reduce((sum, team) => sum + team.members.length, 0));
+const isMany = computed(() => peopleCount.value > MANY_PEOPLE);
 
-const syncNarrow = () => {
-    isNarrow.value = Boolean(narrowQuery?.matches);
-    if (!isNarrow.value) closeAgenda();
+const teamKey = (team) => String(team.teamId ?? "none");
+/** 검색하거나 미제출만 볼 때는 찾은 사람이 숨지 않게 모두 펼친다. */
+const isCollapsed = (team) =>
+    !query.value.trim() && !onlyMissed.value && collapsed.value.has(teamKey(team));
+const toggleTeam = (team) => {
+    const next = new Set(collapsed.value);
+    const key = teamKey(team);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    collapsed.value = next;
+};
+/** 처음 한 번만: 사람이 많으면 부서를 접는다. 팀장은 자기 부서를 펼친 채로 본다. */
+const initCollapse = () => {
+    if (collapseReady || !activities.value.length || !teams.value.length) return;
+    collapseReady = true;
+    if (!isMany.value) return;
+    const own = leaderTeamId.value != null ? String(leaderTeamId.value) : "";
+    collapsed.value = new Set(allRows.value.map(teamKey).filter((key) => key !== own));
 };
 
-const openAgenda = () => {
-    agendaOpen.value = true;
-    document.documentElement.classList.add("is-overlay-open");
+const dayCountText = (count) => {
+    if (count.off && !count.done) return "휴";
+    if (count.future && !count.done) return "·";
+    return `${count.done}/${count.total}`;
+};
+const dayCountTone = (count) => {
+    if (count.missed) return "is-missed";
+    if (count.total && count.done === count.total) return "is-done";
+    return "";
 };
 
-const closeAgenda = () => {
-    agendaOpen.value = false;
-    document.documentElement.classList.remove("is-overlay-open");
-};
-
-const onAgendaKey = (event) => {
-    if (event.key === "Escape") closeAgenda();
-};
-
-watch(agendaOpen, (open) => {
-    if (open) window.addEventListener("keydown", onAgendaKey);
-    else window.removeEventListener("keydown", onAgendaKey);
+const totals = computed(() => {
+    const submitted = rows.value.reduce((sum, team) => sum + team.submitted, 0);
+    const due = rows.value.reduce((sum, team) => sum + team.due, 0);
+    return { submitted, due, pct: due ? Math.round((submitted / due) * 100) : 0 };
 });
+
+/** 오늘 아직 안 낸 사람. 오늘이 평일이고 보는 기간 안일 때만. */
+const todayMissing = computed(() => {
+    const index = days.value.indexOf(today);
+    if (index < 0 || holidays.value[today]) return [];
+    return allRows.value.flatMap((team) =>
+        team.members.filter((member) => member.cells[index].state !== "done").map((member) => member.name),
+    );
+});
+const todayMissingShown = computed(() => todayMissing.value.slice(0, TODAY_NAME_LIMIT));
+const todayMissingMore = computed(() => Math.max(0, todayMissing.value.length - TODAY_NAME_LIMIT));
+
+const load = async () => {
+    isLoading.value = true;
+    loadError.value = "";
+    try {
+        const start = days.value[0];
+        const end = days.value.at(-1);
+        const years = [...new Set([start.slice(0, 4), end.slice(0, 4)])];
+        const [rowsData, ...holidayLists] = await Promise.all([
+            getUserActivities(Number(start.slice(0, 4)), Number(start.slice(5, 7)), start, end),
+            ...years.map((year) => getHolidays(Number(year))),
+        ]);
+        activities.value = rowsData || [];
+        holidays.value = Object.fromEntries(
+            holidayLists.flat().filter((row) => row?.date).map((row) => [row.date, row.name]),
+        );
+        initCollapse();
+    } catch (error) {
+        console.error("사용자 활동 조회 실패:", error);
+        activities.value = [];
+        loadError.value = "제출 현황을 불러오지 못했습니다.";
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+const loadTeams = async () => {
+    try {
+        const [teamRows, users] = await Promise.all([getTeams(), getUsers().catch(() => [])]);
+        teams.value = teamRows || [];
+        adminIds.value = new Set((users || []).filter((user) => user.is_admin).map((user) => String(user.id)));
+        initCollapse();
+    } catch (error) {
+        console.error("부서 조회 실패:", error);
+        showAlert("부서를 불러오지 못했습니다.");
+    }
+};
+
+const setMode = (next) => {
+    if (mode.value === next) return;
+    mode.value = next;
+    load();
+};
+const shift = (step) => {
+    anchor.value = shiftAnchor(mode.value, anchor.value, step);
+    load();
+};
+const goCurrent = () => {
+    anchor.value = today;
+    load();
+};
+
+const openReport = (member, cell) => {
+    if (!cell.reportId) return;
+    router.push({ name: "report-result", params: { id: cell.reportId }, query: { from: "activities" } });
+};
+
+const cellTitle = (member, header, cell) => {
+    const when = `${header.weekLabel} ${header.day}일`;
+    if (cell.state === "done") return `${member.name} · ${when} 제출 (눌러서 보기)`;
+    if (cell.state === "missed") return `${member.name} · ${when} 미제출`;
+    if (cell.date === today) return `${member.name} · 오늘 아직 안 냄`;
+    if (cell.state === "off") return `${when} ${header.holidayName}`;
+    return `${member.name} · ${when} 예정`;
+};
 
 onMounted(() => {
-    narrowQuery = window.matchMedia("(max-width: 860px)");
-    syncNarrow();
-    narrowQuery.addEventListener("change", syncNarrow);
-    fetchUserActivities();
-    fetchTeams();
-});
-
-onUnmounted(() => {
-    narrowQuery?.removeEventListener("change", syncNarrow);
-    window.removeEventListener("keydown", onAgendaKey);
-    document.documentElement.classList.remove("is-overlay-open");
-});
-
-const orderedActivities = computed(() =>
-    userActivities.value
-        .filter(
-            (activity) =>
-                filterTeam.value === "all" ||
-                String(activity.team_id) === String(filterTeam.value),
-        )
-        .filter(
-            (activity) =>
-                !adminIds.value.has(String(activity.member_id)) ||
-                Number(activity.total_count) > 0,
-        )
-        .map((activity) => ({
-            ...activity,
-            activities: [...(activity.activities || [])].sort((left, right) =>
-                left.report_date.localeCompare(right.report_date),
-            ),
-        })),
-);
-
-const activityLookup = computed(() => {
-    const byMember = new Map();
-    for (const activity of orderedActivities.value) {
-        const byDate = new Map();
-        for (const item of activity.activities || []) {
-            byDate.set(item.report_date, item);
-        }
-        byMember.set(String(activity.member_id), byDate);
-    }
-    return byMember;
-});
-
-const members = computed(() =>
-    orderedActivities.value.map((activity) => ({
-        member_id: activity.member_id,
-        name: activity.name,
-    })),
-);
-
-const entriesForDate = (dateStr) =>
-    members.value.map((member) => {
-        const item =
-            activityLookup.value
-                .get(String(member.member_id))
-                ?.get(dateStr) || { report_date: dateStr, count: 0 };
-        return {
-            ...member,
-            item,
-            submitted: Boolean(item.count > 0),
-        };
-    });
-
-const visibleEntries = (cell) =>
-    cell.isOffday
-        ? cell.entries.filter((entry) => entry.submitted)
-        : cell.entries;
-
-/** 인원이 많으면 한 줄로 나열하기 어렵다. 먼저 챙겨야 하는 미제출을 위로 올린다. */
-const railGroups = (cell) => {
-    const entries = visibleEntries(cell);
-    const byName = (left, right) =>
-        String(left.name || "").localeCompare(String(right.name || ""), "ko");
-    const submitted = entries
-        .filter((entry) => entry.submitted)
-        .sort(byName);
-    const missed = entries.filter((entry) => !entry.submitted).sort(byName);
-    const groups = [];
-    if (missed.length) {
-        groups.push({ key: "missed", label: "미제출", people: missed });
-    }
-    if (submitted.length) {
-        groups.push({ key: "submitted", label: "제출", people: submitted });
-    }
-    return groups;
-};
-
-const rosterCount = (cell) => (cell ? visibleEntries(cell).length : 0);
-
-const expandKey = (cell, groupKey) => `${cell?.date || ""}:${groupKey}`;
-
-const expandGroup = (key) => {
-    const current = Number(expandedGroups.value[key]) || AGENDA_NAME_LIMIT;
-    expandedGroups.value = {
-        ...expandedGroups.value,
-        [key]: current + AGENDA_NAME_LIMIT,
-    };
-};
-
-/** 인원이 많으면 다섯 명씩 열고, 이름은 검색으로 찾는다. */
-const agendaGroups = (cell) =>
-    railGroups(cell)
-        .map((group) => {
-            const key = expandKey(cell, group.key);
-            const preview = previewPeople(group.people, {
-                query: nameQuery.value,
-                visible: expandedGroups.value[key] || AGENDA_NAME_LIMIT,
-                limit: AGENDA_NAME_LIMIT,
-            });
-            return {
-                ...group,
-                expandKey: key,
-                people: preview.matched,
-                shown: preview.shown,
-                hidden: preview.hidden,
-                next: preview.next,
-            };
-        })
-        .filter((group) => group.people.length);
-
-watch(selectedDate, () => {
-    nameQuery.value = "";
-    expandedGroups.value = {};
-});
-
-const showNameSearch = (cell) => rosterCount(cell) > 8;
-
-const personTitle = (entry) => {
-    const progress = progressByMember.value[String(entry.member_id)];
-    if (!progress?.total) return entry.name;
-    return `${entry.name} · 이번 달 ${progress.submitted}/${progress.total}`;
-};
-
-const countsOf = (cell) => dayCounts(cell.entries || [], cell.isOffday);
-
-/** 칸에는 숫자만 둔다. 이름은 날짜를 열었을 때 목록으로 본다. */
-const dayStatusLabel = (cell) => {
-    const { submitted, total } = ratioOf(cell);
-    if (cell.isOffday) {
-        if (cell.holidayName && submitted) return `${cell.holidayName} ${submitted}`;
-        if (cell.holidayName) return cell.holidayName;
-        if (submitted) return `휴일 ${submitted}`;
-        return "휴일";
-    }
-    if (cell.isFuture) return "예정";
-    if (!total) return "";
-    if (submitted === 0) return "제출 없음";
-    if (submitted === total) return "전원 제출";
-    return `${submitted}/${total}`;
-};
-
-/** 셀에 이름을 나열하는 대신 제출률만 막대로 보여준다. */
-const ratioOf = (cell) => {
-    const { submitted, missed } = countsOf(cell);
-    const total = submitted + missed;
-    return {
-        submitted,
-        total,
-        pct: total ? Math.round((submitted / total) * 100) : 0,
-    };
-};
-
-const dotKind = (cell) => {
-    if (cell.outside) return "";
-    const { submitted, total } = ratioOf(cell);
-    if (!submitted) return "";
-    if (!cell.isOffday && !cell.isFuture && total && submitted === total) return "full";
-    return "partial";
-};
-
-const selectDay = (cell) => {
-    if (cell.outside) {
-        const date = parseDate(cell.date);
-        selectedYear.value = date.getFullYear();
-        selectedMonth.value = date.getMonth() + 1;
-        selectedDate.value = cell.date;
-        fetchUserActivities();
-    } else {
-        selectedDate.value = cell.date;
-    }
-    if (isNarrow.value) openAgenda();
-};
-
-const agendaTitle = (cell) => {
-    const [, month, day] = String(cell.date).split("-");
-    const longWeek = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
-    return `${Number(month)}월 ${Number(day)}일 ${longWeek[cell.weekday] || ""}`;
-};
-
-const rangeBounds = computed(() => {
-    return {
-        start: new Date(selectedYear.value, selectedMonth.value - 1, 1),
-        end: new Date(selectedYear.value, selectedMonth.value, 0),
-    };
-});
-
-const calendarWeeks = computed(() => {
-    const { start, end } = rangeBounds.value;
-    const gridStart = new Date(start);
-    gridStart.setDate(gridStart.getDate() - gridStart.getDay());
-    const gridEnd = new Date(end);
-    gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()));
-
-    const weeks = [];
-    const cursor = new Date(gridStart);
-    while (cursor.getTime() <= gridEnd.getTime()) {
-        const week = [];
-        for (let i = 0; i < 7; i++) {
-            const dateStr = formatDate(cursor);
-            const inRange =
-                cursor.getTime() >= start.getTime() &&
-                cursor.getTime() <= end.getTime();
-            week.push({
-                ...metaFor(dateStr),
-                outside: !inRange,
-                entries: inRange ? entriesForDate(dateStr) : [],
-            });
-            cursor.setDate(cursor.getDate() + 1);
-        }
-        weeks.push(week);
-    }
-    return weeks;
-});
-
-const inRangeDays = computed(() =>
-    calendarWeeks.value.flat().filter((cell) => !cell.outside),
-);
-
-const selectedCell = computed(
-    () =>
-        inRangeDays.value.find((cell) => cell.date === selectedDate.value) ||
-        null,
-);
-
-const weekdayCount = computed(
-    () => inRangeDays.value.filter((cell) => !cell.isOffday).length,
-);
-
-const progressOf = (activity) => {
-    const submitted = (activity.activities || []).filter(
-        (item) => item.count > 0,
-    ).length;
-    const total = weekdayCount.value || (activity.activities || []).length;
-    return {
-        submitted,
-        total,
-        pct: total ? Math.round((submitted / total) * 100) : 0,
-    };
-};
-
-const calendarCells = computed(() => calendarWeeks.value.flat());
-
-const progressByMember = computed(() => {
-    const map = {};
-    for (const activity of orderedActivities.value) {
-        map[String(activity.member_id)] = progressOf(activity);
-    }
-    return map;
+    loadTeams();
+    load();
 });
 </script>
 
 <template>
     <div class="page">
-        <!-- 주간 보고서와 같은 머리: 왼쪽은 보는 달, 오른쪽은 팀 고르기와 달 이동. -->
         <header class="view-head">
             <div class="view-head-text">
                 <p class="view-period">
-                    {{ selectedYear }}년 {{ selectedMonth }}월
-                    <span v-if="isThisMonth" class="cat-tag is-progress">이번 달</span>
+                    {{ label }}
+                    <span v-if="isCurrent" class="cat-tag is-progress">{{ currentLabel }}</span>
                 </p>
             </div>
             <div class="view-nav">
-                <select
-                    id="activity-filter-team"
-                    class="input team-filter"
-                    v-model="filterTeam"
-                    aria-label="팀"
-                    autocomplete="off"
-                >
-                    <option value="all">전체 팀</option>
+                <div class="seg" role="tablist" aria-label="보는 기간">
+                    <button
+                        v-for="item in MODES"
+                        :key="item.id"
+                        type="button"
+                        role="tab"
+                        :aria-selected="mode === item.id"
+                        :class="{ 'is-on': mode === item.id }"
+                        @click="setMode(item.id)"
+                    >
+                        {{ item.label }}
+                    </button>
+                </div>
+                <select v-model="filterTeam" class="input team-filter" aria-label="부서">
+                    <option value="all">전체 부서</option>
                     <option v-for="team in teams" :key="team.id" :value="String(team.id)">
                         {{ team.team_name }}
                     </option>
                 </select>
-                <div class="stepper" role="group" aria-label="달 이동">
-                    <button type="button" aria-label="이전 달" @click="prevMonth">
+                <div class="stepper" role="group" aria-label="기간 이동">
+                    <button type="button" :aria-label="mode === 'week' ? '이전 주' : '이전 달'" @click="shift(-1)">
                         <ChevronLeft :size="16" />
                     </button>
-                    <button type="button" class="stepper-reset" :disabled="isThisMonth" @click="goThisMonth">
-                        이번 달
+                    <button type="button" class="stepper-reset" :disabled="isCurrent" @click="goCurrent">
+                        {{ currentLabel }}
                     </button>
-                    <button type="button" aria-label="다음 달" @click="nextMonth">
+                    <button type="button" :aria-label="mode === 'week' ? '다음 주' : '다음 달'" @click="shift(1)">
                         <ChevronRight :size="16" />
                     </button>
                 </div>
             </div>
         </header>
 
-        <div v-if="orderedActivities.length === 0" class="empty-state">
-            표시할 활동 기록이 없습니다
-        </div>
-
-        <div v-else class="activity-board">
-            <section class="card month-card" aria-label="달력">
-                <div class="weekdays">
-                    <span
-                        v-for="(label, index) in WEEKDAY_LABELS"
-                        :key="label"
-                        :class="{ sun: index === 0, sat: index === 6 }"
-                    >
-                        {{ label }}
-                    </span>
-                </div>
-                <div class="month-grid">
-                    <button
-                        v-for="cell in calendarCells"
-                        :key="cell.date"
-                        type="button"
-                        class="day-cell"
-                        :aria-pressed="selectedDate === cell.date"
-                        :aria-label="`${formatDotDate(cell.date)} ${dayStatusLabel(cell)}`"
-                        @click="selectDay(cell)"
-                    >
-                        <span
-                            class="day-num"
-                            :class="{
-                                sun: cell.weekday === 0,
-                                sat: cell.weekday === 6,
-                                holiday: cell.isHoliday,
-                                outside: cell.outside,
-                                today: cell.isToday && !cell.outside,
-                                selected: selectedDate === cell.date,
-                            }"
-                        >
-                            {{ cell.day }}
-                        </span>
-                        <span class="day-dot" :class="dotKind(cell) || 'is-empty'"></span>
-                    </button>
-                </div>
-                <p class="dot-legend">
-                    <span><i class="day-dot full" aria-hidden="true"></i>전원 제출</span>
-                    <span><i class="day-dot partial" aria-hidden="true"></i>일부 제출</span>
-                    <span>날짜를 누르면 누가 냈는지 보여요</span>
-                </p>
-            </section>
-
-            <section v-if="selectedCell && !isNarrow" class="card agenda" :aria-label="agendaTitle(selectedCell)">
-                <div class="section-head">
-                    <h2 class="section-title">{{ agendaTitle(selectedCell) }}</h2>
-                </div>
-                <p v-if="selectedCell.holidayName" class="agenda-holiday">{{ selectedCell.holidayName }}</p>
-                <p class="agenda-meta">
-                    제출 {{ countsOf(selectedCell).submitted }}
-                    <template v-if="!selectedCell.isOffday">
-                        · 미제출 {{ countsOf(selectedCell).missed }}
-                    </template>
-                </p>
-                <div
-                    v-if="!selectedCell.isOffday && (countsOf(selectedCell).submitted + countsOf(selectedCell).missed)"
-                    class="agenda-bar"
-                    role="img"
-                    :aria-label="`제출 ${countsOf(selectedCell).submitted}명, 미제출 ${countsOf(selectedCell).missed}명`"
-                >
-                    <span class="is-saved" :style="{ flexGrow: countsOf(selectedCell).submitted }"></span>
-                    <span class="is-missing" :style="{ flexGrow: countsOf(selectedCell).missed }"></span>
-                </div>
-
-                <label v-if="showNameSearch(selectedCell)" class="agenda-search">
-                    <input
-                        v-model="nameQuery"
-                        class="input"
-                        type="search"
-                        placeholder="이름 검색"
-                        aria-label="이름 검색"
-                        autocomplete="off"
-                    />
+        <div class="grid-summary">
+            <p v-if="todayMissing.length" class="summary-today" :title="todayMissing.join(', ')">
+                <strong>오늘 아직 안 냄 {{ todayMissing.length }}명</strong>
+                <span>
+                    {{ todayMissingShown.join(", ") }}<template v-if="todayMissingMore"> 외 {{ todayMissingMore }}명</template>
+                </span>
+            </p>
+            <p v-else-if="days.includes(today)" class="summary-today is-done">
+                <strong>오늘 모두 제출했어요</strong>
+            </p>
+            <p class="summary-rate">
+                제출 {{ totals.submitted }}/{{ totals.due }}<template v-if="totals.due"> · {{ totals.pct }}%</template>
+            </p>
+            <div class="grid-tools">
+                <label v-if="isMany" class="name-search">
+                    <Search :size="14" aria-hidden="true" />
+                    <input v-model="query" class="input" type="search" placeholder="이름 찾기" aria-label="이름 찾기" />
                 </label>
-
-                <div
-                    v-for="group in agendaGroups(selectedCell)"
-                    :key="group.expandKey"
-                    class="agenda-group"
+                <button
+                    type="button"
+                    class="btn btn-small"
+                    :class="{ on: onlyMissed }"
+                    :aria-pressed="onlyMissed"
+                    @click="onlyMissed = !onlyMissed"
                 >
-                    <h3>
-                        <span class="state-chip" :class="group.key === 'missed' ? 'is-danger' : 'is-success'">
-                            {{ group.label }} {{ group.people.length }}
-                        </span>
-                    </h3>
-                    <div class="agenda-chips">
-                        <button
-                            v-for="entry in group.shown.filter((person) => person.submitted)"
-                            :key="entry.member_id"
-                            type="button"
-                            class="person-chip"
-                            :title="personTitle(entry)"
-                            @click="openCell({ member_id: entry.member_id, name: entry.name }, entry.item)"
-                        >
-                            {{ entry.name }}
-                        </button>
-                        <span
-                            v-for="entry in group.shown.filter((person) => !person.submitted)"
-                            :key="entry.member_id"
-                            class="person-chip is-missed"
-                            :title="personTitle(entry)"
-                        >
-                            {{ entry.name }}
-                        </span>
-                    </div>
-                    <button
-                        v-if="group.hidden"
-                        type="button"
-                        class="more-people"
-                        @click="expandGroup(group.expandKey)"
-                    >
-                        {{ group.next }}명 더 보기
-                    </button>
-                </div>
-                <p v-if="!railGroups(selectedCell).length" class="agenda-empty">
-                    이 날 제출한 보고가 없습니다
-                </p>
-                <p
-                    v-else-if="nameQuery.trim() && !agendaGroups(selectedCell).length"
-                    class="agenda-empty"
+                    빠진 날 있는 사람만
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-small"
+                    :class="{ on: missedFirst }"
+                    :aria-pressed="missedFirst"
+                    @click="missedFirst = !missedFirst"
                 >
-                    해당하는 사람이 없습니다
-                </p>
-            </section>
-        <Teleport to="body">
-            <div
-                v-if="isNarrow && agendaOpen && selectedCell"
-                class="app-dialog-overlay"
-                @click.self="closeAgenda"
-            >
-                <div
-                    class="card app-dialog agenda agenda-sheet"
-                    role="dialog"
-                    aria-modal="true"
-                    :aria-label="agendaTitle(selectedCell)"
-                >
-                    <div class="section-head">
-                        <h2 class="section-title">{{ agendaTitle(selectedCell) }}</h2>
-                    </div>
-                    <p v-if="selectedCell.holidayName" class="agenda-holiday">{{ selectedCell.holidayName }}</p>
-                    <p class="agenda-meta">
-                        제출 {{ countsOf(selectedCell).submitted }}
-                        <template v-if="!selectedCell.isOffday">
-                            · 미제출 {{ countsOf(selectedCell).missed }}
-                        </template>
-                    </p>
-                    <div
-                        v-if="!selectedCell.isOffday && (countsOf(selectedCell).submitted + countsOf(selectedCell).missed)"
-                        class="agenda-bar"
-                        role="img"
-                        :aria-label="`제출 ${countsOf(selectedCell).submitted}명, 미제출 ${countsOf(selectedCell).missed}명`"
-                    >
-                        <span class="is-saved" :style="{ flexGrow: countsOf(selectedCell).submitted }"></span>
-                        <span class="is-missing" :style="{ flexGrow: countsOf(selectedCell).missed }"></span>
-                    </div>
-                    <label v-if="showNameSearch(selectedCell)" class="agenda-search">
-                        <input
-                            v-model="nameQuery"
-                            class="input"
-                            type="search"
-                            placeholder="이름 검색"
-                            aria-label="이름 검색"
-                            autocomplete="off"
-                        />
-                    </label>
-                    <div
-                        v-for="group in agendaGroups(selectedCell)"
-                        :key="`sheet-${group.expandKey}`"
-                        class="agenda-group"
-                    >
-                        <h3>
-                        <span class="state-chip" :class="group.key === 'missed' ? 'is-danger' : 'is-success'">
-                            {{ group.label }} {{ group.people.length }}
-                        </span>
-                    </h3>
-                        <div class="agenda-chips">
-                            <button
-                                v-for="entry in group.shown.filter((person) => person.submitted)"
-                                :key="entry.member_id"
-                                type="button"
-                                class="person-chip"
-                                :title="personTitle(entry)"
-                                @click="openCell({ member_id: entry.member_id, name: entry.name }, entry.item)"
-                            >
-                                {{ entry.name }}
-                            </button>
-                            <span
-                                v-for="entry in group.shown.filter((person) => !person.submitted)"
-                                :key="entry.member_id"
-                                class="person-chip is-missed"
-                                :title="personTitle(entry)"
-                            >
-                                {{ entry.name }}
-                            </span>
-                        </div>
-                        <button
-                            v-if="group.hidden"
-                            type="button"
-                            class="more-people"
-                            @click="expandGroup(group.expandKey)"
-                        >
-                            {{ group.next }}명 더 보기
-                        </button>
-                    </div>
-                    <p v-if="!railGroups(selectedCell).length" class="agenda-empty">
-                        이 날 제출한 보고가 없습니다
-                    </p>
-                    <p
-                        v-else-if="nameQuery.trim() && !agendaGroups(selectedCell).length"
-                        class="agenda-empty"
-                    >
-                        해당하는 사람이 없습니다
-                    </p>
-                    <div class="app-dialog-actions">
-                        <button class="btn" type="button" @click="closeAgenda">닫기</button>
-                    </div>
-                </div>
+                    빠진 날 많은 순
+                </button>
             </div>
-        </Teleport>
-
         </div>
+
+        <p v-if="isLoading && !activities.length" class="list-status" role="status">불러오는 중</p>
+        <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
+        <div v-else-if="!rows.length" class="empty-state">
+            {{ query.trim() ? `'${query.trim()}' 이름이 없습니다` : onlyMissed ? "빠진 날이 있는 사람이 없습니다" : "이 기간에 볼 사람이 없습니다" }}
+        </div>
+
+        <section v-else class="card grid-card" aria-label="일일보고 제출 표">
+            <div class="grid-scroll">
+                <table class="sub-grid" :class="`is-${mode}`">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="col-who">이름</th>
+                            <th
+                                v-for="header in headers"
+                                :key="header.date"
+                                scope="col"
+                                class="col-day"
+                                :class="{ 'is-today': header.date === today, 'is-holiday': header.holidayName }"
+                                :title="header.holidayName || undefined"
+                            >
+                                <span class="day-week">{{ header.weekLabel }}</span>
+                                <span class="day-num">{{ header.day }}</span>
+                            </th>
+                            <th scope="col" class="col-rate">제출</th>
+                        </tr>
+                    </thead>
+                    <tbody v-for="team in rows" :key="teamKey(team)">
+                        <tr class="team-row" :class="{ 'is-collapsed': isCollapsed(team) }">
+                            <th scope="rowgroup" class="col-who">
+                                <button
+                                    type="button"
+                                    class="team-toggle"
+                                    :aria-expanded="!isCollapsed(team)"
+                                    @click="toggleTeam(team)"
+                                >
+                                    <ChevronRight v-if="isCollapsed(team)" :size="14" aria-hidden="true" />
+                                    <ChevronDown v-else :size="14" aria-hidden="true" />
+                                    <span class="team-name">{{ team.teamName }}</span>
+                                    <span class="team-size">{{ team.members.length }}명</span>
+                                </button>
+                            </th>
+                            <template v-if="isCollapsed(team)">
+                                <td
+                                    v-for="count in team.dayCounts"
+                                    :key="count.date"
+                                    class="col-day"
+                                    :class="{ 'is-today': count.date === today }"
+                                >
+                                    <span class="team-count" :class="dayCountTone(count)">{{ dayCountText(count) }}</span>
+                                </td>
+                                <td class="col-rate" :class="{ 'has-missed': team.submitted < team.due }">
+                                    {{ team.submitted }}/{{ team.due }}
+                                </td>
+                            </template>
+                            <td v-else :colspan="headers.length + 1" class="team-meta">
+                                {{ team.submitted }}/{{ team.due }}
+                            </td>
+                        </tr>
+                        <tr v-for="member in isCollapsed(team) ? [] : team.members" :key="member.memberId">
+                            <th scope="row" class="col-who">{{ member.name }}</th>
+                            <td
+                                v-for="(cell, index) in member.cells"
+                                :key="cell.date"
+                                class="col-day"
+                                :class="[`is-${cell.state}`, { 'is-today': cell.date === today }]"
+                            >
+                                <button
+                                    v-if="cell.state === 'done'"
+                                    type="button"
+                                    class="cell-mark"
+                                    :aria-label="cellTitle(member, headers[index], cell)"
+                                    :title="cellTitle(member, headers[index], cell)"
+                                    @click="openReport(member, cell)"
+                                >
+                                    <Check :size="15" :stroke-width="2.5" />
+                                </button>
+                                <span
+                                    v-else
+                                    class="cell-mark"
+                                    :aria-label="cellTitle(member, headers[index], cell)"
+                                    :title="cellTitle(member, headers[index], cell)"
+                                >
+                                    <X v-if="cell.state === 'missed'" :size="14" :stroke-width="2.5" />
+                                    <template v-else-if="cell.state === 'off'">휴</template>
+                                    <!-- 요약줄 '오늘 아직 안 냄'과 같은 말로 보인다. 예전에는 예정(·)과 구분이 안 됐다. -->
+                                    <template v-else-if="cell.date === today">아직</template>
+                                    <template v-else>·</template>
+                                </span>
+                            </td>
+                            <td class="col-rate" :class="{ 'has-missed': member.missed }">
+                                {{ member.submitted }}/{{ member.due }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="grid-legend">
+                <span><i class="legend-mark is-done"><Check :size="12" :stroke-width="2.5" /></i>제출 · 눌러서 보기</span>
+                <span><i class="legend-mark is-missed"><X :size="12" :stroke-width="2.5" /></i>미제출</span>
+                <span><i class="legend-mark is-future is-text">아직</i>오늘 아직 안 냄</span>
+                <span><i class="legend-mark is-future">·</i>예정</span>
+                <span><i class="legend-mark is-off">휴</i>공휴일</span>
+            </p>
+        </section>
     </div>
 </template>
 
-<style scoped>
-.team-filter {
-    width: 180px;
-    height: var(--control-h);
-}
-
-.activity-board {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-}
-
-.weekdays,
-.month-grid {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.weekdays span {
-    text-align: center;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-.weekdays .sun,
-.day-num.sun,
-.day-num.holiday,
-.agenda-holiday {
-    color: var(--danger-fg);
-}
-
-.weekdays .sat,
-.day-num.sat {
-    color: var(--info-fg);
-}
-
-.day-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
-    min-height: var(--control-h-lg);
-    margin: 0;
-    padding: var(--space-1) 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    cursor: pointer;
-}
-
-.day-cell:hover {
-    background: var(--surface-soft);
-}
-
-.day-num {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--control-h-sm);
-    height: var(--control-h-sm);
-    border-radius: 50%;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-medium);
-    line-height: 1;
-    color: var(--text-strong);
-}
-
-.day-num.outside,
-.day-num.outside.sun,
-.day-num.outside.sat,
-.day-num.outside.holiday {
-    color: var(--text-muted);
-}
-
-.day-num.today {
-    box-shadow: inset 0 0 0 1px var(--accent);
-    color: var(--accent);
-    font-weight: var(--fw-semibold);
-}
-
-.day-num.selected {
-    background: var(--accent);
-    box-shadow: none;
-    color: var(--text-on-accent);
-    font-weight: var(--fw-semibold);
-}
-
-.day-dot {
-    width: var(--space-1);
-    height: var(--space-1);
-    border-radius: 50%;
-    background: var(--accent);
-}
-
-.day-dot.full {
-    background: var(--success-fg);
-}
-
-.day-dot.partial {
-    background: var(--warning-fg);
-}
-
-.day-dot.is-empty {
-    background: transparent;
-}
-
-.section-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin-bottom: var(--space-2);
-}
-
-.section-head h2 {
-    margin: 0;
-}
-
-.agenda-holiday,
-.agenda-meta,
-.agenda-empty {
-    margin: 0;
-    font-size: var(--fs-13);
-}
-
-.agenda-meta,
-.agenda-empty {
-    color: var(--text-muted);
-}
-
-.agenda-group {
-    margin-top: var(--space-4);
-}
-
-.agenda-group h3 {
-    margin: 0 0 var(--space-2);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-.agenda-search {
-    display: block;
-    margin-top: var(--space-3);
-}
-
-.agenda-search .input {
-    width: 100%;
-    height: var(--control-h);
-}
-
-.agenda-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-}
-
-.person-chip {
-    display: inline-flex;
-    align-items: center;
-    max-width: 100%;
-    min-height: var(--control-h-sm);
-    margin: 0;
-    padding: var(--space-1) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    font: inherit;
-    font-size: var(--fs-13);
-    line-height: 1.2;
-    color: var(--text-strong);
-}
-
-button.person-chip {
-    cursor: pointer;
-}
-
-button.person-chip:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-soft);
-}
-
-/* 미제출은 다른 화면의 상태 태그처럼 옅은 빨간 면 + 빨간 글자. 누를 수 없으니 테두리도 없다. */
-.person-chip.is-missed {
-    border-color: transparent;
-    background: var(--danger-bg);
-    color: var(--danger-fg);
-}
-
-.agenda-bar {
-    display: flex;
-    gap: 2px;
-    height: 6px;
-    margin-top: var(--space-3);
-    overflow: hidden;
-    border-radius: var(--radius-xs);
-    background: var(--surface-soft);
-}
-
-.agenda-bar .is-saved {
-    background: var(--success-fg);
-}
-
-.agenda-bar .is-missing {
-    background: var(--danger-border);
-}
-
-.dot-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-4);
-    margin: var(--space-3) 0 0;
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border);
-    font-size: var(--fs-12);
-    color: var(--text-muted);
-}
-
-.dot-legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.dot-legend span:last-child {
-    margin-left: auto;
-}
-
-.dot-legend .day-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-}
-
-.more-people {
-    margin-top: var(--space-2);
-    padding: var(--space-1) 0;
-    border: 0;
-    background: transparent;
-    font: inherit;
-    font-size: var(--fs-13);
-    color: var(--accent);
-    cursor: pointer;
-}
-
-@media (min-width: 900px) {
-    .activity-board {
-        flex-direction: row;
-        align-items: flex-start;
-    }
-
-    .month-card {
-        flex: 0 0 420px;
-        width: 420px;
-    }
-
-    .agenda {
-        position: sticky;
-        top: var(--space-4);
-        flex: 1;
-        min-width: 0;
-        max-height: calc(100vh - var(--topbar-height) - calc(var(--space-8) * 2));
-        overflow: auto;
-    }
-}
-
-.agenda-sheet {
-    display: flex;
-    flex-direction: column;
-    max-height: min(78vh, 640px);
-    overflow: auto;
-}
-
-.agenda-sheet .app-dialog-actions {
-    position: sticky;
-    bottom: 0;
-    margin-top: var(--space-4);
-    padding-top: var(--space-3);
-    background: var(--surface);
-}
-
-@media (max-width: 860px) {
-    .dot-legend span:last-child {
-        margin-left: 0;
-    }
-
-    .team-filter {
-        width: 100%;
-        min-width: 0;
-        max-width: none;
-        height: var(--control-h-lg);
-        font-size: var(--fs-16);
-    }
-
-    .agenda-search .input,
-    .person-chip,
-    .more-people {
-        min-height: var(--control-h-lg);
-    }
-
-    .agenda-search .input {
-        height: var(--control-h-lg);
-    }
-}
-</style>
+<style scoped src="../styles/components/user-activities.css"></style>

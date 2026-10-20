@@ -24,6 +24,7 @@ def create_tables(conn: sqlite3.Connection) -> None:
     CREATE TABLE IF NOT EXISTS teams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         team_name TEXT NOT NULL UNIQUE,
+        leader_id INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(team_name)
     )

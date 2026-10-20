@@ -17,16 +17,16 @@ export const MOBILE_TABS = [
     { id: "more", sheet: "more", label: "더보기", navKeys: ["/activities", "/project-timeline", "/settings", "/admin"] },
 ];
 
-/** 작성 화면의 선택지. */
+/** 작성 화면의 선택지. 예전 일반보고는 일일보고에 합쳤다(kind=daily). */
 export const COMPOSE_CHOICES = [
-    { id: "daily", to: "/compose?kind=daily", label: "일일보고", hint: "원문을 붙여 넣으면 AI가 프로젝트별로 정리" },
-    { id: "meeting", to: "/compose?kind=meeting", label: "회의록", hint: "안건 · 결정 · 후속 할 일" },
-    { id: "sales", to: "/compose?kind=sales", label: "영업보고", hint: "담당자 · 진행사항 · 추후 진행" },
+    { id: "meeting", to: "/compose?kind=meeting", label: "회의록" },
+    { id: "daily", to: "/compose?kind=daily", label: "일일보고" },
+    { id: "sales", to: "/compose?kind=sales", label: "영업보고" },
 ];
 
 /** 더보기 시트. 하단 탭에 못 들어간 화면. */
 export const MORE_LINKS = [
-    { to: "/activities", label: "사용자 활동", hint: "월 달력 · 제출과 미제출" },
+    { to: "/activities", label: "사용자 활동", hint: "사람별 제출 · 미제출 표" },
     { to: "/project-timeline", label: "프로젝트 흐름", hint: "프로젝트별 타임라인" },
     { to: "/settings", label: "설정", hint: "내 부서 · 프로젝트명" },
 ];

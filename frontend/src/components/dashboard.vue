@@ -4,12 +4,47 @@ import { ArrowRight, Check, CircleAlert, CircleCheck, PenLine } from "lucide-vue
 import { useRoute, useRouter } from "vue-router";
 import useApi from "../composables/useApi";
 import { useMyWeek } from "../composables/useMyWeek";
+import { isAdmin } from "../composables/useSession";
 import { splitHistoryLine } from "../lib/historyLine";
 import { TODAY_LABELS } from "../lib/weekStatus";
+import { buildRows, periodDays, todayByTeam, todayIso } from "../lib/submissionGrid";
 
 const route = useRoute();
 const router = useRouter();
-const { getDashboard } = useApi();
+const { getDashboard, getUserActivities, getTeams, getUsers } = useApi();
+
+/** 다음 할 일의 근거 보고가 며칠 전인지. 일주일이 넘으면 오늘 할 일처럼 보이지 않게 제목을 바꾼다. */
+const STALE_FOCUS_DAYS = 7;
+const focusAgeDays = computed(() => {
+    const date = String(board.value.focus?.date || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return 0;
+    const diff = new Date(`${todayIso()}T00:00:00`) - new Date(`${date}T00:00:00`);
+    return Math.max(0, Math.round(diff / 86400000));
+});
+const focusIsStale = computed(() => focusAgeDays.value > STALE_FOCUS_DAYS);
+
+/* 관리자 홈: 부서별 오늘 제출 현황. 자세히 볼 때는 사용자 활동으로 간다. */
+const teamToday = ref([]);
+const loadTeamToday = async () => {
+    const today = todayIso();
+    const days = periodDays("week", today);
+    try {
+        const [activities, teams, users] = await Promise.all([
+            getUserActivities(Number(days[0].slice(0, 4)), Number(days[0].slice(5, 7)), days[0], days.at(-1)),
+            getTeams(),
+            getUsers().catch(() => []),
+        ]);
+        const rows = buildRows(activities || [], days, {
+            today,
+            adminIds: new Set((users || []).filter((user) => user.is_admin).map((user) => String(user.id))),
+            teamNames: Object.fromEntries((teams || []).map((team) => [String(team.id), team.team_name])),
+        });
+        teamToday.value = todayByTeam(rows, days, today);
+    } catch (error) {
+        console.error("부서별 오늘 현황 조회 실패:", error);
+        teamToday.value = [];
+    }
+};
 const { weekDays, todayState, refreshMyWeek } = useMyWeek();
 
 const board = ref({
@@ -64,8 +99,8 @@ const todayCard = computed(() => {
         return {
             tone: "warning",
             chip: TODAY_LABELS.draft,
-            title: "오늘 원문 초안만 저장돼 있어요",
-            body: "추출하고 검토한 뒤 저장해야 제출로 잡혀요.",
+            title: "오늘 보고를 임시 저장만 했어요",
+            body: "저장까지 마쳐야 제출돼요.",
             action: "이어서 쓰기",
             to: "/compose?kind=daily",
         };
@@ -83,9 +118,17 @@ const todayCard = computed(() => {
     return null;
 });
 
+/** 오늘 재촉할 게 없을 때(todayCard가 null) 그 이유를 말한다. 주말과, 보고 대상이 아닌 관리자를 구분한다. */
+const quietTitle = computed(() => {
+    const weekday = new Date().getDay();
+    if (weekday === 0 || weekday === 6) return "주말이라 오늘은 보고할 게 없어요";
+    if (isAdmin.value) return "관리자 계정은 일일보고 대상이 아니에요";
+    return "오늘은 보고하는 날이 아니에요";
+});
+
 const WEEK_STATE = {
     saved: { label: "제출", tone: "success" },
-    missing: { label: "빠짐", tone: "danger" },
+    missing: { label: "미제출", tone: "danger" },
     today: { label: "오늘", tone: "today" },
     upcoming: { label: "예정", tone: "upcoming" },
 };
@@ -97,12 +140,21 @@ const missingDays = computed(() => weekDays.value.filter((day) => day.state === 
 /** historyLine 톤 → 공통 분류 태그(.cat-tag). */
 const CAT_BY_TONE = { success: "is-done", info: "is-progress", warning: "is-issue", request: "is-request", muted: "is-next" };
 
+/** 대시보드에는 최근 몇 건만. 나머지는 프로젝트 흐름에서 본다. */
+const HISTORY_LIMIT = 5;
 const history = computed(() =>
-    (board.value.history || []).map((item) => ({
+    (board.value.history || []).slice(0, HISTORY_LIMIT).map((item) => ({
         ...item,
         rows: (item.lines || []).map(splitHistoryLine),
     })),
 );
+const moreHistory = computed(() => Math.max(0, (board.value.history || []).length - HISTORY_LIMIT));
+
+const FOCUS_KINDS = [
+    { key: "nextPlans", label: "다음", cls: "is-next" },
+    { key: "issues", label: "이슈", cls: "is-issue" },
+    { key: "requests", label: "요청", cls: "is-request" },
+];
 
 const load = async () => {
     isLoading.value = true;
@@ -136,6 +188,7 @@ watch(() => route.query.project, load, { immediate: true });
 onMounted(() => {
     document.title = "내 현황";
     refreshMyWeek();
+    if (isAdmin.value) loadTeamToday();
 });
 </script>
 
@@ -144,7 +197,7 @@ onMounted(() => {
         <!-- 오늘 상태: 노션 콜아웃. 화면에서 가장 먼저 읽혀야 하는 한 가지. -->
         <section
             v-if="todayCard"
-            class="callout today"
+            class="callout today dash-today"
             :class="`is-${todayCard.tone}`"
             aria-labelledby="today-title"
         >
@@ -153,9 +206,10 @@ onMounted(() => {
                 <p class="today-date">{{ todayHeading }}</p>
                 <h2 id="today-title" class="today-title">{{ todayCard.title }}</h2>
                 <p v-if="todayCard.body" class="callout-body">{{ todayCard.body }}</p>
-                <p v-else-if="board.lastActivity" class="callout-body">
+                <p v-if="board.lastActivity" class="callout-body">
                     마지막 업무 ·
                     <router-link class="inline-link" :to="board.lastActivity.href">{{ board.lastActivity.title }}</router-link>
+                    <span class="last-meta">{{ board.lastActivity.kindLabel }}<template v-if="dotDate(board.lastActivity.date)"> · {{ dotDate(board.lastActivity.date) }}</template></span>
                 </p>
             </div>
             <router-link v-if="todayCard.action" class="btn btn-primary today-cta" :to="todayCard.to">
@@ -163,17 +217,41 @@ onMounted(() => {
                 {{ todayCard.action }}
             </router-link>
         </section>
-        <section v-else class="callout today" aria-labelledby="today-title">
+        <section v-else class="callout today dash-today" aria-labelledby="today-title">
             <div class="callout-text">
                 <p class="today-date">{{ todayHeading }}</p>
-                <h2 id="today-title" class="today-title">오늘은 보고하는 날이 아니에요</h2>
+                <h2 id="today-title" class="today-title">{{ quietTitle }}</h2>
+                <ul v-if="isAdmin && teamToday.length" class="team-today" aria-label="부서별 오늘 제출">
+                    <li v-for="team in teamToday" :key="team.teamId ?? 'none'">
+                        <span class="team-today-name">{{ team.teamName }}</span>
+                        <span class="team-today-count" :class="{ 'is-all': team.done === team.total }">
+                            오늘 {{ team.done }}/{{ team.total }}
+                        </span>
+                        <span v-if="team.pending.length" class="team-today-pending">
+                            아직 안 냄 · {{ team.pending.join(", ") }}
+                        </span>
+                    </li>
+                </ul>
+                <p v-if="isAdmin" class="callout-body">
+                    날짜별로는
+                    <router-link class="inline-link" to="/activities">사용자 활동</router-link>,
+                    주간 취합은
+                    <router-link class="inline-link" to="/weekly">주간 보고서</router-link>에서 봐요.
+                </p>
+                <p v-if="board.lastActivity" class="callout-body">
+                    마지막 업무 ·
+                    <router-link class="inline-link" :to="board.lastActivity.href">{{ board.lastActivity.title }}</router-link>
+                    <span class="last-meta">{{ board.lastActivity.kindLabel }}<template v-if="dotDate(board.lastActivity.date)"> · {{ dotDate(board.lastActivity.date) }}</template></span>
+                </p>
             </div>
         </section>
 
+        <!-- 옆 칸(PC) / 오늘 바로 아래(폰): 이번 주와 다음 할 일. 프로젝트 이력보다 먼저 봐야 하는 것. -->
+        <aside class="dash-side">
         <section v-if="weekCells.length" class="dash-section" aria-labelledby="week-title">
             <div class="dash-section-head">
                 <h2 id="week-title" class="section-title">이번 주</h2>
-                <span v-if="missingDays" class="dash-section-meta is-danger">빠진 날 {{ missingDays }}일</span>
+                <span v-if="missingDays" class="dash-section-meta is-danger">미제출 {{ missingDays }}일</span>
             </div>
             <ol class="week-strip">
                 <li
@@ -183,7 +261,7 @@ onMounted(() => {
                     :class="`is-${day.tone}`"
                     :aria-label="`${day.weekday}요일 ${day.label}`"
                 >
-                    <span class="week-day">{{ day.weekday }}요일</span>
+                    <span class="week-day">{{ day.weekday }}</span>
                     <span class="week-num">{{ day.day }}</span>
                     <span class="week-state">
                         <Check v-if="day.tone === 'success'" :size="15" :stroke-width="2.5" />
@@ -193,10 +271,32 @@ onMounted(() => {
                 </li>
             </ol>
             <p v-if="missingDays" class="dash-note">
-                빠진 날은 주간 초안에 ‘빠진 요일’로 표시돼요.
+                미제출한 날은 주간 초안에 ‘빠진 요일’로 표시돼요.
             </p>
         </section>
 
+        <section v-if="board.focus" class="dash-section" aria-labelledby="focus-title">
+            <div class="dash-section-head">
+                <h2 id="focus-title" class="section-title">{{ focusIsStale ? "지난 할 일" : "다음 할 일" }}</h2>
+                <span class="dash-section-meta">
+                    {{ dotDate(board.focus.date) }} 보고<template v-if="focusIsStale"> · {{ focusAgeDays }}일 전</template>
+                </span>
+            </div>
+            <ul class="focus-list">
+                <li v-for="(item, index) in board.focus.items" :key="`${item.project}-${index}`">
+                    <p v-if="item.project" class="focus-project">{{ item.project }}</p>
+                    <template v-for="kind in FOCUS_KINDS" :key="kind.key">
+                        <p v-for="(text, line) in item[kind.key]" :key="`${kind.key}-${line}`" class="focus-line">
+                            <span class="cat-tag" :class="kind.cls">{{ kind.label }}</span>
+                            <span class="focus-text">{{ text }}</span>
+                        </p>
+                    </template>
+                </li>
+            </ul>
+        </section>
+        </aside>
+
+        <div class="dash-projects">
         <p v-if="isLoading" class="list-status" role="status">현황을 불러오는 중</p>
         <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
 
@@ -274,371 +374,18 @@ onMounted(() => {
                         </router-link>
                     </li>
                 </ol>
+                <router-link
+                    v-if="moreHistory"
+                    class="group-link history-more"
+                    :to="{ path: '/project-timeline', query: { project: selectedProject } }"
+                >
+                    이전 기록 {{ moreHistory }}건 더 보기
+                    <ArrowRight :size="14" />
+                </router-link>
             </div>
         </section>
+        </div>
     </div>
 </template>
 
-<style scoped>
-/* ---- 오늘 콜아웃 (.callout 공통 + 화면 맨 위라 조금 크게) ------------- */
-.today {
-    padding: var(--space-5) var(--space-6);
-}
-
-.today-icon {
-    align-self: flex-start;
-    margin-top: 22px;
-}
-
-.today-date {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-}
-
-.today-title {
-    margin: 0;
-    font-size: var(--fs-20);
-    font-weight: var(--fw-bold);
-    line-height: var(--lh-tight);
-    color: var(--text-strong);
-}
-
-.today .callout-body {
-    font-size: var(--fs-14);
-}
-
-.today-cta {
-    flex-shrink: 0;
-    height: var(--control-h-lg);
-    padding: 0 var(--space-5);
-}
-
-.inline-link {
-    color: var(--accent);
-    font-weight: var(--fw-medium);
-    text-decoration: none;
-}
-
-.inline-link:hover {
-    text-decoration: underline;
-}
-
-/* ---- 섹션 공통 ------------------------------------------------------ */
-.dash-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    min-width: 0;
-}
-
-.dash-section-head {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-3);
-}
-
-.dash-section-meta {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.dash-section-meta.is-danger {
-    color: var(--danger-fg);
-    font-weight: var(--fw-semibold);
-}
-
-.dash-note {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-/* ---- 이번 주 -------------------------------------------------------- */
-.week-strip {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.week-cell {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-}
-
-.week-day {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.week-num {
-    font-size: var(--fs-24);
-    font-weight: var(--fw-bold);
-    line-height: 1.1;
-    color: var(--text-strong);
-    font-variant-numeric: tabular-nums;
-}
-
-.week-state {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-.week-cell.is-success .week-state { color: var(--success-fg); }
-.week-cell.is-danger { border-color: var(--danger-border); background: var(--danger-bg); }
-.week-cell.is-danger .week-state { color: var(--danger-fg); }
-.week-cell.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.week-cell.is-today .week-state { color: var(--accent-hover); }
-.week-cell.is-upcoming { background: var(--surface-soft); border-color: transparent; }
-.week-cell.is-upcoming .week-num { color: var(--text-muted); }
-.week-cell.is-upcoming .week-state { font-weight: var(--fw-regular); }
-
-/* ---- 내 프로젝트 ---------------------------------------------------- */
-.project-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-}
-
-.project-tab {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    max-width: 100%;
-    min-height: var(--control-h);
-    padding: var(--space-1) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
-    cursor: pointer;
-    transition:
-        background var(--dur-fast) var(--ease),
-        border-color var(--dur-fast) var(--ease);
-}
-
-.project-tab:hover {
-    background: var(--surface-soft);
-}
-
-.project-tab:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-}
-
-.project-tab.is-on {
-    border-color: var(--text-strong);
-    background: var(--text-strong);
-    color: var(--surface);
-}
-
-.project-tab-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-}
-
-.project-tab-date {
-    flex-shrink: 0;
-    font-size: var(--fs-12);
-    opacity: 0.75;
-}
-
-.project-panel {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    margin-top: var(--space-2);
-}
-
-.project-panel-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-4);
-}
-
-.project-status {
-    margin: 0;
-    min-width: 0;
-    font-size: var(--fs-14);
-    color: var(--text);
-}
-
-.group-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: auto;
-    flex-shrink: 0;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    color: var(--accent);
-    text-decoration: none;
-}
-
-.group-link:hover {
-    text-decoration: underline;
-}
-
-.history {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border-top: 1px solid var(--border);
-}
-
-.history > li {
-    border-bottom: 1px solid var(--border);
-}
-
-.history-row {
-    display: grid;
-    grid-template-columns: 112px minmax(0, 1fr);
-    gap: var(--space-4);
-    padding: var(--space-4) var(--space-2);
-    border-radius: var(--radius-xs);
-    color: inherit;
-    text-decoration: none;
-    transition: background var(--dur-fast) var(--ease);
-}
-
-.history-row:hover {
-    background: var(--surface-soft);
-}
-
-.history-row:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-}
-
-.history-when {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.history-date {
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.history-kind {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.history-body {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    min-width: 0;
-}
-
-.history-line {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-2);
-    font-size: var(--fs-14);
-    line-height: var(--lh-base);
-    color: var(--text-strong);
-}
-
-.history-line .cat-tag {
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-.history-text {
-    min-width: 0;
-    word-break: keep-all;
-    overflow-wrap: anywhere;
-}
-
-.list-status {
-    margin: 0;
-    font-size: var(--fs-14);
-    color: var(--text-muted);
-}
-
-.list-status.is-error {
-    color: var(--danger-fg);
-}
-
-@media (max-width: 860px) {
-    .today {
-        padding: var(--space-4);
-    }
-
-    .today-icon {
-        margin-top: 2px;
-    }
-
-    .today-title {
-        font-size: var(--fs-16);
-    }
-
-    .week-strip {
-        gap: var(--space-1);
-    }
-
-    .week-cell {
-        align-items: center;
-        padding: var(--space-2) 0;
-    }
-
-    .week-day {
-        font-size: var(--fs-12);
-    }
-
-    .week-num {
-        font-size: var(--fs-16);
-    }
-
-    .week-state {
-        font-size: var(--fs-11);
-    }
-
-    .project-tabs {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        margin: 0 calc(-1 * var(--space-4));
-        padding: 0 var(--space-4);
-        scrollbar-width: none;
-    }
-
-    .project-tab {
-        flex-shrink: 0;
-        min-height: var(--control-h-lg);
-    }
-
-    .history-row {
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-2);
-        padding: var(--space-3) 0;
-    }
-
-    .history-when {
-        flex-direction: row;
-        gap: var(--space-2);
-    }
-}
-</style>
+<style scoped src="../styles/components/dashboard.css"></style>

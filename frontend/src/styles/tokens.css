@@ -30,7 +30,7 @@
     --accent-hover: #005bab;
     --accent-soft: #e7f3f8;     /* selected fill, count chips */
     --accent-border: #b4d6ef;
-    --accent-ring: rgba(0, 117, 222, 0.2);
+    --accent-ring: rgba(0, 117, 222, 0.38);   /* 키보드 포커스가 흐려 어디에 있는지 안 보였다(0.2) */
 
     /* ---- Color: semantic (tinted chip/notice only) ---------------- */
     --success-fg: #1a7f37;
@@ -63,7 +63,7 @@
     --overlay: rgba(15, 15, 15, 0.4);
 
     /* ---- Spacing: 4px grid ---------------------------------------- */
-    --space-1: 4px;
+    --space-1: 6px;             /* 붙어 있는 줄 사이. 4px는 한글 줄이 뛭쳐 보여 6px로 놓았다 */
     --space-2: 8px;
     --space-3: 12px;
     --space-4: 16px;
@@ -97,8 +97,8 @@
     --fs-32: 32px;              /* page title */
     --fs-40: 40px;              /* reserved */
     --lh-none: 1;
-    --lh-tight: 1.25;
-    --lh-base: 1.5;
+    --lh-tight: 1.35;           /* 한글 제목이 두 줄이 되어도 줄끼리 닿지 않게 */
+    --lh-base: 1.6;
     --lh-relaxed: 1.65;
     --fw-regular: 400;
     --fw-medium: 500;

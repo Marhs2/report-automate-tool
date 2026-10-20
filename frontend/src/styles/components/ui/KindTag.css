@@ -1,0 +1,15 @@
+.kind-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.kind-icon {
+    display: inline-flex;
+    color: var(--text-muted);
+}
+
+.kind-icon.is-done { color: var(--success-fg); }
+.kind-icon.is-progress { color: var(--info-fg); }
+.kind-icon.is-issue { color: var(--warning-fg); }
+.kind-icon.is-request { color: var(--project-4-fg); }

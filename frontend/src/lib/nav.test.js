@@ -30,7 +30,8 @@ describe("primary navigation", () => {
         for (const item of [...COMPOSE_CHOICES, ...MORE_LINKS]) {
             assert.ok(livePath(item.to), `${item.label} path ${item.to} is not a live route`);
         }
-        assert.equal(COMPOSE_CHOICES[0].to, "/compose?kind=daily");
+        assert.deepEqual(COMPOSE_CHOICES.map((item) => item.id), ["meeting", "daily", "sales"]);
+        assert.equal(COMPOSE_CHOICES.find((item) => item.id === "daily").label, "일일보고");
         assert.equal(CAPABILITIES.writeReport, "/report");
     });
 

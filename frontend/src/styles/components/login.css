@@ -1,0 +1,130 @@
+/* 카드 하나를 가운데 띄우지 않는다. 왼쪽은 이 도구가 만드는 결과(보고 한 장), 오른쪽은 폼. */
+.login-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    width: 100%;
+    min-height: 100vh;
+}
+
+.login-side {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-5);
+    padding: var(--space-8);
+    border-right: 1px solid var(--border);
+    background: var(--sidebar-bg);
+}
+
+.login-brand {
+    margin: 0;
+    font: var(--type-title);
+    font-size: var(--fs-30);
+    letter-spacing: -0.02em;
+    color: var(--text-strong);
+}
+
+.login-lead {
+    max-width: 420px;
+    margin: 0;
+    font-size: var(--fs-16);
+    line-height: var(--lh-relaxed);
+    color: var(--text);
+    word-break: keep-all;
+}
+
+.login-sample {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    max-width: 420px;
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+}
+
+.login-sample p {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--fs-14);
+    color: var(--text-strong);
+}
+
+.login-sample .login-sample-head {
+    justify-content: space-between;
+    margin-bottom: var(--space-1);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border);
+    font-weight: var(--fw-semibold);
+}
+
+.login-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-8) var(--space-6);
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    width: min(360px, 100%);
+}
+
+.login-form .t-desc {
+    margin-top: calc(-1 * var(--space-2));
+}
+
+.login-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font: var(--type-caption);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.login-field .input {
+    height: var(--control-h-lg);
+}
+
+.login-form .btn {
+    margin-top: var(--space-2);
+    min-height: var(--control-h-lg);
+}
+
+@media (max-width: 860px) {
+    .login-page {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
+    }
+
+    .login-side {
+        gap: var(--space-2);
+        padding: calc(var(--space-7) + env(safe-area-inset-top, 0px)) var(--space-5) var(--space-5);
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .login-brand {
+        font-size: var(--fs-24);
+    }
+
+    .login-lead {
+        font-size: var(--fs-14);
+    }
+
+    .login-sample {
+        display: none;
+    }
+
+    .login-main {
+        align-items: flex-start;
+        padding: var(--space-6) var(--space-5);
+    }
+}

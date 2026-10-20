@@ -124,3 +124,6 @@ asr_sessions/
 frontend/src/lib/*.test.js
 
 .codegraph/
+anti-slop/
+docs/
+test-data/

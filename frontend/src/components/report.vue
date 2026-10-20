@@ -12,18 +12,28 @@ import {
     templateById,
 } from "../lib/reportTemplates";
 import { todayString } from "../lib/dateScope";
-import { onlyStructuredLineReport } from "../lib/lineReport.js";
+import { myRecentReports } from "../lib/reportSummary";
+import {
+    linesToReportJson,
+    onlyStructuredLineReport,
+    orderProjectsByRecent,
+    parseLineReport,
+} from "../lib/lineReport.js";
 import LineWriter from "./ui/line-writer.vue";
 
 const {
     postReport,
     postReportPptx,
     getReportDraft,
+    getReportDrafts,
+    deleteReportDraft,
     postReportDraft,
     getUserActivities,
     getUsers,
     getProjectNames,
     postProjectName,
+    getReports,
+    postSaveReport,
 } = useApi();
 const router = useRouter();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
@@ -36,6 +46,7 @@ const pasteOnNarrow = ref(false);
 const date = ref(todayString());
 
 const aiLoading = ref(false);
+const lineSaving = ref(false);
 const draftSaving = ref(false);
 const draftSavedAt = ref("");
 const formError = ref("");
@@ -44,6 +55,10 @@ const alreadySaved = ref(false);
 const elapsed = ref(0);
 const isDragging = ref(false);
 const knownProjects = ref([]);
+/** 오른쪽 칸: 회의록 · 영업보고 탭처럼 "내가 쓴 일일보고". */
+const myReports = ref([]);
+/** 아직 제출 안 한 임시 저장. 제출하면 서버가 지운다. */
+const myDrafts = ref([]);
 const lineWriter = ref(null);
 const isNarrow = ref(
     typeof window !== "undefined" &&
@@ -66,20 +81,9 @@ const inputModes = computed(() =>
           ]
         : [
               { id: "paste", label: "텍스트" },
-              { id: "file", label: "PPTX 올리기" },
+              { id: "file", label: "파워포인트 파일" },
           ],
 );
-/** AI가 나누는 항목. 작성 화면 옆에서 무엇이 어떻게 나뉘는지 미리 보여 준다. */
-const EXTRACT_KINDS = [
-    { label: "프로젝트", hint: "정식명 · 별칭으로 묶음", tone: "neutral" },
-    { label: "완료", hint: "끝낸 일", tone: "success" },
-    { label: "진행 중", hint: "아직 하는 일", tone: "info" },
-    { label: "이슈", hint: "막힌 점", tone: "warning" },
-    { label: "협조 요청", hint: "필요한 도움", tone: "request" },
-    { label: "다음 계획", hint: "다음에 할 일", tone: "muted" },
-];
-/** 분류 표시는 모든 화면이 같은 .cat-tag를 쓴다. */
-const KIND_CAT = { neutral: "", success: "is-done", info: "is-progress", warning: "is-issue", request: "is-request", muted: "is-next" };
 
 const elapsedLabel = computed(() => {
     const minutes = Math.floor(elapsed.value / 60);
@@ -231,25 +235,69 @@ const loadDraft = async () => {
 
 const statusLabel = computed(() => {
     if (alreadySaved.value) return "제출됨";
-    if (draftSavedAt.value) return `원문 초안 · ${draftSavedAt.value}`;
+    if (draftSavedAt.value) return `임시 저장 · ${draftSavedAt.value}`;
     return "미제출";
 });
 
 const statusDetail = computed(() => {
-    if (alreadySaved.value) return "다시 저장하면 덮어씀";
-    if (draftSavedAt.value) return "추출·검토 전";
+    if (alreadySaved.value) return "고쳐서 저장하면 내용이 바뀜";
+    if (draftSavedAt.value) return "아직 제출 안 됨";
     return "";
 });
 
-const loadProjects = async () => {
+const loadDrafts = async () => {
+    const memberId = getSelectedMemberId();
+    if (memberId === null) return;
     try {
-        const names = await getProjectNames();
-        knownProjects.value = Array.isArray(names)
-            ? names.map((name) => String(name || "").trim()).filter(Boolean)
-            : [];
+        const rows = await getReportDrafts(memberId);
+        myDrafts.value = Array.isArray(rows) ? rows : [];
     } catch {
-        knownProjects.value = [];
+        myDrafts.value = [];
     }
+};
+
+const draftDateLabel = (iso) => {
+    const [, month, day] = String(iso || "").split("-");
+    return month && day ? `${Number(month)}월 ${Number(day)}일` : String(iso || "");
+};
+
+/** 임시 저장한 글을 버린다. 제출한 보고는 건드리지 않는다. */
+const discardDraft = async () => {
+    const memberId = getSelectedMemberId();
+    if (memberId === null || !draftSavedAt.value) return;
+    const ok = await askConfirm("임시 저장한 글이 없어지고 되돌릴 수 없어요.", {
+        title: `${draftDateLabel(date.value)} 임시 저장을 버릴까요?`,
+        confirmLabel: "버리기",
+        danger: true,
+    });
+    if (!ok) return;
+    try {
+        await deleteReportDraft(memberId, date.value);
+        input.value = "";
+        draftSavedAt.value = "";
+        await loadDrafts();
+    } catch (error) {
+        formError.value = error.response?.data?.detail || "임시 저장을 버리지 못했습니다.";
+    }
+};
+
+const loadProjects = async () => {
+    let names = [];
+    try {
+        const rows = await getProjectNames();
+        names = Array.isArray(rows) ? rows : [];
+    } catch {
+        names = [];
+    }
+    // 최근 순서와 오른쪽 목록은 있으면 좋은 것이다. 목록을 못 불러와도 등록된 이름으로 쓸 수 있어야 한다.
+    let reports = [];
+    try {
+        reports = await getReports();
+    } catch {
+        reports = [];
+    }
+    knownProjects.value = orderProjectsByRecent(names, reports, getSelectedMemberId());
+    myReports.value = myRecentReports(reports, getSelectedMemberId());
 };
 
 const registerProject = async (name) => {
@@ -272,7 +320,7 @@ const reportBody = () => input.value;
 const refreshMeta = async () => {
     await loadUserName();
     await loadSavedState();
-    await loadProjects();
+    await Promise.all([loadProjects(), loadDrafts()]);
 };
 
 const syncNarrow = () => {
@@ -377,11 +425,58 @@ const saveDraft = async () => {
         await postReportDraft(reportBody(), date.value, memberId);
         const now = new Date();
         draftSavedAt.value = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        await loadDrafts();
     } catch (error) {
         const detail = error.response?.data?.detail;
         formError.value = detail || "초안 저장에 실패했습니다.";
     } finally {
         draftSaving.value = false;
+    }
+};
+
+const lineCount = computed(() => parseLineReport(input.value).lines.length);
+
+/** 한 줄씩 쓴 보고는 사람이 이미 나눴다. AI 없이 그대로 저장하고, 문장 정리는 주간보고 AI가 맡는다. */
+const saveLines = async () => {
+    const blocked = lineWriter.value?.commitPending() || "";
+    if (blocked) {
+        formError.value = blocked;
+        return;
+    }
+    const memberId = getSelectedMemberId();
+    if (memberId === null) {
+        formError.value = "로그인이 필요합니다.";
+        router.push("/login");
+        return;
+    }
+    const parsed = linesToReportJson(parseLineReport(input.value).lines);
+    if (!parsed.projects.length) {
+        formError.value = "한 줄 이상 넣은 뒤 저장하세요.";
+        return;
+    }
+    if (alreadySaved.value) {
+        const ok = await askConfirm(`${waitDateLabel.value}에 제출한 보고를 지금 쓴 내용으로 바꿀까요?`, {
+            title: "이미 제출한 보고가 있어요",
+            help: "바꾸면 전에 제출한 내용은 되돌릴 수 없어요.",
+            confirmLabel: "바꾸기",
+            cancelLabel: "취소",
+            danger: true,
+        });
+        if (!ok) return;
+    }
+    formError.value = "";
+    lineSaving.value = true;
+    try {
+        await postSaveReport(JSON.stringify(parsed, null, 2), input.value, memberId, date.value);
+        input.value = "";
+        showAlert("보고서를 저장했습니다.");
+        await router.push("/reports");
+    } catch (error) {
+        console.error("일일보고 저장 실패:", error);
+        formError.value =
+            error.response?.data?.detail || "저장하지 못했습니다. 입력한 내용은 그대로 있어요.";
+    } finally {
+        lineSaving.value = false;
     }
 };
 
@@ -484,7 +579,16 @@ const sendReport = async () => {
                     {{ statusLabel }}
                     <span v-if="statusDetail" class="status-chip-more"> · {{ statusDetail }}</span>
                 </span>
-                <div class="seg write-modes" role="tablist" aria-label="입력 방식">
+                <!-- 폰에서는 날짜 · 상태와 한 줄에 두려고 두 칸 전환 대신 다른 방식으로 가는 버튼 하나만 둔다. -->
+                <button
+                    v-if="isNarrow"
+                    type="button"
+                    class="btn btn-small write-mode-switch"
+                    @click="selectType(useLines ? 'paste' : 'lines')"
+                >
+                    {{ useLines ? "붙여넣기" : "한 줄씩" }}
+                </button>
+                <div v-else class="seg write-modes" role="tablist" aria-label="입력 방식">
                     <button
                         v-for="mode in inputModes"
                         :key="mode.id"
@@ -509,13 +613,13 @@ const sendReport = async () => {
                     <template #dock>
                         <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
                         <button
-                            v-if="input.trim()"
+                            v-if="lineCount"
                             type="button"
                             class="btn btn-primary line-send"
-                            @click="sendReport"
-                            :disabled="aiLoading"
+                            @click="saveLines"
+                            :disabled="lineSaving"
                         >
-                            {{ aiLoading ? "추출 중" : "AI로 추출" }}
+                            {{ lineSaving ? "저장 중" : `저장 · ${lineCount}줄` }}
                         </button>
                     </template>
                 </LineWriter>
@@ -523,7 +627,7 @@ const sendReport = async () => {
 
             <div v-else-if="buttonType === 'text'" class="field write-field">
                 <div class="write-helpers">
-                    <span class="write-helpers-label">형식</span>
+                    <span class="write-helpers-label">틀 넣기</span>
                     <div class="template-chips" role="group" aria-label="붙여넣기 형식">
                         <button
                             v-for="template in PASTE_TEMPLATES"
@@ -580,15 +684,18 @@ const sendReport = async () => {
             </p>
             <div v-if="!useLines" class="form-actions">
                 <span v-if="draftSavedAt" class="draft-note" role="status">
-                    {{ draftSavedAt }} 초안 저장됨
+                    {{ draftSavedAt }} 임시 저장됨 · 아직 제출 안 됨
                 </span>
+                <button v-if="draftSavedAt" type="button" class="btn btn-ghost" @click="discardDraft">
+                    버리기
+                </button>
                 <button
                     v-if="buttonType === 'text'"
                     class="btn"
                     @click="saveDraft"
                     :disabled="aiLoading || draftSaving || !input.trim()"
                 >
-                    {{ draftSaving ? "저장 중..." : "원문만 초안 저장" }}
+                    {{ draftSaving ? "저장 중..." : "임시 저장" }}
                 </button>
                 <button
                     class="btn btn-primary"
@@ -599,32 +706,43 @@ const sendReport = async () => {
                 </button>
             </div>
         </div>
-        <aside v-if="!isNarrow" class="write-aside">
-            
-            <section class="aside-card" aria-labelledby="steps-title">
-                <h2 id="steps-title">저장까지</h2>
-                <ol class="step-list">
-                    <li class="is-on"><b>지금</b><span>원문을 쓰거나 붙여 넣기</span></li>
-                    <li><b>다음</b><span>AI가 프로젝트별 초안 만들기</span></li>
-                    <li><b>마지막</b><span>원문과 나란히 검토하고 저장</span></li>
-                </ol>
-                <p class="aside-note">
-                    {{ waitDateLabel }}에
-                    {{ alreadySaved ? "저장된 보고가 있어요. 다시 저장하면 바꿀지 먼저 물어봐요." : "저장된 보고가 없어요." }}
-                </p>
-            </section>
-            <section class="aside-card" aria-labelledby="kinds-title">
-                <h2 id="kinds-title">AI가 나누는 항목</h2>
-                <ul class="kind-list">
-                    <li v-for="kind in EXTRACT_KINDS" :key="kind.label">
-                        <span class="kind-label">
-                            <span class="cat-tag" :class="KIND_CAT[kind.tone]">{{ kind.label }}</span>
-                        </span>
-                        <span class="kind-hint">{{ kind.hint }}</span>
-                    </li>
-                </ul>
-            </section>
-        </aside>
+        <!-- 회의록 · 영업보고 탭과 같은 오른쪽 칸: 그 종류의 내 최근 기록. -->
+        <section v-if="!isNarrow" class="group-block write-aside" aria-labelledby="my-daily-title">
+            <div class="group-head">
+                <h2 id="my-daily-title">내가 쓴 일일보고</h2>
+                <router-link v-if="myReports.length" class="group-meta aside-more" to="/reports">전체 보기</router-link>
+            </div>
+            <!-- 임시 저장은 제출이 아니라 목록에 없다. 없어진 줄 알지 않게 따로 보여 준다. -->
+            <div v-if="myDrafts.length" class="group">
+                <button
+                    v-for="draft in myDrafts"
+                    :key="draft.report_date"
+                    type="button"
+                    class="row"
+                    :class="{ 'is-current': draft.report_date === date }"
+                    @click="date = draft.report_date"
+                >
+                    <span class="row-main">
+                        <span class="row-title">{{ draft.preview || "내용 없음" }}</span>
+                        <span class="row-sub">{{ draftDateLabel(draft.report_date) }} · 임시 저장 · 아직 제출 안 됨</span>
+                    </span>
+                </button>
+            </div>
+            <div class="group">
+                <p v-if="myReports.length === 0" class="group-empty">아직 없어요. 제출하면 여기에 쌓여요.</p>
+                <router-link
+                    v-for="row in myReports"
+                    :key="row.id"
+                    class="row"
+                    :to="`/report-result/${row.id}`"
+                >
+                    <span class="row-main">
+                        <span class="row-title">{{ row.title }}</span>
+                        <span class="row-sub">{{ row.date }}</span>
+                    </span>
+                </router-link>
+            </div>
+        </section>
         </div>
     </div>
     <Teleport to="body">
@@ -650,510 +768,4 @@ const sendReport = async () => {
     </Teleport>
 </template>
 
-<style scoped>
-.write-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-    margin-bottom: var(--space-4);
-}
-
-
-.write-date {
-    width: auto;
-    height: var(--control-h-sm);
-    font-size: var(--fs-13);
-}
-
-.write-modes {
-    margin-left: auto;
-}
-
-.write-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    gap: var(--space-5);
-    align-items: start;
-}
-
-.write-footnote {
-    margin: var(--space-2) 0 0;
-    text-align: right;
-    font-size: var(--fs-12);
-    color: var(--text-muted);
-}
-
-.write-aside {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-}
-
-/* 옆 안내는 카드가 아니다. 가는 선 아래 글로만 둔다. */
-.aside-card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-4) 0 0;
-    border-top: 1px solid var(--border-strong);
-}
-
-.aside-card h2 {
-    margin: 0;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-bold);
-    color: var(--text-strong);
-}
-
-
-
-.step-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin: var(--space-1) 0 0;
-    padding: 0;
-    list-style: none;
-}
-
-.step-list li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-/* 번호 원 대신 짧은 말머리. 지금 단계만 진하게. */
-.step-list b {
-    flex: 0 0 40px;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-medium);
-    color: var(--text-muted);
-}
-
-.step-list li.is-on {
-    color: var(--text-strong);
-    font-weight: var(--fw-semibold);
-}
-
-.step-list li.is-on b {
-    color: var(--accent);
-    font-weight: var(--fw-semibold);
-}
-
-.aside-note {
-    margin: var(--space-1) 0 0;
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border);
-    font-size: var(--fs-12);
-    line-height: var(--lh-base);
-    color: var(--text-muted);
-    word-break: keep-all;
-}
-
-.aside-row {
-    display: flex;
-    justify-content: space-between;
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.aside-row b {
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.kind-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin: var(--space-1) 0 0;
-    padding: 0;
-    list-style: none;
-}
-
-.kind-list li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--fs-13);
-}
-
-.kind-swatch {
-    width: 8px;
-    height: 8px;
-    flex-shrink: 0;
-    border-radius: 2px;
-}
-
-.kind-swatch.is-neutral { background: var(--text-strong); }
-.kind-swatch.is-success { background: var(--success-fg); }
-.kind-swatch.is-info { background: var(--info-fg); }
-.kind-swatch.is-warning { background: var(--warning-fg); }
-.kind-swatch.is-request { background: var(--project-4-fg); }
-.kind-swatch.is-muted { background: var(--text-muted); }
-
-.kind-label {
-    flex: 0 0 76px;
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.kind-hint {
-    color: var(--text-muted);
-}
-
-@media (max-width: 1100px) {
-    .write-layout {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .write-aside {
-        display: none;
-    }
-}
-
-.write-field .textarea {
-    min-height: 320px;
-}
-
-.write-helpers {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-    margin-bottom: var(--space-2);
-}
-
-.write-helpers-label {
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.template-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-}
-
-.template-chips .on {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-    color: var(--text-strong);
-}
-
-.form-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    margin-top: var(--space-4);
-}
-
-.draft-note {
-    margin-right: auto;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--success-fg);
-}
-
-.form-error {
-    margin-top: var(--space-3);
-    color: var(--danger-fg);
-    font-size: var(--fs-13);
-}
-
-.form-hint {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-/* 드래그해서 놓는 칸. 파일 입력은 숨기고 라벨을 버튼처럼 쓴다. */
-.file-drop-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-7) var(--space-5);
-    border: 1px dashed var(--border-strong);
-    border-radius: var(--radius);
-    background: var(--input-bg);
-    text-align: center;
-    transition:
-        border-color var(--dur-fast) var(--ease),
-        background var(--dur-fast) var(--ease);
-}
-
-.file-drop-area svg {
-    color: var(--text);
-}
-
-.file-drop-area:hover,
-.file-drop-area:focus-within,
-.file-drop-area.is-dragging {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-}
-
-.file-drop-copy {
-    margin: 0;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-medium);
-    color: var(--text-strong);
-}
-
-.file-drop-pick {
-    display: inline-flex;
-    align-items: center;
-    height: var(--control-h-sm);
-    padding: 0 var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    color: var(--text-strong);
-    cursor: pointer;
-    transition:
-        border-color var(--dur-fast) var(--ease),
-        background var(--dur-fast) var(--ease);
-}
-
-.file-drop-pick:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-soft);
-}
-
-.file-drop-input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    border: 0;
-}
-
-.file-name {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.file-clear {
-    padding: 0;
-    border: none;
-    background: none;
-    font: inherit;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-medium);
-    color: var(--danger-fg);
-    cursor: pointer;
-}
-
-.submit-wait {
-    position: fixed;
-    inset: 0;
-    z-index: 90;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-4);
-    background: var(--overlay);
-}
-
-.submit-wait-card {
-    width: min(420px, 100%);
-    padding: var(--space-6) var(--space-5) var(--space-5);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    box-shadow: var(--shadow-2);
-}
-
-.submit-wait-date {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.submit-wait-card h2 {
-    margin: var(--space-2) 0 0;
-    font-size: var(--fs-20);
-    font-weight: var(--fw-semibold);
-    letter-spacing: -0.02em;
-    color: var(--text-strong);
-}
-
-.submit-meter {
-    height: var(--space-1);
-    margin: var(--space-4) 0;
-    background: var(--border);
-}
-
-.submit-meter span {
-    display: block;
-    height: 100%;
-    background: var(--accent);
-    transition: width 0.4s ease;
-}
-
-.submit-steps {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-}
-
-.submit-steps li {
-    min-height: var(--control-h-sm);
-    font-size: var(--fs-14);
-    color: var(--text-muted);
-}
-
-.submit-steps li.is-on {
-    color: var(--text-strong);
-    font-weight: var(--fw-semibold);
-}
-
-.submit-steps li.is-done {
-    color: var(--text);
-}
-
-.submit-wait-time {
-    margin: var(--space-4) 0 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-@media (max-width: 860px) {
-    .write-card {
-        padding-bottom: calc(var(--control-h-lg) + var(--space-8));
-    }
-
-    .write-head {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        gap: var(--space-2) var(--space-3);
-    }
-
-    .write-date {
-        width: 100%;
-        min-width: 0;
-        max-width: 100%;
-        min-height: var(--control-h-lg);
-        height: var(--control-h-lg);
-        font-size: var(--fs-16);
-        overflow: hidden;
-    }
-
-    .status-chip {
-        justify-self: start;
-        max-width: 100%;
-    }
-
-    .status-chip-more {
-        display: none;
-    }
-
-    .write-modes {
-        grid-column: 1 / -1;
-        margin-left: 0;
-    }
-
-    .write-footnote {
-        text-align: center;
-    }
-
-    .write-field .textarea {
-        min-height: 42dvh;
-        font-size: var(--fs-16);
-        line-height: 1.5;
-    }
-
-    .file-drop-copy {
-        font-size: var(--fs-14);
-    }
-
-    .file-drop-pick {
-        min-height: var(--control-h-lg);
-        height: var(--control-h-lg);
-        padding: 0 var(--space-5);
-    }
-
-    .form-actions {
-        position: sticky;
-        bottom: calc(var(--bottom-nav-offset) + var(--space-2));
-        z-index: 8;
-        flex-wrap: wrap;
-        justify-content: stretch;
-        margin: var(--space-4) calc(var(--space-4) * -1) calc(var(--space-4) * -1);
-        padding: var(--space-3) var(--space-4);
-        background: var(--surface);
-        border-top: 1px solid var(--border);
-    }
-
-    .form-actions .btn {
-        flex: 1 1 calc(50% - var(--space-2));
-    }
-
-    .form-actions .btn-primary {
-        flex: 1 1 100%;
-    }
-
-
-    .daily-write:has(.write-card.is-lines) {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        box-sizing: border-box;
-        min-height: calc(
-            100dvh - var(--topbar-height) - env(safe-area-inset-top, 0px) - var(--bottom-nav-offset)
-        );
-        padding-bottom: 0;
-        background: var(--surface);
-    }
-
-    .write-card.is-lines {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        margin-left: calc(-1 * max(var(--space-4), env(safe-area-inset-left, 0px)));
-        margin-right: calc(-1 * max(var(--space-4), env(safe-area-inset-right, 0px)));
-        margin-bottom: 0;
-        border-left: 0;
-        border-right: 0;
-        border-bottom: 0;
-        border-radius: 0;
-        padding-bottom: var(--space-4);
-        background: var(--surface);
-    }
-
-    .draft-note {
-        width: 100%;
-        margin-right: 0;
-    }
-}
-
-.line-dock-actions {
-    display: flex;
-    gap: var(--space-2);
-}
-
-.line-dock-actions .btn {
-    flex: 1;
-    min-height: var(--control-h-lg);
-}
-</style>
+<style scoped src="../styles/components/report.css"></style>

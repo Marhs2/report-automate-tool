@@ -1,16 +1,15 @@
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
-import { isAdmin } from "../composables/useSession";
+import { isAdmin, leaderTeamId } from "../composables/useSession";
 import { useDialog } from "../composables/useDialog";
-import PizZip from "pizzip";
-import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
 import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Trash2 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import { projectsFromDeck, toWeeklyDeck } from "../lib/weeklyDeck";
 import { useSidebar } from "../composables/useSidebar";
+import WeeklyCollection from "./weekly-collection.vue";
 import {
     isFutureDate,
     mondayOf,
@@ -259,6 +258,33 @@ const deleteWeekly = async (reportId) => {
     }
 };
 
+/* 초안을 만드는 동안(AI 호출) 일일보고 추출과 같은 기다림 화면을 띄운다. 단계는 경과 시간으로만 넘긴다. */
+const DRAFT_STAGES = ["일일보고를 모으고 있어요", "프로젝트별로 묶고 있어요", "주간 문장으로 다듬고 있어요"];
+const draftWaiting = ref(false);
+const draftElapsed = ref(0);
+let draftTimer = null;
+const draftStage = computed(() => (draftElapsed.value >= 25 ? 2 : draftElapsed.value >= 8 ? 1 : 0));
+const draftElapsedLabel = computed(() => {
+    const minutes = Math.floor(draftElapsed.value / 60);
+    const seconds = draftElapsed.value % 60;
+    return minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+});
+const startDraftWait = () => {
+    draftElapsed.value = 0;
+    draftWaiting.value = true;
+    document.documentElement.classList.add("is-overlay-open");
+    draftTimer = setInterval(() => {
+        draftElapsed.value += 1;
+    }, 1000);
+};
+const stopDraftWait = () => {
+    if (draftTimer !== null) clearInterval(draftTimer);
+    draftTimer = null;
+    if (draftWaiting.value) document.documentElement.classList.remove("is-overlay-open");
+    draftWaiting.value = false;
+};
+onUnmounted(stopDraftWait);
+
 const sendDates = async () => {
     if (!userId.value) {
         showAlert("로그인이 필요합니다.");
@@ -269,6 +295,7 @@ const sendDates = async () => {
         return;
     }
     isLoading.value = true;
+    startDraftWait();
     try {
         const response = await postWeeklyReport(userId.value, selects.value);
         const draft = response.data || {};
@@ -290,6 +317,7 @@ const sendDates = async () => {
         console.error("주간 보고서 생성 실패:", error);
         showAlert(detail || "주간 보고서 생성에 실패했습니다. 다시 시도해주세요.");
     } finally {
+        stopDraftWait();
         isLoading.value = false;
     }
 };
@@ -379,7 +407,7 @@ const missingDayCount = computed(
 
 const createSummary = computed(() => {
     const bits = [`선택 ${selects.value.length}일`];
-    if (missingDayCount.value) bits.push(`빠진 날 ${missingDayCount.value}일은 초안에 표시돼요`);
+    if (missingDayCount.value) bits.push(`미제출 ${missingDayCount.value}일은 초안에 표시돼요`);
     return bits.join(" · ");
 });
 
@@ -422,6 +450,11 @@ const downloadReport = async (report) => {
             throw new Error("템플릿 파일이 올바른 Word 문서가 아닙니다.");
         }
 
+        // DOCX 도구(약 600KB)는 내려받을 때만 불러온다.
+        const [{ default: PizZip }, { default: Docxtemplater }] = await Promise.all([
+            import("pizzip"),
+            import("docxtemplater"),
+        ]);
         const zip = new PizZip(arrayBuffer);
         const doc = new Docxtemplater(zip, {
             paragraphLoop: true,
@@ -501,7 +534,7 @@ const downloadReport = async (report) => {
         saveAs(out, filename);
     } catch (error) {
         console.error("보고서 다운로드 실패:", error);
-        showAlert("보고서 다운로드 중 오류가 발생했습니다: " + error.message);
+        showAlert("Word 파일을 만들지 못했습니다. 페이지를 새로고침한 뒤 다시 받아 주세요.");
     } finally {
         isLoading.value = false;
     }
@@ -574,16 +607,15 @@ onMounted(async () => {
 <template>
     <div class="page weekly-report-page">
         <!-- 1. 초안 만들기: 기간 → 날 고르기 → 만들기. 위에서 아래로 한 번에 끝난다. -->
-        <section class="wk-create" aria-labelledby="create-title">
-            <header class="view-head">
-                <div class="view-head-text">
-                    <h2 id="create-title" class="section-title">주간 초안 만들기</h2>
-                    <p class="view-period">
-                        {{ headerTitle }}
-                        <span v-if="isThisWeek" class="cat-tag is-progress">이번 주</span>
-                    </p>
-                </div>
-                <div class="view-nav">
+        <section class="wk-card wk-create" aria-labelledby="create-title">
+            <!-- 세 카드 모두 같은 머리줄: 제목 · 기간 · 오른쪽 조작. -->
+            <header class="group-head wk-head">
+                <h2 id="create-title">주간 초안 만들기</h2>
+                <span class="wk-period">
+                    {{ headerTitle }}
+                    <span v-if="isThisWeek" class="cat-tag is-progress">이번 주</span>
+                </span>
+                <div class="wk-head-nav">
                     <div class="stepper" role="group" aria-label="주 이동">
                         <button type="button" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
                             <ChevronLeft :size="16" />
@@ -681,7 +713,7 @@ onMounted(async () => {
                 <FileText :size="20" class="callout-icon" aria-hidden="true" />
                 <div class="callout-text">
                     <p class="callout-title">이 주의 주간보고가 이미 있어요</p>
-                    <p class="callout-body">새 초안을 만들면 기존 보고를 덮어써요.</p>
+                    <p class="callout-body">새 초안을 만들면 지금 있는 주간보고가 새 내용으로 바뀌어요.</p>
                 </div>
                 <button
                     type="button"
@@ -708,8 +740,8 @@ onMounted(async () => {
         </section>
 
         <!-- 2. 만든 보고서: 기간 · 프로젝트를 읽고, 내려받기는 바로 옆에서. -->
-        <section class="group-block" aria-labelledby="made-title">
-            <div class="group-head">
+        <section class="wk-card group-block wk-made" aria-labelledby="made-title">
+            <div class="group-head wk-head">
                 <h2 id="made-title">내가 만든 주간 보고서</h2>
                 <span v-if="weeklyGroups.length" class="group-meta">{{ weeklyGroups.length }}건</span>
             </div>
@@ -774,320 +806,31 @@ onMounted(async () => {
                 </div>
             </div>
         </section>
+
+        <!-- 3. 취합: 관리자는 전 부서, 팀장은 자기 부서를 한 PPT로. 팀원에게는 없다. -->
+        <WeeklyCollection v-if="isAdmin || leaderTeamId" class="wk-card wk-collect" />
     </div>
+    <Teleport to="body">
+        <div v-if="draftWaiting" class="submit-wait" role="status" aria-live="polite">
+            <div class="submit-wait-card">
+                <p class="submit-wait-date">{{ headerTitle }} 주간 초안 · {{ selects.length }}일</p>
+                <h2>{{ DRAFT_STAGES[draftStage] }}</h2>
+                <div class="submit-meter" aria-hidden="true">
+                    <span :style="{ width: ['18%', '52%', '78%'][draftStage] }"></span>
+                </div>
+                <ol class="submit-steps">
+                    <li
+                        v-for="(stage, index) in DRAFT_STAGES"
+                        :key="stage"
+                        :class="{ 'is-done': index < draftStage, 'is-on': index === draftStage }"
+                    >
+                        {{ stage }}
+                    </li>
+                </ol>
+                <p class="submit-wait-time">{{ draftElapsedLabel }} 지났어요 · 끝나면 초안 화면으로 넘어가요</p>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
-<style scoped>
-/* ---- 초안 만들기 ---------------------------------------------------- */
-.wk-create {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-}
-
-.wk-hint {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.day-chip:focus-visible,
-.week-fold-head:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-}
-
-.range-toggle {
-    height: var(--control-h);
-}
-
-/* 기간 입력: '기간 지정'을 누르면 두 날짜 필드가 나온다. */
-.week-range {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 200px));
-    gap: var(--space-3);
-    padding: var(--space-4);
-    border-radius: var(--radius);
-    background: var(--surface-soft);
-}
-
-.week-range label {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    min-width: 0;
-}
-
-.week-range span {
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    color: var(--text-strong);
-}
-
-.week-range .input {
-    min-width: 0;
-    height: var(--control-h);
-    background: var(--surface);
-}
-
-/* 주 단위 묶음. 데스크톱은 간격만, 좁은 화면(접힘)은 헤어라인으로 나눈다. */
-.week-folds {
-    display: grid;
-    gap: var(--space-3);
-}
-
-.week-fold-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    width: 100%;
-    min-height: var(--control-h-touch);
-    margin: 0;
-    padding: var(--space-2) 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-strong);
-    font: inherit;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    text-align: left;
-    word-break: keep-all;
-    cursor: pointer;
-}
-
-.week-fold-meta {
-    margin-left: auto;
-    font-size: var(--fs-13);
-    font-weight: normal;
-    color: var(--text-muted);
-}
-
-.week-fold-head svg {
-    flex: none;
-    color: var(--text-muted);
-    transition: transform var(--dur-fast) var(--ease);
-}
-
-.week-fold-head svg.is-open {
-    transform: rotate(180deg);
-}
-
-.week-fold-head + .day-chips {
-    margin-bottom: var(--space-3);
-}
-
-/* 날짜 칸: 하나씩 떨어진 칸. 고른 날은 파란 테두리 + 체크, 못 고르는 날은 회색 면. */
-.day-chips {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: var(--space-2);
-}
-
-.day-chip {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-1);
-    margin: 0;
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
-    line-height: var(--lh-tight);
-    text-align: left;
-    word-break: keep-all;
-    cursor: pointer;
-    transition:
-        background var(--dur-fast) var(--ease),
-        border-color var(--dur-fast) var(--ease);
-}
-
-.day-chip.on::after {
-    content: "";
-    position: absolute;
-    top: var(--space-3);
-    right: var(--space-3);
-    width: 18px;
-    height: 18px;
-    border-radius: var(--radius-xs);
-    background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center / 13px no-repeat;
-}
-
-.day-chip:not(:disabled):not(.on):hover {
-    border-color: var(--border-strong);
-    background: var(--surface-soft);
-}
-
-.day-chip.on {
-    border-color: var(--accent);
-    box-shadow: inset 0 0 0 1px var(--accent);
-    background: var(--accent-soft);
-}
-
-.day-chip-name {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.day-chip-date {
-    font-size: var(--fs-20);
-    font-weight: var(--fw-bold);
-    color: var(--text-strong);
-    font-variant-numeric: tabular-nums;
-}
-
-.day-chip-state {
-    margin-top: var(--space-1);
-}
-
-.cat-tag.is-muted {
-    background: transparent;
-    color: var(--text-muted);
-    padding: 0;
-}
-
-/* 일일보고가 없는 날은 고를 수 없다. 옅은 면으로 눕혀 둔다. */
-.day-chip.is-blank {
-    border-color: transparent;
-    background: var(--surface-soft);
-    cursor: not-allowed;
-}
-
-.day-chip.is-blank .day-chip-date {
-    color: var(--text-muted);
-}
-
-/* 아직 오지 않은 날. 켤 수는 있지만 끝난 날처럼 보이지 않게 흐리게 둔다. */
-.day-chip.is-future:not(.on) .day-chip-date {
-    color: var(--text-muted);
-}
-
-.wk-foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-}
-
-.create-summary {
-    flex: 1;
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.create-week-btn {
-    flex-shrink: 0;
-    height: var(--control-h-lg);
-    padding: 0 var(--space-5);
-}
-
-/* ---- 만든 보고서 ---------------------------------------------------- */
-.made-icon {
-    flex-shrink: 0;
-    color: var(--text-muted);
-}
-
-.made-actions .btn-small {
-    height: 28px;
-    gap: 4px;
-}
-
-@media (max-width: 860px) {
-    .range-toggle {
-        height: var(--control-h-touch);
-    }
-
-    .week-range {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--space-2);
-        padding: var(--space-3);
-    }
-
-    .week-range .input {
-        width: 100%;
-        min-width: 0;
-        max-width: 100%;
-        height: var(--control-h-touch);
-        font-size: var(--fs-16);
-        overflow: hidden;
-    }
-
-    .week-folds {
-        gap: 0;
-    }
-
-    .week-fold + .week-fold {
-        border-top: 1px solid var(--border);
-    }
-
-    .day-chips {
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-1);
-    }
-
-    .day-chip {
-        flex-direction: row;
-        align-items: center;
-        gap: var(--space-3);
-        min-height: var(--control-h-touch);
-        padding: var(--space-2) var(--space-3);
-    }
-
-    .day-chip.on::after {
-        position: static;
-        order: 3;
-        flex-shrink: 0;
-    }
-
-    .day-chip-name {
-        width: 2.5em;
-    }
-
-    .day-chip-date {
-        font-size: var(--fs-16);
-    }
-
-    .day-chip-state {
-        margin: 0 0 0 auto;
-    }
-
-    .create-summary {
-        flex-basis: 100%;
-    }
-
-    .create-week-btn {
-        width: 100%;
-        min-height: var(--control-h-touch);
-    }
-
-    /* 행 버튼은 이름 아래 한 줄로 내린다. */
-    .made-row {
-        flex-wrap: wrap;
-        row-gap: var(--space-2);
-    }
-
-    .made-row .row-chevron {
-        display: none;
-    }
-
-    .made-actions {
-        width: 100%;
-        padding-left: calc(18px + var(--space-3));
-    }
-
-    .made-actions .btn-small {
-        height: var(--control-h);
-    }
-
-    .made-actions .row-icon-btn {
-        margin-left: auto;
-        width: var(--control-h);
-        height: var(--control-h);
-    }
-}
-</style>
+<style scoped src="../styles/components/weekly-report.css"></style>

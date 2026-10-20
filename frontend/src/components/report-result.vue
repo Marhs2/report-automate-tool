@@ -6,13 +6,21 @@
                 <h1>{{ userName || "일일보고" }}</h1>
                 <span class="detail-date">{{ formatDotDate(reportDate) || "날짜 없음" }}</span>
                 <span class="status-chip" :class="stateChip.tone">{{ stateChip.label }}</span>
+                <button
+                    v-if="canAdminEdit && !adminEditing"
+                    type="button"
+                    class="btn btn-small"
+                    @click="adminEditing = true"
+                >
+                    관리자로 수정
+                </button>
             </div>
             <p v-if="reportData && canEdit" class="detail-summary">
                 {{ sizeLabel }}<template v-if="!savedReportId"> · AI가 만든 초안이에요. 원문과 대조하고 고친 뒤 저장하세요.</template>
             </p>
         </header>
 
-     
+
 
         <Teleport to="body">
             <div
@@ -153,7 +161,7 @@
                             type="button"
                             @click="openProjectPopup(projectIndex)"
                         >
-                            고르기
+                            프로젝트 선택
                         </button>
                         <button
                             class="btn btn-danger"
@@ -449,16 +457,25 @@ const isMine = computed(() => {
     return String(savedMemberId.value) === String(selectedUserId.value);
 });
 
-/** 새로 추출한 초안, 내 보고, 관리자는 고칠 수 있다. */
+/** 관리자가 다른 사람 보고를 열면 읽기로 시작한다. 고칠 때만 '관리자로 수정'을 누른다. */
+const adminEditing = ref(false);
+const canAdminEdit = computed(() => Boolean(savedReportId.value) && !isMine.value && isAdmin.value);
+
+/** 새로 추출한 초안, 내 보고, 수정을 연 관리자는 고칠 수 있다. */
 const canEdit = computed(() => {
     if (!savedReportId.value) return true;
-    return isMine.value || isAdmin.value;
+    return isMine.value || (isAdmin.value && adminEditing.value);
 });
 
 /** 상태가 글보다 먼저 보여야 한다. 새 추출은 "검토 전"을 분명히 적는다. */
 const stateChip = computed(() => {
     if (aiLoading.value) return { label: "재추출 중", tone: "is-info" };
     if (!savedReportId.value) return { label: "AI 초안 · 검토 전", tone: "is-draft" };
+    if (canAdminEdit.value) {
+        return adminEditing.value
+            ? { label: "다른 사람 보고 · 관리자 수정 중", tone: "is-info" }
+            : { label: "다른 사람 보고", tone: "is-saved" };
+    }
     return { label: canEdit.value ? "저장됨 · 수정 가능" : "저장됨", tone: "is-saved" };
 });
 
@@ -849,10 +866,10 @@ const writeReport = async (announce) => {
         const existing = await findSameDayReport(memberId, day);
         if (existing) {
             const [, month, date] = day.split("-").map(Number);
-            const ok = await askConfirm(`${month}월 ${date}일 보고를 덮어쓸까요?`, {
-                title: "같은 날 저장된 보고가 있어요",
-                help: `${overwriteNote(existing.parsed_json, reportData.value)}\n덮어쓰면 저장된 보고는 되돌릴 수 없어요.`,
-                confirmLabel: "덮어쓰기",
+            const ok = await askConfirm(`${month}월 ${date}일에 제출한 보고를 지금 내용으로 바꿀까요?`, {
+                title: "이미 제출한 보고가 있어요",
+                help: `${overwriteNote(existing.parsed_json, reportData.value)}\n바꾸면 전에 제출한 내용은 되돌릴 수 없어요.`,
+                confirmLabel: "바꾸기",
                 cancelLabel: "취소",
                 danger: true,
             });
@@ -954,534 +971,4 @@ const getSelectedMemberId = () => {
 };
 </script>
 
-<style scoped>
-/* 제목 줄 하나에 사람·날짜·상태·동작을 모은다. */
-.detail-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin-bottom: 0;
-}
-
-.detail-title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2) var(--space-3);
-    min-width: 0;
-}
-
-.detail-title h1 {
-    margin: 0;
-    font-family: var(--heading);
-    font-size: var(--fs-24);
-    letter-spacing: -0.02em;
-    color: var(--text-strong);
-}
-
-.detail-date {
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.detail-title .status-chip {
-    align-self: center;
-    font-size: var(--fs-12);
-}
-
-.detail-summary {
-    flex-basis: 100%;
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.empty-extract {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    border-style: dashed;
-}
-
-.empty-extract h2 {
-    margin: 0;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.empty-extract p {
-    margin: 0;
-    font-size: var(--fs-14);
-    line-height: var(--lh-base);
-    color: var(--text-muted);
-}
-
-.empty-extract-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    margin-top: var(--space-1);
-}
-
-.reextract {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin: 0 0 var(--space-3);
-    padding: var(--space-3) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-}
-
-.reextract p {
-    margin: 0;
-    min-width: 0;
-    font-size: var(--fs-13);
-    line-height: 1.45;
-    color: var(--text);
-    word-break: keep-all;
-}
-
-.reextract-btn {
-    flex: none;
-    width: auto;
-}
-
-/* 읽기 모드: 입력칸 대신 문서로 읽는다. */
-.read-project-name {
-    margin: 0;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    word-break: keep-all;
-}
-
-/* 읽기: 분류 태그 한 칸 + 항목 목록. 편집 화면과 같은 줄 구조다. */
-.read-block {
-    display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
-    gap: var(--space-3);
-    align-items: start;
-}
-
-.read-block + .read-block {
-    margin-top: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border);
-}
-
-.read-block h3 {
-    margin: 2px 0 0;
-    font-size: var(--fs-13);
-}
-
-.read-list {
-    margin: 0;
-    padding-left: var(--space-5);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-}
-
-.read-list li {
-    font-size: var(--fs-14);
-    color: var(--text-strong);
-    line-height: var(--lh-relaxed);
-    word-break: keep-all;
-}
-
-.projects-container {
-    scroll-margin-top: calc(var(--topbar-height) + var(--space-4));
-}
-
-.project-head {
-    padding-bottom: var(--space-3);
-    border-bottom: 1px solid var(--border);
-}
-
-.project-dot {
-    flex-shrink: 0;
-    width: var(--space-2);
-    height: var(--space-2);
-    border-radius: 50%;
-    background: var(--project-accent, var(--accent));
-}
-
-.project-nav {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-}
-
-.project-nav-label {
-    margin-right: var(--space-2);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    word-break: keep-all;
-}
-
-.project-nav-chip {
-    --project-accent: var(--accent);
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    max-width: 240px;
-    height: var(--control-h-sm);
-    padding: 0 var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    font: inherit;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-}
-
-.project-nav-chip:hover {
-    border-color: var(--project-accent);
-    background: var(--surface-soft);
-}
-
-.project-nav-chip[data-accent="1"] {
-    --project-accent: var(--info-fg);
-}
-
-.project-nav-chip[data-accent="2"] {
-    --project-accent: var(--warning-fg);
-}
-
-.project-nav-chip[data-accent="3"] {
-    --project-accent: var(--success-fg);
-}
-
-.project-nav-chip[data-accent="4"] {
-    --project-accent: var(--project-4-fg);
-}
-
-.project-nav-chip[data-accent="5"] {
-    --project-accent: var(--project-5-fg);
-}
-
-@media (max-width: 860px) {
-    .detail-head {
-        align-items: flex-start;
-        gap: var(--space-2);
-        margin-bottom: var(--space-3);
-    }
-
-    .detail-title {
-        width: 100%;
-    }
-
-    .detail-title h1 {
-        font-size: var(--fs-20);
-    }
-
-    .reextract-btn {
-        min-height: var(--control-h-lg);
-    }
-
-    .project-nav {
-        flex-wrap: nowrap;
-        align-items: stretch;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-    }
-
-    .project-nav-label {
-        flex: none;
-        align-self: center;
-    }
-
-    .project-nav-chip {
-        flex: none;
-        max-width: 220px;
-        min-height: var(--control-h-lg);
-    }
-}
-
-.report-doc .save-bar {
-    margin-top: var(--space-2);
-}
-
-.edit-quiet {
-    min-height: var(--control-h-lg);
-    padding: 0 var(--space-1);
-    border: 0;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-size: var(--fs-16);
-    cursor: pointer;
-}
-
-.edit-quiet:disabled {
-    opacity: 0.5;
-    cursor: default;
-}
-
-.edit-current {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding-bottom: var(--space-4);
-}
-
-.edit-current .input {
-    min-width: 0;
-    flex: 1;
-    min-height: var(--control-h-lg);
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-}
-
-.edit-more {
-    flex: none;
-    min-height: var(--control-h-lg);
-    padding: 0 var(--space-2);
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--accent);
-    font: inherit;
-    font-size: var(--fs-16);
-    cursor: pointer;
-}
-
-.edit-more:hover {
-    background: var(--surface-soft);
-    color: var(--text-strong);
-}
-
-.edit-bucket + .edit-bucket {
-    margin-top: var(--space-3);
-}
-
-.edit-bucket h2 {
-    margin: 5px 0;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.edit-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-top: var(--space-2);
-}
-
-.edit-row .input {
-    min-width: 0;
-    flex: 1;
-    min-height: var(--control-h-lg);
-    font-size: var(--fs-16);
-}
-
-.edit-remove {
-    flex: none;
-    min-width: var(--control-h-lg);
-    min-height: var(--control-h-lg);
-    padding: 0 var(--space-2);
-    border: 0;
-    background: transparent;
-    color: var(--danger-fg);
-    font: inherit;
-    font-size: var(--fs-14);
-    cursor: pointer;
-}
-
-.edit-empty {
-    margin: 0;
-    min-height: var(--control-h-lg);
-    display: flex;
-    align-items: center;
-    border-top: 1px solid var(--border);
-    font-size: var(--fs-14);
-    color: var(--text-muted);
-}
-
-.edit-compose {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin-top: var(--space-4);
-}
-
-.edit-kinds {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    min-width: 0;
-}
-
-.edit-kinds button {
-    flex: 1 1 calc(33.33% - var(--space-2));
-    min-width: 0;
-    min-height: var(--control-h-lg);
-    padding: 0 var(--space-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text-strong);
-    font: inherit;
-    font-size: var(--fs-14);
-    white-space: nowrap;
-    cursor: pointer;
-    transition:
-        border-color var(--dur-fast) var(--ease),
-        background var(--dur-fast) var(--ease);
-}
-
-.edit-kinds button:hover {
-    border-color: var(--border-strong);
-}
-
-.edit-kinds button.is-on {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-    color: var(--accent-hover);
-    font-weight: var(--fw-semibold);
-}
-
-.edit-kinds button:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-}
-
-.edit-entry {
-    display: flex;
-    gap: var(--space-2);
-    align-items: center;
-}
-
-.edit-entry .input {
-    min-width: 0;
-    flex: 1;
-    min-height: var(--control-h-lg);
-    font-size: var(--fs-16);
-}
-
-.edit-pick-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    max-height: 240px;
-    margin-bottom: var(--space-3);
-    overflow: auto;
-}
-
-.edit-pick-row {
-    display: flex;
-    gap: var(--space-2);
-    align-items: center;
-}
-
-.edit-pick-row .edit-pick {
-    flex: 1;
-    min-width: 0;
-}
-
-.edit-pick-row .edit-drop {
-    flex: none;
-    margin: 0;
-    padding: 0 var(--space-1);
-}
-
-.edit-pick {
-    min-height: var(--control-h-lg);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text-strong);
-    font: inherit;
-    font-size: var(--fs-16);
-    text-align: left;
-    cursor: pointer;
-}
-
-.edit-pick.is-on {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-}
-
-.edit-project-add {
-    display: flex;
-    gap: var(--space-2);
-    align-items: center;
-    margin-bottom: var(--space-3);
-}
-
-.edit-project-add .input {
-    min-width: 0;
-    flex: 1;
-    min-height: var(--control-h-lg);
-}
-
-.edit-drop {
-    display: flex;
-    align-items: center;
-    min-height: var(--control-h-lg);
-    margin: 0 0 var(--space-2);
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--danger-fg);
-    font: inherit;
-    font-size: var(--fs-16);
-    cursor: pointer;
-}
-
-.app-dialog-actions .edit-quiet {
-    color: var(--danger-fg);
-}
-
-.raw-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--space-2);
-}
-
-.raw-container .raw-head h2 {
-    margin: 0;
-    padding: 0;
-    border: 0;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-bold);
-    color: var(--text-strong);
-}
-
-.raw-fold {
-    min-height: var(--control-h-sm);
-    padding: 0 var(--space-2);
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--accent);
-    font: inherit;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    cursor: pointer;
-}
-
-.raw-fold:hover {
-    background: var(--surface-soft);
-}
-</style>
+<style scoped src="../styles/components/report-result.css"></style>

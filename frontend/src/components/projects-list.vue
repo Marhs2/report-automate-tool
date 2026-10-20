@@ -18,6 +18,16 @@ const isLoading = ref(false);
 const loadError = ref("");
 const query = ref("");
 const filterProject = ref("");
+/** 지금 걸린 조건. 두 개를 같이 걸면 결과가 비는데 무엇이 걸렸는지 안 보여 헷갈렸다. */
+const filterSummary = computed(() =>
+    [query.value.trim() && `검색 "${query.value.trim()}"`, filterProject.value && `프로젝트 ${filterProject.value}`]
+        .filter(Boolean)
+        .join(" · "),
+);
+const clearFilters = () => {
+    query.value = "";
+    filterProject.value = "";
+};
 
 const fetchReports = async () => {
     isLoading.value = true;
@@ -161,7 +171,14 @@ const deleteProjectReport = async (reportId) => {
         showAlert("자신의 보고만 삭제할 수 있습니다.");
         return;
     }
-    if (!(await askConfirm("이 보고서를 삭제할까요?"))) return;
+    const owner = isMine(report) ? "내" : `${report.member_name}님의`;
+    const ok = await askConfirm(`${formatDate(report.report_date)} ${owner} 일일보고를 삭제할까요?`, {
+        title: "일일보고 삭제",
+        confirmLabel: "삭제",
+        help: "삭제하면 되돌릴 수 없어요.",
+        danger: true,
+    });
+    if (!ok) return;
     try {
         await deleteReport(reportId);
         await fetchReports();
@@ -197,6 +214,11 @@ onMounted(() => {
             </select>
         </div>
 
+        <p v-if="filterSummary" class="filter-active">
+            <span>{{ filterSummary }}</span>
+            <button type="button" class="btn btn-small btn-ghost" @click="clearFilters">조건 지우기</button>
+        </p>
+
         <p v-if="isLoading" class="list-status" role="status">보고서를 불러오는 중</p>
         <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
         <div v-else-if="groups.length === 0" class="empty-state">
@@ -204,9 +226,12 @@ onMounted(() => {
                 {{ query.trim() || filterProject ? "맞는 보고가 없어요" : "아직 저장된 일일보고가 없어요" }}
             </p>
             <p class="empty-body">
-                {{ query.trim() || filterProject ? "검색어나 프로젝트를 바꿔 보세요." : "원문을 붙여 넣으면 AI가 프로젝트별로 정리해 줘요." }}
+                {{ filterSummary ? `${filterSummary} 조건에 맞는 보고가 없어요.` : "원문을 붙여 넣으면 AI가 프로젝트별로 정리해 줘요." }}
             </p>
-            <div v-if="!query.trim() && !filterProject" class="empty-actions">
+            <div v-if="filterSummary" class="empty-actions">
+                <button type="button" class="btn" @click="clearFilters">조건 지우기</button>
+            </div>
+            <div v-else class="empty-actions">
                 <router-link class="btn btn-primary" to="/compose?kind=daily">일일보고 쓰기</router-link>
             </div>
         </div>
@@ -270,146 +295,4 @@ onMounted(() => {
     </div>
 </template>
 
-<style scoped>
-.list-toolbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 220px;
-    gap: var(--space-2);
-}
-
-.list-toolbar .input {
-    min-width: 0;
-}
-
-.list-status {
-    margin: 0;
-    font-size: var(--fs-14);
-    color: var(--text-muted);
-}
-
-.list-status.is-error {
-    color: var(--danger-fg);
-}
-
-.day-weekday {
-    margin-left: 2px;
-    font-weight: var(--fw-regular);
-    color: var(--text-muted);
-}
-
-.me-mark {
-    display: inline-flex;
-    align-items: center;
-    height: 18px;
-    margin-left: var(--space-1);
-    padding: 0 5px;
-    border: 0;
-    border-radius: var(--radius-tag);
-    background: var(--accent-soft);
-    color: var(--accent-hover);
-    font-size: var(--fs-11);
-    font-weight: var(--fw-semibold);
-    vertical-align: 1px;
-}
-
-/* 날짜 머리는 스크롤해도 위에 붙어 있어 지금 어느 날을 보는지 잃지 않는다. */
-.group-head {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    padding-top: var(--space-2);
-    padding-bottom: var(--space-2);
-    background: var(--bg);
-}
-
-.group-block {
-    gap: 0;
-}
-
-.row {
-    align-items: flex-start;
-    padding-top: var(--space-3);
-    padding-bottom: var(--space-3);
-}
-
-.row .avatar {
-    margin-top: 1px;
-}
-
-.report-main {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-}
-
-.report-who {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    min-width: 0;
-}
-
-.report-name {
-    flex-shrink: 0;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.report-projects {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.report-headline {
-    font-size: var(--fs-14);
-    line-height: var(--lh-base);
-    color: var(--text-strong);
-    word-break: keep-all;
-    overflow-wrap: anywhere;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    margin-top: 2px;
-}
-
-.row-end {
-    align-self: center;
-}
-
-@media (max-width: 860px) {
-    .list-toolbar {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    }
-
-    .list-toolbar .input {
-        min-height: var(--control-h-lg);
-    }
-
-    .group-head {
-        top: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
-    }
-
-    .row-end .row-chevron {
-        display: none;
-    }
-
-    .row-icon-btn {
-        width: var(--control-h-sm);
-        height: var(--control-h-sm);
-    }
-}
-</style>
+<style scoped src="../styles/components/projects-list.css"></style>

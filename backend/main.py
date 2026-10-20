@@ -1,4 +1,3 @@
-import asyncio
 import io
 import json
 import os
@@ -14,12 +13,20 @@ from db import get_db
 from init_db import ensure_default_admin
 from dotenv import load_dotenv
 from kr_holidays import kr_holiday_map
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from openai import OpenAI
-import websockets
-from pptx_fill import fill_weekly_pptx
+import requests
+from pptx_fill import fill_combined_pptx, fill_weekly_pptx
+from weekly_collection import (
+    CollectionError,
+    collected_rows,
+    collection_status,
+    cover_date,
+    led_team_id,
+    monday_of,
+)
 from pptx_to_text import extract_all_text_from_pptx
 from weekly_deck import (
     from_legacy,
@@ -29,21 +36,25 @@ from weekly_deck import (
     replace_member_week,
 )
 from meeting_notes import (
+    ASR_API_KEY,
     ASR_BASE_URL,
     MeetingError,
-    asr_stream_url,
+    asr_transcribe_url,
+    check_chunk,
     check_meeting_date,
     check_transcript,
-    final_segment,
     fix_batches,
     fix_user_message,
     merge_numbered_fix,
     normalize_fix,
     normalize_summary,
     numbered_lines,
-    stream_config,
-    strip_context_echo,
+    piece_segment,
+    read_wav,
+    split_pieces,
     summary_user_message,
+    transcribe_form,
+    wav_bytes,
 )
 from work_records import (
     WorkRecordError,
@@ -507,6 +518,9 @@ def ensure_runtime_schema():
         ):
             conn.execute("ALTER TABLE projects ADD COLUMN report_date DATE")
         conn.execute("DROP TABLE IF EXISTS project_aliases")
+        team_columns = conn.execute("PRAGMA table_info(teams)").fetchall()
+        if team_columns and not any(column["name"] == "leader_id" for column in team_columns):
+            conn.execute("ALTER TABLE teams ADD COLUMN leader_id INTEGER")
         member_columns = conn.execute("PRAGMA table_info(members)").fetchall()
         if member_columns and not any(
             column["name"] == "password_hash" for column in member_columns
@@ -2205,6 +2219,46 @@ def get_report_draft(member_id: int, report_date: str, actor_id: int = Depends(c
     }
 
 
+@app.get("/report-drafts/{member_id}")
+def list_report_drafts(member_id: int, actor_id: int = Depends(current_member_id)):
+    """아직 제출하지 않은 내 초안. 제출하면 초안은 지워지므로 여기 남은 것은 모두 미제출이다."""
+    require_own_or_admin(actor_id, member_id)
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT report_date, updated_at, raw_text
+            FROM report_drafts
+            WHERE member_id = ? AND TRIM(raw_text) <> ''
+            ORDER BY report_date DESC
+            LIMIT 20
+            """,
+            (member_id,),
+        ).fetchall()
+    return [
+        {
+            "report_date": row[0],
+            "updated_at": row[1],
+            "preview": " ".join(str(row[2] or "").split())[:60],
+        }
+        for row in rows
+    ]
+
+
+@app.delete("/report-drafts/{member_id}/{report_date}")
+def delete_report_draft(member_id: int, report_date: str, actor_id: int = Depends(current_member_id)):
+    require_own_or_admin(actor_id, member_id)
+    report_date = validate_report_date(report_date)
+    with get_db() as conn:
+        deleted = conn.execute(
+            "DELETE FROM report_drafts WHERE member_id = ? AND report_date = ?",
+            (member_id, report_date),
+        ).rowcount
+        conn.commit()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="버릴 초안이 없습니다.")
+    return {"message": "초안을 버렸습니다.", "report_date": report_date}
+
+
 @app.get("/holidays")
 def get_holidays(year: int):
     items = kr_holiday_map(year - 1, year, year + 1)
@@ -2318,13 +2372,23 @@ def get_user_activities(
 def delete_report(report_id: int, actor_id: int = Depends(current_member_id)):
     with get_db() as db:
         row = db.execute(
-            "SELECT member_id FROM daily_reports WHERE id = ?",
+            "SELECT member_id, report_date FROM daily_reports WHERE id = ?",
             (report_id,),
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="보고서를 찾을 수 없습니다.")
         require_own_or_admin(actor_id, row["member_id"], conn=db)
         db.execute("DELETE FROM daily_reports WHERE id = ?", (report_id,))
+        # 프로젝트 행은 사람·날짜로 묶여 있다. 그날 보고가 남아 있지 않으면 같이 지워야 내 현황·프로젝트 흐름에 남지 않는다.
+        still_there = db.execute(
+            "SELECT 1 FROM daily_reports WHERE member_id = ? AND report_date = ?",
+            (row["member_id"], row["report_date"]),
+        ).fetchone()
+        if not still_there:
+            db.execute(
+                "DELETE FROM projects WHERE member_id = ? AND report_date = ?",
+                (row["member_id"], row["report_date"]),
+            )
     return {"message": "Report deleted successfully"}
 
 
@@ -2451,6 +2515,72 @@ def export_weekly_pptx(weekly_id: int, actor_id: int = Depends(current_member_id
                 f"attachment; filename*=UTF-8''{quote(filename)}"
             )
         },
+    )
+
+
+def _raise_collection(exc: CollectionError):
+    raise HTTPException(status_code=exc.status, detail=str(exc))
+
+
+def _collection_team(conn, actor_id: int):
+    """관리자는 전 부서(None), 팀장은 자기 부서만. 그 밖의 사람은 취합할 수 없다."""
+    if member_is_admin(conn, actor_id):
+        return None
+    team_id = led_team_id(conn, actor_id)
+    if team_id is None:
+        raise HTTPException(status_code=403, detail="팀장과 관리자만 주간보고를 취합할 수 있습니다.")
+    return team_id
+
+
+@app.get("/weekly-collection")
+def weekly_collection(week: str = "", actor_id: int = Depends(current_member_id)):
+    """그 주 주간보고 제출 현황. week는 그 주의 아무 날(YYYY-MM-DD), 비우면 이번 주."""
+    try:
+        with get_db() as conn:
+            team_id = _collection_team(conn, actor_id)
+            status = collection_status(conn, monday_of(week), team_id)
+    except CollectionError as exc:
+        _raise_collection(exc)
+    return {**status, "scope": "all" if team_id is None else "team"}
+
+
+@app.get("/weekly-collection/pptx")
+def weekly_collection_pptx(week: str = "", partial: int = 0, actor_id: int = Depends(current_member_id)):
+    """주간보고를 한 PPT로 합친다(팀장은 자기 부서만). 다 내지 않았으면 409, partial=1이면 낸 사람만으로 만든다."""
+    try:
+        with get_db() as conn:
+            team_id = _collection_team(conn, actor_id)
+            monday = monday_of(week)
+            status, rows = collected_rows(conn, monday, partial=bool(partial), team_id=team_id)
+    except CollectionError as exc:
+        _raise_collection(exc)
+    reports = []
+    for who, row in rows:
+        selected = json.loads(row["selected_date"])
+        reports.append(
+            {
+                **who,
+                "selectedDate": selected,
+                "report": from_legacy(
+                    normalize_issues(json.loads(row["report_json"])),
+                    selected_dates=selected,
+                    member_name=who["memberName"],
+                    team_name=who["teamName"],
+                ),
+            }
+        )
+    if team_id is None:
+        scope = f"전체 {len(status['teams'])}개 부서 · {status['submitted']}/{status['total']}명"
+        label = "전체"
+    else:
+        label = status["teams"][0]["name"]
+        scope = f"{label} · {status['submitted']}/{status['total']}명"
+    payload = fill_combined_pptx(reports, report_date=cover_date(monday), scope=scope)
+    filename = f"주간_보고서_{label}_{status['week']['start']}.pptx"
+    return Response(
+        content=payload,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
     )
 
 
@@ -2614,12 +2744,14 @@ def login(data: LoginRequest):
             )
         token = _create_session(conn, row["id"])
         conn.commit()
+        leads_team_id = led_team_id(conn, row["id"])
     return {
         "token": token,
         "member_id": row["id"],
         "name": row["name"],
         "team_id": row["team_id"],
         "is_admin": bool(row["is_admin"]) if "is_admin" in row.keys() else False,
+        "leads_team_id": leads_team_id,
     }
 
 
@@ -2638,6 +2770,7 @@ def me(actor_id: int = Depends(current_member_id)):
             "SELECT id, name, team_id, created_at, is_admin FROM members WHERE id = ?",
             (actor_id,),
         ).fetchone()
+        leads_team_id = led_team_id(conn, actor_id) if row else None
     if not row:
         raise HTTPException(status_code=401, detail="로그인해 주세요.")
     return {
@@ -2646,6 +2779,7 @@ def me(actor_id: int = Depends(current_member_id)):
         "team_id": row["team_id"],
         "created_at": row["created_at"],
         "is_admin": bool(row["is_admin"]) if "is_admin" in row.keys() else False,
+        "leads_team_id": leads_team_id,
     }
 
 
@@ -2818,6 +2952,30 @@ def save_team(data: TeamRequest, actor_id: int = Depends(current_member_id)):
             )
         conn.commit()
     return {"message": "Team saved successfully."}
+
+class TeamLeaderRequest(BaseModel):
+    member_id: int | None = None
+
+
+@app.post("/teams/{team_id}/leader")
+def set_team_leader(team_id: int, data: TeamLeaderRequest, actor_id: int = Depends(current_member_id)):
+    """부서 팀장을 정하거나(member_id) 비운다(null). 그 부서 사람만 팀장이 될 수 있다."""
+    with get_db() as conn:
+        require_admin(conn, actor_id)
+        if not conn.execute("SELECT 1 FROM teams WHERE id = ?", (team_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="부서를 찾을 수 없습니다.")
+        if data.member_id is not None:
+            member = conn.execute(
+                "SELECT team_id FROM members WHERE id = ?", (data.member_id,)
+            ).fetchone()
+            if not member:
+                raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+            if int(member["team_id"] or 0) != int(team_id):
+                raise HTTPException(status_code=400, detail="그 부서 사람만 팀장이 될 수 있습니다.")
+        conn.execute("UPDATE teams SET leader_id = ? WHERE id = ?", (data.member_id, team_id))
+        conn.commit()
+    return {"team_id": team_id, "leader_id": data.member_id}
+
 
 @app.get("/teams/{member_id}")
 def get_team_by_member_id(member_id: int, actor_id: int = Depends(current_member_id)):
@@ -3100,112 +3258,61 @@ def _raise_meeting(exc: MeetingError):
 ASR_UNREACHABLE = f"음성 인식 서버({ASR_BASE_URL})에 연결하지 못했습니다. 서버가 켜져 있는지 확인해주세요."
 
 
-@app.websocket("/meeting/stream")
-async def meeting_stream(ws: WebSocket):
-    """회의 녹음을 받아 적기 서버(Qwen3-ASR, qwen_live_server.py)로 흘려 보내고 받아 적은 글을 돌려준다.
+# 30초 구간 하나를 받아 적는 데 걸리는 시간. 모델을 처음 올리는 중이면 오래 걸린다.
+ASR_TIMEOUT_SECONDS = float(os.environ.get("ASR_TIMEOUT_SECONDS", "300"))
 
-    브라우저 → 서버: 첫 메시지 {"token"}, 그다음 바이너리(16kHz 모노 16비트 PCM), 끝에 "end".
-    서버 → 브라우저: ready(받아 적기 서버에 붙음), partial {utt, text}(말하는 중), final {utt, start, end, text}.
-    "end" 뒤에는 polishing을 보내고, 발화마다 사내 용어로 교정한 done {segments, duration}으로 끝낸다.
-    """
-    await ws.accept()
 
-    async def send(payload: dict) -> bool:
-        try:
-            await ws.send_json(payload)
-            return True
-        except Exception:
-            return False
-
+def _transcribe_piece(wav: bytes, vocabulary: list[str], seconds: float) -> dict:
     try:
-        first = await asyncio.wait_for(ws.receive_json(), 15)
-        await asyncio.to_thread(current_member_id, str((first or {}).get("token") or ""))
-    except Exception:
-        await send({"type": "error", "message": "로그인이 만료되었습니다. 다시 로그인해 주세요."})
-        await ws.close(code=4401)
-        return
-
-    vocabulary = await asyncio.to_thread(meeting_vocabulary)
-    try:
-        upstream = await websockets.connect(
-            asr_stream_url(), max_size=None, open_timeout=10, ping_interval=20, ping_timeout=120,
+        resp = requests.post(
+            asr_transcribe_url(),
+            headers={"Authorization": f"Bearer {ASR_API_KEY}"} if ASR_API_KEY else {},
+            files={"file": ("piece.wav", wav, "audio/wav")},
+            data=transcribe_form(vocabulary, seconds),
+            timeout=ASR_TIMEOUT_SECONDS,
         )
-        await upstream.send(json.dumps(stream_config(vocabulary), ensure_ascii=False))
-    except Exception as e:
-        print(f"[meeting-asr] connect error: {e!r}")
-        await send({"type": "error", "message": ASR_UNREACHABLE})
-        await ws.close()
-        return
-    await send({"type": "ready"})
-
-    segments = []
-
-    async def browser_to_asr() -> bool:
-        """녹음을 넘긴다. "end"를 받았으면 True, 브라우저가 그냥 떠났으면 False."""
-        while True:
-            msg = await ws.receive()
-            if msg["type"] == "websocket.disconnect":
-                return False
-            if msg.get("bytes") is not None:
-                await upstream.send(msg["bytes"])
-            elif msg.get("text") == "end":
-                await upstream.send("end")
-                return True
-
-    async def asr_to_browser():
-        """받아 적은 글을 넘긴다. done 메시지가 오면 그것을, 그냥 끊기면 None을 돌려준다."""
-        async for raw in upstream:
-            data = json.loads(raw)
-            kind = data.get("type")
-            if kind == "done":
-                return data
-            if kind == "final":
-                seg = final_segment(data, vocabulary)
-                if seg:
-                    segments.append(seg)
-                    await send({"type": "final", "utt": data.get("utt"), **seg})
-            elif kind == "partial":
-                text = strip_context_echo(data.get("text"), vocabulary)
-                await send({"type": "partial", "utt": data.get("utt"), "text": text})
-        return None
-
-    sending = asyncio.create_task(browser_to_asr())
-    receiving = asyncio.create_task(asr_to_browser())
-    try:
-        await asyncio.wait({sending, receiving}, return_when=asyncio.FIRST_COMPLETED)
-        if not receiving.done():
-            if sending.exception() or not sending.result():
-                return
-        else:
-            sending.cancel()
+    except requests.RequestException as e:
+        print(f"[meeting-asr] request error: {e!r}")
+        raise HTTPException(status_code=502, detail=ASR_UNREACHABLE)
+    if resp.status_code != 200:
+        print(f"[meeting-asr] upstream status={resp.status_code} body={resp.text[:500]}")
         try:
-            result = await receiving
-        except Exception as e:
-            print(f"[meeting-asr] stream error: {e!r}")
-            result = None
-        if not result:
-            # 받아 적은 데까지는 브라우저가 final로 이미 받았다.
-            await send({"type": "error", "message": "음성 인식 서버와 연결이 끊겼습니다. 받아 적은 데까지만 남습니다."})
-            return
-        await send({"type": "polishing"})
+            reason = resp.json()["error"]["message"]
+        except Exception:
+            reason = f"status={resp.status_code}"
+        raise HTTPException(status_code=502, detail=f"음성 인식 서버 오류: {reason}")
+    return resp.json()
+
+
+@app.post("/meeting/transcribe")
+def meeting_transcribe(
+    file: UploadFile = File(...),
+    offset: float = Form(0),
+    actor_id: int = Depends(current_member_id),
+):
+    """회의 녹음 조각(5분 안팎 16비트 모노 WAV) 하나를 받아 적고 사내 용어로 다듬는다.
+
+    받아 적기 서버에는 15초 안팎 구간(split_pieces)으로 나눠 차례로 보낸다. 길게 보내면 모델이 말을 지어내거나 문장을 빼먹는다.
+    offset은 조각이 회의에서 시작한 시각(초)이다. 돌려주는 구간의 start/end는 회의 처음부터 센다.
+    돌려주는 값: {segments: [{start, end, text}], duration}
+    """
+    try:
+        samples, rate = read_wav(check_chunk(file.file.read()))
+        vocabulary = meeting_vocabulary()
+        base = max(0.0, float(offset or 0))
+        segments = []
+        for start, end in split_pieces(samples, rate):
+            result = _transcribe_piece(wav_bytes(samples[start:end], rate), vocabulary, (end - start) / rate)
+            seg = piece_segment(result, start / rate, end / rate, vocabulary, base)
+            if seg:
+                segments.append(seg)
         if segments:
-            fixed = await asyncio.to_thread(polish_segments, [row["text"] for row in segments], vocabulary)
+            fixed = polish_segments([row["text"] for row in segments], vocabulary)
             for row, text in zip(segments, fixed):
                 row["text"] = text
-        await send({"type": "done", "segments": segments, "duration": float(result.get("duration") or 0)})
-    except WebSocketDisconnect:
-        pass
-    finally:
-        for task in (sending, receiving):
-            task.cancel()
-        try:
-            await upstream.close()
-        except Exception:
-            pass
-        try:
-            await ws.close()
-        except Exception:
-            pass
+        return {"segments": segments, "duration": round(len(samples) / rate, 2)}
+    except MeetingError as exc:
+        _raise_meeting(exc)
 
 
 def meeting_vocabulary() -> list[str]:

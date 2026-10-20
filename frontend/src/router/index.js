@@ -1,15 +1,17 @@
 import { createRouter, createWebHistory } from "vue-router";
-import reportResult from "../components/report-result.vue";
-import projectList from "../components/projects-list.vue";
+// 화면마다 따로 나눠 불러온다. 한 번에 묶으면 첫 화면이 모든 화면 코드를 다 받을 때까지 기다린다.
+const reportResult = () => import("../components/report-result.vue");
+const projectList = () => import("../components/projects-list.vue");
+// 첫 화면(내 현황)은 나누지 않는다. 나누면 본 코드 다음에 한 번 더 받아야 해서 가장 큰 글자가 늦게 뜬다.
 import dashboard from "../components/dashboard.vue";
-import compose from "../components/compose.vue";
-import activities from "../components/user-activities.vue";
-import weekly from "../components/weekly-report.vue";
-import weeklyDetail from "../components/weekly-detail.vue";
-import projectTimeline from "../components/project-timeline.vue";
-import settings from "../components/settings.vue";
-import admin from "../components/admin.vue";
-import login from "../components/login.vue";
+const compose = () => import("../components/compose.vue");
+const activities = () => import("../components/user-activities.vue");
+const weekly = () => import("../components/weekly-report.vue");
+const weeklyDetail = () => import("../components/weekly-detail.vue");
+const projectTimeline = () => import("../components/project-timeline.vue");
+const settings = () => import("../components/settings.vue");
+const admin = () => import("../components/admin.vue");
+const login = () => import("../components/login.vue");
 
 const routes = [
   {
@@ -144,5 +146,10 @@ const router = createRouter({
   routes,
 });
 
+
+// 탭 제목은 화면 이름을 따른다. 화면이 따로 정하지 않으면 '일일보고'로 남아 주간 상세 등에서 헷갈렸다.
+router.afterEach((to) => {
+  document.title = to.meta?.title || "일일보고";
+});
 
 export default router;

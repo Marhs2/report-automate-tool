@@ -1,0 +1,501 @@
+.last-meta {
+    margin-left: var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--fs-13);
+}
+
+/* ---- 오늘 콜아웃 (.callout 공통 + 화면 맨 위라 조금 크게) ------------- */
+.today {
+    padding: var(--space-5) var(--space-6);
+}
+
+.today-icon {
+    align-self: flex-start;
+    margin-top: 22px;
+}
+
+.today-date {
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.today-title {
+    margin: 0;
+    font-size: var(--fs-20);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.today .callout-body {
+    font-size: var(--fs-14);
+}
+
+.today-cta {
+    flex-shrink: 0;
+    height: var(--control-h-lg);
+    padding: 0 var(--space-5);
+}
+
+.inline-link {
+    color: var(--accent);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
+}
+
+.inline-link:hover {
+    text-decoration: underline;
+}
+
+/* ---- 배치: 폰은 오늘 → 이번 주·할 일 → 프로젝트, 넓은 화면은 오른쪽에 옆 칸 ---- */
+.page.dash {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+        "today"
+        "side"
+        "projects";
+    align-items: start;
+}
+
+.dash-today {
+    grid-area: today;
+}
+
+.dash-side {
+    grid-area: side;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    min-width: 0;
+}
+
+.dash-projects {
+    grid-area: projects;
+    min-width: 0;
+}
+
+@media (min-width: 1100px) {
+    .page.dash {
+        grid-template-columns: minmax(0, 1fr) 300px;
+        grid-template-areas:
+            "today side"
+            "projects side";
+        column-gap: var(--space-6);
+    }
+
+    .dash-side {
+        position: sticky;
+        top: var(--space-5);
+        gap: var(--space-4);
+    }
+
+    .dash-side .dash-section {
+        padding: var(--space-4);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+    }
+}
+
+/* ---- 다음 할 일 ------------------------------------------------------ */
+.focus-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.focus-project {
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.focus-line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+}
+
+.focus-line .cat-tag {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.focus-text {
+    min-width: 0;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+.history-more {
+    margin-left: 0;
+    align-self: flex-start;
+}
+
+/* ---- 섹션 공통 ------------------------------------------------------ */
+.dash-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+.dash-section-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+}
+
+.dash-section-meta {
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.dash-section-meta.is-danger {
+    color: var(--danger-fg);
+    font-weight: var(--fw-semibold);
+}
+
+.dash-note {
+    margin: 0;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+/* ---- 이번 주 -------------------------------------------------------- */
+.week-strip {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.week-cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.week-day {
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.week-num {
+    font-size: var(--fs-24);
+    font-weight: var(--fw-bold);
+    line-height: 1.1;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.week-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+}
+
+.week-cell.is-success .week-state { color: var(--success-fg); }
+.week-cell.is-danger { border-color: var(--danger-border); background: var(--danger-bg); }
+.week-cell.is-danger .week-state { color: var(--danger-fg); }
+.week-cell.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.week-cell.is-today .week-state { color: var(--accent-hover); }
+.week-cell.is-upcoming { background: var(--surface-soft); border-color: transparent; }
+.week-cell.is-upcoming .week-num { color: var(--text-muted); }
+.week-cell.is-upcoming .week-state { font-weight: var(--fw-regular); }
+
+/* ---- 내 프로젝트 ---------------------------------------------------- */
+.project-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.project-tab {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    max-width: 100%;
+    min-height: var(--control-h);
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease);
+}
+
+.project-tab:hover {
+    background: var(--surface-soft);
+}
+
+.project-tab:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.project-tab.is-on {
+    border-color: var(--text-strong);
+    background: var(--text-strong);
+    color: var(--surface);
+}
+
+.project-tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+}
+
+.project-tab-date {
+    flex-shrink: 0;
+    font-size: var(--fs-12);
+    opacity: 0.75;
+}
+
+.project-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
+}
+
+.project-panel-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+}
+
+.project-status {
+    margin: 0;
+    min-width: 0;
+    font-size: var(--fs-14);
+    color: var(--text);
+}
+
+.group-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.group-link:hover {
+    text-decoration: underline;
+}
+
+.history {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--border);
+}
+
+.history > li {
+    border-bottom: 1px solid var(--border);
+}
+
+.history-row {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-2);
+    border-radius: var(--radius-xs);
+    color: inherit;
+    text-decoration: none;
+    transition: background var(--dur-fast) var(--ease);
+}
+
+.history-row:hover {
+    background: var(--surface-soft);
+}
+
+.history-row:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.history-when {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.history-date {
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.history-kind {
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.history-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.history-line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+}
+
+.history-line .cat-tag {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.history-text {
+    min-width: 0;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+.list-status {
+    margin: 0;
+    font-size: var(--fs-14);
+    color: var(--text-muted);
+}
+
+.list-status.is-error {
+    color: var(--danger-fg);
+}
+
+@media (max-width: 860px) {
+    .today {
+        padding: var(--space-4);
+    }
+
+    .today-icon {
+        margin-top: 2px;
+    }
+
+    .today-title {
+        font-size: var(--fs-16);
+    }
+
+    .project-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        margin: 0 calc(-1 * var(--space-4));
+        padding: 0 var(--space-4);
+        scrollbar-width: none;
+    }
+
+    .project-tab {
+        flex-shrink: 0;
+    }
+
+    .history-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-2);
+        padding: var(--space-3) 0;
+    }
+
+    .history-when {
+        flex-direction: row;
+        gap: var(--space-2);
+    }
+}
+
+/* 이번 주는 폰과 PC 옆 칸에서 작은 칸으로. 중간 폭(한 단 PC)만 크게 둔다. */
+@media (max-width: 860px), (min-width: 1100px) {
+    .week-strip {
+        gap: var(--space-1);
+    }
+
+    .week-cell {
+        align-items: center;
+        padding: var(--space-2) 0;
+    }
+
+    .week-day {
+        font-size: var(--fs-12);
+    }
+
+    .week-num {
+        font-size: var(--fs-16);
+    }
+
+    .week-state {
+        font-size: var(--fs-11);
+    }
+}
+
+/* 관리자 홈: 부서별 오늘 제출. 한 부서 한 줄. */
+.team-today {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: var(--space-3) 0 var(--space-2);
+    padding: 0;
+    list-style: none;
+}
+
+.team-today li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+}
+
+.team-today-name {
+    min-width: 48px;
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+}
+
+.team-today-count {
+    font-weight: var(--fw-semibold);
+    color: var(--danger-fg);
+}
+
+.team-today-count.is-all {
+    color: var(--success-fg);
+}
+
+.team-today-pending {
+    color: var(--text-muted);
+}

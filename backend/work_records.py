@@ -18,7 +18,7 @@ KIND_LABELS = {
     "daily": "일일보고",
     "weekly": "주간보고",
     "meeting": "회의록",
-    "general": "일반보고",
+    "general": "일일보고",
     "sales": "영업보고",
 }
 
@@ -187,18 +187,22 @@ def normalize_work(payload: dict) -> dict:
         phone = _limit(payload.get("phone"), 40, "전화번호")
         email = _limit(payload.get("email"), 120, "이메일")
         progress = _limit(payload.get("progress"), 4000, "진행사항")
+        # 한 번 저장할 때 틀린 칸을 모두 알려 준다. 하나씩 고치며 여러 번 저장하지 않게.
+        errors = []
         if not project_name:
-            raise WorkRecordError("프로젝트명을 입력해주세요.")
+            errors.append("프로젝트명을 입력해주세요.")
         if not contact:
-            raise WorkRecordError("담당자명을 입력해주세요.")
+            errors.append("담당자명을 입력해주세요.")
         if not phone and not email:
-            raise WorkRecordError("전화번호 또는 이메일을 입력해주세요.")
+            errors.append("전화번호 또는 이메일을 입력해주세요.")
         if phone and len(_digits(phone)) < 8:
-            raise WorkRecordError("전화번호가 너무 짧습니다.")
+            errors.append("전화번호가 너무 짧습니다.")
         if email and not _email_ok(email):
-            raise WorkRecordError("이메일 형식이 올바르지 않습니다.")
+            errors.append("이메일 형식이 올바르지 않습니다.")
         if not progress:
-            raise WorkRecordError("진행사항을 입력해주세요.")
+            errors.append("진행사항을 입력해주세요.")
+        if errors:
+            raise WorkRecordError(" ".join(errors))
         if not title:
             title = f"{project_name} · {contact}"[:200]
         details = {
@@ -960,11 +964,42 @@ def project_history(conn, member_id: int, project_name: str) -> list[dict]:
     return items
 
 
+def my_focus(conn, member_id: int):
+    """가장 최근 일일보고의 다음 계획 · 막힌 점 · 요청. 대시보드의 '다음 할 일'."""
+    latest = conn.execute(
+        "SELECT MAX(report_date) AS day FROM projects WHERE member_id = ?",
+        (member_id,),
+    ).fetchone()
+    day = latest["day"] if latest else None
+    if not day:
+        return None
+    items = []
+    for row in conn.execute(
+        """
+        SELECT name, next_plans, issues, requests FROM projects
+        WHERE member_id = ? AND report_date = ?
+        ORDER BY id
+        """,
+        (member_id, day),
+    ):
+        name = str(row["name"] or "").strip()
+        entry = {
+            "project": "" if name in SYNTHETIC_PROJECTS else name,
+            "nextPlans": _json_list(row["next_plans"])[:5],
+            "issues": _json_list(row["issues"])[:5],
+            "requests": _json_list(row["requests"])[:5],
+        }
+        if entry["nextPlans"] or entry["issues"] or entry["requests"]:
+            items.append(entry)
+    return {"date": day, "items": items} if items else None
+
+
 def build_dashboard(conn, member_id: int, project: str = "") -> dict:
     selected = str(project or "").strip()
     return {
         "projects": progress_projects(conn, member_id),
         "lastActivity": last_activity(conn, member_id),
+        "focus": my_focus(conn, member_id),
         "projectNames": project_names_for_member(conn, member_id),
         "selectedProject": selected,
         "history": project_history(conn, member_id, selected) if selected else [],

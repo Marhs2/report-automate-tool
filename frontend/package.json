@@ -10,17 +10,19 @@
     "test": "node --test src/lib/*.test.js"
   },
   "dependencies": {
+    "@vueuse/core": "^15.0.0",
     "axios": "^1.20.0",
-    "docx": "^9.8.1",
-    "docxtemplater": "^3.71.0",
+    "docx": "^9.13.0",
+    "docxtemplater": "^3.71.1",
     "file-saver": "^2.0.5",
     "lucide-vue-next": "^1.0.0",
     "pizzip": "^3.3.0",
-    "vue": "^3.5.43",
-    "vue-router": "^5.3.1"
+    "vue": "^3.5.44",
+    "vue-router": "^5.4.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.9",
-    "vite": "^8.3.1"
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "vite": "^8.3.4"
   }
 }

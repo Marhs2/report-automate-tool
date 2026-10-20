@@ -20,10 +20,6 @@
                     <button type="button" :class="{ 'is-on': isEditing }" :aria-pressed="isEditing"
                         :disabled="isReextracting" @click="!isEditing && toggleEditing()">수정</button>
                 </div>
-                <button v-if="canEdit && isEditing" type="button" class="btn btn-primary btn-small hide-on-narrow"
-                    @click="saveReport" :disabled="isSaving || isReextracting">
-                    {{ isSaving ? "저장 중..." : saveLabel }}
-                </button>
             </div>
         </header>
 
@@ -52,6 +48,7 @@
                                     <li v-for="(item, index) in group.items" :key="index">{{ item }}</li>
                                 </ul>
                             </div>
+                            <p v-if="!doneGroups(block).length" class="read-empty">없음</p>
                         </div>
                         <div class="split-col">
                             <h3 class="read-col-head">
@@ -61,6 +58,7 @@
                             <ul v-if="nextItems(block).length" class="read-list">
                                 <li v-for="(item, index) in nextItems(block)" :key="index">{{ item }}</li>
                             </ul>
+                            <p v-else class="read-empty">없음</p>
                         </div>
                     </div>
                 </section>
@@ -90,15 +88,13 @@
                     </div>
                     <div v-if="extras.collab" class="read-kind">
                         <h4>센터 협업</h4>
-                        <p v-if="collab?.supports.length" class="read-support">
-                            지원 {{ collab.supports.join(", ") }}
-                        </p>
-                        <ul class="read-list">
-                            <li v-for="(item, index) in [...(collab?.done || []), ...(collab?.next || [])].filter(Boolean)"
-                                :key="`rc-${index}`">
-                                {{ item }}
-                            </li>
-                        </ul>
+                        <template v-for="row in collabRows" :key="row.code">
+                            <p class="read-support">{{ row.code }}</p>
+                            <ul class="read-list">
+                                <li v-for="(item, index) in row.done" :key="`rcd-${index}`">{{ item }}</li>
+                                <li v-for="(item, index) in row.next" :key="`rcn-${index}`">향후 · {{ item }}</li>
+                            </ul>
+                        </template>
                     </div>
                 </section>
             </div>
@@ -109,6 +105,9 @@
                 <details class="card meta-card">
                     <summary>
                         <span class="meta-summary">{{ metaSummary }}</span>
+                        <button type="button" class="btn btn-small layout-chip" @click.prevent.stop="changeLayout">
+                            PPT · {{ layoutName }}
+                        </button>
                         <span class="meta-edit">수정</span>
                     </summary>
                     <div class="meta-grid">
@@ -130,64 +129,6 @@
                         <AppField label="향후 주차">
                             <input class="input" :value="nextWeek" readonly tabindex="-1" />
                         </AppField>
-                    </div>
-                </details>
-
-                <!-- 공지사항 슬라이드 -->
-                <details class="card fold-card" :open="notices.length > 0">
-                    <summary>
-                        <span class="fold-title">공지사항</span>
-                        <span class="fold-count">{{ notices.length }}건</span>
-                        <span v-if="!notices.length" class="fold-hint">비우면 슬라이드가 빠집니다</span>
-                    </summary>
-                    <div v-for="(notice, noticeIndex) in notices" :key="`notice-${noticeIndex}`"
-                        class="fold-block notice-block">
-                        <div class="fold-block-head">
-                            <input class="input" v-model="notice.title" placeholder="공지 제목" />
-                            <button type="button" class="btn btn-danger" @click="removeNotice(noticeIndex)">
-                                삭제
-                            </button>
-                        </div>
-                        <div v-for="(_line, lineIndex) in notice.body" :key="`line-${lineIndex}`" class="task-row">
-                            <input class="input" v-model="notice.body[lineIndex]" placeholder="세부 내용 한 줄" />
-                            <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
-                                @click="removeNoticeLine(notice, lineIndex)">
-                                <X :size="14" aria-hidden="true" />
-                            </button>
-                        </div>
-                        <button type="button" class="btn add-btn" @click="addNoticeLine(notice)">
-                            + 줄 추가
-                        </button>
-                    </div>
-                    <button type="button" class="btn add-project-btn add-notice-btn" @click="addNotice">
-                        공지 추가
-                    </button>
-                </details>
-
-                <!-- 주요 업무 현황 슬라이드의 이벤트 표 -->
-                <details class="card fold-card" :open="eventCount > 0">
-                    <summary>
-                        <span class="fold-title">주요 이벤트</span>
-                        <span class="fold-count">{{ eventCount }}건</span>
-                        <span v-if="!eventCount" class="fold-hint">비우면 이벤트 표가 빠집니다</span>
-                    </summary>
-                    <div class="split">
-                        <section v-for="list in eventLists" :key="list.key" class="field-group split-col">
-                            <h2>{{ list.label }}</h2>
-                            <div v-for="(event, eventIndex) in eventsOf(list.key)" :key="`${list.key}-${eventIndex}`"
-                                class="task-row">
-                                <input class="input event-when" v-model="event.when" placeholder="6/15" />
-                                <input class="input" v-model="event.title" placeholder="내용" />
-                                <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
-                                    @click="removeEvent(list.key, eventIndex)">
-                                    <X :size="14" aria-hidden="true" />
-                                </button>
-                            </div>
-                            <p v-if="!eventsOf(list.key).length" class="empty-msg">항목이 없습니다</p>
-                            <button type="button" class="btn add-btn" @click="addEvent(list.key)">
-                                + 추가
-                            </button>
-                        </section>
                     </div>
                 </details>
 
@@ -233,41 +174,119 @@
                     프로젝트 추가
                 </button>
 
-                <!-- 센터 협업 현황 슬라이드 -->
-                <details v-if="collab" class="card fold-card" :open="collabFilled > 0">
+                <!-- 아래는 PPT에만 들어가는 칸. 업무 내용을 먼저 쓰고 필요할 때만 채운다. -->
+                <h2 class="extras-label">PPT 전용 칸</h2>
+
+                <!-- 공지사항 슬라이드 -->
+                <details class="card fold-card" :open="foldOpen.notices"
+                    @toggle="foldOpen.notices = $event.target.open">
                     <summary>
-                        <span class="fold-title">센터 협업 현황</span>
-                        <span class="fold-count">{{ collab.supports.length }}개 센터</span>
-                        <span v-if="!collabFilled" class="fold-hint">비우면 슬라이드가 빠집니다</span>
+                        <span class="fold-title">공지사항</span>
+                        <span class="fold-count">{{ notices.length }}건</span>
+                        <span v-if="!notices.length" class="fold-hint">비우면 슬라이드가 빠집니다</span>
                     </summary>
-                    <div class="support-picker" role="group" aria-label="지원 센터">
-                        <span class="support-label">지원</span>
-                        <button v-for="code in COLLAB_CENTERS" :key="code" type="button" class="support-chip"
-                            :class="{ 'is-on': collab.supports.includes(code) }"
-                            :aria-pressed="collab.supports.includes(code)" @click="toggleSupport(code)">
-                            {{ code }}
+                    <div v-for="(notice, noticeIndex) in notices" :key="`notice-${noticeIndex}`"
+                        class="fold-block notice-block">
+                        <div class="fold-block-head">
+                            <input class="input project-name-input notice-title-input" v-model="notice.title"
+                                placeholder="공지 제목" />
+                            <button type="button" class="btn btn-danger" @click="removeNotice(noticeIndex)">
+                                삭제
+                            </button>
+                        </div>
+                        <div v-for="(_line, lineIndex) in notice.body" :key="`line-${lineIndex}`" class="task-row">
+                            <input class="input" v-model="notice.body[lineIndex]" placeholder="세부 내용 한 줄" />
+                            <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
+                                @click="removeNoticeLine(notice, lineIndex)">
+                                <X :size="14" aria-hidden="true" />
+                            </button>
+                        </div>
+                        <button type="button" class="btn add-btn" @click="addNoticeLine(notice)">
+                            + 줄 추가
                         </button>
                     </div>
+                    <button type="button" class="btn add-project-btn add-notice-btn" @click="addNotice">
+                        공지 추가
+                    </button>
+                </details>
+
+                <!-- 주요 업무 현황 슬라이드의 이벤트 표 -->
+                <details class="card fold-card" :open="foldOpen.events"
+                    @toggle="foldOpen.events = $event.target.open">
+                    <summary>
+                        <span class="fold-title">주요 이벤트</span>
+                        <span class="fold-count">{{ eventCount }}건</span>
+                        <span v-if="!eventCount" class="fold-hint">비우면 이벤트 표가 빠집니다</span>
+                    </summary>
                     <div class="split">
-                        <section v-for="col in collabColumns" :key="col.kind" class="field-group split-col">
-                            <h2>{{ col.label }}</h2>
-                            <div v-for="(_item, itemIndex) in collab[col.kind]" :key="`collab-${col.kind}-${itemIndex}`"
+                        <section v-for="list in eventLists" :key="list.key" class="field-group split-col">
+                            <h2>{{ list.label }}</h2>
+                            <div v-for="(event, eventIndex) in eventsOf(list.key)" :key="`${list.key}-${eventIndex}`"
                                 class="task-row">
-                                <input class="input" v-model="collab[col.kind][itemIndex]" placeholder="내용을 입력하세요" />
+                                <input class="input event-when" v-model="event.when" placeholder="6/15" />
+                                <input class="input" v-model="event.title" placeholder="내용" />
                                 <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
-                                    @click="removeCollabItem(col.kind, itemIndex)">
+                                    @click="removeEvent(list.key, eventIndex)">
                                     <X :size="14" aria-hidden="true" />
                                 </button>
                             </div>
-                            <button type="button" class="btn add-btn" @click="addCollabItem(col.kind)">
+                            <p v-if="!eventsOf(list.key).length" class="empty-msg">항목이 없습니다</p>
+                            <button type="button" class="btn add-btn" @click="addEvent(list.key)">
                                 + 추가
                             </button>
                         </section>
                     </div>
                 </details>
 
+                <!-- 센터 협업 현황 슬라이드 -->
+                <details v-if="collab" class="card fold-card" :open="foldOpen.collab"
+                    @toggle="foldOpen.collab = $event.target.open">
+                    <summary>
+                        <span class="fold-title">센터 협업 현황</span>
+                        <span class="fold-count">{{ collabVisible.length && !collabFilled ? `${collabVisible.length}개 센터` : `${collabFilled}건` }}</span>
+                        <span v-if="!collabFilled" class="fold-hint">비우면 슬라이드가 빠집니다</span>
+                    </summary>
+                    <!-- PPT 표와 같은 모양: 센터 행 × 진행 현황 · 향후일정 열. -->
+                    <!-- 내용이 있거나 방금 더한 센터만 줄로 보인다. PPT에는 다섯 줄이 모두 들어간다. -->
+                    <div v-if="collabVisible.length" class="collab-grid">
+                        <div class="collab-head" aria-hidden="true">
+                            <span>지원</span>
+                            <span v-for="col in collabColumns" :key="col.kind">{{ col.label }}</span>
+                        </div>
+                        <div v-for="code in collabVisible" :key="code" class="collab-row" :data-collab="code">
+                            <span class="collab-code">
+                                {{ code }}
+                                <button type="button" class="btn btn-danger btn-small collab-drop"
+                                    :aria-label="`${code} 센터 삭제`" @click="hideCenter(code)">삭제</button>
+                            </span>
+                            <div v-for="col in collabColumns" :key="col.kind" class="collab-cell"
+                                role="group" :aria-label="`${code} ${col.label}`">
+                                <span class="collab-cell-label">{{ col.label }}</span>
+                                <div v-for="(_item, itemIndex) in collab.centers[code][col.kind]"
+                                    :key="`collab-${code}-${col.kind}-${itemIndex}`" class="task-row">
+                                    <input class="input" v-model="collab.centers[code][col.kind][itemIndex]"
+                                        placeholder="내용을 입력하세요" />
+                                    <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
+                                        @click="removeCollabItem(code, col.kind, itemIndex)">
+                                        <X :size="14" aria-hidden="true" />
+                                    </button>
+                                </div>
+                                <button type="button" class="btn add-btn" @click="addCollabItem(code, col.kind)">
+                                    + 추가
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="collabHidden.length" class="collab-add" role="group" aria-label="센터 추가">
+                        <span class="collab-add-label">센터 추가</span>
+                        <button v-for="code in collabHidden" :key="code" type="button" class="btn btn-small"
+                            @click="showCenter(code)">
+                            + {{ code }}
+                        </button>
+                    </div>
+                </details>
+
                 <div class="card save-bar">
-                    <span class="save-note">{{ userName }}</span>
                     <div class="save-actions">
                         <button v-if="canEdit" type="button" class="btn btn-small" @click="reextractReport"
                             :disabled="isSaving || isReextracting">
@@ -283,6 +302,57 @@
         </div>
 
         <div v-else class="empty-state">보고서 데이터가 없습니다.</div>
+
+        <Teleport to="body">
+            <div v-if="layoutPicker" class="app-dialog-overlay" @click.self="closeLayoutPicker(null)"
+                @keydown.esc="closeLayoutPicker(null)">
+                <div class="card app-dialog layout-dialog" role="dialog" aria-modal="true"
+                    aria-labelledby="layout-dialog-title">
+                    <h2 id="layout-dialog-title" class="app-dialog-message">PPT를 어떤 형식으로 만들까요?</h2>
+                    <div class="layout-options" role="radiogroup" aria-labelledby="layout-dialog-title">
+                        <button v-for="option in WEEKLY_LAYOUTS" :key="option.value" type="button" role="radio"
+                            class="layout-option" :class="{ 'is-on': layoutPicker.choice === option.value }"
+                            :aria-checked="layoutPicker.choice === option.value"
+                            @click="layoutPicker.choice = option.value">
+                            <span class="layout-option-name">{{ option.label }}</span>
+                            <!-- 내 보고 앞부분을 주요 업무 현황 슬라이드 모양으로 줄여 그린다 -->
+                            <span class="slide" aria-hidden="true">
+                                <span class="slide-title">주요 업무 현황</span>
+                                <span class="slide-table" :class="`is-${layoutPreviews[option.value].kind}`">
+                                    <span v-if="layoutPreviews[option.value].kind === 'rows'" class="slide-head">구분</span>
+                                    <span class="slide-head">진행 현황</span>
+                                    <span class="slide-head is-next">향후일정</span>
+                                    <template v-if="layoutPreviews[option.value].kind === 'rows'">
+                                        <template v-for="(row, rowIndex) in layoutPreviews[option.value].rows"
+                                            :key="`r-${rowIndex}`">
+                                            <span class="slide-cell is-lead">{{ row.title }}</span>
+                                            <span v-for="key in ['done', 'next']" :key="key" class="slide-cell">
+                                                <span v-for="(line, lineIndex) in row[key]" :key="lineIndex"
+                                                    class="slide-line">{{ line }}</span>
+                                            </span>
+                                        </template>
+                                    </template>
+                                    <template v-else>
+                                        <span v-for="key in ['done', 'next']" :key="key" class="slide-cell">
+                                            <span v-for="(line, lineIndex) in layoutPreviews[option.value][key]"
+                                                :key="lineIndex" class="slide-line" :class="{ 'is-head': line.head }">
+                                                {{ line.text }}
+                                            </span>
+                                        </span>
+                                    </template>
+                                </span>
+                            </span>
+                        </button>
+                    </div>
+                    <div class="app-dialog-actions">
+                        <button type="button" class="btn" @click="closeLayoutPicker(null)">취소</button>
+                        <button type="button" class="btn btn-primary" @click="closeLayoutPicker(layoutPicker.choice)">
+                            {{ layoutPicker.forSave ? "이 형식으로 저장" : "이 형식으로" }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
@@ -295,8 +365,12 @@ import { selectedUserId } from "../composables/useSelectedUser";
 import { isAdmin } from "../composables/useSession";
 import {
     COLLAB_CENTERS,
+    WEEKLY_LAYOUTS,
+    asCollab,
+    layoutPreview,
+    collabItemCount,
     deckExtrasCount,
-    emptyCollab,
+    deckForSave,
     emptyEvent,
     emptyNotice,
     emptySection,
@@ -410,7 +484,6 @@ const metaSummary = computed(() => {
         data.report_date,
         data.author,
         data.center,
-        periodLabel.value,
     ]
         .map((value) => String(value || "").trim())
         .filter(Boolean)
@@ -554,50 +627,106 @@ const removeEvent = (key, index) => {
     reportData.value?.[key]?.splice(index, 1);
 };
 
+/** 편집은 센터별 모양으로만 한다. 예전 모양이나 빈 값은 처음 열 때 바꾼다. */
 const collab = computed(() => {
     if (!reportData.value) return null;
-    if (!reportData.value.collab) reportData.value.collab = emptyCollab();
+    if (!reportData.value.collab?.centers) reportData.value.collab = asCollab(reportData.value.collab);
     return reportData.value.collab;
 });
+
+const collabRows = computed(() =>
+    COLLAB_CENTERS.map((code) => {
+        const row = collab.value?.centers?.[code] || {};
+        return {
+            code,
+            done: (row.done || []).filter((item) => String(item || "").trim()),
+            next: (row.next || []).filter((item) => String(item || "").trim()),
+        };
+    }).filter((row) => row.done.length || row.next.length),
+);
 
 const collabColumns = [
     { kind: "done", label: "진행 현황" },
     { kind: "next", label: "향후일정" },
 ];
 
-const collabFilled = computed(() => {
-    const data = collab.value;
-    if (!data) return 0;
-    return (
-        data.supports.length +
-        [...(data.done || []), ...(data.next || [])].filter((item) =>
-            String(item || "").trim(),
-        ).length
-    );
+const collabFilled = computed(() => collabItemCount(collab.value));
+
+/* 접기 카드는 보고를 불러올 때만 "내용이 있으면 펼침"으로 정한다.
+   개수에 실시간으로 묶으면 마지막 항목을 지우는 순간 카드가 닫힌다. */
+const foldOpen = ref({ notices: false, events: false, collab: false });
+/* 협업 편집에 보이는 센터. 불러올 때는 내용 있는 센터만, 이후에는 항목을 다 지워도 줄을 남긴다. */
+const collabShown = ref([]);
+watch(reportData, () => {
+    foldOpen.value = {
+        notices: notices.value.length > 0,
+        events: eventCount.value > 0,
+        collab: collabFilled.value > 0,
+    };
+    collabShown.value = collabRows.value.map((row) => row.code);
 });
-
-const toggleSupport = (code) => {
-    const data = collab.value;
-    if (!data) return;
-    const index = data.supports.indexOf(code);
-    if (index >= 0) data.supports.splice(index, 1);
-    else data.supports.push(code);
+const collabVisible = computed(() => COLLAB_CENTERS.filter((code) => collabShown.value.includes(code)));
+const collabHidden = computed(() => COLLAB_CENTERS.filter((code) => !collabShown.value.includes(code)));
+/* 센터 줄을 빼면 그 센터 항목도 비운다. 내용이 있으면 한 번 묻는다. */
+const hideCenter = async (code) => {
+    const row = collab.value?.centers[code];
+    if (!row) return;
+    const filled = [...row.done, ...row.next].some((item) => String(item || "").trim());
+    if (filled && !(await askConfirm("저장하기 전에는 보고서에 반영되지 않습니다.", {
+        title: `${code} 협업 내용을 지울까요?`,
+        confirmLabel: "삭제",
+        danger: true,
+    }))) return;
+    collab.value.centers[code] = { done: [], next: [] };
+    collabShown.value = collabShown.value.filter((shown) => shown !== code);
 };
 
-const addCollabItem = (kind) => {
-    collab.value?.[kind].push("");
+const showCenter = async (code) => {
+    collabShown.value = [...collabShown.value, code];
+    addCollabItem(code, "done");
+    await nextTick();
+    document.querySelector(`[data-collab="${code}"] input`)?.focus();
 };
 
-const removeCollabItem = (kind, index) => {
-    const list = collab.value?.[kind];
-    if (!list) return;
-    list.splice(index, 1);
-    if (!list.length) list.push("");
+const addCollabItem = (code, kind) => {
+    collab.value?.centers[code][kind].push("");
+};
+
+const removeCollabItem = (code, kind, index) => {
+    collab.value?.centers[code][kind].splice(index, 1);
 };
 
 /* 센터·센터장은 매주 같은 값이다. 한 번 입력하면 다음 보고서에 자동으로 채운다. */
 const CENTER_KEY = "dxel.weekly.center";
 const DIRECTOR_KEY = "dxel.weekly.director";
+const LAYOUT_KEY = "dxel.weekly.layout";
+
+const layoutName = computed(
+    () => WEEKLY_LAYOUTS.find((option) => option.value === reportData.value?.layout)?.label || "형식 고르기",
+);
+
+/* 형식 고르기 창. 저장 전에(새 초안이거나 아직 안 고른 보고) 또는 '미리보기'로 연다. */
+const layoutPicker = ref(null);
+const layoutPreviews = computed(() =>
+    Object.fromEntries(WEEKLY_LAYOUTS.map((option) => [option.value, layoutPreview(reportData.value, option.value)])),
+);
+const pickLayout = (forSave) =>
+    new Promise((resolve) => {
+        const remembered = localStorage.getItem(LAYOUT_KEY);
+        const choice = [reportData.value?.layout, remembered].find((value) =>
+            WEEKLY_LAYOUTS.some((option) => option.value === value),
+        );
+        layoutPicker.value = { choice: choice || WEEKLY_LAYOUTS[0].value, forSave, resolve };
+        nextTick(() => document.querySelector(".layout-option.is-on")?.focus());
+    });
+const closeLayoutPicker = (value) => {
+    layoutPicker.value?.resolve(value);
+    layoutPicker.value = null;
+};
+const changeLayout = async () => {
+    const layout = await pickLayout(false);
+    if (layout) reportData.value.layout = layout;
+};
 
 const applyRememberedHeader = () => {
     const data = reportData.value;
@@ -617,14 +746,16 @@ const rememberHeader = () => {
     const director = String(data.director || "").trim();
     if (center && center !== "미지정") localStorage.setItem(CENTER_KEY, center);
     if (director) localStorage.setItem(DIRECTOR_KEY, director);
+    if (data.layout) localStorage.setItem(LAYOUT_KEY, data.layout);
 };
 
 
 
 const WEEKLY_DRAFT_KEY = "weeklyDraft";
 
+/* 저장된 보고는 읽기로 연다(읽으러 온 사람이 실수로 고치지 않게). 새 초안만 바로 수정으로 연다. */
 const openForEdit = () => {
-    isEditing.value = canEdit.value;
+    isEditing.value = canEdit.value && isUnsaved.value;
     if (isEditing.value) growAllEditors();
 };
 
@@ -811,7 +942,7 @@ const persistReport = async () => {
     isSaving.value = true;
     try {
         rememberHeader();
-        await updateWeeklyReport(reportId, JSON.stringify(reportData.value));
+        await updateWeeklyReport(reportId, JSON.stringify(deckForSave(reportData.value)));
         showAlert("주간 보고서가 저장되었습니다.");
     } catch (error) {
         console.error("저장 실패:", error);
@@ -840,7 +971,7 @@ const createSavedReport = async () => {
         const created = await postCreateWeekly(
             draft.memberId ?? ownerMemberId.value,
             selects,
-            JSON.stringify(reportData.value),
+            JSON.stringify(deckForSave(reportData.value)),
         );
         sessionStorage.removeItem(WEEKLY_DRAFT_KEY);
         showAlert("주간 보고서가 저장되었습니다.");
@@ -864,6 +995,11 @@ const saveReport = async () => {
         return;
     }
     if (isUnsaved.value && !(await askConfirmQuestions())) return;
+    if (isUnsaved.value || !reportData.value.layout) {
+        const layout = await pickLayout(true);
+        if (!layout) return;
+        reportData.value.layout = layout;
+    }
     if (isUnsaved.value) {
         await createSavedReport();
         return;
@@ -872,545 +1008,4 @@ const saveReport = async () => {
 };
 </script>
 
-<style scoped>
-.detail-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin-bottom: 0;
-}
-
-.detail-title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2) var(--space-3);
-    min-width: 0;
-}
-
-.detail-title h1 {
-    margin: 0;
-    font-family: var(--heading);
-    font-size: var(--fs-24);
-    letter-spacing: -0.02em;
-    color: var(--text-strong);
-}
-
-.detail-period {
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.detail-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: var(--space-2);
-}
-
-.detail-copy-col {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-2);
-}
-
-.read-project-name {
-    margin: 0 0 var(--space-3);
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    word-break: keep-all;
-}
-
-.read-col-head {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    margin: 0 0 var(--space-2);
-    font-family: var(--sans);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.read-col-head span {
-    font-size: var(--fs-11);
-    font-weight: var(--fw-medium);
-    color: var(--text);
-}
-
-.read-kind+.read-kind {
-    margin-top: var(--space-3);
-}
-
-.read-kind h4 {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    margin: 0 0 var(--space-1);
-    font-size: var(--fs-12);
-}
-
-.read-count {
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-.detail-title .state-chip {
-    align-self: center;
-}
-
-/* 읽기 · 수정 전환. 한때 인라인 색으로 칠하던 버튼을 분명한 두 칸으로 바꿨다. */
-.mode-switch {
-    display: inline-flex;
-    padding: 2px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-soft);
-}
-
-.mode-switch button {
-    height: 28px;
-    padding: 0 var(--space-3);
-    border: 0;
-    border-radius: var(--radius-xs);
-    background: transparent;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    cursor: pointer;
-}
-
-.mode-switch button.is-on {
-    background: var(--surface);
-    box-shadow: 0 0 0 1px var(--border);
-    color: var(--text-strong);
-    font-weight: var(--fw-semibold);
-}
-
-.mode-switch button:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-}
-
-.read-list {
-    margin: 0;
-    padding-left: var(--space-5);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-}
-
-.read-list li {
-    font-size: var(--fs-14);
-    color: var(--text-strong);
-    line-height: var(--lh-base);
-    word-break: keep-all;
-}
-
-.read-support {
-    margin: 0 0 var(--space-1);
-    font-size: var(--fs-12);
-    color: var(--text);
-}
-
-.extras-card .read-kind:first-of-type {
-    margin-top: 0;
-}
-
-/* 비어 있는 PPT 칸은 "0건" 카드로 늘어놓지 않고 한 줄로 알린다. */
-.extras-note {
-    margin: 0;
-    padding: var(--space-3) var(--space-4);
-    border: 1px dashed var(--border);
-    border-radius: var(--radius);
-    font-size: var(--fs-12);
-    color: var(--text);
-    word-break: keep-all;
-}
-
-/* 접히는 보조 카드: 공지사항 · 주요 이벤트 · 센터 협업 현황.
-   비어 있을 때는 한 줄로 접어 두고, 내용이 있으면 펼친 상태로 연다.
-   노션 토글처럼 박스 없이 줄 사이 선만 둔다. */
-.fold-card,
-.meta-card {
-    padding: var(--space-3) 0;
-    border: 0;
-    border-bottom: 1px solid var(--border);
-    border-radius: 0;
-    background: transparent;
-}
-
-.fold-card>summary {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    cursor: pointer;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.fold-card[open]>summary {
-    margin-bottom: var(--space-4);
-}
-
-.fold-title {
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.fold-count {
-    padding: 0 var(--space-2);
-    border-radius: var(--radius-sm);
-    background: var(--surface-soft);
-    font-size: var(--fs-11);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.fold-hint {
-    margin-left: auto;
-    font-size: var(--fs-12);
-    color: var(--text-muted);
-}
-
-.fold-block+.fold-block {
-    margin-top: var(--space-3);
-}
-
-/* 공지 하나 = 제목 줄 + 세부 줄. 카드 안에 또 카드를 두지 않고 가는 선으로만 나눈다. */
-.notice-block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    min-width: 0;
-    padding: var(--space-3) 0;
-    border-top: 1px solid var(--border);
-}
-
-.fold-block-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-2);
-    margin-bottom: 0;
-    min-width: 0;
-    width: 100%;
-}
-
-.fold-block-head .input {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-}
-
-.fold-block-head .btn {
-    width: auto;
-    min-width: calc(var(--control-h-lg) + var(--space-3));
-    height: var(--control-h);
-    padding: 0 var(--space-3);
-}
-
-.notice-block .add-btn {
-    align-self: flex-start;
-}
-
-.fold-card .add-project,
-.add-notice-btn {
-    margin-top: var(--space-3);
-}
-
-.event-when {
-    flex: 0 0 72px;
-    text-align: center;
-}
-
-.support-picker {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
-}
-
-.support-label {
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.support-chip {
-    height: var(--control-h-sm);
-    padding: 0 var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    font: inherit;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-    cursor: pointer;
-}
-
-.support-chip:hover {
-    border-color: var(--border-strong);
-}
-
-.support-chip.is-on {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-    color: var(--accent-hover);
-}
-
-.meta-card>summary {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    cursor: pointer;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.meta-summary {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-strong);
-    font-weight: var(--fw-medium);
-}
-
-.meta-edit {
-    margin-left: auto;
-    flex-shrink: 0;
-    color: var(--text-muted);
-}
-
-.meta-card[open]>summary {
-    margin-bottom: var(--space-4);
-}
-
-.json-container,
-.project-block,
-.split,
-.split-col,
-.meta-grid {
-    min-width: 0;
-    max-width: 100%;
-}
-
-.meta-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-3);
-}
-
-.meta-grid :deep(.input) {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-}
-
-.project-head {
-    min-width: 0;
-}
-
-/* 줄 끝에 붙는 작은 아이콘 버튼. 텍스트 '삭제' 버튼이 항목마다 반복되던 것을 대체한다. */
-.row-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: var(--control-h-sm);
-    height: var(--control-h-sm);
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition:
-        background var(--dur-fast) var(--ease),
-        color var(--dur-fast) var(--ease);
-}
-
-.row-btn:hover,
-.row-btn:focus-visible {
-    background: var(--danger-bg);
-    color: var(--danger-fg);
-}
-
-.add-item {
-    display: inline-flex;
-    align-items: center;
-    align-self: flex-start;
-    gap: var(--space-1);
-    padding: var(--space-1) var(--space-2);
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    font: inherit;
-    font-size: var(--fs-13);
-    color: var(--text);
-    cursor: pointer;
-}
-
-.add-item:hover {
-    background: var(--surface-soft);
-    color: var(--text-strong);
-}
-
-.add-project {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    width: 100%;
-    padding: var(--space-3);
-    border: 1px dashed var(--border-strong);
-    border-radius: var(--radius);
-    background: transparent;
-    font: inherit;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    color: var(--text);
-    cursor: pointer;
-}
-
-.add-project:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-soft);
-    color: var(--text-strong);
-}
-
-/* 두 칸은 면 대신 가운데 세로선으로 나눈다. */
-.split {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 0;
-    align-items: stretch;
-}
-
-.split > .split-col + .split-col {
-    padding-left: var(--space-5);
-    border-left: 1px solid var(--border);
-}
-
-.split > .split-col:first-child {
-    padding-right: var(--space-5);
-}
-
-.split-col {
-    margin-bottom: 0;
-}
-
-.task-row {
-    align-items: flex-start;
-}
-
-.task-editor {
-    min-height: var(--control-h);
-    resize: none;
-    overflow: hidden;
-    line-height: var(--lh-relaxed);
-}
-
-.project-block {
-    overflow: hidden;
-}
-
-/* 고정 저장 바의 위치·테두리·그림자는 report-doc.css의 .report-doc .save-bar가 담당한다. */
-.save-note {
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.save-actions {
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-}
-
-
-@media (max-width: 1100px) {
-
-    .meta-grid,
-    .split {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .split > .split-col + .split-col {
-        padding-left: 0;
-        border-left: 0;
-        border-top: 1px solid var(--border);
-    }
-
-    .split > .split-col:first-child {
-        padding-right: 0;
-    }
-}
-
-@media (max-width: 860px) {
-    .detail-actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        width: 100%;
-        gap: var(--space-2);
-    }
-
-    .mode-switch {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .mode-switch button {
-        min-height: var(--control-h-lg);
-    }
-
-    .detail-actions .btn,
-    .detail-copy-col .btn {
-        flex: none;
-        width: 100%;
-        min-height: var(--control-h-lg);
-    }
-
-    .meta-summary {
-        white-space: normal;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-    }
-
-    .fold-card>summary {
-        flex-wrap: wrap;
-        align-items: flex-start;
-        row-gap: var(--space-1);
-    }
-
-    .fold-hint {
-        flex-basis: 100%;
-        margin-left: 0;
-    }
-
-    .save-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        width: 100%;
-        margin-left: 0;
-    }
-
-    .save-actions .btn {
-        width: 100%;
-    }
-
-    .task-editor {
-        min-height: var(--control-h-lg);
-        font-size: var(--fs-16);
-    }
-}
-</style>
+<style scoped src="../styles/components/weekly-detail.css"></style>

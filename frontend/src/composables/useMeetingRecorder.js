@@ -1,20 +1,24 @@
 import { onBeforeUnmount, ref } from "vue";
-import { SAMPLE_RATE, createAutoGain, downsample, rms, toInt16 } from "../lib/meetingAudio";
+import { SAMPLE_RATE, createAutoGain, downsample, rms } from "../lib/meetingAudio";
 
 function micError(error) {
-    if (error?.name === "NotAllowedError") {
-        return new Error("마이크 권한이 막혀 있습니다. 주소창의 사이트 설정에서 마이크를 허용한 뒤 다시 눌러 주세요.");
+    if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
+        // code를 보고 화면이 브라우저 · 운영체제별 허용 방법을 펼쳐 보여 준다.
+        return Object.assign(new Error("마이크 권한이 막혀 있습니다. 아래 순서로 허용한 뒤 다시 눌러 주세요."), { code: "mic-denied" });
     }
     if (error?.name === "NotFoundError") {
-        return new Error("연결된 마이크를 찾지 못했습니다.");
+        return new Error("연결된 마이크를 찾지 못했습니다. 마이크를 연결하고 다시 눌러 주세요.");
     }
-    return new Error(`마이크를 열지 못했습니다: ${error?.message || error}`);
+    if (error?.name === "NotReadableError") {
+        return new Error("다른 프로그램이 마이크를 쓰고 있습니다. 화상회의 프로그램 등을 끄고 다시 눌러 주세요.");
+    }
+    return new Error("마이크를 열지 못했습니다. 페이지를 새로고침한 뒤 다시 눌러 주세요.");
 }
 
 /**
- * 마이크를 16kHz로 녹음해 onAudio(Int16Array)로 계속 넘긴다(0.25초 안팎마다).
+ * 마이크를 16kHz로 녹음해 onAudio(Float32Array)로 계속 넘긴다(0.25초 안팎마다).
  * 작은 목소리는 자동으로 키운다(createAutoGain). 막대도 키운 소리 크기를 보여 준다.
- * 발화를 끊는 일은 받아 적기 서버가 한다. 화면을 떠나면 마이크를 닫는다.
+ * 5분 조각으로 자르는 일은 useMeetingChunks가 한다. 화면을 떠나면 마이크를 닫는다.
  */
 export function useMeetingRecorder({ onAudio }) {
     const recording = ref(false);
@@ -72,7 +76,7 @@ export function useMeetingRecorder({ onAudio }) {
             totalSamples += chunk.length;
             seconds.value = totalSamples / SAMPLE_RATE;
             level.value = Math.min(1, rms(chunk) * 4);
-            onAudio(toInt16(chunk));
+            onAudio(chunk);
         };
         // ScriptProcessor는 destination에 이어져야 돈다. 스피커로는 소리를 내지 않는다.
         const mute = ctx.createGain();

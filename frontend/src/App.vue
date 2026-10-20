@@ -21,7 +21,7 @@ import { useRoute, useRouter } from "vue-router";
 import useApi from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
 import { selectedTeamId } from "./composables/useSelectedTeam";
-import { hasSession, isAdmin, sessionToken } from "./composables/useSession";
+import { hasSession, isAdmin, leaderTeamId, sessionToken } from "./composables/useSession";
 import { useDialog } from "./composables/useDialog";
 import { useSidebar } from "./composables/useSidebar";
 import { MOBILE_TABS, MORE_LINKS, PRIMARY_NAV } from "./lib/nav";
@@ -139,6 +139,7 @@ router.beforeEach((to) => {
 const clearSession = () => {
     sessionToken.value = "";
     isAdmin.value = false;
+    leaderTeamId.value = null;
     selectedUserId.value = null;
     selectedTeamId.value = null;
     currentUser.value = "";
@@ -159,6 +160,7 @@ const loadCurrent = async () => {
         selectedUserId.value = me.member_id;
         selectedTeamId.value = me.team_id ?? null;
         isAdmin.value = Boolean(me.is_admin);
+        leaderTeamId.value = me.leads_team_id ?? null;
         currentUser.value = me.name || `사용자 ${me.member_id}`;
         const teams = await getTeams();
         const foundTeam = teams.find((t) => String(t.id) === String(me.team_id));

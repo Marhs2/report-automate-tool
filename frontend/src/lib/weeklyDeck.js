@@ -34,6 +34,22 @@ const deckSections = (doneRaw, nextRaw) => {
     return { done, next };
 };
 
+/** 저장 직전 정리: 빈 프로젝트 · 빈 항목 · 빈 공지 · 빈 이벤트 줄을 본다. 편집 중인 원본은 그대로 둔다. */
+export function deckForSave(deck) {
+    const data = deck && typeof deck === "object" ? deck : {};
+    const filled = (item) => (item && typeof item === "object") || String(item ?? "").trim();
+    const sections = (list) =>
+        keptSections(list).map((section) => ({ ...section, items: (section.items || []).filter(filled) }));
+    return {
+        ...data,
+        done: sections(data.done),
+        next: sections(data.next),
+        notices: asNotices(data.notices).map((notice) => ({ ...notice, body: notice.body.filter(filled) })),
+        month_events: asEvents(data.month_events),
+        next_month_events: asEvents(data.next_month_events),
+    };
+}
+
 /** 진행 현황을 먼저 보고, 제목이 없는 향후일정만 그 뒤에 붙인다. */
 export const projectSectionOrder = (data) => {
     const order = [];
@@ -75,7 +91,65 @@ export const placeProjectSection = (data, anchor, section) => {
 export const emptyEvent = () => ({ when: "", title: "" });
 export const emptyNotice = () => ({ title: "", body: [""] });
 export const COLLAB_CENTERS = ["AC", "BC", "DC", "TC", "CSC"];
-export const emptyCollab = () => ({ supports: [], done: [""], next: [""] });
+const PREVIEW_SAMPLE = {
+    done: [{ title: "프로젝트 A", items: ["이번 주에 한 일"] }],
+    next: [{ title: "프로젝트 A", items: ["다음 주에 할 일"] }],
+};
+
+/**
+ * 형식 고르기 미리보기: 내 보고 앞부분을 그 형식으로 줄 세운다. backend pptx_fill의 section_lines · paginate_rows와 같은 꼴.
+ * text: { kind, done: [{ text, head }], next } / rows: { kind, rows: [{ title, done: ["- …"], next }] }
+ */
+export function layoutPreview(deck, layout, { projects = 2, items = 2 } = {}) {
+    const pick = (sections) =>
+        (sections || [])
+            .map((section) => ({
+                title: String(section?.title || "").trim(),
+                items: texts(section?.items).slice(0, items),
+            }))
+            .filter((section) => section.title || section.items.length)
+            .slice(0, projects);
+    let done = pick(deck?.done);
+    let next = pick(deck?.next);
+    if (!done.length && !next.length) {
+        done = PREVIEW_SAMPLE.done;
+        next = PREVIEW_SAMPLE.next;
+    }
+    if (layout === "rows") {
+        const rows = new Map();
+        for (const [key, sections] of [["done", done], ["next", next]]) {
+            for (const section of sections) {
+                if (!rows.has(section.title)) rows.set(section.title, { title: section.title, done: [], next: [] });
+                rows.get(section.title)[key].push(...section.items.map((item) => `- ${item}`));
+            }
+        }
+        return { kind: "rows", rows: [...rows.values()].slice(0, projects) };
+    }
+    const lines = (sections) =>
+        sections.flatMap((section, index) =>
+            layout === "bracket"
+                ? [
+                      ...(section.title ? [{ text: `[${section.title}]`, head: true }] : []),
+                      ...section.items.map((text) => ({ text, head: false })),
+                  ]
+                : [
+                      { text: `${index + 1}. ${section.title}`.trim(), head: true },
+                      ...section.items.map((text) => ({ text: `- ${text}`, head: false })),
+                  ],
+        );
+    return { kind: "text", done: lines(done), next: lines(next) };
+}
+
+/** 주요 업무 현황 PPT 형식(deck.layout). backend/weekly_deck.py WEEKLY_LAYOUTS와 같은 값. 비면 numbered. */
+export const WEEKLY_LAYOUTS = [
+    { value: "numbered", label: "1. 번호" },
+    { value: "bracket", label: "[대괄호]" },
+    { value: "rows", label: "구분 표" },
+];
+/** 센터 협업 현황: 센터마다 진행 현황(done) · 향후일정(next). backend/weekly_deck.py _as_collab과 같은 모양. */
+export const emptyCollab = () => ({
+    centers: Object.fromEntries(COLLAB_CENTERS.map((code) => [code, { done: [], next: [] }])),
+});
 
 const asNotices = (raw) => {
     const out = [];
@@ -101,25 +175,30 @@ const asEvents = (raw) => {
     return out;
 };
 
-const asCollab = (raw) => {
+/** 예전 모양({supports, done, next})은 첫 지원 센터(없으면 AC) 칸으로 옮긴다. */
+export const asCollab = (raw) => {
     const data = raw && typeof raw === "object" ? raw : {};
-    const seen = new Set();
-    const supports = [];
-    for (const item of data.supports || []) {
-        const code = String(item || "").trim().toUpperCase();
-        if (COLLAB_CENTERS.includes(code) && !seen.has(code)) {
-            seen.add(code);
-            supports.push(code);
+    const out = emptyCollab();
+    if (data.centers && typeof data.centers === "object") {
+        for (const [key, row] of Object.entries(data.centers)) {
+            const code = String(key || "").trim().toUpperCase();
+            if (out.centers[code] && row && typeof row === "object") {
+                out.centers[code] = { done: texts(row.done), next: texts(row.next) };
+            }
         }
+        return out;
     }
-    const done = texts(data.done);
-    const next = texts(data.next);
-    return {
-        supports,
-        done: done.length ? done : [""],
-        next: next.length ? next : [""],
-    };
+    const supports = (data.supports || []).map((item) => String(item || "").trim().toUpperCase());
+    const target = supports.find((code) => out.centers[code]) || COLLAB_CENTERS[0];
+    out.centers[target] = { done: texts(data.done), next: texts(data.next) };
+    return out;
 };
+
+export const collabItemCount = (collab) =>
+    COLLAB_CENTERS.reduce((sum, code) => {
+        const row = collab?.centers?.[code] || {};
+        return sum + [...(row.done || []), ...(row.next || [])].filter((item) => String(item || "").trim()).length;
+    }, 0);
 
 const yearOf = (value) => {
     const text = String(value || "").replaceAll(".", "-");
@@ -275,6 +354,7 @@ export function toWeeklyDeck(report) {
             data.week_label_next ||
             "",
         director: String(data.director || "").trim(),
+        layout: data.layout || "",
         notices: asNotices(data.notices),
         month_events: asEvents(data.month_events),
         next_month_events: asEvents(data.next_month_events),
@@ -341,15 +421,12 @@ export function deckExtrasCount(deck) {
     const events =
         asEvents(deck?.month_events).length +
         asEvents(deck?.next_month_events).length;
-    const collab = asCollab(deck?.collab);
-    const collabItems = [...(collab.done || []), ...(collab.next || [])].filter(
-        (item) => String(item || "").trim(),
-    ).length;
+    const collab = collabItemCount(asCollab(deck?.collab));
     return {
         notices,
         events,
-        collab: collab.supports.length + collabItems,
-        total: notices + events + collab.supports.length + collabItems,
+        collab,
+        total: notices + events + collab,
     };
 }
 
@@ -427,16 +504,16 @@ export function formatDeck(deck) {
         }
     }
     const collab = asCollab(deck.collab);
-    const collabDone = (collab.done || []).filter(Boolean);
-    const collabNext = (collab.next || []).filter(Boolean);
-    if (collab.supports.length || collabDone.length || collabNext.length) {
+    if (collabItemCount(collab)) {
         lines.push("");
         lines.push("[센터 협업 현황]");
-        if (collab.supports.length) {
-            lines.push(`지원: ${collab.supports.join(", ")}`);
+        for (const code of COLLAB_CENTERS) {
+            const row = collab.centers[code];
+            if (!row.done.length && !row.next.length) continue;
+            lines.push(code);
+            for (const item of row.done) lines.push(`- 진행: ${item}`);
+            for (const item of row.next) lines.push(`- 향후: ${item}`);
         }
-        for (const item of collabDone) lines.push(`- ${item}`);
-        for (const item of collabNext) lines.push(`- ${item}`);
     }
     return lines.join("\n").trim();
 }
