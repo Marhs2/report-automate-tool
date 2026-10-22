@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { useMyWeek } from "../composables/useMyWeek";
+import { useTeamSummary } from "../composables/useTeamSummary";
 import { todayString, weekdayLabelOf } from "../lib/dateScope";
 import { TEAM_LINKS } from "../lib/nav";
 import { shiftWorkday, teamDay } from "../lib/teamDay";
@@ -13,6 +14,8 @@ import KindTag from "./ui/KindTag.vue";
 const { getReports, getUsers, getTeams } = useApi();
 /** 남의 임시 저장은 볼 수 없지만 내 것은 안다. 내 줄만 "임시 저장"으로 보여 준다. */
 const { todayState } = useMyWeek();
+/** 팀장: 우리 부서 오늘 제출 · 주간 취합. 관리자: 부서별 오늘 제출 · 전체 주간 취합. 내 현황과 같은 값. */
+const { role, teamToday, myTeam, pct, collection, isMaking, makeDeck } = useTeamSummary();
 
 const today = todayString();
 const date = ref(today);
@@ -121,11 +124,65 @@ onMounted(load);
             </div>
         </div>
 
+        <!-- 팀장 · 관리자에게만. 오늘 기준 요약이라 다른 날을 볼 때는 숨긴다. -->
+        <div v-if="role === 'leader' && date === today && (myTeam || collection)" class="team-summary-cards">
+            <section v-if="myTeam" class="team-card">
+                <p class="team-card-label">우리 부서 오늘 제출</p>
+                <p class="team-card-num">{{ myTeam.done }} / {{ myTeam.total }}명</p>
+                <span class="team-bar" role="img" :aria-label="`${myTeam.total}명 중 ${myTeam.done}명 제출`">
+                    <span :style="{ width: `${pct(myTeam.done, myTeam.total)}%` }"></span>
+                </span>
+                <p class="team-card-note">
+                    <template v-if="myTeam.pending.length">아직 안 낸 사람 <b>{{ myTeam.pending.join(", ") }}</b></template>
+                    <template v-else>모두 냈어요</template>
+                </p>
+            </section>
+            <section v-if="collection" class="team-card">
+                <p class="team-card-label">이번 주 주간 취합</p>
+                <p class="team-card-num">{{ collection.submitted }} / {{ collection.total }}명</p>
+                <span class="team-bar" role="img" :aria-label="`${collection.total}명 중 ${collection.submitted}명 주간보고 제출`">
+                    <span :style="{ width: `${pct(collection.submitted, collection.total)}%` }"></span>
+                </span>
+                <button v-if="collection.complete" type="button" class="btn btn-primary" :disabled="isMaking" @click="makeDeck">
+                    {{ isMaking ? "만드는 중" : "부서 PPT 만들기" }}
+                </button>
+                <p v-else class="team-card-note">다 모이면 부서 PPT를 만들 수 있어요.</p>
+            </section>
+        </div>
+
+        <template v-if="role === 'admin' && date === today">
+            <section v-if="teamToday.length" class="team-depts" aria-labelledby="team-depts-title">
+                <h2 id="team-depts-title" class="team-section-label">부서별 오늘 제출 · 안 낸 사람이 많은 부서부터</h2>
+                <div class="group team-list">
+                    <div v-for="team in teamToday" :key="team.teamId ?? 'none'" class="team-dept">
+                        <span class="team-dept-name">{{ team.teamName }}</span>
+                        <span class="team-bar" :class="{ 'is-low': team.pending.length }" role="img" :aria-label="`${team.total}명 중 ${team.done}명 제출`">
+                            <span :style="{ width: `${pct(team.done, team.total)}%` }"></span>
+                        </span>
+                        <span class="team-dept-count" :class="team.pending.length ? 'is-low' : 'is-all'">{{ team.done }}/{{ team.total }}명</span>
+                        <span class="team-dept-who">{{ team.pending.length ? `아직 안 낸 사람 ${team.pending.join(", ")}` : "모두 냄" }}</span>
+                    </div>
+                </div>
+            </section>
+            <section v-if="collection" class="team-depts" aria-labelledby="team-collect-title">
+                <h2 id="team-collect-title" class="team-section-label">
+                    전체 주간 취합 · {{ collection.week.label }} · {{ collection.submitted }} / {{ collection.total }}명
+                </h2>
+                <div class="group team-list">
+                    <div v-for="team in collection.teams" :key="team.id ?? team.name" class="team-dept is-plain">
+                        <span class="team-dept-name">{{ team.name }}</span>
+                        <span class="team-dept-count">{{ team.submitted }}/{{ team.total }}명</span>
+                    </div>
+                    <router-link class="team-dept-link" to="/weekly">주간보고에서 취합하기</router-link>
+                </div>
+            </section>
+        </template>
+
         <p v-if="isLoading" class="list-status" role="status">불러오는 중</p>
         <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
 
         <template v-else>
-            <p v-if="day.notYet.length && !onlyIssues" class="team-notyet">
+            <p v-if="day.notYet.length && !onlyIssues && !(role === 'admin' && date === today)" class="team-notyet">
                 아직 안 낸 사람: {{ day.notYet.map((person) => person.name).join(", ") }}
             </p>
 

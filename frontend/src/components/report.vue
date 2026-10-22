@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ChevronDown, UploadCloud } from "lucide-vue-next";
+import { ChevronDown, CircleCheck, UploadCloud } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { useDialog } from "../composables/useDialog";
@@ -13,6 +13,8 @@ import {
 } from "../lib/reportTemplates";
 import { todayString, weekdayLabelOf } from "../lib/dateScope";
 import { useMyWeek } from "../composables/useMyWeek";
+import { useMyWeekly } from "../composables/useMyWeekly";
+import { focusColumnsOf } from "../lib/focusColumns";
 import { myRecentReports } from "../lib/reportSummary";
 import {
     linesToReportJson,
@@ -21,6 +23,10 @@ import {
     parseLineReport,
 } from "../lib/lineReport.js";
 import LineWriter from "./ui/line-writer.vue";
+import KindTag from "./ui/KindTag.vue";
+
+const FOCUS_KIND = { next: "next", issue: "issue", request: "request" };
+const FOCUS_LABEL = { next: "다음", issue: "이슈", request: "요청" };
 
 const {
     postReport,
@@ -35,6 +41,7 @@ const {
     postProjectName,
     getReports,
     postSaveReport,
+    getDashboard,
 } = useApi();
 const router = useRouter();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
@@ -59,6 +66,7 @@ const knownProjects = ref([]);
 /** 오른쪽 칸: 회의록 · 영업보고 탭처럼 "내가 쓴 일일보고". */
 const myReports = ref([]);
 const { weekDays } = useMyWeek();
+const { weeklyState, weeklyCard } = useMyWeekly();
 const todayIso = todayString();
 const moreOpen = ref(false);
 const TODAY_PLACEHOLDER = "예) MES 운영 문의 2건 처리했고, 엑셀 업로드 검증은 아직 하는 중. 도면이 안 와서 실측이 밀림";
@@ -68,6 +76,33 @@ const dateLabel = computed(() => {
     if (!month || !day) return "";
     return `${month}월 ${day}일 ${weekdayLabelOf(date.value)}요일`;
 });
+
+/* ---- 오늘 · 제출 후 ------------------------------------------------
+   오늘 보고를 이미 냈으면 쓰는 칸 대신 "다음 할 일"과 이번 주 주간보고를 보여 준다.
+   다른 날을 쓰거나 다시 보고 싶으면 아래 버튼으로 쓰는 칸을 연다. */
+const myReportRows = ref([]);
+const writeAnyway = ref(false);
+const focus = ref(null);
+const savedToday = computed(() => alreadySaved.value && date.value === todayIso && !writeAnyway.value);
+const savedReportId = computed(
+    () => myReportRows.value.find((row) => String(row.report_date) === String(date.value))?.id ?? null,
+);
+const focusColumns = computed(() => (focus.value?.date === todayIso ? focusColumnsOf(focus.value) : focusColumnsOf(null)));
+const hasFocus = computed(() => focusColumns.value.some((column) => column.items.length));
+const loadFocus = async () => {
+    try {
+        focus.value = (await getDashboard(""))?.focus || null;
+    } catch {
+        focus.value = null;
+    }
+};
+const writeAnotherDay = () => {
+    writeAnyway.value = true;
+    moreOpen.value = true;
+};
+watch(savedToday, (now) => {
+    if (now) loadFocus();
+}, { immediate: true });
 
 /** 아직 제출 안 한 임시 저장. 제출하면 서버가 지운다. */
 const myDrafts = ref([]);
@@ -310,6 +345,7 @@ const loadProjects = async () => {
     }
     knownProjects.value = orderProjectsByRecent(names, reports, getSelectedMemberId());
     myReports.value = myRecentReports(reports, getSelectedMemberId());
+    myReportRows.value = reports.filter((row) => String(row.member_id) === String(getSelectedMemberId()));
 };
 
 const registerProject = async (name) => {
@@ -592,6 +628,40 @@ const sendReport = async () => {
                 </ol>
             </div>
 
+            <section v-if="savedToday" class="today-done" aria-labelledby="today-done-title">
+                <h2 id="today-done-title" class="today-done-title">
+                    <CircleCheck :size="26" aria-hidden="true" />오늘 보고를 냈어요
+                </h2>
+                <p class="today-done-sub">팀 보고와 이번 주 주간보고에 들어갔어요.</p>
+
+                <div class="today-done-group">
+                    <p class="today-done-label">다음 할 일 · 오늘 보고에서</p>
+                    <ul v-if="hasFocus" class="today-done-list">
+                        <template v-for="column in focusColumns" :key="column.key">
+                            <li v-for="(item, index) in column.items" :key="`${column.key}-${index}`" class="today-done-item">
+                                <KindTag :kind="FOCUS_KIND[column.key]" :label="FOCUS_LABEL[column.key]" />
+                                <span>{{ item.text }}<span v-if="item.project" class="today-done-project">{{ item.project }}</span></span>
+                            </li>
+                        </template>
+                    </ul>
+                    <p v-else class="today-done-empty">다음 계획 · 이슈 · 요청이 없어요.</p>
+                </div>
+
+                <router-link v-if="weeklyState !== 'saved'" class="today-weekly" :to="weeklyCard.to">
+                    <span class="today-weekly-text">
+                        <span class="today-weekly-title">이번 주 주간보고를 {{ weeklyState === "draft" ? "만드는 중이에요" : "아직 안 만들었어요" }}</span>
+                        <span class="today-weekly-sub">이번 주 일일보고로 금요일까지 만들어요</span>
+                    </span>
+                    <span class="btn btn-primary today-weekly-btn">{{ weeklyCard.action }}</span>
+                </router-link>
+
+                <div class="today-done-links">
+                    <router-link v-if="savedReportId" class="btn btn-ghost" :to="`/report-result/${savedReportId}`">오늘 보고 보기 · 고치기</router-link>
+                    <button type="button" class="btn btn-ghost" @click="writeAnotherDay">다른 날 보고 쓰기</button>
+                </div>
+            </section>
+
+            <template v-else>
             <div class="today-box" :class="{ 'is-lines': useLines }">
                 <template v-if="useLines">
                     <LineWriter
@@ -769,6 +839,8 @@ const sendReport = async () => {
                         {{ aiLoading ? "정리하는 중" : "AI로 정리하기" }}
                     </button>
                 </div>
+            </template>
+
             </template>
 
             <router-link class="today-other" :to="{ path: '/compose', query: { kind: 'meeting' } }">
