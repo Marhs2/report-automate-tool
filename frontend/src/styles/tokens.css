@@ -158,7 +158,7 @@
     /* ---- Shell geometry ------------------------------------------- */
     --sidebar-width: 240px;
     --sidebar-width-collapsed: 64px;
-    --topbar-height: 45px;
+    --topbar-height: 56px;      /* app bar: brand · 3 tabs · account */
     --content-max: 1040px;      /* one page column for every screen */
     --content-max-wide: 1040px; /* kept as a hook; same column as .page */
     --bottom-nav-height: 0px;

@@ -1,21 +1,5 @@
 <script setup>
-import {
-    FolderKanban,
-    CalendarDays,
-    FileBarChart,
-    GitGraph,
-    LayoutDashboard,
-    LogOut,
-    PenLine,
-    Settings2,
-    Shield,
-    PanelLeftClose,
-    PanelLeftOpen,
-    ChevronLeft,
-    ChevronRight,
-    MoreHorizontal,
-    X,
-} from "lucide-vue-next";
+import { ChevronLeft, FileBarChart, PenLine, Users } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import useApi from "./composables/useApi";
@@ -24,7 +8,7 @@ import { selectedTeamId } from "./composables/useSelectedTeam";
 import { hasSession, isAdmin, leaderTeamId, sessionToken } from "./composables/useSession";
 import { useDialog } from "./composables/useDialog";
 import { useSidebar } from "./composables/useSidebar";
-import { MOBILE_TABS, MORE_LINKS, PRIMARY_NAV } from "./lib/nav";
+import { ACCOUNT_LINKS, MOBILE_TABS, PRIMARY_NAV } from "./lib/nav";
 import { useMyWeek } from "./composables/useMyWeek";
 import { TODAY_LABELS } from "./lib/weekStatus";
 import { pageParentOverride, pageTitleOverride } from "./composables/usePageMeta";
@@ -32,7 +16,7 @@ import { pageParentOverride, pageTitleOverride } from "./composables/usePageMeta
 const router = useRouter();
 const route = useRoute();
 const { getMe, getTeams, postLogout } = useApi();
-const { collapsedEffective, isNarrow, toggleCollapsed } = useSidebar();
+const { isNarrow } = useSidebar();
 const {
     open: dialogOpen,
     locked: dialogLocked,
@@ -51,62 +35,40 @@ const {
     rejectKey: rejectDialogKey,
 } = useDialog();
 
-const NAV_ICONS = {
-    "/": LayoutDashboard,
-    "/reports": FolderKanban,
-    "/compose": PenLine,
-    "/weekly": FileBarChart,
-    "/activities": CalendarDays,
-    "/project-timeline": GitGraph,
-    "/settings": Settings2,
-    "/admin": Shield,
-};
-
-const navItems = PRIMARY_NAV.map((item) => ({
-    ...item,
-    icon: NAV_ICONS[item.to] || Settings2,
-}));
-
-const mainNavItems = navItems.filter((item) => item.group !== "설정");
-const settingsNavItems = navItems.filter((item) => item.group === "설정");
-const adminNavItems = computed(() =>
-    isAdmin.value
-        ? [{ to: "/admin", label: "관리", shortLabel: "관리", icon: Shield }]
-        : [],
-);
+const navItems = PRIMARY_NAV;
 
 /** 화면이 자기 제목·상위 위치를 덮어쓸 수 있다.
  *  같은 라우트라도 "읽는 중"과 "고치는 중"의 이름이 달라야 한다. */
 const pageMeta = computed(() => ({
-    title: pageTitleOverride.value || route.meta.title || "내 현황",
+    title: pageTitleOverride.value || route.meta.title || "오늘 한 일",
     parent: pageParentOverride.value || route.meta.parent || null,
     action: route.meta.action || null,
 }));
 
 const isNavActive = (to) => route.meta.navKey === to;
 
-/** 모바일 하단 탭: 현황 · 일일보고 · 주간 · 더보기. 더보기는 시트를 연다. */
+/** 모바일 하단 탭: 위쪽 탭과 같은 오늘 · 팀 · 주간. */
 const TAB_ICONS = {
-    home: LayoutDashboard,
-    daily: FolderKanban,
-    write: PenLine,
+    today: PenLine,
+    team: Users,
     weekly: FileBarChart,
-    more: MoreHorizontal,
 };
 const bottomTabs = computed(() =>
     MOBILE_TABS.map((tab) => ({
         ...tab,
         icon: TAB_ICONS[tab.id],
-        active: tab.navKeys.includes(String(route.meta.navKey || "")),
+        active: tab.navKeys.includes(String(route.meta.navKey ?? "")),
     })),
 );
-const moreLinks = computed(() => [
-    ...MORE_LINKS,
-    ...(isAdmin.value ? [{ to: "/admin", label: "관리자", hint: "사용자 · 부서" }] : []),
+
+/** 오른쪽 위 이름 동그라미 메뉴. 관리자에게만 관리가 더 보인다. */
+const accountLinks = computed(() => [
+    ...ACCOUNT_LINKS,
+    ...(isAdmin.value ? [{ to: "/admin", label: "관리", hint: "사용자 · 부서" }] : []),
 ]);
-const openSheet = ref(null);
-const closeSheet = () => {
-    openSheet.value = null;
+const accountOpen = ref(false);
+const closeAccount = () => {
+    accountOpen.value = false;
 };
 
 const { todayState, todayMissing, refreshMyWeek } = useMyWeek();
@@ -183,7 +145,7 @@ watch(sessionToken, () => {
 watch(
     () => [route.name, selectedUserId.value],
     () => {
-        closeSheet();
+        closeAccount();
         if (!isPublicPage.value && hasSession()) refreshMyWeek();
     },
     { immediate: true },
@@ -215,6 +177,10 @@ const logout = async () => {
 };
 
 const onDialogKeydown = (event) => {
+    if (accountOpen.value && event.key === "Escape") {
+        closeAccount();
+        return;
+    }
     if (!dialogOpen.value) return;
     if (event.key !== "Escape" && event.key !== "Enter") return;
     event.preventDefault();
@@ -226,6 +192,7 @@ const onDialogKeydown = (event) => {
 
 onMounted(() => {
     window.addEventListener("keydown", onDialogKeydown);
+    window.addEventListener("click", closeAccount);
     if (!hasSession()) {
         router.push("/login");
     }
@@ -233,6 +200,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     window.removeEventListener("keydown", onDialogKeydown);
+    window.removeEventListener("click", closeAccount);
     document.documentElement.classList.remove("is-overlay-open");
 });
 </script>
@@ -240,92 +208,53 @@ onUnmounted(() => {
 <template>
     <RouterView v-if="isPublicPage" />
     <template v-else>
-    <aside
-        v-if="!isWritePage"
-        id="app-sidebar"
-        class="sidebar"
-        :class="{ 'is-collapsed': collapsedEffective }"
-    >
-        <div class="sidebar-brand">
-            <router-link v-if="!collapsedEffective" to="/" class="sidebar-brand-link">
-                <span class="sidebar-mark" aria-hidden="true">일</span>
-                <span class="sidebar-brand-name">{{ currentTeam || "일일보고" }}</span>
-            </router-link>
-            <button
-                type="button"
-                class="sidebar-collapse-btn"
-                :aria-expanded="!collapsedEffective"
-                :aria-label="collapsedEffective ? '사이드바 펼치기' : '사이드바 접기'"
-                :title="collapsedEffective ? '사이드바 펼치기' : '사이드바 접기'"
-                @click="toggleCollapsed"
-            >
-                <PanelLeftOpen v-if="collapsedEffective" :size="16" />
-                <PanelLeftClose v-else :size="16" />
-            </button>
-        </div>
-
-        <nav class="nav-links" aria-label="주요 메뉴">
-            <p v-if="!collapsedEffective" class="nav-group-label">작업</p>
+    <header class="appbar">
+        <router-link to="/" class="appbar-brand" aria-label="일일보고 처음 화면">일일보고</router-link>
+        <nav class="appbar-tabs" aria-label="주요 메뉴">
             <router-link
-                v-for="item in mainNavItems"
+                v-for="item in navItems"
                 :key="item.to"
                 :to="item.to"
-                class="nav-link"
-                :class="{ 'router-link-exact-active': isNavActive(item.to) }"
-                :title="collapsedEffective ? item.label : null"
+                class="appbar-tab"
+                :class="{ 'is-active': isNavActive(item.navKey) }"
+                :aria-current="isNavActive(item.navKey) ? 'page' : null"
             >
-                <component :is="item.icon" :size="16" />
-                <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
-                <span
-                    v-if="item.to === '/reports' && todayMissing"
-                    class="nav-badge"
-                    :class="{ 'is-dot': collapsedEffective }"
-                >{{ collapsedEffective ? "" : todayLabel }}</span>
-            </router-link>
-            <p v-if="!collapsedEffective" class="nav-group-label">설정</p>
-            <router-link
-                v-for="item in settingsNavItems"
-                :key="item.to"
-                :to="item.to"
-                class="nav-link"
-                :class="{ 'router-link-exact-active': isNavActive(item.to) }"
-                :title="collapsedEffective ? item.label : null"
-            >
-                <component :is="item.icon" :size="16" />
-                <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
-            </router-link>
-            <router-link
-                v-for="item in adminNavItems"
-                :key="item.to"
-                :to="item.to"
-                class="nav-link"
-                :class="{ 'router-link-exact-active': isNavActive(item.to) }"
-                :title="collapsedEffective ? item.label : null"
-            >
-                <component :is="item.icon" :size="16" />
-                <span v-if="!collapsedEffective" class="nav-link-label">{{ item.label }}</span>
+                {{ item.label }}
+                <i v-if="item.navKey === '/' && todayMissing" class="appbar-dot" :title="todayLabel" aria-label="오늘 보고 아직 안 씀"></i>
             </router-link>
         </nav>
-
-        <div class="sidebar-footer">
-            <div class="sidebar-user">
-                <span class="sidebar-avatar">{{ userInitial() }}</span>
-                <span class="sidebar-user-meta">
-                    <span class="sidebar-user-name">{{ currentUser || "로그인 필요" }}</span>
-                    <span class="sidebar-user-team">{{ currentTeam || "부서 없음" }}</span>
-                </span>
-            </div>
+        <div class="appbar-end">
             <button
                 type="button"
-                class="sidebar-logout"
-                :title="collapsedEffective ? '로그아웃' : null"
-                @click="logout"
+                class="appbar-me"
+                :aria-expanded="accountOpen"
+                aria-haspopup="menu"
+                :aria-label="`${currentUser || '내 계정'} · 설정과 로그아웃`"
+                @click.stop="accountOpen = !accountOpen"
             >
-                <LogOut :size="16" />
-                <span>로그아웃</span>
+                {{ userInitial() }}
             </button>
+            <div v-if="accountOpen" class="account-menu" role="menu" @click.stop>
+                <div class="account-menu-who">
+                    <span class="account-menu-name">{{ currentUser || "로그인 필요" }}</span>
+                    <span class="account-menu-team">{{ currentTeam || "부서 없음" }}</span>
+                </div>
+                <router-link
+                    v-for="item in accountLinks"
+                    :key="item.to"
+                    :to="item.to"
+                    class="account-menu-row"
+                    role="menuitem"
+                >
+                    <span class="account-menu-label">{{ item.label }}</span>
+                    <span class="account-menu-hint">{{ item.hint }}</span>
+                </router-link>
+                <button type="button" class="account-menu-row is-danger" role="menuitem" @click="logout">
+                    <span class="account-menu-label">로그아웃</span>
+                </button>
+            </div>
         </div>
-    </aside>
+    </header>
 
     <main class="main-content" :class="{ 'has-bottom-nav': isNarrow && !isWritePage, 'is-focus-write': isWritePage }">
         <div v-if="isWritePage" class="write-backbar">
@@ -335,84 +264,29 @@ onUnmounted(() => {
             </button>
             <span class="write-backbar-title">{{ pageMeta.title }}</span>
         </div>
-        <header v-else class="topbar">
-            <nav class="topbar-crumbs" aria-label="현재 위치">
-                <router-link v-if="pageMeta.parent" class="topbar-crumb" :to="pageMeta.parent.to">
-                    {{ pageMeta.parent.label }}
-                </router-link>
-                <span v-if="pageMeta.parent" class="topbar-crumb-sep" aria-hidden="true">›</span>
-                <span class="topbar-title" aria-current="page">{{ pageMeta.title }}</span>
-            </nav>
-            <div class="topbar-end">
-                <router-link
-                    v-if="pageMeta.action && !isNarrow"
-                    class="btn btn-primary btn-small topbar-action"
-                    :to="pageMeta.action.to"
-                >
-                    {{ pageMeta.action.label }}
-                </router-link>
-            </div>
-        </header>
         <div class="main-body">
-            <div v-if="!isWritePage" class="page-hero">
+            <div v-if="!isWritePage" class="page-hero" :class="{ 'is-narrow': route.meta.narrow }">
+                <router-link v-if="pageMeta.parent" class="page-hero-back" :to="pageMeta.parent.to">
+                    <ChevronLeft :size="18" />{{ pageMeta.parent.label }}
+                </router-link>
                 <h1 class="page-hero-title">{{ pageMeta.title }}</h1>
             </div>
             <RouterView />
         </div>
     </main>
     <nav v-if="isNarrow && !isWritePage" class="app-bottom-nav" aria-label="주요 메뉴">
-        <template v-for="tab in bottomTabs" :key="tab.id">
-            <router-link
-                v-if="tab.to"
-                :to="tab.to"
-                :class="{ 'is-active': tab.active }"
-                :aria-current="tab.active ? 'page' : null"
-            >
-                <component :is="tab.icon" :size="20" />
-                <span>{{ tab.label }}</span>
-                <i v-if="tab.id === 'daily' && todayMissing" class="tab-dot" aria-label="오늘 미제출"></i>
-            </router-link>
-            <button
-                v-else
-                type="button"
-                :class="{ 'is-active': tab.active || openSheet === tab.sheet }"
-                :aria-expanded="openSheet === tab.sheet"
-                aria-haspopup="dialog"
-                @click="openSheet = openSheet === tab.sheet ? null : tab.sheet"
-            >
-                <component :is="tab.icon" :size="20" />
-                <span>{{ tab.label }}</span>
-            </button>
-        </template>
-    </nav>
-    <div v-if="openSheet" class="app-sheet-overlay" @click.self="closeSheet">
-        <div
-            class="app-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-label="더보기"
+        <router-link
+            v-for="tab in bottomTabs"
+            :key="tab.id"
+            :to="tab.to"
+            :class="{ 'is-active': tab.active }"
+            :aria-current="tab.active ? 'page' : null"
         >
-            <div class="app-sheet-head">
-                <h2>더보기</h2>
-                <button type="button" class="app-sheet-close" aria-label="닫기" @click="closeSheet">
-                    <X :size="16" />
-                </button>
-            </div>
-            <router-link v-for="item in moreLinks" :key="item.to" :to="item.to" class="app-sheet-row">
-                <span class="app-sheet-text">
-                    <span class="app-sheet-label">{{ item.label }}</span>
-                    <span class="app-sheet-hint">{{ item.hint }}</span>
-                </span>
-                <ChevronRight :size="16" class="app-sheet-chevron" />
-            </router-link>
-            <button type="button" class="app-sheet-row is-danger" @click="logout">
-                <span class="app-sheet-text">
-                    <span class="app-sheet-label">로그아웃</span>
-                    <span class="app-sheet-hint">{{ currentUser }} · {{ currentTeam || "부서 없음" }}</span>
-                </span>
-            </button>
-        </div>
-    </div>
+            <component :is="tab.icon" :size="20" />
+            <span>{{ tab.label }}</span>
+            <i v-if="tab.id === 'today' && todayMissing" class="tab-dot" aria-label="오늘 보고 아직 안 씀"></i>
+        </router-link>
+    </nav>
     </template>
     <div
         v-if="dialogOpen"

@@ -1,0 +1,159 @@
+/* 팀: 하루치 팀원 목록. 한 사람 한 줄, 누르면 그날 보고가 펼쳐진다. */
+.team-page {
+    max-width: calc(720px + 2 * var(--space-7));
+}
+
+.team-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-4);
+}
+
+.team-day {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.team-date-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: calc(-1 * var(--space-2));
+}
+
+.team-step {
+    width: var(--control-h);
+    padding: 0;
+}
+
+.team-date {
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+}
+
+.team-summary {
+    font-size: var(--fs-16);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.team-notyet {
+    margin-top: calc(-1 * var(--space-3));
+    font-size: var(--fs-13);
+    color: var(--danger-fg);
+}
+
+.team-list {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.team-person + .team-person {
+    border-top: 1px solid var(--border);
+}
+
+.team-row {
+    min-height: 60px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: 0;
+    text-align: left;
+    cursor: pointer;
+}
+
+.team-row:disabled {
+    cursor: default;
+    opacity: 1;
+}
+
+.team-row.is-static:hover {
+    background: transparent;
+}
+
+.team-row .avatar {
+    width: 36px;
+    height: 36px;
+    font-size: var(--fs-14);
+}
+
+.team-meta {
+    margin-left: var(--space-1);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+}
+
+.team-lines {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 36px + var(--space-3));
+}
+
+.team-line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text);
+}
+
+.team-line :deep(.kind-tag) {
+    margin-top: 2px;
+}
+
+.team-line-text {
+    min-width: 0;
+}
+
+.team-line-project {
+    margin-left: var(--space-1);
+    font-size: var(--fs-12);
+    color: var(--text-muted);
+}
+
+.team-raw {
+    align-self: flex-start;
+    margin-top: var(--space-1);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+}
+
+.team-hint {
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.team-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
+}
+
+.team-links .btn {
+    color: var(--accent-text);
+}
+
+@media (max-width: 860px) {
+    .team-row {
+        min-height: var(--control-h-lg);
+    }
+
+    .team-lines {
+        padding-left: var(--space-4);
+    }
+
+    .team-links .btn {
+        min-height: var(--control-h-lg);
+    }
+}
