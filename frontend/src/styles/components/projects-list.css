@@ -42,7 +42,7 @@
     border: 0;
     border-radius: var(--radius-tag);
     background: var(--accent-soft);
-    color: var(--accent-hover);
+    color: var(--accent-text);
     font-size: var(--fs-11);
     font-weight: var(--fw-semibold);
     vertical-align: 1px;

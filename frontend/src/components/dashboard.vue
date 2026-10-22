@@ -1,12 +1,12 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { saveAs } from "file-saver";
 import useApi from "../composables/useApi";
 import { useMyWeek } from "../composables/useMyWeek";
-import { isAdmin, leaderTeamId } from "../composables/useSession";
-import { selectedUserId } from "../composables/useSelectedUser";
-import { buildRows, periodDays, todayByTeam, todayIso } from "../lib/submissionGrid";
+import { useMyWeekly } from "../composables/useMyWeekly";
+import { useTeamSummary } from "../composables/useTeamSummary";
+import { focusColumnsOf } from "../lib/focusColumns";
+import { todayIso } from "../lib/submissionGrid";
 
 /*
  * 내 현황. 2026-10-21 시안(실무자 · 팀장 · 관리자)을 따른다.
@@ -16,15 +16,7 @@ import { buildRows, periodDays, todayByTeam, todayIso } from "../lib/submissionG
  */
 const route = useRoute();
 const router = useRouter();
-const {
-    getDashboard,
-    getUserActivities,
-    getTeams,
-    getUsers,
-    getWeeklyReport,
-    getWeeklyCollection,
-    downloadWeeklyCollectionPptx,
-} = useApi();
+const { getDashboard } = useApi();
 const { weekDays, todayState, refreshMyWeek } = useMyWeek();
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
@@ -42,7 +34,9 @@ const slashDate = (iso) => {
 };
 const daysBetween = (from, to) => Math.round((parseIso(to) - parseIso(from)) / 86400000);
 
-const role = computed(() => (isAdmin.value ? "admin" : leaderTeamId.value != null ? "leader" : "member"));
+const { role, teamToday, openTeams, toggleTeam, teamKey, todayTotal, myTeam, pct, collection, isMaking, makeDeck } =
+    useTeamSummary();
+const { weeklyCard, weeklyEmph } = useMyWeekly();
 const todayText = computed(() => longDate(todayIso()));
 
 /* ---- 오늘 · 이번 주 ---------------------------------------------- */
@@ -79,65 +73,13 @@ const focusBasis = computed(() => {
     if (focusStale.value) return `${longDate(date)} 보고 기준 · ${focusAge.value}일 전`;
     return date === todayIso() ? `${longDate(date)} 오늘 보고 기준` : `${longDate(date)} 보고 기준`;
 });
-/** 프로젝트별로 온 할 일을 세 칸(다음 계획 · 열린 이슈 · 요청)으로 편다. 프로젝트가 둘 이상이면 이름을 곁들인다. */
-const focusColumns = computed(() => {
-    const items = board.value.focus?.items || [];
-    const many = new Set(items.map((item) => item.project)).size > 1;
-    const column = (key) =>
-        items.flatMap((item) => (item[key] || []).map((text) => ({ text, project: many ? item.project : "" })));
-    return [
-        { key: "next", title: "다음 계획", items: column("nextPlans") },
-        { key: "issue", title: "열린 이슈", items: column("issues") },
-        { key: "request", title: "요청", items: column("requests") },
-    ];
-});
-
-/* ---- 이번 주 주간보고 ----------------------------------------------- */
-const thisMonday = computed(() => weekDays.value[0]?.date || periodDays("week", todayIso())[0]);
-const myWeekly = ref(null);
-const weeklyState = computed(() => {
-    if (myWeekly.value) return "saved";
-    try {
-        const draft = JSON.parse(sessionStorage.getItem("weeklyDraft") || "null");
-        const monday = thisMonday.value;
-        const friday = periodDays("week", monday).at(-1);
-        if ((draft?.selects || []).some((day) => day >= monday && day <= friday)) return "draft";
-    } catch {
-        return "none";
-    }
-    return "none";
-});
-const WEEKLY = {
-    none: { label: "안 만듦", tone: "muted", action: "주간보고 만들기", to: "/weekly" },
-    draft: { label: "초안", tone: "warning", action: "이어서 만들기", to: "/weekly-detail/new" },
-    saved: { label: "저장됨", tone: "success", action: "주간보고 열기", to: "" },
-};
-const weeklyCard = computed(() => {
-    const base = WEEKLY[weeklyState.value];
-    return { ...base, to: base.to || `/weekly-detail/${myWeekly.value?.id}` };
-});
-/** 목 · 금에는 만들 때라 버튼을 크게, 그 밖의 날은 한 줄로 조용히. */
-const weeklyEmph = computed(() => [4, 5].includes(new Date().getDay()));
-const loadMyWeekly = async () => {
-    myWeekly.value = null;
-    if (selectedUserId.value == null || selectedUserId.value === "") return;
-    try {
-        const rows = await getWeeklyReport(selectedUserId.value);
-        const monday = thisMonday.value;
-        const friday = periodDays("week", monday).at(-1);
-        myWeekly.value =
-            (rows || [])
-                .filter((row) => (row.selectedDate || []).some((day) => day >= monday && day <= friday))
-                .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
-    } catch {
-        myWeekly.value = null;
-    }
-};
+/** 프로젝트별로 온 할 일을 세 칸(다음 계획 · 열린 이슈 · 요청)으로 편다. */
+const focusColumns = computed(() => focusColumnsOf(board.value.focus));
 
 /* ---- 내 프로젝트 ---------------------------------------------------- */
 const FLOW_LIMIT = 5;
 const selectedProject = computed(() => String(route.query.project || board.value.selectedProject || ""));
-const chooseProject = (name) => router.replace({ path: "/", query: { project: name } });
+const chooseProject = (name) => router.replace({ path: route.path, query: { project: name } });
 const flowRows = computed(() =>
     (board.value.history || [])
         .filter((item) => item.kind === "daily")
@@ -164,80 +106,7 @@ const loadBoard = async () => {
     }
 };
 
-/* ---- 부서 오늘 제출 (팀장: 우리 부서, 관리자: 전체) ------------------ */
-const PREVIEW = 3;
-const teamToday = ref([]);
-const openTeams = ref([]);
-const toggleTeam = (key) => {
-    openTeams.value = openTeams.value.includes(key) ? openTeams.value.filter((k) => k !== key) : [...openTeams.value, key];
-};
-const teamKey = (team) => String(team.teamId ?? "none");
-const loadTeamToday = async () => {
-    const today = todayIso();
-    const days = periodDays("week", today);
-    try {
-        const [activities, teams, users] = await Promise.all([
-            getUserActivities(Number(days[0].slice(0, 4)), Number(days[0].slice(5, 7)), days[0], days.at(-1)),
-            getTeams(),
-            getUsers().catch(() => []),
-        ]);
-        const rows = buildRows(activities || [], days, {
-            today,
-            adminIds: new Set((users || []).filter((user) => user.is_admin).map((user) => String(user.id))),
-            teamNames: Object.fromEntries((teams || []).map((team) => [String(team.id), team.team_name])),
-            teamFilter: role.value === "leader" ? String(leaderTeamId.value) : "all",
-        });
-        // 안 낸 사람이 많은 부서부터.
-        teamToday.value = todayByTeam(rows, days, today).sort((a, b) => b.pending.length - a.pending.length);
-    } catch (error) {
-        console.error("부서별 오늘 현황 조회 실패:", error);
-        teamToday.value = [];
-    }
-};
-const todayTotal = computed(() => {
-    const done = teamToday.value.reduce((sum, team) => sum + team.done, 0);
-    const total = teamToday.value.reduce((sum, team) => sum + team.total, 0);
-    return { done, total, left: total - done };
-});
-const myTeam = computed(() => teamToday.value[0] || null);
-const pct = (done, total) => (total ? Math.round((done / total) * 100) : 0);
-
-/* ---- 주간 취합 (팀장: 우리 부서, 관리자: 전체) ----------------------- */
-const collection = ref(null);
-const isMaking = ref(false);
-const loadCollection = async () => {
-    try {
-        collection.value = await getWeeklyCollection(thisMonday.value);
-    } catch {
-        collection.value = null;
-    }
-};
-const makeDeck = async () => {
-    if (!collection.value?.complete) return;
-    isMaking.value = true;
-    try {
-        const blob = await downloadWeeklyCollectionPptx(thisMonday.value, false);
-        const label = collection.value.scope === "team" ? collection.value.teams?.[0]?.name || "부서" : "전체";
-        saveAs(blob, `DXel 주간보고 ${label} ${collection.value.week.start}.pptx`);
-    } catch (error) {
-        console.error("취합 PPT 만들기 실패:", error);
-    } finally {
-        isMaking.value = false;
-    }
-};
-
-const loadRoleBlocks = () => {
-    teamToday.value = [];
-    collection.value = null;
-    if (role.value === "member") return;
-    loadTeamToday();
-    loadCollection();
-};
-
 watch(() => route.query.project, loadBoard, { immediate: true });
-watch(selectedUserId, loadMyWeekly, { immediate: true });
-// 관리자 · 팀장 여부는 /me 응답 뒤에 정해진다. 그때 블록을 불러온다.
-watch(role, loadRoleBlocks, { immediate: true });
 
 onMounted(() => {
     document.title = "내 현황";

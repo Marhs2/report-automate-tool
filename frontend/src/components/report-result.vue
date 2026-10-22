@@ -493,9 +493,10 @@ const formatDotDate = (value) => {
 /** 어디서 들어왔는지에 따라 위쪽 크럼을 맞춘다.
  *  달력에서 왔는데 "일일보고"로 돌아가면 보던 자리를 잃는다. */
 const CRUMB_SOURCES = {
-    activities: { to: "/activities", label: "사용자 활동" },
+    activities: { to: "/activities", label: "제출 기록" },
     timeline: { to: "/project-timeline", label: "프로젝트 흐름" },
-    list: { to: "/reports", label: "일일보고" },
+    list: { to: "/reports", label: "검색 · 필터" },
+    team: { to: "/team", label: "팀" },
 };
 
 watch(
@@ -891,7 +892,7 @@ const writeReport = async (announce) => {
             sessionStorage.removeItem("reportRaw");
             sessionStorage.removeItem("reportDate");
             showAlert("보고서를 저장했습니다.");
-            router.push("/reports");
+            router.push("/team");
             return;
         }
         const nextId = saved?.id;

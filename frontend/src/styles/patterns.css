@@ -260,7 +260,7 @@
 
 .avatar.is-me {
     background: var(--accent-soft);
-    color: var(--accent-hover);
+    color: var(--accent-text);
 }
 
 /* ---- Segmented control -------------------------------------------- */

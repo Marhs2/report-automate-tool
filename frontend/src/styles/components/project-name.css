@@ -151,7 +151,7 @@
 }
 
 .chip-edit {
-    border: 1px solid #63625e;
+    border: 1px solid var(--border-input);
     padding-right: var(--space-1);
     background: var(--accent-soft);
     color: var(--text-strong);

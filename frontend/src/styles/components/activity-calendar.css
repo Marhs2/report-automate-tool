@@ -41,7 +41,7 @@
 .ios-arrow {
     border: 0;
     background: transparent;
-    color: var(--accent);
+    color: var(--accent-text);
     cursor: pointer;
 }
 
@@ -107,7 +107,7 @@
 
 .ios-weekdays .sat,
 .ios-num.sat {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .ios-cell {
@@ -147,7 +147,7 @@
 }
 
 .ios-num.today {
-    background: var(--danger-fg);
+    background: var(--danger-solid);
     color: var(--text-on-accent);
     font-weight: 600;
 }

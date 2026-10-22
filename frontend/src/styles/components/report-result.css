@@ -359,7 +359,7 @@
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--accent);
+    color: var(--accent-text);
     font: inherit;
     font-size: var(--fs-16);
     cursor: pointer;
@@ -457,7 +457,7 @@
 .edit-kinds button.is-on {
     border-color: var(--accent);
     background: var(--accent-soft);
-    color: var(--accent-hover);
+    color: var(--accent-text);
     font-weight: var(--fw-semibold);
 }
 
@@ -576,7 +576,7 @@
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--accent);
+    color: var(--accent-text);
     font: inherit;
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
