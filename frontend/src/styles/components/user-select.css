@@ -107,7 +107,7 @@
 
 .user-row {
     display: grid;
-    grid-template-columns: var(--control-h) minmax(0, 1.2fr) minmax(160px, 220px) minmax(160px, 240px);
+    grid-template-columns: var(--control-h) minmax(0, 1.2fr) minmax(10rem, 13.75rem) minmax(10rem, 15rem);
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
@@ -143,9 +143,6 @@
 .user-row-team .input {
     width: 100%;
     min-width: 0;
-    height: var(--control-h-lg);
-    padding: 0 calc(var(--space-6) + var(--space-1)) 0 var(--space-3);
-    font-size: var(--fs-14);
 }
 
 .user-row-now {
@@ -153,7 +150,7 @@
 }
 
 .user-row-name .state-chip {
-    height: 20px;
+    height: 1.25rem;
     padding: 0 var(--space-2);
     font-size: var(--fs-11);
 }
@@ -169,7 +166,6 @@
 .user-row-temp .input {
     width: 100%;
     min-width: 0;
-    height: var(--control-h-lg);
 }
 
 .sr-only {
@@ -213,12 +209,6 @@
 .account-form-grid :deep(.input) {
     width: 100%;
     min-width: 0;
-    height: var(--control-h-lg);
-    font-size: var(--fs-14);
-}
-
-.account-form-submit {
-    min-height: var(--control-h-lg);
 }
 
 .account-form-note {

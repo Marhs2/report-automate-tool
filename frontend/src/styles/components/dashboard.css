@@ -25,9 +25,9 @@
     background: var(--surface);
 }
 
-.dash-card.is-narrow { flex: 1 1 300px; }
-.dash-card.is-wide { flex: 2 1 480px; }
-.dash-card.is-half { flex: 1 1 360px; }
+.dash-card.is-narrow { flex: 1 1 18.75rem; }
+.dash-card.is-wide { flex: 2 1 30rem; }
+.dash-card.is-half { flex: 1 1 22.5rem; }
 
 .dash-card-head {
     display: flex;
@@ -104,15 +104,15 @@
     align-items: center;
     gap: var(--space-2);
     margin: 0;
-    font-size: 22px;
+    font-size: 1.375rem;
     font-weight: var(--fw-bold);
     line-height: var(--lh-tight);
     color: var(--text-strong);
 }
 
 .today-state i {
-    width: 8px;
-    height: 8px;
+    width: 0.5rem;
+    height: 0.5rem;
     border-radius: 50%;
     background: var(--text-muted);
 }
@@ -138,7 +138,7 @@
     align-items: center;
     gap: 2px;
     padding: var(--space-3) var(--space-1);
-    border-radius: 10px;
+    border-radius: 0.625rem;
     background: var(--surface-soft);
     color: var(--text-muted);
     text-align: center;
@@ -182,22 +182,6 @@
 }
 
 /* ---- 막대 ------------------------------------------------------------ */
-.bar {
-    display: block;
-    height: 6px;
-    overflow: hidden;
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-}
-
-.bar > span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--accent);
-}
-
-.bar > span.is-full { background: var(--success-fg); }
 
 /* ---- 부서 오늘 제출 -------------------------------------------------- */
 .dept-list {
@@ -219,13 +203,11 @@
 
 .dept-line {
     display: grid;
-    grid-template-columns: minmax(80px, 160px) minmax(60px, 1fr) max-content;
+    grid-template-columns: minmax(5rem, 10rem) minmax(3.75rem, 1fr) max-content;
     align-items: center;
     gap: var(--space-3);
 }
 
-.dept-line .bar > span { background: var(--success-fg); }
-.dept-line .bar { background: var(--danger-bg); }
 
 .dept-name {
     overflow: hidden;
@@ -305,7 +287,7 @@
 /* ---- 주간 취합 (관리자) ---------------------------------------------- */
 .collect-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(12.5rem, 100%), 1fr));
     gap: var(--space-3);
 }
 
@@ -379,7 +361,7 @@
     flex-direction: column;
     gap: var(--space-1);
     margin: 0;
-    padding-left: 18px;
+    padding-left: 1.125rem;
     font-size: var(--fs-14);
     line-height: var(--lh-base);
     color: var(--text);
@@ -485,7 +467,7 @@
 }
 
 .flow-table tbody th {
-    width: 130px;
+    width: 8.125rem;
     font-weight: var(--fw-semibold);
     white-space: nowrap;
 }
@@ -534,7 +516,7 @@
     }
 
     .dept-line {
-        grid-template-columns: minmax(64px, max-content) minmax(40px, 1fr) max-content;
+        grid-template-columns: minmax(4rem, max-content) minmax(2.5rem, 1fr) max-content;
     }
 
     .dash-cta {
@@ -581,7 +563,7 @@
 
     .flow-table td[data-label] {
         display: grid;
-        grid-template-columns: 40px minmax(0, 1fr);
+        grid-template-columns: 2.5rem minmax(0, 1fr);
         gap: var(--space-2);
         padding: 2px 0;
     }

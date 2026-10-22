@@ -257,15 +257,14 @@ onUnmounted(() => {
     </header>
 
     <main class="main-content" :class="{ 'has-bottom-nav': isNarrow && !isWritePage, 'is-focus-write': isWritePage }">
-        <div v-if="isWritePage" class="write-backbar">
-            <button type="button" class="write-back" @click="goBack">
-                <ChevronLeft :size="20" />
-                {{ pageMeta.parent?.label || "뒤로" }}
-            </button>
-            <span class="write-backbar-title">{{ pageMeta.title }}</span>
-        </div>
         <div class="main-body">
-            <div v-if="!isWritePage && !route.meta.hideHero" class="page-hero" :class="{ 'is-narrow': route.meta.narrow }">
+            <!-- 모든 화면이 같은 머리: 위로 가는 링크, 그 아래 큰 제목. 상세 화면은 본문이 이름을 제목으로 쓴다. -->
+            <div v-if="isWritePage" class="page-hero">
+                <button type="button" class="page-hero-back" @click="goBack">
+                    <ChevronLeft :size="18" />{{ pageMeta.parent?.label || "뒤로" }}
+                </button>
+            </div>
+            <div v-else-if="!route.meta.hideHero" class="page-hero">
                 <router-link v-if="pageMeta.parent" class="page-hero-back" :to="pageMeta.parent.to">
                     <ChevronLeft :size="18" />{{ pageMeta.parent.label }}
                 </router-link>

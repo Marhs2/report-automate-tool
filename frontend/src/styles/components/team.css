@@ -1,8 +1,4 @@
 /* 팀: 하루치 팀원 목록. 한 사람 한 줄, 누르면 그날 보고가 펼쳐진다. */
-.team-page {
-    max-width: calc(720px + 2 * var(--space-7));
-}
-
 .team-head {
     display: flex;
     flex-wrap: wrap;
@@ -58,7 +54,7 @@
     background: var(--surface);
 }
 
-.team-card .team-bar {
+.team-card .bar {
     flex: none;
 }
 
@@ -66,12 +62,20 @@
     align-self: flex-start;
 }
 
-.team-card-label,
-.team-section-label {
+.team-card-label {
     margin: 0;
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     color: var(--text-muted);
+}
+
+/* 섹션 제목: 내 현황 · 주간의 카드 제목과 같은 글씨. */
+.team-section-label {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
 }
 
 .team-card-num {
@@ -90,25 +94,6 @@
     color: var(--text-strong);
 }
 
-.team-bar {
-    display: block;
-    flex: 1;
-    height: 8px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-    overflow: hidden;
-}
-
-.team-bar > span {
-    display: block;
-    height: 100%;
-    border-radius: var(--radius-pill);
-    background: var(--success-fg);
-}
-
-.team-bar.is-low > span {
-    background: var(--danger-fg);
-}
 
 .team-depts {
     display: flex;
@@ -118,7 +103,7 @@
 
 .team-dept {
     display: grid;
-    grid-template-columns: 72px minmax(0, 1fr) 64px;
+    grid-template-columns: 4.5rem minmax(0, 1fr) 4rem;
     align-items: center;
     gap: var(--space-2) var(--space-3);
     padding: var(--space-3) var(--space-4);
@@ -183,7 +168,7 @@
 }
 
 .team-row {
-    min-height: 60px;
+    min-height: 3.75rem;
     padding: var(--space-3) var(--space-4);
     border-radius: 0;
     text-align: left;
@@ -200,8 +185,8 @@
 }
 
 .team-row .avatar {
-    width: 36px;
-    height: 36px;
+    width: 2.25rem;
+    height: 2.25rem;
     font-size: var(--fs-14);
 }
 
@@ -216,7 +201,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 36px + var(--space-3));
+    padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 2.25rem + var(--space-3));
 }
 
 .team-line {

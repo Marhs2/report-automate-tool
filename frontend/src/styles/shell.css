@@ -80,8 +80,8 @@
 
 /* 오늘 보고를 아직 안 썼으면 "오늘" 탭 옆에 점 하나. 예전 사이드바 배지의 자리. */
 .appbar-dot {
-    width: 7px;
-    height: 7px;
+    width: 0.4375rem;
+    height: 0.4375rem;
     margin-left: var(--space-1);
     border-radius: var(--radius-pill);
     background: var(--danger-fg);
@@ -125,7 +125,7 @@
     z-index: var(--z-overlay);
     display: flex;
     flex-direction: column;
-    width: 260px;
+    width: 16.25rem;
     padding: var(--space-1);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -214,60 +214,6 @@
     overflow-y: auto;
 }
 
-/* Write/detail focus mode: a single back affordance replaces the page title. */
-.write-backbar {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    min-height: var(--topbar-height);
-    padding: 0 var(--space-7);
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
-}
-
-.write-back {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    min-height: var(--control-h-touch);
-    margin: 0 0 0 calc(-1 * var(--space-2));
-    padding: 0 var(--space-3) 0 var(--space-2);
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-strong);
-    font: inherit;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-medium);
-    line-height: var(--lh-tight);
-    cursor: pointer;
-    transition:
-        background var(--dur-fast) var(--ease),
-        color var(--dur-fast) var(--ease);
-}
-
-.write-back svg {
-    flex-shrink: 0;
-    color: var(--text-muted);
-    transition: color var(--dur-fast) var(--ease);
-}
-
-.write-back:hover {
-    background: var(--surface-soft);
-}
-
-.write-back:hover svg {
-    color: inherit;
-}
-
-.write-back:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-}
-
 /* ---------- Page frame ---------- */
 
 /* Large page title (Apple large title): one per screen, with an optional back link above it. */
@@ -278,17 +224,16 @@
     padding: var(--space-7) var(--space-7) 0;
 }
 
-/* 오늘 · 팀은 한 단(720px)이라 제목도 같은 폭에 맞춘다. */
-.page-hero.is-narrow {
-    max-width: calc(720px + 2 * var(--space-7));
-}
-
 .main-body:has(> .page.is-wide) .page-hero {
     max-width: var(--content-max-wide);
 }
 
 .page-hero-back {
     display: inline-flex;
+    border: 0;
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
     align-items: center;
     gap: 2px;
     min-height: var(--control-h);
@@ -318,6 +263,11 @@
 
 .page-hero + .page {
     padding-top: var(--space-6);
+}
+
+/* 상세 화면은 뒤로 링크만 있고 제목은 본문 머리에 있다. 다른 화면처럼 링크 바로 아래에 붙인다. */
+.page-hero:not(:has(.page-hero-title)) + .page {
+    padding-top: var(--space-1);
 }
 
 /* 섹션 사이는 DESIGN.md의 20~24px. 32px이면 탭 아래와 목록 위가 빈 띠처럼 보인다. */
@@ -382,10 +332,6 @@
 
 /* Small laptop: chrome padding follows the tighter page padding responsive.css applies here. */
 @media (max-width: 1100px) and (min-width: 861px) {
-    .write-backbar {
-        padding-left: var(--space-5);
-        padding-right: var(--space-5);
-    }
 
     .page-hero {
         padding-left: var(--space-5);
@@ -435,16 +381,7 @@
         overflow: visible;
     }
 
-    .write-backbar {
-        min-height: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
-        padding-top: env(safe-area-inset-top, 0px);
-        padding-left: max(var(--space-3), env(safe-area-inset-left, 0px));
-        padding-right: max(var(--space-3), env(safe-area-inset-right, 0px));
-    }
 
-    .write-back {
-        margin-left: 0;
-    }
 
     .page {
         gap: var(--space-5);
@@ -452,17 +389,4 @@
     }
 }
 
-/* ---------- Focus-mode title ---------- */
 
-.write-backbar-title {
-    min-width: 0;
-    margin-left: var(--space-2);
-    padding-left: var(--space-3);
-    border-left: 1px solid var(--border);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}

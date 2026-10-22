@@ -49,14 +49,14 @@
 
 .name-search svg {
     position: absolute;
-    left: 10px;
+    left: 0.625rem;
     pointer-events: none;
 }
 
 .name-search .input {
     width: 10rem;
     height: var(--control-h);
-    padding-left: 30px;
+    padding-left: 1.875rem;
     font-size: var(--fs-13);
 }
 
@@ -72,7 +72,7 @@
 
 /* 표 안에서 스크롤해야 날짜 머리줄(위)과 이름 열(왼쪽)이 둘 다 고정된다. */
 .grid-scroll {
-    max-height: max(320px, calc(100dvh - 300px));
+    max-height: max(20rem, calc(100dvh - 18.75rem));
     overflow: auto;
 }
 
@@ -117,17 +117,17 @@ thead th.col-who {
 thead .col-who,
 thead .col-day,
 thead .col-rate {
-    height: 48px;
+    height: 3rem;
     font-weight: var(--fw-semibold);
     color: var(--text-muted);
 }
 
 .col-day {
-    min-width: 36px;
+    min-width: 2.25rem;
 }
 
 .is-week .col-day {
-    min-width: 52px;
+    min-width: 3.25rem;
 }
 
 .day-week,
@@ -167,7 +167,7 @@ thead .col-day.is-holiday .day-num {
 
 .team-row th,
 .team-row td {
-    height: 36px;
+    height: 2.25rem;
     background: var(--surface-soft);
     font-size: var(--fs-12);
 }
@@ -184,7 +184,7 @@ thead .col-day.is-holiday .day-num {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
-    min-height: 32px;
+    min-height: 2rem;
     padding: 0 var(--space-1);
     border: 0;
     border-radius: var(--radius-sm);
@@ -229,15 +229,15 @@ thead .col-day.is-holiday .day-num {
 }
 
 tbody tr:not(.team-row) {
-    height: 40px;
+    height: 2.5rem;
 }
 
 .cell-mark {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 1.75rem;
+    height: 1.75rem;
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -290,11 +290,11 @@ tbody tr:not(.team-row) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 0.25rem;
     font-style: normal;
-    font-size: 11px;
+    font-size: 0.6875rem;
 }
 
 .legend-mark.is-done {
@@ -348,20 +348,20 @@ tbody tr:not(.team-row) {
     }
 
     .grid-scroll {
-        max-height: max(300px, calc(100dvh - 380px));
+        max-height: max(18.75rem, calc(100dvh - 23.75rem));
     }
 
     tbody tr:not(.team-row) {
-        height: 44px;
+        height: 2.75rem;
     }
 
     .team-row th,
     .team-row td {
-        height: 44px;
+        height: 2.75rem;
     }
 
     .is-week .col-day {
-        min-width: 40px;
+        min-width: 2.5rem;
     }
 
     .col-who {
@@ -375,7 +375,7 @@ tbody tr:not(.team-row) {
     }
 
     .cell-mark {
-        width: 32px;
-        height: 32px;
+        width: 2rem;
+        height: 2rem;
     }
 }

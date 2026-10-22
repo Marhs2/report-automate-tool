@@ -129,8 +129,8 @@ onMounted(load);
             <section v-if="myTeam" class="team-card">
                 <p class="team-card-label">우리 부서 오늘 제출</p>
                 <p class="team-card-num">{{ myTeam.done }} / {{ myTeam.total }}명</p>
-                <span class="team-bar" role="img" :aria-label="`${myTeam.total}명 중 ${myTeam.done}명 제출`">
-                    <span :style="{ width: `${pct(myTeam.done, myTeam.total)}%` }"></span>
+                <span class="bar" role="img" :aria-label="`${myTeam.total}명 중 ${myTeam.done}명 제출`">
+                    <span :class="{ 'is-full': !myTeam.pending.length }" :style="{ width: `${pct(myTeam.done, myTeam.total)}%` }"></span>
                 </span>
                 <p class="team-card-note">
                     <template v-if="myTeam.pending.length">아직 안 낸 사람 <b>{{ myTeam.pending.join(", ") }}</b></template>
@@ -140,8 +140,8 @@ onMounted(load);
             <section v-if="collection" class="team-card">
                 <p class="team-card-label">이번 주 주간 취합</p>
                 <p class="team-card-num">{{ collection.submitted }} / {{ collection.total }}명</p>
-                <span class="team-bar" role="img" :aria-label="`${collection.total}명 중 ${collection.submitted}명 주간보고 제출`">
-                    <span :style="{ width: `${pct(collection.submitted, collection.total)}%` }"></span>
+                <span class="bar" role="img" :aria-label="`${collection.total}명 중 ${collection.submitted}명 주간보고 제출`">
+                    <span :class="{ 'is-full': collection.complete }" :style="{ width: `${pct(collection.submitted, collection.total)}%` }"></span>
                 </span>
                 <button v-if="collection.complete" type="button" class="btn btn-primary" :disabled="isMaking" @click="makeDeck">
                     {{ isMaking ? "만드는 중" : "부서 PPT 만들기" }}
@@ -156,8 +156,8 @@ onMounted(load);
                 <div class="group team-list">
                     <div v-for="team in teamToday" :key="team.teamId ?? 'none'" class="team-dept">
                         <span class="team-dept-name">{{ team.teamName }}</span>
-                        <span class="team-bar" :class="{ 'is-low': team.pending.length }" role="img" :aria-label="`${team.total}명 중 ${team.done}명 제출`">
-                            <span :style="{ width: `${pct(team.done, team.total)}%` }"></span>
+                        <span class="bar" role="img" :aria-label="`${team.total}명 중 ${team.done}명 제출`">
+                            <span :class="{ 'is-full': !team.pending.length }" :style="{ width: `${pct(team.done, team.total)}%` }"></span>
                         </span>
                         <span class="team-dept-count" :class="team.pending.length ? 'is-low' : 'is-all'">{{ team.done }}/{{ team.total }}명</span>
                         <span class="team-dept-who">{{ team.pending.length ? `아직 안 낸 사람 ${team.pending.join(", ")}` : "모두 냄" }}</span>

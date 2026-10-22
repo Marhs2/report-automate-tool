@@ -1,5 +1,5 @@
 .calendar-page {
-    max-width: 880px;
+    max-width: 55rem;
 }
 
 .ios-head {
@@ -69,7 +69,7 @@
 
 .team-filter {
     height: var(--control-h-sm);
-    max-width: 160px;
+    max-width: 10rem;
     padding: 0 calc(var(--space-6) + var(--space-1)) 0 var(--space-3);
     border: 0;
     border-radius: var(--radius-sm);
@@ -259,8 +259,8 @@ button.agenda-row {
     }
 
     .ios-month {
-        flex: 0 0 420px;
-        width: 420px;
+        flex: 0 0 26.25rem;
+        width: 26.25rem;
     }
 
     .ios-agenda {
@@ -279,7 +279,7 @@ button.agenda-row {
     }
 
     .team-filter {
-        max-width: 140px;
+        max-width: 8.75rem;
         font-size: var(--fs-16);
     }
 }

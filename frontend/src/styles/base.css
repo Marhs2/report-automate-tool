@@ -1,8 +1,28 @@
 /* ------------------------------------------------------------------
    Base — document defaults and element resets. No component classes.
    ------------------------------------------------------------------ */
+/* 크기는 모두 rem이라 이 한 줄이 화면 전체의 배율이다.
+   100%: 브라우저 글꼴 크기 설정(크게 · 매우 크게)을 그대로 따른다. px로 박아 두면 그 설정이 무시된다.
+   큰 모니터(배율 100%인 QHD · 4K 등)에서는 같은 px가 물리적으로 작아지므로 폭에 따라 한 단계씩 키운다. */
+html {
+    font-size: 100%;
+}
+
+@media (min-width: 1800px) {
+    html { font-size: 106.25%; }
+}
+
+@media (min-width: 2200px) {
+    html { font-size: 118.75%; }
+}
+
+@media (min-width: 2500px) {
+    html { font-size: 125%; }
+}
+
 :root {
-    font: var(--fs-16) / var(--lh-base) var(--sans);
+    font-family: var(--sans);
+    line-height: var(--lh-base);
     letter-spacing: 0;
     color-scheme: light;
     accent-color: var(--accent);
@@ -22,6 +42,7 @@
 
 body {
     margin: 0;
+    font-size: var(--fs-16);
     min-width: 0;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
@@ -39,12 +60,26 @@ textarea {
 
 input[type="checkbox"],
 input[type="radio"] {
-    width: 16px;
-    height: 16px;
+    width: 1rem;
+    height: 1rem;
     margin: 0;
     flex-shrink: 0;
     accent-color: var(--accent);
 }
+
+/* 아이콘은 :size(px 속성)로 그린다. 글자처럼 rem으로 다시 재서 화면 배율을 따라가게 한다. */
+svg.lucide[width="11"] { width: 0.6875rem; height: 0.6875rem; }
+svg.lucide[width="12"] { width: 0.75rem; height: 0.75rem; }
+svg.lucide[width="13"] { width: 0.8125rem; height: 0.8125rem; }
+svg.lucide[width="14"] { width: 0.8750rem; height: 0.8750rem; }
+svg.lucide[width="15"] { width: 0.9375rem; height: 0.9375rem; }
+svg.lucide[width="16"] { width: 1.00rem; height: 1.00rem; }
+svg.lucide[width="18"] { width: 1.1250rem; height: 1.1250rem; }
+svg.lucide[width="20"] { width: 1.25rem; height: 1.25rem; }
+svg.lucide[width="22"] { width: 1.3750rem; height: 1.3750rem; }
+svg.lucide[width="24"] { width: 1.50rem; height: 1.50rem; }
+svg.lucide[width="26"] { width: 1.6250rem; height: 1.6250rem; }
+svg.lucide[width="34"] { width: 2.1250rem; height: 2.1250rem; }
 
 summary {
     cursor: pointer;
@@ -67,8 +102,8 @@ summary {
 }
 
 *::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 0.625rem;
+    height: 0.625rem;
 }
 
 *::-webkit-scrollbar-track {
