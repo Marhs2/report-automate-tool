@@ -143,9 +143,6 @@
 .user-row-team .input {
     width: 100%;
     min-width: 0;
-    height: var(--control-h-lg);
-    padding: 0 calc(var(--space-6) + var(--space-1)) 0 var(--space-3);
-    font-size: var(--fs-14);
 }
 
 .user-row-now {
@@ -169,7 +166,6 @@
 .user-row-temp .input {
     width: 100%;
     min-width: 0;
-    height: var(--control-h-lg);
 }
 
 .sr-only {
@@ -213,12 +209,6 @@
 .account-form-grid :deep(.input) {
     width: 100%;
     min-width: 0;
-    height: var(--control-h-lg);
-    font-size: var(--fs-14);
-}
-
-.account-form-submit {
-    min-height: var(--control-h-lg);
 }
 
 .account-form-note {

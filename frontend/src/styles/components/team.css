@@ -1,8 +1,4 @@
 /* 팀: 하루치 팀원 목록. 한 사람 한 줄, 누르면 그날 보고가 펼쳐진다. */
-.team-page {
-    max-width: calc(720px + 2 * var(--space-7));
-}
-
 .team-head {
     display: flex;
     flex-wrap: wrap;
@@ -58,7 +54,7 @@
     background: var(--surface);
 }
 
-.team-card .team-bar {
+.team-card .bar {
     flex: none;
 }
 
@@ -66,12 +62,20 @@
     align-self: flex-start;
 }
 
-.team-card-label,
-.team-section-label {
+.team-card-label {
     margin: 0;
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     color: var(--text-muted);
+}
+
+/* 섹션 제목: 내 현황 · 주간의 카드 제목과 같은 글씨. */
+.team-section-label {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
 }
 
 .team-card-num {
@@ -90,25 +94,6 @@
     color: var(--text-strong);
 }
 
-.team-bar {
-    display: block;
-    flex: 1;
-    height: 8px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-soft);
-    overflow: hidden;
-}
-
-.team-bar > span {
-    display: block;
-    height: 100%;
-    border-radius: var(--radius-pill);
-    background: var(--success-fg);
-}
-
-.team-bar.is-low > span {
-    background: var(--danger-fg);
-}
 
 .team-depts {
     display: flex;

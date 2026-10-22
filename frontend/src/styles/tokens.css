@@ -12,7 +12,7 @@
     --surface: #ffffff;         /* cards, inputs, dialogs, sticky bars */
     --surface-soft: #f1f1ef;    /* hover fill, trays, static chips, avatars */
     --surface-press: #e8e7e4;   /* pressed/active fill for neutral controls */
-    --input-bg: #f7f7f5;        /* Notion input well; turns surface on focus */
+    --input-bg: #ffffff;        /* same white field as cards, so every input looks alike */
     --sidebar-bg: #f7f7f5;      /* Notion sidebar gray */
     --sidebar-hover: #ebebe9;   /* sidebar row hover / active fill */
 
@@ -179,7 +179,7 @@
         --surface: #202020;
         --surface-soft: #2a2a28;
         --surface-press: #33332f;
-        --input-bg: #1f1f1e;
+        --input-bg: #202020;
         --sidebar-bg: #141413;
         --sidebar-hover: #262624;
         --border: #2f2e2b;
@@ -229,7 +229,7 @@
     --surface: #202020;
     --surface-soft: #2a2a28;
     --surface-press: #33332f;
-    --input-bg: #1f1f1e;
+    --input-bg: #202020;
     --sidebar-bg: #141413;
     --sidebar-hover: #262624;
     --border: #2f2e2b;

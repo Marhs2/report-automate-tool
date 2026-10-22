@@ -131,7 +131,7 @@ onMounted(() => {
                     <li v-for="team in teamToday" :key="teamKey(team)" class="dept-row">
                         <div class="dept-line">
                             <span class="dept-name">{{ team.teamName }}</span>
-                            <span class="bar" aria-hidden="true"><span :style="{ width: `${pct(team.done, team.total)}%` }"></span></span>
+                            <span class="bar" aria-hidden="true"><span :class="{ 'is-full': !team.pending.length }" :style="{ width: `${pct(team.done, team.total)}%` }"></span></span>
                             <span class="dept-count" :class="{ 'is-all': !team.pending.length }">{{ team.done }}/{{ team.total }}명</span>
                         </div>
                         <p class="dept-missing">
@@ -238,7 +238,7 @@ onMounted(() => {
                     <h2 id="dept-today-h" class="dash-card-title">우리 부서 오늘 제출</h2>
                     <template v-if="myTeam">
                         <p class="dash-total">오늘 <b>{{ myTeam.done }}/{{ myTeam.total }}명</b> 냄</p>
-                        <span class="bar" aria-hidden="true"><span :style="{ width: `${pct(myTeam.done, myTeam.total)}%` }"></span></span>
+                        <span class="bar" aria-hidden="true"><span :class="{ 'is-full': !myTeam.pending.length }" :style="{ width: `${pct(myTeam.done, myTeam.total)}%` }"></span></span>
                         <p v-if="!myTeam.pending.length" class="is-success">모두 냈습니다.</p>
                         <div v-else-if="!openTeams.includes('mine')" class="dept-collapsed">
                             <p class="dept-missing">

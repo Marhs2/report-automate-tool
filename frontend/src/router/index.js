@@ -20,19 +20,19 @@ const routes = [
     path: "/",
     name: "today",
     component: today,
-    meta: { title: "오늘 한 일", navKey: "/", narrow: true },
+    meta: { title: "오늘 한 일", navKey: "/" },
   },
   {
     path: "/me",
     name: "dashboard",
     component: dashboard,
-    meta: { title: "내 현황", navKey: "", hideHero: true },
+    meta: { title: "내 현황", navKey: "" },
   },
   {
     path: "/team",
     name: "team",
     component: team,
-    meta: { title: "팀", navKey: "/team", narrow: true },
+    meta: { title: "팀", navKey: "/team" },
   },
   {
     path: "/reports",

@@ -181,9 +181,10 @@ const selectedMemberName = computed(() => {
 const displayDate = (value) => {
   const [year, month, day] = String(value).split("-");
   if (!year || !month || !day) return value;
-  const monthDay = `${Number(month)}.${Number(day)}`;
+  // 검색 · 필터 목록과 같은 날짜 머리: "10월 16일".
+  const monthDay = `${Number(month)}월 ${Number(day)}일`;
   if (year === String(new Date().getFullYear())) return monthDay;
-  return `${year}.${monthDay}`;
+  return `${year}년 ${monthDay}`;
 };
 
 const summaryLine = computed(() => {

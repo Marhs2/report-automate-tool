@@ -340,10 +340,16 @@
     opacity: 1;
 }
 
+/* 브라우저마다 다른 기본 화살표 대신 같은 꺾쇠 하나. */
 select.input,
 .field>select {
     cursor: pointer;
-    padding-right: var(--space-6);
+    padding-right: calc(var(--control-px) + 20px);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2378776f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--control-px) center;
+    background-size: 16px;
 }
 
 /* Multi-line: same frame as inputs, natural height, relaxed leading. */
@@ -1005,3 +1011,21 @@ input[type="file"]::file-selector-button:hover {
     font-size: var(--fs-13);
     color: var(--text);
 }
+
+/* 진행 막대: 내 현황 · 팀 · 주간에서 같은 모양. 채우는 중은 파랑, 다 차면 초록. */
+.bar {
+    display: block;
+    height: 6px;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+}
+
+.bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+}
+
+.bar > span.is-full { background: var(--success-fg); }

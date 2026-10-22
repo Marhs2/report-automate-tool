@@ -176,9 +176,6 @@ html.is-overlay-open .main-body {
         background: var(--danger-fg);
     }
 
-    .write-backbar-title {
-        font-size: var(--fs-14);
-    }
 
     .page {
         padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right, 0px))
