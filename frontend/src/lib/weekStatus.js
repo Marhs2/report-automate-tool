@@ -36,13 +36,14 @@ export function savedDatesOf(rows, memberId) {
 }
 
 /**
- * 요일별 상태. saved: 저장됨, missing: 지난 날인데 없음,
- * today: 오늘인데 아직 없음, upcoming: 아직 오지 않은 날.
+ * 요일별 상태. saved: 저장됨, holiday: 평일 공휴일(미제출로 세지 않는다), missing: 지난 날인데 없음,
+ * today: 오늘인데 아직 없음, upcoming: 아직 오지 않은 날. holidays는 { "YYYY-MM-DD": 이름 }.
  */
-export function weekStatus(days, savedDates, todayIso) {
+export function weekStatus(days, savedDates, todayIso, holidays = {}) {
     return (days || []).map((entry) => {
         let state = "upcoming";
         if (savedDates?.has(entry.date)) state = "saved";
+        else if (holidays[entry.date]) state = "holiday";
         else if (entry.date === todayIso) state = "today";
         else if (entry.date < todayIso) state = "missing";
         return { ...entry, state };

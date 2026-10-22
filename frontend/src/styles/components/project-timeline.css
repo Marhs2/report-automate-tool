@@ -85,7 +85,6 @@
 
 .issue-row:hover {
   background: var(--surface-soft);
-  border-radius: var(--radius-sm);
 }
 
 .issue-group .issue-row:first-of-type {

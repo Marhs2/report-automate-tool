@@ -205,7 +205,10 @@
     overflow: hidden;
 }
 
+/* position: relative: 안쪽의 absolute 요소(.sr-only 등)가 이 스크롤 칸을 기준으로 놓이게 한다.
+   없으면 문서 기준으로 놓여 페이지가 늘어나고, 관리 > 사용자처럼 긴 화면에 스크롤바가 두 개 생겼다. */
 .main-body {
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow-y: auto;

@@ -1,180 +1,129 @@
-.last-meta {
-    margin-left: var(--space-2);
-    color: var(--text-muted);
-    font-size: var(--fs-13);
+/* 내 현황 (2026-10-21 시안). 흰 카드를 가는 테두리로 나누고, 줄은 넓은 화면에서 옆으로, 좁으면 아래로 쌓는다.
+   색은 tokens.css의 의미 색만 쓴다: 제출 success, 미제출 danger, 임시 저장 · 초안 warning, 휴 project-4. */
+
+.dash {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
 }
 
-/* ---- 오늘 콜아웃 (.callout 공통 + 화면 맨 위라 조금 크게) ------------- */
-.today {
+.dash-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+}
+
+.dash-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    box-sizing: border-box;
+    min-width: 0;
     padding: var(--space-5) var(--space-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
 }
 
-.today-icon {
-    align-self: flex-start;
-    margin-top: 22px;
+.dash-card.is-narrow { flex: 1 1 300px; }
+.dash-card.is-wide { flex: 2 1 480px; }
+.dash-card.is-half { flex: 1 1 360px; }
+
+.dash-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
 }
 
-.today-date {
+.dash-card-title {
     margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-}
-
-.today-title {
-    margin: 0;
-    font-size: var(--fs-20);
+    font-size: var(--fs-16);
     font-weight: var(--fw-bold);
     line-height: var(--lh-tight);
     color: var(--text-strong);
 }
 
-.today .callout-body {
-    font-size: var(--fs-14);
+.dash-meta {
+    font-size: var(--fs-13);
+    color: var(--text-muted);
 }
 
-.today-cta {
-    flex-shrink: 0;
-    height: var(--control-h-lg);
+.dash-note,
+.dash-empty {
+    margin: 0;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.dash-foot {
+    margin: 0;
+    padding-top: var(--space-2);
+    font-size: var(--fs-12);
+    color: var(--text-muted);
+}
+
+.dash-total {
+    margin: 0;
+    font-size: var(--fs-14);
+    color: var(--text);
+}
+
+.dash-total b {
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
+}
+
+.dash-cta {
+    align-self: flex-start;
+    min-height: var(--control-h-lg);
     padding: 0 var(--space-5);
 }
 
-.inline-link {
-    color: var(--accent-text);
+.dash-link {
+    align-self: flex-start;
+    font-size: var(--fs-13);
     font-weight: var(--fw-medium);
+    color: var(--accent-text);
     text-decoration: none;
 }
 
-.inline-link:hover {
+.dash-link:hover {
+    color: var(--accent-text);
     text-decoration: underline;
 }
 
-/* ---- 배치: 폰은 오늘 → 이번 주·할 일 → 프로젝트, 넓은 화면은 오른쪽에 옆 칸 ---- */
-.page.dash {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-        "today"
-        "side"
-        "projects";
-    align-items: start;
-}
+.is-danger { color: var(--danger-fg); }
+.is-success { color: var(--success-fg); }
 
-.dash-today {
-    grid-area: today;
-}
-
-.dash-side {
-    grid-area: side;
+/* ---- 오늘 상태: 점 + 큰 글자 ---------------------------------------- */
+.today-state {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-6);
-    min-width: 0;
-}
-
-.dash-projects {
-    grid-area: projects;
-    min-width: 0;
-}
-
-@media (min-width: 1100px) {
-    .page.dash {
-        grid-template-columns: minmax(0, 1fr) 300px;
-        grid-template-areas:
-            "today side"
-            "projects side";
-        column-gap: var(--space-6);
-    }
-
-    .dash-side {
-        position: sticky;
-        top: var(--space-5);
-        gap: var(--space-4);
-    }
-
-    .dash-side .dash-section {
-        padding: var(--space-4);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-    }
-}
-
-/* ---- 다음 할 일 ------------------------------------------------------ */
-.focus-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.focus-project {
-    margin: 0 0 var(--space-1);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    word-break: keep-all;
-}
-
-.focus-line {
-    display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--space-2);
-    margin: 0 0 var(--space-1);
-    font-size: var(--fs-14);
-    line-height: var(--lh-base);
+    margin: 0;
+    font-size: 22px;
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
     color: var(--text-strong);
 }
 
-.focus-line .cat-tag {
-    flex-shrink: 0;
-    margin-top: 2px;
+.today-state i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
 }
 
-.focus-text {
-    min-width: 0;
-    word-break: keep-all;
-    overflow-wrap: anywhere;
-}
+.today-state.is-warning { color: var(--warning-fg); }
+.today-state.is-warning i { background: var(--warning-fg); }
+.today-state.is-success { color: var(--success-fg); }
+.today-state.is-success i { background: var(--success-fg); }
 
-.history-more {
-    margin-left: 0;
-    align-self: flex-start;
-}
-
-/* ---- 섹션 공통 ------------------------------------------------------ */
-.dash-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    min-width: 0;
-}
-
-.dash-section-head {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-3);
-}
-
-.dash-section-meta {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.dash-section-meta.is-danger {
-    color: var(--danger-fg);
-    font-weight: var(--fw-semibold);
-}
-
-.dash-note {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-/* ---- 이번 주 -------------------------------------------------------- */
-.week-strip {
+/* ---- 이번 주: 요일 다섯 칸 ------------------------------------------- */
+.week-grid {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: var(--space-2);
@@ -186,316 +135,461 @@
 .week-cell {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-3) var(--space-1);
+    border-radius: 10px;
+    background: var(--surface-soft);
+    color: var(--text-muted);
+    text-align: center;
 }
 
 .week-day {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
 }
 
-.week-num {
-    font-size: var(--fs-24);
+.week-date {
+    font-size: var(--fs-16);
     font-weight: var(--fw-bold);
-    line-height: 1.1;
-    color: var(--text-strong);
     font-variant-numeric: tabular-nums;
 }
 
 .week-state {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--fs-13);
+    font-size: var(--fs-12);
     font-weight: var(--fw-semibold);
+    white-space: nowrap;
+}
+
+.week-cell.is-success { background: var(--success-bg); color: var(--success-fg); }
+.week-cell.is-danger { background: var(--danger-bg); color: var(--danger-fg); }
+.week-cell.is-today { background: var(--surface); color: var(--accent-text); box-shadow: inset 0 0 0 2px var(--accent); }
+.week-cell.is-holiday { background: var(--project-4-bg); color: var(--project-4-fg); }
+
+.week-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+}
+
+.dash-foot-inline {
+    font-size: var(--fs-12);
+    font-weight: var(--fw-regular);
     color: var(--text-muted);
 }
 
-.week-cell.is-success .week-state { color: var(--success-fg); }
-.week-cell.is-danger { border-color: var(--danger-border); background: var(--danger-bg); }
-.week-cell.is-danger .week-state { color: var(--danger-fg); }
-.week-cell.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.week-cell.is-today .week-state { color: var(--accent-text); }
-.week-cell.is-upcoming { background: var(--surface-soft); border-color: transparent; }
-.week-cell.is-upcoming .week-num { color: var(--text-muted); }
-.week-cell.is-upcoming .week-state { font-weight: var(--fw-regular); }
-
-/* ---- 내 프로젝트 ---------------------------------------------------- */
-.project-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-}
-
-.project-tab {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    max-width: 100%;
-    min-height: var(--control-h);
-    padding: var(--space-1) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
-    cursor: pointer;
-    transition:
-        background var(--dur-fast) var(--ease),
-        border-color var(--dur-fast) var(--ease);
-}
-
-.project-tab:hover {
+/* ---- 막대 ------------------------------------------------------------ */
+.bar {
+    display: block;
+    height: 6px;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
     background: var(--surface-soft);
 }
 
-.project-tab:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
+.bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
 }
 
-.project-tab.is-on {
-    border-color: var(--text-strong);
-    background: var(--text-strong);
-    color: var(--surface);
-}
+.bar > span.is-full { background: var(--success-fg); }
 
-.project-tab-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-}
-
-.project-tab-date {
-    flex-shrink: 0;
-    font-size: var(--fs-12);
-    opacity: 0.75;
-}
-
-.project-panel {
+/* ---- 부서 오늘 제출 -------------------------------------------------- */
+.dept-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    margin-top: var(--space-2);
-}
-
-.project-panel-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-4);
-}
-
-.project-status {
-    margin: 0;
-    min-width: 0;
-    font-size: var(--fs-14);
-    color: var(--text);
-}
-
-.group-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: auto;
-    flex-shrink: 0;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    color: var(--accent-text);
-    text-decoration: none;
-}
-
-.group-link:hover {
-    text-decoration: underline;
-}
-
-.history {
     margin: 0;
     padding: 0;
     list-style: none;
     border-top: 1px solid var(--border);
 }
 
-.history > li {
+.dept-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3) 0;
     border-bottom: 1px solid var(--border);
 }
 
-.history-row {
+.dept-line {
     display: grid;
-    grid-template-columns: 112px minmax(0, 1fr);
-    gap: var(--space-4);
-    padding: var(--space-4) var(--space-2);
-    border-radius: var(--radius-xs);
-    color: inherit;
-    text-decoration: none;
-    transition: background var(--dur-fast) var(--ease);
+    grid-template-columns: minmax(80px, 160px) minmax(60px, 1fr) max-content;
+    align-items: center;
+    gap: var(--space-3);
 }
 
-.history-row:hover {
-    background: var(--surface-soft);
-}
+.dept-line .bar > span { background: var(--success-fg); }
+.dept-line .bar { background: var(--danger-bg); }
 
-.history-row:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-}
-
-.history-when {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.history-date {
-    font-size: var(--fs-14);
+.dept-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }
 
-.history-kind {
+.dept-count {
+    font-weight: var(--fw-semibold);
+    font-variant-numeric: tabular-nums;
+    color: var(--danger-fg);
+}
+
+.dept-count.is-all { color: var(--success-fg); }
+
+.dept-missing {
+    margin: 0;
     font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text);
+}
+
+.dept-missing-label {
+    margin-right: var(--space-1);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
     color: var(--text-muted);
 }
 
-.history-body {
+.link-btn {
+    margin-left: var(--space-1);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent-text);
+    font: inherit;
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+}
+
+.link-btn:hover { text-decoration: underline; }
+
+.dept-collapsed,
+.dept-expanded-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.dept-expanded {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.name-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.name-chips li {
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+    font-size: var(--fs-13);
+}
+
+/* ---- 주간 취합 (관리자) ---------------------------------------------- */
+.collect-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+    gap: var(--space-3);
+}
+
+.collect-cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.collect-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.collect-count {
+    font-size: var(--fs-18);
+    font-weight: var(--fw-bold);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-strong);
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+    color: var(--text);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    white-space: nowrap;
+}
+
+.pill.is-success { background: var(--success-bg); color: var(--success-fg); }
+.pill.is-warning { background: var(--warning-bg); color: var(--warning-fg); }
+
+/* ---- 다음 할 일: 세 칸 ------------------------------------------------ */
+.todo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-5);
+}
+
+.todo-col {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
     min-width: 0;
+    padding-left: var(--space-3);
+    border-left: 3px solid var(--border);
 }
 
-.history-line {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-2);
-    font-size: var(--fs-14);
-    line-height: var(--lh-base);
-    color: var(--text-strong);
-}
+.todo-col.is-issue { border-left-color: var(--danger-border); }
+.todo-col.is-request { border-left-color: var(--warning-border); }
+.todo-col.is-next { border-left-color: var(--accent-border); }
 
-.history-line .cat-tag {
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-.history-text {
-    min-width: 0;
-    word-break: keep-all;
-    overflow-wrap: anywhere;
-}
-
-.list-status {
+.todo-title {
     margin: 0;
-    font-size: var(--fs-14);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
     color: var(--text-muted);
 }
 
-.list-status.is-error {
-    color: var(--danger-fg);
+.todo-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+    padding-left: 18px;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text);
 }
 
+.todo-project {
+    font-size: var(--fs-12);
+    color: var(--text-muted);
+}
+
+/* ---- 이번 주 주간보고 ------------------------------------------------- */
+.weekly-card {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.weekly-card.is-emph {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+}
+
+.weekly-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.weekly-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.weekly-card .dash-link,
+.weekly-card .dash-cta {
+    align-self: center;
+}
+
+/* ---- 내 프로젝트: 칩 + 표 -------------------------------------------- */
+.proj-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.proj-chip {
+    min-height: var(--control-h);
+    padding: 0 var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-13);
+    cursor: pointer;
+}
+
+.proj-chip:hover { border-color: var(--border-strong); }
+
+.proj-chip[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-weight: var(--fw-semibold);
+}
+
+.flow-wrap {
+    overflow-x: auto;
+}
+
+.flow-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+}
+
+.flow-table caption {
+    padding-bottom: var(--space-2);
+    caption-side: top;
+    text-align: left;
+    font-size: var(--fs-12);
+    color: var(--text-muted);
+}
+
+.flow-table th,
+.flow-table td {
+    padding: var(--space-3) var(--space-3) var(--space-3) 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+
+.flow-table thead th {
+    padding-top: 0;
+    padding-bottom: var(--space-2);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+}
+
+.flow-table tbody th {
+    width: 130px;
+    font-weight: var(--fw-semibold);
+    white-space: nowrap;
+}
+
+.flow-table tbody th a {
+    color: var(--text-strong);
+    text-decoration: none;
+}
+
+.flow-table tbody th a:hover { color: var(--accent-text); }
+.flow-table td { color: var(--text); }
+.flow-table td.is-none { color: var(--text-muted); }
+
+/* ==== 좁은 화면 ======================================================== */
 @media (max-width: 860px) {
-    .today {
+    .dash,
+    .dash-row {
+        gap: var(--space-3);
+    }
+
+    .dash-card {
         padding: var(--space-4);
     }
 
-    .today-icon {
-        margin-top: 2px;
+    .dash-card.is-narrow,
+    .dash-card.is-wide,
+    .dash-card.is-half {
+        flex-basis: 100%;
     }
 
-    .today-title {
-        font-size: var(--fs-16);
-    }
-
-    .project-tabs {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        margin: 0 calc(-1 * var(--space-4));
-        padding: 0 var(--space-4);
-        scrollbar-width: none;
-    }
-
-    .project-tab {
-        flex-shrink: 0;
-    }
-
-    .history-row {
+    .todo-grid {
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-2);
-        padding: var(--space-3) 0;
-    }
-
-    .history-when {
-        flex-direction: row;
-        gap: var(--space-2);
-    }
-}
-
-/* 이번 주는 폰과 PC 옆 칸에서 작은 칸으로. 중간 폭(한 단 PC)만 크게 둔다. */
-@media (max-width: 860px), (min-width: 1100px) {
-    .week-strip {
-        gap: var(--space-1);
+        gap: var(--space-3);
     }
 
     .week-cell {
-        align-items: center;
-        padding: var(--space-2) 0;
+        padding: var(--space-2) 2px;
     }
 
-    .week-day {
-        font-size: var(--fs-12);
-    }
-
-    .week-num {
-        font-size: var(--fs-16);
+    .week-date {
+        font-size: var(--fs-14);
     }
 
     .week-state {
         font-size: var(--fs-11);
     }
-}
 
-/* 관리자 홈: 부서별 오늘 제출. 한 부서 한 줄. */
-.team-today {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin: var(--space-3) 0 var(--space-2);
-    padding: 0;
-    list-style: none;
-}
+    .dept-line {
+        grid-template-columns: minmax(64px, max-content) minmax(40px, 1fr) max-content;
+    }
 
-.team-today li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-1) var(--space-3);
-    font-size: var(--fs-14);
-    line-height: var(--lh-base);
-}
+    .dash-cta {
+        align-self: stretch;
+        justify-content: center;
+    }
 
-.team-today-name {
-    min-width: 48px;
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
+    .weekly-card .dash-cta {
+        flex: 1 1 100%;
+    }
 
-.team-today-count {
-    font-weight: var(--fw-semibold);
-    color: var(--danger-fg);
-}
+    /* 표는 폰에서 날짜마다 한 덩어리: 날짜 한 줄, 그 아래 분류: 내용. */
+    .flow-table thead {
+        display: none;
+    }
 
-.team-today-count.is-all {
-    color: var(--success-fg);
-}
+    .flow-table caption {
+        display: block;
+    }
 
-.team-today-pending {
-    color: var(--text-muted);
+    .flow-table,
+    .flow-table tbody,
+    .flow-table tr,
+    .flow-table th,
+    .flow-table td {
+        display: block;
+        width: auto;
+    }
+
+    .flow-table tr {
+        padding: var(--space-3) 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .flow-table th,
+    .flow-table td {
+        padding: 0;
+        border: 0;
+    }
+
+    .flow-table tbody th {
+        margin-bottom: var(--space-1);
+    }
+
+    .flow-table td[data-label] {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr);
+        gap: var(--space-2);
+        padding: 2px 0;
+    }
+
+    .flow-table td[data-label]::before {
+        content: attr(data-label);
+        font-size: var(--fs-12);
+        font-weight: var(--fw-semibold);
+        color: var(--text-muted);
+    }
 }

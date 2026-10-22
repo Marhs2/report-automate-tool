@@ -248,7 +248,7 @@ const loadDraft = async () => {
 const statusLabel = computed(() => {
     if (alreadySaved.value) return "제출됨";
     if (draftSavedAt.value) return `임시 저장 · ${draftSavedAt.value}`;
-    return "미제출";
+    return "아직 안 냄";
 });
 
 const statusDetail = computed(() => {

@@ -10,7 +10,7 @@
                 </span>
             </div>
             <div class="detail-actions">
-                <div class="detail-copy-col">
+                <div class="detail-copy-col" :class="{ 'is-editing': isEditing }">
                     <button type="button" class="btn btn-small" @click="copyReport"
                         :disabled="isSaving || isReextracting">복사</button>
                 </div>
@@ -20,7 +20,24 @@
                     <button type="button" :class="{ 'is-on': isEditing }" :aria-pressed="isEditing"
                         :disabled="isReextracting" @click="!isEditing && toggleEditing()">수정</button>
                 </div>
+                <!-- 저장은 머리줄에 붙어 있다. 아래에 떠 있던 저장 칸은 '공지 추가'와 다음 칸을 가렸다. -->
+                <template v-if="reportData && isEditing && canEdit">
+                    <button type="button" class="btn btn-ghost" @click="reextractReport"
+                        :disabled="isSaving || isReextracting">
+                        <template v-if="isReextracting">다시 뽑는 중</template>
+                        <template v-else><span class="hide-on-narrow">일일보고로&nbsp;</span>다시 뽑기</template>
+                    </button>
+                    <button class="btn btn-primary" @click="saveReport" :disabled="isSaving || isReextracting">
+                        {{ isSaving ? "저장 중" : saveLabel }}
+                    </button>
+                </template>
             </div>
+            <nav v-if="reportData && isEditing" class="section-jump" aria-label="칸 이동">
+                <button v-for="item in jumpItems" :key="item.id" type="button" class="section-jump-chip"
+                    @click="jumpTo(item)">
+                    {{ item.label }}<span class="section-jump-count">{{ item.count }}</span>
+                </button>
+            </nav>
         </header>
 
         <div v-if="reportData && !isEditing" class="content-container single">
@@ -102,13 +119,13 @@
 
         <div v-else-if="reportData" class="content-container single">
             <div class="json-container">
-                <details class="card meta-card">
+                <details id="jump-work" class="card meta-card">
                     <summary>
                         <span class="meta-summary">{{ metaSummary }}</span>
                         <button type="button" class="btn btn-small layout-chip" @click.prevent.stop="changeLayout">
-                            PPT · {{ layoutName }}
+                            PPT 형식 · {{ layoutName }}
                         </button>
-                        <span class="meta-edit">수정</span>
+                        <span class="meta-edit">문서 정보 고치기</span>
                     </summary>
                     <div class="meta-grid">
                         <AppField label="보고일자">
@@ -154,7 +171,7 @@
                                 <textarea class="input task-editor"
                                     :data-weekly-editor="`${block.key}-${col.kind}-${itemIndex}`"
                                     v-model="block[col.kind].items[itemIndex]" rows="1" placeholder="내용을 입력하세요"
-                                    @input="growEditor" @keydown.enter.exact.prevent="$event.target.blur()" />
+                                    @input="growEditor" @keydown.enter.exact="addLineAfter($event, block, col.kind, itemIndex)" />
                                 <button type="button" class="btn remove-btn" aria-label="이 항목 삭제"
                                     @click="removeAt(block[col.kind].items, itemIndex)">
                                     <X :size="14" aria-hidden="true" />
@@ -164,7 +181,7 @@
                                 항목이 없습니다
                             </p>
                             <button type="button" class="btn add-btn" @click="addItem(block, col.kind)">
-                                + 추가
+                                + 줄 추가
                             </button>
                         </section>
                     </div>
@@ -178,7 +195,7 @@
                 <h2 class="extras-label">PPT 전용 칸</h2>
 
                 <!-- 공지사항 슬라이드 -->
-                <details class="card fold-card" :open="foldOpen.notices"
+                <details id="jump-notices" class="card fold-card" :open="foldOpen.notices"
                     @toggle="foldOpen.notices = $event.target.open">
                     <summary>
                         <span class="fold-title">공지사항</span>
@@ -211,7 +228,7 @@
                 </details>
 
                 <!-- 주요 업무 현황 슬라이드의 이벤트 표 -->
-                <details class="card fold-card" :open="foldOpen.events"
+                <details id="jump-events" class="card fold-card" :open="foldOpen.events"
                     @toggle="foldOpen.events = $event.target.open">
                     <summary>
                         <span class="fold-title">주요 이벤트</span>
@@ -239,7 +256,7 @@
                 </details>
 
                 <!-- 센터 협업 현황 슬라이드 -->
-                <details v-if="collab" class="card fold-card" :open="foldOpen.collab"
+                <details id="jump-collab" v-if="collab" class="card fold-card" :open="foldOpen.collab"
                     @toggle="foldOpen.collab = $event.target.open">
                     <summary>
                         <span class="fold-title">센터 협업 현황</span>
@@ -286,18 +303,6 @@
                     </div>
                 </details>
 
-                <div class="card save-bar">
-                    <div class="save-actions">
-                        <button v-if="canEdit" type="button" class="btn btn-small" @click="reextractReport"
-                            :disabled="isSaving || isReextracting">
-                            {{ isReextracting ? "재추출 중..." : "재추출" }}
-                        </button>
-                        <button v-if="canEdit" class="btn btn-primary" @click="saveReport"
-                            :disabled="isSaving || isReextracting">
-                            {{ isSaving ? "저장 중..." : saveLabel }}
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -480,14 +485,12 @@ const periodLabel = computed(() => {
 const metaSummary = computed(() => {
     const data = reportData.value;
     if (!data) return "";
+    const value = (raw) => String(raw || "").trim();
     return [
-        data.report_date,
-        data.author,
-        data.center,
-    ]
-        .map((value) => String(value || "").trim())
-        .filter(Boolean)
-        .join(" · ");
+        `보고일자 ${value(data.report_date) || "미입력"}`,
+        `센터 ${value(data.center) && value(data.center) !== "미지정" ? value(data.center) : "미입력"}`,
+        `센터장 ${value(data.director) || "미입력"}`,
+    ].join(" · ");
 });
 
 const confirmQuestions = computed(() =>
@@ -496,6 +499,14 @@ const confirmQuestions = computed(() =>
 
 const removeAt = (list, index) => {
     list.splice(index, 1);
+};
+
+/** 엔터: 그 줄 다음에 빈 줄을 넣고 커서를 옮긴다. 한글 조합 중 엔터는 글자 확정이라 건너뛴다. */
+const addLineAfter = (event, block, kind, index) => {
+    if (event.isComposing) return;
+    event.preventDefault();
+    block[kind].items.splice(index + 1, 0, "");
+    startEdit(block, kind, index + 1);
 };
 
 /** 가드 DOM 키. 제목을 키로 쓰면 글자마다 카드가 다시 만들어져 입력 포커스가 풀린다. */
@@ -665,6 +676,18 @@ watch(reportData, () => {
     };
     collabShown.value = collabRows.value.map((row) => row.code);
 });
+/* 머리줄의 칸 이동 칩. 누르면 그 칸으로 가고, 접힌 칸이면 펼친다. */
+const jumpItems = computed(() => [
+    { id: "work", label: "업무", count: projectBlocks.value.length },
+    { id: "notices", label: "공지사항", count: notices.value.length },
+    { id: "events", label: "주요 이벤트", count: eventCount.value },
+    ...(collab.value ? [{ id: "collab", label: "센터 협업", count: collabFilled.value }] : []),
+]);
+const jumpTo = async (item) => {
+    if (item.id in foldOpen.value) foldOpen.value = { ...foldOpen.value, [item.id]: true };
+    await nextTick();
+    document.getElementById(`jump-${item.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
 const collabVisible = computed(() => COLLAB_CENTERS.filter((code) => collabShown.value.includes(code)));
 const collabHidden = computed(() => COLLAB_CENTERS.filter((code) => !collabShown.value.includes(code)));
 /* 센터 줄을 빼면 그 센터 항목도 비운다. 내용이 있으면 한 번 묻는다. */
@@ -702,7 +725,7 @@ const DIRECTOR_KEY = "dxel.weekly.director";
 const LAYOUT_KEY = "dxel.weekly.layout";
 
 const layoutName = computed(
-    () => WEEKLY_LAYOUTS.find((option) => option.value === reportData.value?.layout)?.label || "형식 고르기",
+    () => WEEKLY_LAYOUTS.find((option) => option.value === reportData.value?.layout)?.label || "골라 주세요",
 );
 
 /* 형식 고르기 창. 저장 전에(새 초안이거나 아직 안 고른 보고) 또는 '미리보기'로 연다. */

@@ -25,6 +25,18 @@ const isLoading = ref(false);
 const isMaking = ref(false);
 const loadError = ref("");
 
+/** 부서마다 처음 보여 줄 사람 수. 안 낸 사람을 앞에 두고, 나머지는 '더보기'로 펼친다. */
+const MEMBER_PREVIEW = 6;
+const openTeams = ref([]);
+const teamKey = (team) => String(team.id ?? team.name);
+const isTeamOpen = (team) => openTeams.value.includes(teamKey(team));
+const toggleTeam = (team) => {
+    const key = teamKey(team);
+    openTeams.value = isTeamOpen(team) ? openTeams.value.filter((k) => k !== key) : [...openTeams.value, key];
+};
+const sortedMembers = (team) => [...team.members].sort((a, b) => Number(a.submitted) - Number(b.submitted));
+const shownMembers = (team) => (isTeamOpen(team) ? sortedMembers(team) : sortedMembers(team).slice(0, MEMBER_PREVIEW));
+
 const isThisWeek = computed(() => week.value === thisMonday());
 /** 팀장이면 서버가 자기 부서만 돌려준다(scope: "team"). */
 const isTeam = computed(() => status.value?.scope === "team");
@@ -122,7 +134,7 @@ onMounted(load);
                         <span class="row-title">{{ team.name }}</span>
                         <span class="collection-members">
                             <span
-                                v-for="member in team.members"
+                                v-for="member in shownMembers(team)"
                                 :key="member.id"
                                 class="cat-tag"
                                 :class="member.submitted ? 'is-done' : 'is-issue'"
@@ -131,6 +143,15 @@ onMounted(load);
                                 <CircleAlert v-else :size="12" aria-hidden="true" />
                                 {{ member.name }} {{ member.submitted ? "제출" : "미제출" }}
                             </span>
+                            <button
+                                v-if="team.members.length > MEMBER_PREVIEW"
+                                type="button"
+                                class="collection-more"
+                                :aria-expanded="isTeamOpen(team)"
+                                @click="toggleTeam(team)"
+                            >
+                                {{ isTeamOpen(team) ? "접기" : `더보기 +${team.members.length - MEMBER_PREVIEW}명` }}
+                            </button>
                         </span>
                     </span>
                     <span class="row-end group-meta">{{ team.submitted }}/{{ team.total }}</span>

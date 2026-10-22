@@ -188,6 +188,7 @@
 .card-actions {
     display: flex;
     gap: var(--space-1);
+    justify-content: right;
     flex-shrink: 0;
 }
 

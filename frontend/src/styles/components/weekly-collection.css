@@ -35,3 +35,36 @@
     justify-content: flex-end;
     margin-top: var(--space-3);
 }
+
+/* 부서 사람이 많을 때 칩 6개 뒤에 붙는 펼치기. 칩과 같은 높이, 테두리만 있는 버튼. */
+.collection-more {
+    display: inline-flex;
+    align-items: center;
+    height: var(--chip-h);
+    padding: 0 var(--space-2);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-tag);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
+}
+
+.collection-more:hover {
+    background: var(--surface-soft);
+}
+
+@media (max-width: 860px) {
+    .collection-more {
+        min-height: var(--control-h-sm);
+    }
+}
+
+/* 부서 줄 자체는 누르는 곳이 아니다. 공용 .row의 hover 회색이 폰에서 더보기를 누른 뒤 남아 있었다. */
+.collection-team,
+.collection-team:hover {
+    background: transparent;
+    cursor: default;
+}

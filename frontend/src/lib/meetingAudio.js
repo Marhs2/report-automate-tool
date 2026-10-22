@@ -13,12 +13,22 @@ const CUT_FRAME = SAMPLE_RATE / 10;
 /** 정지할 때 남은 소리가 이보다 짧으면 보내지 않는다(서버도 0.5초 미만은 버린다). */
 export const MIN_CHUNK_SECONDS = 0.5;
 
-/** 브라우저가 16kHz AudioContext를 거부했을 때를 위한 최근접 샘플 다운샘플. */
+/**
+ * 브라우저가 16kHz AudioContext를 거부했을 때의 다운샘플. 출력 한 샘플마다 그 구간의 입력을 평균 낸다.
+ * 샘플을 듬성듬성 뽑기만 하면 8kHz 위 소리가 잡음으로 접혀 들어오고, 작은 목소리를 키울 때 그 잡음도 같이 커진다.
+ * shortcut: 평균(박스 필터)은 접힘을 줄일 뿐 다 막지는 못한다. 그래도 받아 적기가 틀리면 제대로 된 저역 통과 필터로 바꿀 것.
+ */
 export function downsample(input, inRate, outRate = SAMPLE_RATE) {
     if (inRate === outRate) return input;
     const ratio = inRate / outRate;
     const out = new Float32Array(Math.floor(input.length / ratio));
-    for (let i = 0; i < out.length; i++) out[i] = input[Math.floor(i * ratio)];
+    for (let i = 0; i < out.length; i++) {
+        const from = Math.floor(i * ratio);
+        const to = Math.max(from + 1, Math.floor((i + 1) * ratio));
+        let sum = 0;
+        for (let j = from; j < to; j++) sum += input[j];
+        out[i] = sum / (to - from);
+    }
     return out;
 }
 

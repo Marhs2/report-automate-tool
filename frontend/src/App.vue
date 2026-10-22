@@ -265,7 +265,7 @@ onUnmounted(() => {
             <span class="write-backbar-title">{{ pageMeta.title }}</span>
         </div>
         <div class="main-body">
-            <div v-if="!isWritePage" class="page-hero" :class="{ 'is-narrow': route.meta.narrow }">
+            <div v-if="!isWritePage && !route.meta.hideHero" class="page-hero" :class="{ 'is-narrow': route.meta.narrow }">
                 <router-link v-if="pageMeta.parent" class="page-hero-back" :to="pageMeta.parent.to">
                     <ChevronLeft :size="18" />{{ pageMeta.parent.label }}
                 </router-link>

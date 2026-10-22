@@ -26,7 +26,7 @@ const routes = [
     path: "/me",
     name: "dashboard",
     component: dashboard,
-    meta: { title: "내 현황", navKey: "" },
+    meta: { title: "내 현황", navKey: "", hideHero: true },
   },
   {
     path: "/team",

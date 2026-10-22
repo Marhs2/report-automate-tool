@@ -884,7 +884,7 @@ def project_history(conn, member_id: int, project_name: str) -> list[dict]:
     items = []
     rows = conn.execute(
         """
-        SELECT p.id, p.report_date, p.completed_tasks, p.in_progress_tasks, p.next_plans,
+        SELECT p.id, p.report_date, p.completed_tasks, p.in_progress_tasks, p.next_plans, p.issues,
                d.id AS report_id, d.created_at
         FROM projects p
         LEFT JOIN daily_reports d
@@ -910,6 +910,11 @@ def project_history(conn, member_id: int, project_name: str) -> list[dict]:
                 "at": row["created_at"] or "",
                 "title": name,
                 "lines": _history_lines_daily(row),
+                # 대시보드 표(완료 · 진행 · 이슈 · 다음)용. lines는 프로젝트 흐름 화면이 그대로 쓴다.
+                "done": _json_list(row["completed_tasks"]),
+                "doing": _json_list(row["in_progress_tasks"]),
+                "issues": _json_list(row["issues"]),
+                "next": _json_list(row["next_plans"]),
                 "href": f"/report-result/{report_id}" if report_id else "/reports",
                 "id": report_id or row["id"],
             }
