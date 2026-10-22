@@ -80,8 +80,8 @@
 
 /* 오늘 보고를 아직 안 썼으면 "오늘" 탭 옆에 점 하나. 예전 사이드바 배지의 자리. */
 .appbar-dot {
-    width: 7px;
-    height: 7px;
+    width: 0.4375rem;
+    height: 0.4375rem;
     margin-left: var(--space-1);
     border-radius: var(--radius-pill);
     background: var(--danger-fg);
@@ -125,7 +125,7 @@
     z-index: var(--z-overlay);
     display: flex;
     flex-direction: column;
-    width: 260px;
+    width: 16.25rem;
     padding: var(--space-1);
     border-radius: var(--radius-lg);
     background: var(--surface);

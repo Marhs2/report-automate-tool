@@ -154,7 +154,7 @@
 /* 읽기: 분류 태그 한 칸 + 항목 목록. 편집 화면과 같은 줄 구조다. */
 .read-block {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-columns: 6rem minmax(0, 1fr);
     gap: var(--space-3);
     align-items: start;
 }
@@ -226,7 +226,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    max-width: 240px;
+    max-width: 15rem;
     height: var(--control-h-sm);
     padding: 0 var(--space-3);
     border: 1px solid var(--border);
@@ -315,7 +315,7 @@
 
     .project-nav-chip {
         flex: none;
-        max-width: 220px;
+        max-width: 13.75rem;
         min-height: var(--control-h-lg);
     }
 }
@@ -378,7 +378,7 @@
 }
 
 .edit-bucket h2 {
-    margin: 5px 0;
+    margin: 0.3125rem 0;
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     color: var(--text);
@@ -486,7 +486,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    max-height: 240px;
+    max-height: 15rem;
     margin-bottom: var(--space-3);
     overflow: auto;
 }

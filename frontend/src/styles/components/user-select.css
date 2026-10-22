@@ -107,7 +107,7 @@
 
 .user-row {
     display: grid;
-    grid-template-columns: var(--control-h) minmax(0, 1.2fr) minmax(160px, 220px) minmax(160px, 240px);
+    grid-template-columns: var(--control-h) minmax(0, 1.2fr) minmax(10rem, 13.75rem) minmax(10rem, 15rem);
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
@@ -150,7 +150,7 @@
 }
 
 .user-row-name .state-chip {
-    height: 20px;
+    height: 1.25rem;
     padding: 0 var(--space-2);
     font-size: var(--fs-11);
 }

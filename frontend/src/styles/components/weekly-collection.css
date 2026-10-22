@@ -27,7 +27,7 @@
 .collection-members .cat-tag {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 0.25rem;
 }
 
 .collection-actions {
