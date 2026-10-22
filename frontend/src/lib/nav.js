@@ -15,7 +15,7 @@ export const MOBILE_TABS = PRIMARY_NAV.map((item) => ({
 
 /** 작성 화면의 선택지. 일일보고는 "오늘" 화면이 곧 작성 화면이다(kind=daily는 /로 보낸다). */
 export const COMPOSE_CHOICES = [
-    { id: "daily", to: "/compose?kind=daily", label: "일일보고" },
+    { id: "daily", to: "/", label: "일일보고" },
     { id: "meeting", to: "/compose?kind=meeting", label: "회의록" },
     { id: "sales", to: "/compose?kind=sales", label: "영업보고" },
 ];

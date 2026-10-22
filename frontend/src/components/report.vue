@@ -843,9 +843,6 @@ const sendReport = async () => {
 
             </template>
 
-            <router-link class="today-other" :to="{ path: '/compose', query: { kind: 'meeting' } }">
-                회의록이나 영업보고 쓰기
-            </router-link>
         </div>
     </div>
     <Teleport to="body">
