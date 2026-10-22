@@ -1,30 +1,177 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { ArrowRight, Check, CircleAlert, CircleCheck, PenLine } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
+import { saveAs } from "file-saver";
 import useApi from "../composables/useApi";
 import { useMyWeek } from "../composables/useMyWeek";
-import { isAdmin } from "../composables/useSession";
-import { splitHistoryLine } from "../lib/historyLine";
-import { TODAY_LABELS } from "../lib/weekStatus";
+import { isAdmin, leaderTeamId } from "../composables/useSession";
+import { selectedUserId } from "../composables/useSelectedUser";
 import { buildRows, periodDays, todayByTeam, todayIso } from "../lib/submissionGrid";
 
+/*
+ * 내 현황. 2026-10-21 시안(실무자 · 팀장 · 관리자)을 따른다.
+ * 실무자: 오늘 · 이번 주 → 다음 할 일 → 이번 주 주간보고 → 내 프로젝트 표.
+ * 팀장: 실무자 화면 + 이번 주 아래에 우리 부서 오늘 제출 · 주간 취합.
+ * 관리자: 전체 오늘 제출 · 전체 주간 취합, 이번 주에 직접 쓴 보고가 있으면 내 보고 두 칸.
+ */
 const route = useRoute();
 const router = useRouter();
-const { getDashboard, getUserActivities, getTeams, getUsers } = useApi();
+const {
+    getDashboard,
+    getUserActivities,
+    getTeams,
+    getUsers,
+    getWeeklyReport,
+    getWeeklyCollection,
+    downloadWeeklyCollectionPptx,
+} = useApi();
+const { weekDays, todayState, refreshMyWeek } = useMyWeek();
 
-/** 다음 할 일의 근거 보고가 며칠 전인지. 일주일이 넘으면 오늘 할 일처럼 보이지 않게 제목을 바꾼다. */
-const STALE_FOCUS_DAYS = 7;
-const focusAgeDays = computed(() => {
-    const date = String(board.value.focus?.date || "").slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return 0;
-    const diff = new Date(`${todayIso()}T00:00:00`) - new Date(`${date}T00:00:00`);
-    return Math.max(0, Math.round(diff / 86400000));
+const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+const parseIso = (iso) => {
+    const [y, m, d] = String(iso || "").slice(0, 10).split("-").map(Number);
+    return y && m && d ? new Date(y, m - 1, d) : null;
+};
+const longDate = (iso) => {
+    const day = parseIso(iso);
+    return day ? `${day.getMonth() + 1}월 ${day.getDate()}일 (${WEEKDAY[day.getDay()]})` : "";
+};
+const slashDate = (iso) => {
+    const day = parseIso(iso);
+    return day ? `${day.getMonth() + 1}/${day.getDate()}` : "";
+};
+const daysBetween = (from, to) => Math.round((parseIso(to) - parseIso(from)) / 86400000);
+
+const role = computed(() => (isAdmin.value ? "admin" : leaderTeamId.value != null ? "leader" : "member"));
+const todayText = computed(() => longDate(todayIso()));
+
+/* ---- 오늘 · 이번 주 ---------------------------------------------- */
+const TODAY = {
+    missing: { label: "아직 안 냄", tone: "muted", note: "오늘 보고는 오늘 안에 내면 됩니다.", action: "작성하기" },
+    draft: { label: "임시 저장만 함", tone: "warning", note: "임시 저장은 제출이 아닙니다. 제출해야 집계에 들어갑니다.", action: "이어서 쓰기" },
+    saved: { label: "제출됨", tone: "success", note: "오늘 할 일은 끝났습니다.", action: "" },
+};
+const todayCard = computed(() => TODAY[todayState.value] || null);
+
+const CELL = {
+    saved: { label: "제출", tone: "success" },
+    missing: { label: "미제출", tone: "danger" },
+    today: { label: "오늘", tone: "today" },
+    upcoming: { label: "예정", tone: "upcoming" },
+    holiday: { label: "휴", tone: "holiday" },
+};
+const weekCells = computed(() =>
+    weekDays.value.map((day) => ({ ...day, ...CELL[day.state], slash: slashDate(day.date) })),
+);
+const missedDays = computed(() => weekDays.value.filter((day) => day.state === "missing"));
+/** 내가 이번 주에 보고를 쓴 적이 있는지. 관리자는 이때만 내 보고 칸을 본다. */
+const wroteThisWeek = computed(() => weekDays.value.some((day) => day.state === "saved"));
+
+/* ---- 다음 할 일 ---------------------------------------------------- */
+const STALE_DAYS = 7;
+const board = ref({ projects: [], focus: null, history: [], projectNames: [] });
+const loadError = ref("");
+const focusAge = computed(() => (board.value.focus?.date ? daysBetween(board.value.focus.date, todayIso()) : 0));
+const focusStale = computed(() => focusAge.value > STALE_DAYS);
+const focusBasis = computed(() => {
+    const date = board.value.focus?.date;
+    if (!date) return "";
+    if (focusStale.value) return `${longDate(date)} 보고 기준 · ${focusAge.value}일 전`;
+    return date === todayIso() ? `${longDate(date)} 오늘 보고 기준` : `${longDate(date)} 보고 기준`;
 });
-const focusIsStale = computed(() => focusAgeDays.value > STALE_FOCUS_DAYS);
+/** 프로젝트별로 온 할 일을 세 칸(다음 계획 · 열린 이슈 · 요청)으로 편다. 프로젝트가 둘 이상이면 이름을 곁들인다. */
+const focusColumns = computed(() => {
+    const items = board.value.focus?.items || [];
+    const many = new Set(items.map((item) => item.project)).size > 1;
+    const column = (key) =>
+        items.flatMap((item) => (item[key] || []).map((text) => ({ text, project: many ? item.project : "" })));
+    return [
+        { key: "next", title: "다음 계획", items: column("nextPlans") },
+        { key: "issue", title: "열린 이슈", items: column("issues") },
+        { key: "request", title: "요청", items: column("requests") },
+    ];
+});
 
-/* 관리자 홈: 부서별 오늘 제출 현황. 자세히 볼 때는 사용자 활동으로 간다. */
+/* ---- 이번 주 주간보고 ----------------------------------------------- */
+const thisMonday = computed(() => weekDays.value[0]?.date || periodDays("week", todayIso())[0]);
+const myWeekly = ref(null);
+const weeklyState = computed(() => {
+    if (myWeekly.value) return "saved";
+    try {
+        const draft = JSON.parse(sessionStorage.getItem("weeklyDraft") || "null");
+        const monday = thisMonday.value;
+        const friday = periodDays("week", monday).at(-1);
+        if ((draft?.selects || []).some((day) => day >= monday && day <= friday)) return "draft";
+    } catch {
+        return "none";
+    }
+    return "none";
+});
+const WEEKLY = {
+    none: { label: "안 만듦", tone: "muted", action: "주간보고 만들기", to: "/weekly" },
+    draft: { label: "초안", tone: "warning", action: "이어서 만들기", to: "/weekly-detail/new" },
+    saved: { label: "저장됨", tone: "success", action: "주간보고 열기", to: "" },
+};
+const weeklyCard = computed(() => {
+    const base = WEEKLY[weeklyState.value];
+    return { ...base, to: base.to || `/weekly-detail/${myWeekly.value?.id}` };
+});
+/** 목 · 금에는 만들 때라 버튼을 크게, 그 밖의 날은 한 줄로 조용히. */
+const weeklyEmph = computed(() => [4, 5].includes(new Date().getDay()));
+const loadMyWeekly = async () => {
+    myWeekly.value = null;
+    if (selectedUserId.value == null || selectedUserId.value === "") return;
+    try {
+        const rows = await getWeeklyReport(selectedUserId.value);
+        const monday = thisMonday.value;
+        const friday = periodDays("week", monday).at(-1);
+        myWeekly.value =
+            (rows || [])
+                .filter((row) => (row.selectedDate || []).some((day) => day >= monday && day <= friday))
+                .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+    } catch {
+        myWeekly.value = null;
+    }
+};
+
+/* ---- 내 프로젝트 ---------------------------------------------------- */
+const FLOW_LIMIT = 5;
+const selectedProject = computed(() => String(route.query.project || board.value.selectedProject || ""));
+const chooseProject = (name) => router.replace({ path: "/", query: { project: name } });
+const flowRows = computed(() =>
+    (board.value.history || [])
+        .filter((item) => item.kind === "daily")
+        .slice(0, FLOW_LIMIT)
+        .map((item) => ({
+            key: item.key,
+            href: item.href,
+            date: longDate(item.date),
+            done: item.done || [],
+            doing: item.doing || [],
+            issues: item.issues || [],
+            next: item.next || [],
+        })),
+);
+const loadBoard = async () => {
+    loadError.value = "";
+    try {
+        board.value = await getDashboard(String(route.query.project || ""));
+        // 고르지 않았으면 가장 최근 프로젝트를 먼저 펼친다.
+        if (!route.query.project && board.value.projects?.length) chooseProject(board.value.projects[0].name);
+    } catch (error) {
+        console.error("내 현황 조회 실패:", error);
+        loadError.value = "내 현황을 불러오지 못했습니다.";
+    }
+};
+
+/* ---- 부서 오늘 제출 (팀장: 우리 부서, 관리자: 전체) ------------------ */
+const PREVIEW = 3;
 const teamToday = ref([]);
+const openTeams = ref([]);
+const toggleTeam = (key) => {
+    openTeams.value = openTeams.value.includes(key) ? openTeams.value.filter((k) => k !== key) : [...openTeams.value, key];
+};
+const teamKey = (team) => String(team.teamId ?? "none");
 const loadTeamToday = async () => {
     const today = todayIso();
     const days = periodDays("week", today);
@@ -38,353 +185,314 @@ const loadTeamToday = async () => {
             today,
             adminIds: new Set((users || []).filter((user) => user.is_admin).map((user) => String(user.id))),
             teamNames: Object.fromEntries((teams || []).map((team) => [String(team.id), team.team_name])),
+            teamFilter: role.value === "leader" ? String(leaderTeamId.value) : "all",
         });
-        teamToday.value = todayByTeam(rows, days, today);
+        // 안 낸 사람이 많은 부서부터.
+        teamToday.value = todayByTeam(rows, days, today).sort((a, b) => b.pending.length - a.pending.length);
     } catch (error) {
         console.error("부서별 오늘 현황 조회 실패:", error);
         teamToday.value = [];
     }
 };
-const { weekDays, todayState, refreshMyWeek } = useMyWeek();
-
-const board = ref({
-    projects: [],
-    lastActivity: null,
-    projectNames: [],
-    selectedProject: "",
-    history: [],
+const todayTotal = computed(() => {
+    const done = teamToday.value.reduce((sum, team) => sum + team.done, 0);
+    const total = teamToday.value.reduce((sum, team) => sum + team.total, 0);
+    return { done, total, left: total - done };
 });
-const isLoading = ref(false);
-const loadError = ref("");
+const myTeam = computed(() => teamToday.value[0] || null);
+const pct = (done, total) => (total ? Math.round((done / total) * 100) : 0);
 
-const selectedProject = computed({
-    get: () => String(route.query.project || ""),
-    set: (value) => {
-        const project = String(value || "").trim();
-        router.replace({ path: "/", query: project ? { project } : {} });
-    },
-});
-
-const projectOptions = computed(() => {
-    const names = [...(board.value.projectNames || [])];
-    const selected = String(board.value.selectedProject || "");
-    if (selected && !names.includes(selected)) names.push(selected);
-    return names;
-});
-
-const dotDate = (value) => {
-    const [year, month, day] = String(value || "").split("T")[0].split("-");
-    if (!year || !month || !day) return "";
-    return `${Number(month)}월 ${Number(day)}일`;
-};
-
-const todayHeading = computed(() => {
-    const now = new Date();
-    const weekday = ["일", "월", "화", "수", "목", "금", "토"][now.getDay()];
-    return `${now.getMonth() + 1}월 ${now.getDate()}일 ${weekday}요일`;
-});
-
-/** 오늘 보고 상태를 화면 맨 위 한 장에 말한다. 주말이면 null. */
-const todayCard = computed(() => {
-    if (todayState.value === "missing") {
-        return {
-            tone: "danger",
-            chip: TODAY_LABELS.missing,
-            title: "오늘 일일보고를 아직 쓰지 않았어요",
-            action: "작성하기",
-            to: "/compose?kind=daily",
-        };
-    }
-    if (todayState.value === "draft") {
-        return {
-            tone: "warning",
-            chip: TODAY_LABELS.draft,
-            title: "오늘 보고를 임시 저장만 했어요",
-            body: "저장까지 마쳐야 제출돼요.",
-            action: "이어서 쓰기",
-            to: "/compose?kind=daily",
-        };
-    }
-    if (todayState.value === "saved") {
-        return {
-            tone: "success",
-            chip: TODAY_LABELS.saved,
-            title: "오늘 보고를 저장했어요",
-            body: "",
-            action: "",
-            to: "",
-        };
-    }
-    return null;
-});
-
-/** 오늘 재촉할 게 없을 때(todayCard가 null) 그 이유를 말한다. 주말과, 보고 대상이 아닌 관리자를 구분한다. */
-const quietTitle = computed(() => {
-    const weekday = new Date().getDay();
-    if (weekday === 0 || weekday === 6) return "주말이라 오늘은 보고할 게 없어요";
-    if (isAdmin.value) return "관리자 계정은 일일보고 대상이 아니에요";
-    return "오늘은 보고하는 날이 아니에요";
-});
-
-const WEEK_STATE = {
-    saved: { label: "제출", tone: "success" },
-    missing: { label: "미제출", tone: "danger" },
-    today: { label: "오늘", tone: "today" },
-    upcoming: { label: "예정", tone: "upcoming" },
-};
-const weekCells = computed(() =>
-    weekDays.value.map((day) => ({ ...day, ...WEEK_STATE[day.state] })),
-);
-const missingDays = computed(() => weekDays.value.filter((day) => day.state === "missing").length);
-
-/** historyLine 톤 → 공통 분류 태그(.cat-tag). */
-const CAT_BY_TONE = { success: "is-done", info: "is-progress", warning: "is-issue", request: "is-request", muted: "is-next" };
-
-/** 대시보드에는 최근 몇 건만. 나머지는 프로젝트 흐름에서 본다. */
-const HISTORY_LIMIT = 5;
-const history = computed(() =>
-    (board.value.history || []).slice(0, HISTORY_LIMIT).map((item) => ({
-        ...item,
-        rows: (item.lines || []).map(splitHistoryLine),
-    })),
-);
-const moreHistory = computed(() => Math.max(0, (board.value.history || []).length - HISTORY_LIMIT));
-
-const FOCUS_KINDS = [
-    { key: "nextPlans", label: "다음", cls: "is-next" },
-    { key: "issues", label: "이슈", cls: "is-issue" },
-    { key: "requests", label: "요청", cls: "is-request" },
-];
-
-const load = async () => {
-    isLoading.value = true;
-    loadError.value = "";
+/* ---- 주간 취합 (팀장: 우리 부서, 관리자: 전체) ----------------------- */
+const collection = ref(null);
+const isMaking = ref(false);
+const loadCollection = async () => {
     try {
-        board.value = await getDashboard(String(route.query.project || ""));
-        // 고르지 않았으면 가장 최근 프로젝트를 먼저 펼친다. 빈 칸을 보여줄 이유가 없다.
-        if (!route.query.project && board.value.projects?.length) {
-            selectedProject.value = board.value.projects[0].name;
-        }
+        collection.value = await getWeeklyCollection(thisMonday.value);
+    } catch {
+        collection.value = null;
+    }
+};
+const makeDeck = async () => {
+    if (!collection.value?.complete) return;
+    isMaking.value = true;
+    try {
+        const blob = await downloadWeeklyCollectionPptx(thisMonday.value, false);
+        const label = collection.value.scope === "team" ? collection.value.teams?.[0]?.name || "부서" : "전체";
+        saveAs(blob, `DXel 주간보고 ${label} ${collection.value.week.start}.pptx`);
     } catch (error) {
-        console.error("내 현황 조회 실패:", error);
-        loadError.value = "내 현황을 불러오지 못했습니다.";
+        console.error("취합 PPT 만들기 실패:", error);
     } finally {
-        isLoading.value = false;
+        isMaking.value = false;
     }
 };
 
-const currentProject = computed(() =>
-    (board.value.projects || []).find((project) => project.name === selectedProject.value) || null,
-);
-
-const TODAY_ICONS = { danger: CircleAlert, warning: PenLine, success: CircleCheck };
-
-const chooseProject = (name) => {
-    selectedProject.value = name;
+const loadRoleBlocks = () => {
+    teamToday.value = [];
+    collection.value = null;
+    if (role.value === "member") return;
+    loadTeamToday();
+    loadCollection();
 };
 
-watch(() => route.query.project, load, { immediate: true });
+watch(() => route.query.project, loadBoard, { immediate: true });
+watch(selectedUserId, loadMyWeekly, { immediate: true });
+// 관리자 · 팀장 여부는 /me 응답 뒤에 정해진다. 그때 블록을 불러온다.
+watch(role, loadRoleBlocks, { immediate: true });
 
 onMounted(() => {
     document.title = "내 현황";
     refreshMyWeek();
-    if (isAdmin.value) loadTeamToday();
 });
 </script>
 
 <template>
     <div class="page dash">
-        <!-- 오늘 상태: 노션 콜아웃. 화면에서 가장 먼저 읽혀야 하는 한 가지. -->
-        <section
-            v-if="todayCard"
-            class="callout today dash-today"
-            :class="`is-${todayCard.tone}`"
-            aria-labelledby="today-title"
-        >
-            <component :is="TODAY_ICONS[todayCard.tone]" :size="22" class="callout-icon today-icon" aria-hidden="true" />
-            <div class="callout-text">
-                <p class="today-date">{{ todayHeading }}</p>
-                <h2 id="today-title" class="today-title">{{ todayCard.title }}</h2>
-                <p v-if="todayCard.body" class="callout-body">{{ todayCard.body }}</p>
-                <p v-if="board.lastActivity" class="callout-body">
-                    마지막 업무 ·
-                    <router-link class="inline-link" :to="board.lastActivity.href">{{ board.lastActivity.title }}</router-link>
-                    <span class="last-meta">{{ board.lastActivity.kindLabel }}<template v-if="dotDate(board.lastActivity.date)"> · {{ dotDate(board.lastActivity.date) }}</template></span>
-                </p>
-            </div>
-            <router-link v-if="todayCard.action" class="btn btn-primary today-cta" :to="todayCard.to">
-                <PenLine :size="16" />
-                {{ todayCard.action }}
-            </router-link>
-        </section>
-        <section v-else class="callout today dash-today" aria-labelledby="today-title">
-            <div class="callout-text">
-                <p class="today-date">{{ todayHeading }}</p>
-                <h2 id="today-title" class="today-title">{{ quietTitle }}</h2>
-                <ul v-if="isAdmin && teamToday.length" class="team-today" aria-label="부서별 오늘 제출">
-                    <li v-for="team in teamToday" :key="team.teamId ?? 'none'">
-                        <span class="team-today-name">{{ team.teamName }}</span>
-                        <span class="team-today-count" :class="{ 'is-all': team.done === team.total }">
-                            오늘 {{ team.done }}/{{ team.total }}
-                        </span>
-                        <span v-if="team.pending.length" class="team-today-pending">
-                            아직 안 냄 · {{ team.pending.join(", ") }}
-                        </span>
+        <!-- 관리자: 전체 현황이 먼저. 본인 보고는 이번 주에 쓴 적이 있을 때만 아래에. -->
+        <template v-if="role === 'admin'">
+            <section class="dash-card" aria-labelledby="all-today-h">
+                <div class="dash-card-head">
+                    <h2 id="all-today-h" class="dash-card-title">전체 오늘 제출</h2>
+                    <p v-if="teamToday.length" class="dash-total">
+                        오늘 <b>{{ todayTotal.done }}/{{ todayTotal.total }}명</b> 냄
+                        <span v-if="todayTotal.left" class="is-danger">· 아직 안 낸 사람 {{ todayTotal.left }}명</span>
+                    </p>
+                </div>
+                <p v-if="!teamToday.length" class="dash-empty">오늘은 보고하는 날이 아니거나, 집계할 사람이 없습니다.</p>
+                <ul v-else class="dept-list">
+                    <li v-for="team in teamToday" :key="teamKey(team)" class="dept-row">
+                        <div class="dept-line">
+                            <span class="dept-name">{{ team.teamName }}</span>
+                            <span class="bar" aria-hidden="true"><span :style="{ width: `${pct(team.done, team.total)}%` }"></span></span>
+                            <span class="dept-count" :class="{ 'is-all': !team.pending.length }">{{ team.done }}/{{ team.total }}명</span>
+                        </div>
+                        <p class="dept-missing">
+                            <template v-if="team.pending.length">
+                                <span class="dept-missing-label">아직 안 낸 사람</span>
+                                <template v-if="openTeams.includes(teamKey(team))">{{ team.pending.join(", ") }}</template>
+                                <template v-else>{{ team.pending.slice(0, PREVIEW).join(", ") }}</template>
+                                <button v-if="team.pending.length > PREVIEW" type="button" class="link-btn"
+                                    :aria-expanded="openTeams.includes(teamKey(team))" @click="toggleTeam(teamKey(team))">
+                                    {{ openTeams.includes(teamKey(team)) ? "접기" : `외 ${team.pending.length - PREVIEW}명` }}
+                                </button>
+                            </template>
+                            <span v-else class="is-success">모두 냄</span>
+                        </p>
                     </li>
                 </ul>
-                <p v-if="isAdmin" class="callout-body">
-                    날짜별로는
-                    <router-link class="inline-link" to="/activities">사용자 활동</router-link>,
-                    주간 취합은
-                    <router-link class="inline-link" to="/weekly">주간 보고서</router-link>에서 봐요.
-                </p>
-                <p v-if="board.lastActivity" class="callout-body">
-                    마지막 업무 ·
-                    <router-link class="inline-link" :to="board.lastActivity.href">{{ board.lastActivity.title }}</router-link>
-                    <span class="last-meta">{{ board.lastActivity.kindLabel }}<template v-if="dotDate(board.lastActivity.date)"> · {{ dotDate(board.lastActivity.date) }}</template></span>
-                </p>
-            </div>
-        </section>
+                <p class="dash-foot">안 낸 사람이 많은 부서부터. 오늘은 미제출로 세지 않고, 관리자 계정은 이번 기간에 낸 보고가 있을 때만 셉니다.</p>
+            </section>
 
-        <!-- 옆 칸(PC) / 오늘 바로 아래(폰): 이번 주와 다음 할 일. 프로젝트 이력보다 먼저 봐야 하는 것. -->
-        <aside class="dash-side">
-        <section v-if="weekCells.length" class="dash-section" aria-labelledby="week-title">
-            <div class="dash-section-head">
-                <h2 id="week-title" class="section-title">이번 주</h2>
-                <span v-if="missingDays" class="dash-section-meta is-danger">미제출 {{ missingDays }}일</span>
-            </div>
-            <ol class="week-strip">
-                <li
-                    v-for="day in weekCells"
-                    :key="day.date"
-                    class="week-cell"
-                    :class="`is-${day.tone}`"
-                    :aria-label="`${day.weekday}요일 ${day.label}`"
-                >
-                    <span class="week-day">{{ day.weekday }}</span>
-                    <span class="week-num">{{ day.day }}</span>
-                    <span class="week-state">
-                        <Check v-if="day.tone === 'success'" :size="15" :stroke-width="2.5" />
-                        <CircleAlert v-else-if="day.tone === 'danger'" :size="15" :stroke-width="2.25" />
-                        {{ day.label }}
-                    </span>
-                </li>
-            </ol>
-            <p v-if="missingDays" class="dash-note">
-                미제출한 날은 주간 초안에 ‘빠진 요일’로 표시돼요.
-            </p>
-        </section>
-
-        <section v-if="board.focus" class="dash-section" aria-labelledby="focus-title">
-            <div class="dash-section-head">
-                <h2 id="focus-title" class="section-title">{{ focusIsStale ? "지난 할 일" : "다음 할 일" }}</h2>
-                <span class="dash-section-meta">
-                    {{ dotDate(board.focus.date) }} 보고<template v-if="focusIsStale"> · {{ focusAgeDays }}일 전</template>
-                </span>
-            </div>
-            <ul class="focus-list">
-                <li v-for="(item, index) in board.focus.items" :key="`${item.project}-${index}`">
-                    <p v-if="item.project" class="focus-project">{{ item.project }}</p>
-                    <template v-for="kind in FOCUS_KINDS" :key="kind.key">
-                        <p v-for="(text, line) in item[kind.key]" :key="`${kind.key}-${line}`" class="focus-line">
-                            <span class="cat-tag" :class="kind.cls">{{ kind.label }}</span>
-                            <span class="focus-text">{{ text }}</span>
-                        </p>
-                    </template>
-                </li>
-            </ul>
-        </section>
-        </aside>
-
-        <div class="dash-projects">
-        <p v-if="isLoading" class="list-status" role="status">현황을 불러오는 중</p>
-        <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
-
-        <div v-else-if="board.projects.length === 0" class="empty-state">
-            <p class="empty-title">진행 중인 프로젝트가 없어요</p>
-            <p class="empty-body">
-                일일보고를 저장하면 프로젝트별로 여기 모여요. 표기가 제각각이라면
-                정식명과 별칭을 먼저 등록해 두세요.
-            </p>
-            <div class="empty-actions">
-                <router-link class="btn btn-primary" to="/compose?kind=daily">첫 보고 쓰기</router-link>
-                <router-link class="btn" to="/settings/projects">프로젝트명 등록</router-link>
-            </div>
-        </div>
-
-        <!-- 내 프로젝트: 위에서 고르고 바로 아래에서 읽는다. 좌우로 눈을 옮기지 않게 한 칸으로 쌓는다. -->
-        <section v-else class="dash-section" aria-labelledby="progress-title">
-            <div class="dash-section-head">
-                <h2 id="progress-title" class="section-title">내 프로젝트</h2>
-                <span class="dash-section-meta">{{ board.projects.length }}개</span>
-            </div>
-
-            <div class="project-tabs" role="tablist" aria-label="프로젝트">
-                <button
-                    v-for="project in board.projects"
-                    :key="project.name"
-                    type="button"
-                    role="tab"
-                    class="project-tab"
-                    :class="{ 'is-on': project.name === selectedProject }"
-                    :aria-selected="project.name === selectedProject"
-                    @click="chooseProject(project.name)"
-                >
-                    <span class="project-tab-name">{{ project.name }}</span>
-                    <span v-if="project.lastActive" class="project-tab-date">{{ dotDate(project.lastActive) }}</span>
-                </button>
-            </div>
-
-            <div v-if="selectedProject" class="project-panel" role="tabpanel">
-                <div class="project-panel-head">
-                    <p v-if="currentProject?.statusLine" class="project-status">{{ currentProject.statusLine }}</p>
-                    <router-link
-                        class="group-link"
-                        :to="{ path: '/project-timeline', query: { project: selectedProject } }"
-                    >
-                        전체 흐름 보기
-                        <ArrowRight :size="14" />
-                    </router-link>
+            <section v-if="collection" class="dash-card" aria-labelledby="all-week-h">
+                <div class="dash-card-head">
+                    <h2 id="all-week-h" class="dash-card-title">전체 주간 취합</h2>
+                    <span class="dash-meta">{{ collection.week.label }} · {{ collection.submitted }}/{{ collection.total }}명</span>
                 </div>
+                <div class="collect-grid">
+                    <div v-for="team in collection.teams" :key="team.id ?? team.name" class="collect-cell">
+                        <div class="collect-top">
+                            <span class="dept-name">{{ team.name }}</span>
+                            <span v-if="team.submitted === team.total" class="pill is-success">모두 모임</span>
+                        </div>
+                        <span class="collect-count">{{ team.submitted }}/{{ team.total }}명</span>
+                        <span class="bar" aria-hidden="true">
+                            <span :class="{ 'is-full': team.submitted === team.total }"
+                                :style="{ width: `${pct(team.submitted, team.total)}%` }"></span>
+                        </span>
+                    </div>
+                </div>
+                <router-link class="dash-link" to="/weekly">주간보고에서 취합하기</router-link>
+            </section>
 
-                <p v-if="history.length === 0" class="group-empty">
-                    이 프로젝트에 기록된 업무가 없어요.
-                </p>
-                <ol v-else class="history">
-                    <li v-for="item in history" :key="item.key">
-                        <router-link class="history-row" :to="item.href">
-                            <span class="history-when">
-                                <span class="history-date">{{ dotDate(item.date) }}</span>
-                                <span class="history-kind">{{ item.kindLabel }}</span>
-                            </span>
-                            <span class="history-body">
-                                <span
-                                    v-for="(row, index) in item.rows"
-                                    :key="index"
-                                    class="history-line"
-                                >
-                                    <span v-if="row.tag" class="cat-tag"
-                                        :class="CAT_BY_TONE[row.tone] || 'is-next'">{{ row.tag }}</span>
-                                    <span class="history-text">{{ row.text }}</span>
-                                </span>
-                                <span v-if="item.rows.length === 0" class="history-line">
-                                    <span class="history-text">{{ item.title }}</span>
-                                </span>
-                            </span>
-                        </router-link>
-                    </li>
-                </ol>
-                <router-link
-                    v-if="moreHistory"
-                    class="group-link history-more"
-                    :to="{ path: '/project-timeline', query: { project: selectedProject } }"
-                >
-                    이전 기록 {{ moreHistory }}건 더 보기
-                    <ArrowRight :size="14" />
-                </router-link>
+            <div v-if="wroteThisWeek" class="dash-row">
+                <section class="dash-card is-narrow" aria-labelledby="own-today-h">
+                    <h2 id="own-today-h" class="dash-card-title">내 오늘 일일보고</h2>
+                    <template v-if="todayCard">
+                        <p class="today-state" :class="`is-${todayCard.tone}`"><i aria-hidden="true"></i>{{ todayCard.label }}</p>
+                        <router-link v-if="todayCard.action" class="btn btn-primary dash-cta" to="/compose?kind=daily">{{ todayCard.action }}</router-link>
+                    </template>
+                </section>
+                <section class="dash-card is-wide" aria-labelledby="own-week-h">
+                    <h2 id="own-week-h" class="dash-card-title">내 이번 주</h2>
+                    <ol class="week-grid">
+                        <li v-for="day in weekCells" :key="day.date" class="week-cell" :class="`is-${day.tone}`">
+                            <span class="week-day">{{ day.weekday }}</span>
+                            <span class="week-date">{{ day.slash }}</span>
+                            <span class="week-state">{{ day.label }}</span>
+                        </li>
+                    </ol>
+                </section>
             </div>
-        </section>
-        </div>
+        </template>
+
+        <!-- 실무자 · 팀장 -->
+        <template v-else>
+            <div class="dash-row">
+                <section class="dash-card is-narrow" aria-labelledby="today-h">
+                    <div class="dash-card-head">
+                        <h2 id="today-h" class="dash-card-title">오늘 일일보고</h2>
+                        <span class="dash-meta">{{ todayText }}</span>
+                    </div>
+                    <template v-if="todayCard">
+                        <p class="today-state" :class="`is-${todayCard.tone}`"><i aria-hidden="true"></i>{{ todayCard.label }}</p>
+                        <p class="dash-note">{{ todayCard.note }}</p>
+                        <router-link v-if="todayCard.action" class="btn btn-primary dash-cta" to="/compose?kind=daily">{{ todayCard.action }}</router-link>
+                    </template>
+                    <template v-else>
+                        <p class="today-state is-muted"><i aria-hidden="true"></i>보고하는 날이 아님</p>
+                        <p class="dash-note">주말이나 공휴일에는 보고하지 않습니다.</p>
+                    </template>
+                </section>
+
+                <section class="dash-card is-wide" aria-labelledby="week-h">
+                    <h2 id="week-h" class="dash-card-title">이번 주</h2>
+                    <ol class="week-grid">
+                        <li v-for="day in weekCells" :key="day.date" class="week-cell" :class="`is-${day.tone}`"
+                            :aria-label="`${day.weekday}요일 ${day.slash} ${day.label}`">
+                            <span class="week-day">{{ day.weekday }}</span>
+                            <span class="week-date">{{ day.slash }}</span>
+                            <span class="week-state">{{ day.label }}</span>
+                        </li>
+                    </ol>
+                    <div class="week-foot">
+                        <span v-if="missedDays.length" class="is-danger">
+                            빠진 보고 {{ missedDays.length }}건 · {{ missedDays.map((day) => longDate(day.date)).join(", ") }}
+                        </span>
+                        <span v-else class="is-success">빠진 보고 없음</span>
+                        <span class="dash-foot-inline">오늘과 공휴일(휴)은 미제출로 세지 않습니다</span>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 팀장: 우리 부서 -->
+            <div v-if="role === 'leader'" class="dash-row">
+                <section class="dash-card is-half" aria-labelledby="dept-today-h">
+                    <h2 id="dept-today-h" class="dash-card-title">우리 부서 오늘 제출</h2>
+                    <template v-if="myTeam">
+                        <p class="dash-total">오늘 <b>{{ myTeam.done }}/{{ myTeam.total }}명</b> 냄</p>
+                        <span class="bar" aria-hidden="true"><span :style="{ width: `${pct(myTeam.done, myTeam.total)}%` }"></span></span>
+                        <p v-if="!myTeam.pending.length" class="is-success">모두 냈습니다.</p>
+                        <div v-else-if="!openTeams.includes('mine')" class="dept-collapsed">
+                            <p class="dept-missing">
+                                <span class="dept-missing-label">아직 안 낸 사람</span>
+                                {{ myTeam.pending.slice(0, PREVIEW).join(", ") }}
+                                <span v-if="myTeam.pending.length > PREVIEW" class="dash-meta">외 {{ myTeam.pending.length - PREVIEW }}명</span>
+                            </p>
+                            <button v-if="myTeam.pending.length > PREVIEW" type="button" class="btn btn-small"
+                                aria-expanded="false" @click="toggleTeam('mine')">전체 보기</button>
+                        </div>
+                        <div v-else class="dept-expanded">
+                            <div class="dept-expanded-head">
+                                <span class="dept-missing-label">아직 안 낸 사람 {{ myTeam.pending.length }}명</span>
+                                <button type="button" class="btn btn-small" aria-expanded="true" @click="toggleTeam('mine')">접기</button>
+                            </div>
+                            <ul class="name-chips">
+                                <li v-for="name in myTeam.pending" :key="name">{{ name }}</li>
+                            </ul>
+                        </div>
+                        <p class="dash-foot">오늘은 아직 낼 수 있어 미제출로 세지 않습니다.</p>
+                    </template>
+                    <p v-else class="dash-empty">오늘은 보고하는 날이 아닙니다.</p>
+                </section>
+
+                <section class="dash-card is-half" aria-labelledby="dept-week-h">
+                    <h2 id="dept-week-h" class="dash-card-title">우리 부서 주간 취합</h2>
+                    <template v-if="collection">
+                        <p class="dash-total"><b>{{ collection.submitted }}/{{ collection.total }}명</b> 제출</p>
+                        <span class="bar" aria-hidden="true">
+                            <span :class="{ 'is-full': collection.complete }" :style="{ width: `${pct(collection.submitted, collection.total)}%` }"></span>
+                        </span>
+                        <button v-if="collection.complete" type="button" class="btn btn-primary dash-cta" :disabled="isMaking" @click="makeDeck">
+                            {{ isMaking ? "만드는 중" : "PPT 만들기" }}
+                        </button>
+                        <p v-else class="dash-note">다 모이면 부서 PPT를 만들 수 있습니다.</p>
+                    </template>
+                    <p v-else class="dash-empty">취합 현황을 불러오지 못했습니다.</p>
+                </section>
+            </div>
+
+            <section class="dash-card" aria-labelledby="todo-h">
+                <div class="dash-card-head">
+                    <h2 id="todo-h" class="dash-card-title">{{ focusStale ? "지난 할 일" : "다음 할 일" }}</h2>
+                    <span class="dash-meta" :class="{ 'is-danger': focusStale }">{{ focusBasis }}</span>
+                </div>
+                <p v-if="!board.focus" class="dash-empty">일일보고를 저장하면 다음 계획 · 이슈 · 요청이 여기 모입니다.</p>
+                <div v-else class="todo-grid">
+                    <div v-for="col in focusColumns" :key="col.key" class="todo-col" :class="`is-${col.key}`">
+                        <h3 class="todo-title">{{ col.title }}</h3>
+                        <ul v-if="col.items.length" class="todo-list">
+                            <li v-for="(item, index) in col.items" :key="index">
+                                {{ item.text }}<span v-if="item.project" class="todo-project"> · {{ item.project }}</span>
+                            </li>
+                        </ul>
+                        <p v-else class="dash-empty">없음</p>
+                    </div>
+                </div>
+            </section>
+
+            <section v-if="weeklyEmph" class="dash-card weekly-card is-emph" aria-labelledby="weekly-h">
+                <div class="weekly-text">
+                    <div class="weekly-head">
+                        <h2 id="weekly-h" class="dash-card-title">이번 주 주간보고</h2>
+                        <span class="pill" :class="`is-${weeklyCard.tone}`">{{ weeklyCard.label }}</span>
+                    </div>
+                    <p class="dash-note">이번 주 일일보고로 금요일까지 만듭니다.</p>
+                </div>
+                <router-link class="btn btn-primary dash-cta" :to="weeklyCard.to">{{ weeklyCard.action }}</router-link>
+            </section>
+            <section v-else class="dash-card weekly-card" aria-labelledby="weekly-h2">
+                <div class="weekly-head">
+                    <h2 id="weekly-h2" class="dash-card-title">이번 주 주간보고</h2>
+                    <span class="pill" :class="`is-${weeklyCard.tone}`">{{ weeklyCard.label }}</span>
+                </div>
+                <router-link class="dash-link" :to="weeklyCard.to">주간보고로 가기</router-link>
+            </section>
+
+            <section class="dash-card" aria-labelledby="proj-h">
+                <h2 id="proj-h" class="dash-card-title">내 프로젝트</h2>
+                <p v-if="loadError" class="dash-empty is-danger" role="alert">{{ loadError }}</p>
+                <p v-else-if="!board.projects.length" class="dash-empty">
+                    일일보고를 저장하면 프로젝트별로 여기 모입니다.
+                    <router-link class="dash-link" to="/compose?kind=daily">첫 보고 쓰기</router-link>
+                </p>
+                <template v-else>
+                    <div class="proj-chips" role="group" aria-label="프로젝트 고르기">
+                        <button v-for="project in board.projects" :key="project.name" type="button" class="proj-chip"
+                            :aria-pressed="project.name === selectedProject" @click="chooseProject(project.name)">
+                            {{ project.name }}
+                        </button>
+                    </div>
+                    <div class="flow-wrap">
+                        <table class="flow-table">
+                            <caption>{{ selectedProject }} · 최근 일일보고 {{ flowRows.length }}건</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">날짜</th>
+                                    <th scope="col">완료</th>
+                                    <th scope="col">진행</th>
+                                    <th scope="col">이슈</th>
+                                    <th scope="col">다음</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in flowRows" :key="row.key">
+                                    <th scope="row"><router-link :to="row.href">{{ row.date }}</router-link></th>
+                                    <td data-label="완료">{{ row.done.join(", ") || "—" }}</td>
+                                    <td data-label="진행">{{ row.doing.join(", ") || "—" }}</td>
+                                    <td data-label="이슈" :class="row.issues.length ? 'is-danger' : 'is-none'">{{ row.issues.join(", ") || "—" }}</td>
+                                    <td data-label="다음">{{ row.next.join(", ") || "—" }}</td>
+                                </tr>
+                                <tr v-if="!flowRows.length">
+                                    <td colspan="5" class="is-none">이 프로젝트의 일일보고가 없습니다.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <router-link class="dash-link" :to="{ path: '/project-timeline', query: { project: selectedProject } }">
+                        전체 흐름 보기
+                    </router-link>
+                </template>
+            </section>
+        </template>
     </div>
 </template>
 

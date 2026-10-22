@@ -21,6 +21,7 @@ const routes = [
     meta: {
       title: "내 현황",
       navKey: "/",
+      hideHero: true,
     },
   },
   {
@@ -40,6 +41,8 @@ const routes = [
     meta: {
       title: "작성",
       navKey: "/compose",
+      // 위 막대에 이미 "작성"이 있고 바로 아래 탭이 화면 이름 노릇을 한다.
+      hideHero: true,
     },
   },
   {

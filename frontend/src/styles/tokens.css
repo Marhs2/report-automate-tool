@@ -63,6 +63,7 @@
     --overlay: rgba(15, 15, 15, 0.4);
 
     /* ---- Spacing: 4px grid ---------------------------------------- */
+    /* 2026-10-21: 화면이 전체적으로 작다는 말에 글자 · 컨트롤 · 본문 폭을 한 단계씩 키웠다. */
     --space-1: 6px;             /* 붙어 있는 줄 사이. 4px는 한글 줄이 뛭쳐 보여 6px로 놓았다 */
     --space-2: 8px;
     --space-3: 12px;
@@ -73,26 +74,26 @@
     --space-8: 48px;
 
     /* ---- Control system: three heights, one horizontal padding scale */
-    --control-h: 32px;          /* default button / input / select */
-    --control-h-sm: 28px;       /* .btn-small, icon buttons, sidebar rows */
+    --control-h: 36px;          /* default button / input / select */
+    --control-h-sm: 32px;       /* .btn-small, icon buttons, sidebar rows */
     --control-h-lg: 44px;       /* touch (<=860px) and hero CTAs */
     --control-h-touch: var(--control-h-lg);
     --control-px: var(--space-3);
-    --chip-h-sm: 20px;          /* Notion inline tags */
-    --chip-h: 24px;             /* static text chips */
+    --chip-h-sm: 22px;          /* Notion inline tags */
+    --chip-h: 26px;             /* static text chips */
 
     /* ---- Type ----------------------------------------------------- */
     --sans: "Inter", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
     --heading: "Inter", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --fs-11: 11px;              /* micro labels, nav group caps */
-    --fs-12: 12px;              /* chips, field labels, kickers */
-    --fs-13: 14px;              /* meta, help (name kept as a hook; 14px reads easier in Korean) */
-    --fs-14: 15px;              /* UI default: body, list text (hook name kept) */
-    --fs-16: 16px;
-    --fs-18: 18px;              /* section titles (Notion heading 3) */              /* section titles, dialog message, doc inputs */
-    --fs-20: 20px;              /* mobile page title */
-    --fs-24: 24px;              /* page title */
+    --fs-11: 12px;              /* micro labels, nav group caps */
+    --fs-12: 13px;              /* chips, field labels, kickers */
+    --fs-13: 15px;              /* meta, help (name kept as a hook; 14px reads easier in Korean) */
+    --fs-14: 16px;              /* UI default: body, list text (hook name kept) */
+    --fs-16: 17px;
+    --fs-18: 19px;              /* section titles (Notion heading 3) */              /* section titles, dialog message, doc inputs */
+    --fs-20: 21px;              /* mobile page title */
+    --fs-24: 26px;              /* page title */
     --fs-30: 30px;              /* reserved: hero numbers only */
     --fs-32: 32px;              /* page title */
     --fs-40: 40px;              /* reserved */
@@ -143,11 +144,11 @@
     --z-overlay: 90;
 
     /* ---- Shell geometry ------------------------------------------- */
-    --sidebar-width: 240px;
+    --sidebar-width: 272px;
     --sidebar-width-collapsed: 64px;
-    --topbar-height: 45px;
-    --content-max: 1040px;      /* one page column for every screen */
-    --content-max-wide: 1040px; /* kept as a hook; same column as .page */
+    --topbar-height: 52px;
+    --content-max: 1160px;      /* one page column for every screen */
+    --content-max-wide: 1160px; /* kept as a hook; same column as .page */
     --bottom-nav-height: 0px;
     --bottom-nav-offset: 0px;
 

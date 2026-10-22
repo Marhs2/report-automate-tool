@@ -247,10 +247,6 @@ onUnmounted(() => {
         :class="{ 'is-collapsed': collapsedEffective }"
     >
         <div class="sidebar-brand">
-            <router-link v-if="!collapsedEffective" to="/" class="sidebar-brand-link">
-                <span class="sidebar-mark" aria-hidden="true">일</span>
-                <span class="sidebar-brand-name">{{ currentTeam || "일일보고" }}</span>
-            </router-link>
             <button
                 type="button"
                 class="sidebar-collapse-btn"
@@ -354,7 +350,7 @@ onUnmounted(() => {
             </div>
         </header>
         <div class="main-body">
-            <div v-if="!isWritePage" class="page-hero">
+            <div v-if="!isWritePage && !route.meta.hideHero" class="page-hero">
                 <h1 class="page-hero-title">{{ pageMeta.title }}</h1>
             </div>
             <RouterView />

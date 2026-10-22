@@ -602,7 +602,16 @@ watch(selectedUserId, loadUserName);
                     <span class="status-chip" :class="recordId ? 'is-saved' : 'is-draft'">
                         {{ recordId ? "저장됨" : `새 ${KIND_LABELS[kind]}` }}
                     </span>
+                    <!-- 저장은 머리줄에 붙어 있다. 아래에 떠 있던 저장 칸은 긴 양식에서 내용을 가렸다. -->
+                    <div v-if="showsForm" class="write-actions">
+                        <button v-if="recordId" type="button" class="btn btn-ghost btn-danger" @click="remove">삭제</button>
+                        <button v-if="recordId" type="button" class="btn" @click="startNew">새로 작성</button>
+                        <button type="submit" class="btn btn-primary" :disabled="isSaving">
+                            {{ isSaving ? "저장 중" : recordId ? "수정" : "저장" }}
+                        </button>
+                    </div>
                 </div>
+                <p v-if="showsForm && formError" class="form-error" role="alert">{{ formError }}</p>
 
                 <section
                     v-if="!showsForm"
@@ -697,7 +706,7 @@ watch(selectedUserId, loadUserName);
                     <h2 id="sec-basic" class="section-title">
                         {{ kind === "meeting" ? "회의 정보" : kind === "sales" ? "프로젝트" : "기본 정보" }}
                     </h2>
-                    <div class="detail-grid">
+                    <div class="detail-grid" :class="{ 'is-pair': kind === 'meeting' }">
                         <AppField
                             :label="kind === 'sales' ? '프로젝트명' : '관련 프로젝트'"
                             for-id="work-project"
@@ -738,6 +747,7 @@ watch(selectedUserId, loadUserName);
                 <template v-if="kind === 'meeting'">
                     <section class="form-section" aria-labelledby="sec-meeting">
                         <h2 id="sec-meeting" class="section-title">회의 내용</h2>
+                        <div class="pair-grid">
                         <AppField label="안건" for-id="meeting-agenda">
                             <textarea
                                 id="meeting-agenda"
@@ -758,6 +768,7 @@ watch(selectedUserId, loadUserName);
                                 placeholder="- 정해진 것"
                             />
                         </AppField>
+                        </div>
                     </section>
 
                     <section class="form-section" aria-labelledby="sec-follow">
@@ -832,6 +843,7 @@ watch(selectedUserId, loadUserName);
 
                     <section class="form-section" aria-labelledby="sec-progress">
                         <h2 id="sec-progress" class="section-title">진행</h2>
+                        <div class="pair-grid">
                         <AppField label="진행사항" for-id="sales-progress">
                             <textarea
                                 id="sales-progress"
@@ -845,17 +857,10 @@ watch(selectedUserId, loadUserName);
                         <AppField label="추후 진행사항" for-id="sales-next">
                             <textarea id="sales-next" v-model="form.nextSteps" v-autosize class="textarea grow" rows="2" />
                         </AppField>
+                        </div>
                     </section>
                 </template>
 
-                <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
-                <div class="form-actions">
-                    <button v-if="recordId" type="button" class="btn btn-danger" @click="remove">삭제</button>
-                    <button v-if="recordId" type="button" class="btn" @click="startNew">새로 작성</button>
-                    <button type="submit" class="btn btn-primary" :disabled="isSaving">
-                        {{ isSaving ? "저장 중" : recordId ? "수정" : "저장" }}
-                    </button>
-                </div>
                 </template>
             </form>
 

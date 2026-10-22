@@ -96,6 +96,9 @@ def _style_cell(cell, *, size_pt=None, bold_headings=False, scheme_color=None):
                 if ppr is None:
                     ppr = paragraph.makeelement(qn("a:pPr"), {})
                     paragraph.insert(0, ppr)
+                # 마스터 문단에 spcBef가 이미 있으면 바꾼다. 두 개가 되면 PowerPoint가 파일을 복구한다.
+                for old in ppr.findall(qn("a:spcBef")):
+                    ppr.remove(old)
                 gap = ppr.makeelement(qn("a:spcBef"), {})
                 gap.append(gap.makeelement(qn("a:spcPts"), {"val": str(int(size_pt * HEADING_GAP * 100))}))
                 after = ppr.find(qn("a:lnSpc"))

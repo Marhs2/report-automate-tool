@@ -236,7 +236,7 @@ const loadDraft = async () => {
 const statusLabel = computed(() => {
     if (alreadySaved.value) return "제출됨";
     if (draftSavedAt.value) return `임시 저장 · ${draftSavedAt.value}`;
-    return "미제출";
+    return "아직 안 냄";
 });
 
 const statusDetail = computed(() => {
@@ -573,7 +573,7 @@ const sendReport = async () => {
                 />
                 <span
                     class="status-chip"
-                    :class="alreadySaved ? 'is-saved' : draftSavedAt ? 'is-draft' : 'is-danger'"
+                    :class="alreadySaved ? 'is-saved' : 'is-draft'"
                     :title="statusDetail"
                 >
                     {{ statusLabel }}
@@ -702,7 +702,7 @@ const sendReport = async () => {
                     @click="sendReport"
                     :disabled="aiLoading"
                 >
-                    {{ aiLoading ? "추출 중" : "AI로 추출" }}
+                    {{ aiLoading ? "정리하는 중" : "AI로 정리하기" }}
                 </button>
             </div>
         </div>

@@ -18,15 +18,23 @@ const refresh = async () => {
         state.value = null;
         return;
     }
-    const { getUserActivities, getReportDraft } = useApi();
+    const { getUserActivities, getReportDraft, getHolidays } = useApi();
     const iso = todayString();
     const week = weekDays(iso);
     if (!week.length) return;
     const [year, month] = iso.split("-").map(Number);
     let saved = new Set();
+    let holidays = {};
     try {
-        const rows = await getUserActivities(year, month, week[0].date, week[4].date);
+        const years = [...new Set([week[0].date.slice(0, 4), week[4].date.slice(0, 4)])];
+        const [rows, ...holidayLists] = await Promise.all([
+            getUserActivities(year, month, week[0].date, week[4].date),
+            ...years.map((y) => getHolidays(Number(y))),
+        ]);
         saved = savedDatesOf(rows, memberId);
+        holidays = Object.fromEntries(
+            holidayLists.flat().filter((row) => row?.date).map((row) => [row.date, row.name]),
+        );
     } catch {
         return;
     }
@@ -41,13 +49,13 @@ const refresh = async () => {
     }
     const weekday = new Date().getDay();
     today.value = iso;
-    days.value = weekStatus(week, saved, iso);
+    days.value = weekStatus(week, saved, iso, holidays);
     // 이번 주 보고를 한 번도 안 쓴 관리자는 보고 대상이 아니다. 배지로 재촉하지 않는다.
     const quietAdmin = Boolean(isAdmin.value) && saved.size === 0 && !hasDraft;
     state.value = todayState({
         saved: saved.has(iso),
         hasDraft,
-        weekend: weekday === 0 || weekday === 6 || quietAdmin,
+        weekend: weekday === 0 || weekday === 6 || Boolean(holidays[iso]) || quietAdmin,
     });
 };
 

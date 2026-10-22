@@ -80,3 +80,14 @@ describe("daySubmission", () => {
         });
     });
 });
+
+describe("weekStatus holidays", () => {
+    it("marks a weekday holiday as holiday instead of missing, unless a report was saved", () => {
+        const days = weekDays("2026-10-09");
+        const states = weekStatus(days, new Set(["2026-10-05"]), "2026-10-09", {
+            "2026-10-05": "개천절 대체 휴일",
+            "2026-10-09": "한글날",
+        }).map((day) => day.state);
+        assert.deepEqual(states, ["saved", "missing", "missing", "missing", "holiday"]);
+    });
+});

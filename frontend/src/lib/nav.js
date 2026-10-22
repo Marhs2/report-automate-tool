@@ -19,8 +19,8 @@ export const MOBILE_TABS = [
 
 /** 작성 화면의 선택지. 예전 일반보고는 일일보고에 합쳤다(kind=daily). */
 export const COMPOSE_CHOICES = [
-    { id: "meeting", to: "/compose?kind=meeting", label: "회의록" },
     { id: "daily", to: "/compose?kind=daily", label: "일일보고" },
+    { id: "meeting", to: "/compose?kind=meeting", label: "회의록" },
     { id: "sales", to: "/compose?kind=sales", label: "영업보고" },
 ];
 

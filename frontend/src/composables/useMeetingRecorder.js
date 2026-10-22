@@ -50,8 +50,10 @@ export function useMeetingRecorder({ onAudio }) {
         starting.value = true;
         let mic;
         try {
+            // 브라우저의 잡음 제거 · 에코 제거는 마이크 앞 한 사람용이라 멀리 앉은 사람 목소리를 잡음으로 깎았다.
+            // 회의 녹음은 스피커로 소리를 내지 않아 에코도 없다. 음량은 createAutoGain 하나만 맞춘다(둘이면 서로 출렁인다).
             mic = await navigator.mediaDevices.getUserMedia({
-                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
             });
         } catch (error) {
             throw micError(error);

@@ -15,6 +15,20 @@
                     관리자로 수정
                 </button>
             </div>
+            <div v-if="reportData && canEdit" class="detail-actions">
+                <button
+                    v-if="rawData"
+                    class="btn btn-ghost reextract-btn"
+                    type="button"
+                    :disabled="aiLoading || saving"
+                    @click="retryExtract"
+                >
+                    {{ aiLoading ? "다시 정리하는 중" : "원문으로 다시 정리" }}
+                </button>
+                <button class="btn btn-primary" type="button" :disabled="aiLoading || saving" @click="saveReport">
+                    {{ saveLabel }}
+                </button>
+            </div>
             <p v-if="reportData && canEdit" class="detail-summary">
                 {{ sizeLabel }}<template v-if="!savedReportId"> · AI가 만든 초안이에요. 원문과 대조하고 고친 뒤 저장하세요.</template>
             </p>
@@ -157,22 +171,17 @@
                             placeholder="프로젝트 이름"
                         />
                         <button
-                            class="btn"
+                            class="btn btn-small project-more"
                             type="button"
+                            :aria-label="`${project.projectName || '이 프로젝트'} 바꾸기 · 삭제`"
+                            title="프로젝트 바꾸기 · 삭제"
                             @click="openProjectPopup(projectIndex)"
                         >
-                            프로젝트 선택
-                        </button>
-                        <button
-                            class="btn btn-danger"
-                            type="button"
-                            @click="removeProject(projectIndex)"
-                        >
-                            삭제
+                            <MoreHorizontal :size="16" aria-hidden="true" />
                         </button>
                     </div>
                     <div
-                        v-for="col in DESK_FIELDS"
+                        v-for="col in filledDeskFields(project)"
                         :key="col.key"
                         class="field-group is-row"
                         :class="col.key"
@@ -188,6 +197,7 @@
                                     class="input"
                                     v-model="project[col.key][itemIndex]"
                                     :aria-label="col.label"
+                                    @keydown.enter="addLineAfter($event, projectIndex, col.key, itemIndex)"
                                 />
                                 <button
                                     class="btn remove-btn"
@@ -199,34 +209,26 @@
                                     <X :size="14" aria-hidden="true" />
                                 </button>
                             </div>
-                            <p v-if="!(project[col.key] || []).length" class="empty-msg">없음</p>
-                            <button class="btn add-btn" type="button" @click="addField(project, col.key)">
-                                + 추가
+                            <button class="btn add-btn" type="button" @click="addLineAfter(null, projectIndex, col.key, project[col.key].length - 1)">
+                                + 줄 추가
                             </button>
                         </div>
                     </div>
-                </div>
-                <button class="btn add-project-btn" type="button" @click="openProjectPopup()">프로젝트 추가</button>
-                <div class="card save-bar">
-                    <div class="save-actions">
+                    <!-- 빈 분류는 줄을 차지하지 않고 여기 칩으로만 둔다. 누르면 그 분류가 열리고 첫 줄에 커서가 간다. -->
+                    <div v-if="emptyDeskFields(project).length" class="empty-fields">
+                        <span class="empty-fields-label">비어 있음</span>
                         <button
-                            class="btn btn-primary"
-                            @click="saveReport"
-                            :disabled="aiLoading || saving"
-                        >
-                            {{ saveLabel }}
-                        </button>
-                        <button
-                            v-if="rawData"
-                            class="btn reextract-btn"
+                            v-for="col in emptyDeskFields(project)"
+                            :key="`empty-${col.key}`"
                             type="button"
-                            :disabled="aiLoading || saving"
-                            @click="retryExtract"
+                            class="btn btn-small empty-field-add"
+                            @click="addLineAfter(null, projectIndex, col.key, -1)"
                         >
-                            {{ aiLoading ? "재추출 중..." : "재추출" }}
+                            + {{ col.label }}
                         </button>
                     </div>
                 </div>
+                <button class="btn add-project-btn" type="button" @click="openProjectPopup()">프로젝트 추가</button>
                 </template>
 
                 <template v-else>
@@ -240,8 +242,9 @@
                         />
                         <button type="button" class="edit-more" @click="openProjectPopup(activeIndex)">더보기</button>
                     </div>
+                    <!-- 빈 분류는 숨긴다. 아래 종류 버튼으로 고르고 넣으면 나타난다. -->
                     <section
-                        v-for="col in EDIT_COLUMNS"
+                        v-for="col in EDIT_COLUMNS.filter((c) => activeProject[c.key].length)"
                         :key="col.key"
                         class="edit-bucket"
                     >
@@ -300,26 +303,6 @@
                     프로젝트 추가
                 </button>
 
-                <div class="card save-bar">
-                    <div class="save-actions">
-                        <button
-                            class="btn btn-primary"
-                            @click="saveReport"
-                            :disabled="aiLoading || saving"
-                        >
-                            {{ saveLabel }}
-                        </button>
-                        <button
-                v-if="rawData"
-                class="btn reextract-btn"
-                type="button"
-                :disabled="aiLoading || saving"
-                @click="retryExtract"
-            >
-                {{ aiLoading ? "재추출 중..." : "재추출" }}
-            </button>
-                    </div>
-                </div>
                 </template>
             </div>
 
@@ -360,7 +343,7 @@ import {
 } from "../lib/projectAccent";
 import { indexAfterCurrent } from "../lib/projectInsert";
 import { overwriteNote, reportSizeLabel } from "../lib/reportSummary";
-import { X } from "lucide-vue-next";
+import { MoreHorizontal, X } from "lucide-vue-next";
 
 const route = useRoute();
 const router = useRouter();
@@ -803,6 +786,24 @@ const addCurrentLine = () => {
 const addField = (project, key) => {
     if (!Array.isArray(project[key])) project[key] = [];
     project[key].push("");
+};
+
+const filledDeskFields = (project) => DESK_FIELDS.filter((col) => (project[col.key] || []).length);
+const emptyDeskFields = (project) => DESK_FIELDS.filter((col) => !(project[col.key] || []).length);
+
+/** index 다음에 빈 줄을 넣고 커서를 옮긴다. 엔터(한글 조합 중 제외), '+ 줄 추가', 빈 분류 칩이 함께 쓴다. */
+const addLineAfter = async (event, projectIndex, key, index) => {
+    if (event) {
+        if (event.isComposing) return;
+        event.preventDefault();
+    }
+    const project = reportData.value?.projects?.[projectIndex];
+    if (!project) return;
+    if (!Array.isArray(project[key])) project[key] = [];
+    project[key].splice(index + 1, 0, "");
+    await nextTick();
+    const inputs = document.querySelectorAll(`#project-${projectIndex} .field-group.${key} .task-row input`);
+    inputs[index + 1]?.focus();
 };
 
 const removeProject = async (index) => {
