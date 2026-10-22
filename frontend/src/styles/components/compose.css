@@ -1,10 +1,3 @@
-/* 설정 화면과 같은 밑줄 탭. */
-.kind-bar {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-}
-
 
 /* 머리줄은 일일보고 탭(report.vue .write-head)과 같은 모양. 탭을 바꿔도 누가 · 언제 · 상태가 같은 자리에 있다. */
 .write-head {

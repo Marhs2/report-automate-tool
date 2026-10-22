@@ -6,7 +6,6 @@ import { useDialog } from "../composables/useDialog";
 import { selectedUserId } from "../composables/useSelectedUser";
 import AppField from "./ui/AppField.vue";
 import Report from "./report.vue";
-import { COMPOSE_CHOICES } from "../lib/nav";
 import { Mic, Square } from "lucide-vue-next";
 import { useMeetingRecorder } from "../composables/useMeetingRecorder";
 import { useMeetingChunks } from "../composables/useMeetingChunks";
@@ -567,21 +566,6 @@ watch(selectedUserId, loadUserName);
 
 <template>
     <div class="page is-wide">
-        <div class="kind-bar">
-            <nav class="app-tabs kind-switch" aria-label="작성">
-                <router-link
-                    v-for="item in COMPOSE_CHOICES"
-                    :key="item.id"
-                    :to="item.to"
-                    class="app-tab"
-                    :class="{ 'is-active': kind === item.id }"
-                    :aria-current="kind === item.id ? 'page' : null"
-                >
-                    {{ item.label }}
-                </router-link>
-            </nav>
-        </div>
-
         <Report v-if="kind === 'daily'" />
         <template v-else>
         <p v-if="isLoading" class="list-status" role="status">불러오는 중</p>

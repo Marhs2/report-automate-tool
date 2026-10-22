@@ -20,7 +20,7 @@ const routes = [
     path: "/",
     name: "today",
     component: today,
-    meta: { title: "오늘 한 일", navKey: "/" },
+    meta: { title: "오늘 한 일", navKey: "/", kindSwitch: true },
   },
   {
     path: "/me",
@@ -49,9 +49,9 @@ const routes = [
     name: "compose",
     component: compose,
     meta: {
-      title: "다른 보고",
+      title: "회의록",
       navKey: "/",
-      parent: { to: "/", label: "오늘" },
+      kindSwitch: true,
     },
     // 일일보고는 "오늘" 화면이 곧 작성 화면이다.
     beforeEnter: (to) => {

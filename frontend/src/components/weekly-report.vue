@@ -17,6 +17,7 @@ import {
     weekKeyOfDates,
     weekRangeLabel,
 } from "../lib/dateScope";
+import { periodTotals } from "../lib/carryOver";
 
 
 const router = useRouter();
@@ -28,6 +29,7 @@ const {
     deleteWeeklyReport,
     downloadWeeklyPptx,
     getUserActivities,
+    getReports,
 } = useApi();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
 
@@ -37,6 +39,18 @@ const userId = ref(selectedUserId.value || "");
 const weeklyReport = ref(null);
 const isLoading = ref(false);
 const myDays = ref({});
+/** 고른 기간에 낸 일일보고의 완료 · 진행 · 이슈 수. 주간 회고 도구(Sunsama)처럼 "무엇을 했는지"를 먼저 보여 준다. */
+const totals = ref(null);
+const loadTotals = async () => {
+    totals.value = null;
+    if (!rangeStart.value || !rangeEnd.value || !userId.value) return;
+    try {
+        totals.value = periodTotals(await getReports(), userId.value, rangeStart.value, rangeEnd.value);
+    } catch {
+        totals.value = null;
+    }
+};
+const pastDays = computed(() => weekDays.value.filter((day) => !isFutureDate(day)).length);
 
 const formatLocalDate = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -188,9 +202,12 @@ const dayTone = (dayDate) => {
 
 const showRange = ref(false);
 
+/** 쓴 날은 "작성함" 대신 그날 끝낸 일 수를 적는다. */
 const dayState = (dayDate) => {
     if (isFutureDay(dayDate)) return hasMine(dayDate) ? "예정 · 작성함" : "예정";
-    return hasMine(dayDate) ? "작성함" : "보고 없음";
+    if (!hasMine(dayDate)) return "보고 없음";
+    const day = totals.value?.byDay?.[dayDate];
+    return day?.done ? `완료 ${day.done}` : "작성함";
 };
 
 const weekGroups = computed(() => {
@@ -325,6 +342,7 @@ const sendDates = async () => {
 /** 고른 기간에 내가 낸 일일보고만 조회해 선택 가능한 날짜를 정한다. */
 const loadMyWeek = async () => {
     myDays.value = {};
+    loadTotals();
     if (!rangeStart.value || !rangeEnd.value || !userId.value) return;
     try {
         const rows = await getUserActivities(
@@ -663,6 +681,25 @@ onMounted(async () => {
                     />
                 </label>
             </div>
+
+            <dl v-if="totals?.days" class="wk-done" :aria-label="isThisWeek ? '이번 주 한 일' : '이 기간에 한 일'">
+                <div class="wk-done-cell">
+                    <dt>쓴 날</dt>
+                    <dd>{{ totals.days }}<small>/{{ pastDays || weekDays.length }}일</small></dd>
+                </div>
+                <div class="wk-done-cell is-done">
+                    <dt>완료</dt>
+                    <dd>{{ totals.done }}</dd>
+                </div>
+                <div class="wk-done-cell is-progress">
+                    <dt>진행</dt>
+                    <dd>{{ totals.progress }}</dd>
+                </div>
+                <div class="wk-done-cell" :class="{ 'is-issue': totals.issues }">
+                    <dt>이슈</dt>
+                    <dd>{{ totals.issues }}</dd>
+                </div>
+            </dl>
 
             <p class="wk-hint">일일보고를 쓴 날만 고를 수 있어요. 고른 날의 내용으로 초안을 만들어요.</p>
 

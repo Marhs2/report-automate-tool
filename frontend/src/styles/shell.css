@@ -251,6 +251,26 @@
     color: var(--text-strong);
 }
 
+.page-hero-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-4);
+}
+
+/* 일일보고 · 회의록 · 영업보고 전환. 제목 오른쪽, 좁으면 제목 아래로 내려와 한 줄을 채운다. */
+.kind-switch > a {
+    min-height: var(--control-h);
+    font-size: var(--fs-14);
+}
+
+@media (max-width: 640px) {
+    .kind-switch {
+        width: 100%;
+    }
+}
+
 .page-hero-title {
     margin: 0;
     font-size: var(--fs-32);

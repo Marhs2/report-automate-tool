@@ -8,7 +8,7 @@ import { selectedTeamId } from "./composables/useSelectedTeam";
 import { hasSession, isAdmin, leaderTeamId, sessionToken } from "./composables/useSession";
 import { useDialog } from "./composables/useDialog";
 import { useSidebar } from "./composables/useSidebar";
-import { ACCOUNT_LINKS, MOBILE_TABS, PRIMARY_NAV } from "./lib/nav";
+import { ACCOUNT_LINKS, COMPOSE_CHOICES, MOBILE_TABS, PRIMARY_NAV } from "./lib/nav";
 import { useMyWeek } from "./composables/useMyWeek";
 import { TODAY_LABELS } from "./lib/weekStatus";
 import { pageParentOverride, pageTitleOverride } from "./composables/usePageMeta";
@@ -39,8 +39,17 @@ const navItems = PRIMARY_NAV;
 
 /** 화면이 자기 제목·상위 위치를 덮어쓸 수 있다.
  *  같은 라우트라도 "읽는 중"과 "고치는 중"의 이름이 달라야 한다. */
+/** 오늘 화면과 회의록 · 영업보고는 같은 "쓰기" 화면이다. 제목 옆 전환으로 오간다. 기존 기록을 고칠 때는 숨긴다. */
+const activeKind = computed(() => (route.name === "compose" ? String(route.query.kind || "meeting") : "daily"));
+const showKindSwitch = computed(() => Boolean(route.meta.kindSwitch) && !route.params.id);
+const KIND_TITLES = { meeting: "회의록", sales: "영업보고" };
+
 const pageMeta = computed(() => ({
-    title: pageTitleOverride.value || route.meta.title || "오늘 한 일",
+    title:
+        pageTitleOverride.value ||
+        (route.name === "compose" ? KIND_TITLES[activeKind.value] : "") ||
+        route.meta.title ||
+        "오늘 한 일",
     parent: pageParentOverride.value || route.meta.parent || null,
     action: route.meta.action || null,
 }));
@@ -268,7 +277,20 @@ onUnmounted(() => {
                 <router-link v-if="pageMeta.parent" class="page-hero-back" :to="pageMeta.parent.to">
                     <ChevronLeft :size="18" />{{ pageMeta.parent.label }}
                 </router-link>
-                <h1 class="page-hero-title">{{ pageMeta.title }}</h1>
+                <div class="page-hero-row">
+                    <h1 class="page-hero-title">{{ pageMeta.title }}</h1>
+                    <nav v-if="showKindSwitch" class="seg kind-switch" aria-label="보고 종류">
+                        <router-link
+                            v-for="item in COMPOSE_CHOICES"
+                            :key="item.id"
+                            :to="item.to"
+                            :class="{ 'is-on': activeKind === item.id }"
+                            :aria-current="activeKind === item.id ? 'page' : null"
+                        >
+                            {{ item.label }}
+                        </router-link>
+                    </nav>
+                </div>
             </div>
             <RouterView />
         </div>
