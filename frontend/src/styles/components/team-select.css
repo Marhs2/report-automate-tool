@@ -23,7 +23,7 @@
 }
 
 .team-on {
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: var(--fw-semibold);
 }
 

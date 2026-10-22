@@ -53,7 +53,7 @@
 .letter-chip.is-on {
     background: var(--accent-soft);
     border-color: var(--accent);
-    color: var(--accent-hover);
+    color: var(--accent-text);
 }
 
 .team-chip:focus-visible,

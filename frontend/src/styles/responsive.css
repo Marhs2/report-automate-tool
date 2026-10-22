@@ -136,7 +136,7 @@ html.is-overlay-open .main-body {
 
     .topbar-tool.is-active {
         background: var(--accent-soft);
-        color: var(--accent-hover);
+        color: var(--accent-text);
     }
 
     .sidebar-avatar {
@@ -220,14 +220,14 @@ html.is-overlay-open .main-body {
 
     .app-bottom-nav a.is-active,
     .app-bottom-nav button.is-active {
-        color: var(--accent-hover);
+        color: var(--accent-text);
         background: transparent;
     }
 
     .app-bottom-nav a.is-active svg,
     .app-bottom-nav button.is-active svg {
         opacity: 1;
-        color: var(--accent-hover);
+        color: var(--accent-text);
     }
 
     .app-bottom-nav .tab-dot {

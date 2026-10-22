@@ -327,7 +327,7 @@
 }
 
 .record-btn.is-stop .record-disc {
-    background: var(--danger-fg);
+    background: var(--danger-solid);
 }
 
 .record-btn:focus-visible {

@@ -39,7 +39,7 @@
   font: inherit;
   font-size: var(--fs-13);
   font-weight: var(--fw-semibold);
-  color: var(--accent-hover);
+  color: var(--accent-text);
   cursor: pointer;
 }
 

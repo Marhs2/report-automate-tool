@@ -2,6 +2,7 @@
 
 실제 값은 `frontend/src/styles/tokens.css` 한 곳에만 있다. 이 문서는 **언제 무엇을 쓰는지**를 정한다.
 참고: `docs/design-reference.md`(Linear · Notion 크롬 규칙).
+전체 디자인 시스템(토큰 · 컴포넌트 · 레퍼런스 분석 · UX 개선안): https://claude.ai/artifact/2AfoF9wZVwRPtgtPCFMqGB
 
 ---
 
@@ -117,3 +118,23 @@ AI 느낌은 색이 아니라 **모양**(알약 배지, 상자 남발, 같은 �
 - 알약 배경 + 점 상태 배지
 - 같은 모양 타일을 줄 세운 그리드
 - 점선 상자 버튼
+
+---
+
+## 8. 2026-10 개정: 다크 테마 · 신규 토큰
+
+레퍼런스(Linear 2026 refresh, GitHub Primer, Atlassian, Toss TDS)를 확인하고 정한 변경.
+
+| 변경 | 토큰 | 이유 |
+|---|---|---|
+| 다크 테마 | `tokens.css` 하단, 이름은 그대로 값만 1:1 | OS 설정을 따른다. `<html data-theme="light|dark">`로 강제 가능 |
+| 입력칸 경계 | `--border-input` (#8f8d87, 3.3:1) | 기존 `--border`는 흰 바탕에서 1.2:1이라 칸이 안 보였다(WCAG 1.4.11) |
+| 기본 버튼 테두리 | `--border-strong` | 흰 버튼이 바탕에 묻힘 |
+| 강조색 글자 | `--accent-text` | 다크에서 `--accent`는 바탕 대비 3.6:1. **강조색을 글자·아이콘에 쓸 때는 항상 `--accent-text`** |
+| 되돌릴 수 없는 버튼 면 | `--danger-solid`, `--danger-solid-hover` | 다크의 `--danger-fg`는 흰 글자를 못 받친다. `color-mix()` 제거 |
+| 비활성 글자 | `--text-subtle` | 비활성 전용(3.5:1). 정보에 쓰지 않는다 |
+| 선택 표시 | `--selected-bg`, `--selected-text` | 선택과 포커스(`--focus-ring`)를 분리(Atlassian) |
+| 간격 · 크기 | `--space-05` 4, `--space-9` 64, `--row-min-h` 44, `--dialog-w` 440 | 빠진 단계 보충 |
+| 글꼴 | `--sans` = Pretendard 단일 | Inter와 섞이면 영·한 글자 높이가 줄 안에서 어긋났다. Inter 다운로드 제거 |
+
+새 색을 쓸 때 원값(#hex, `color-mix`)을 컴포넌트 CSS에 넣지 않는다. 토큰을 추가하고 라이트·다크 두 값을 함께 정한다. 예외: 주간 PPT 형식 미리보기(`weekly-detail.css`의 `--slide-*`)는 실제 슬라이드 색이라 두 테마에서 같다.

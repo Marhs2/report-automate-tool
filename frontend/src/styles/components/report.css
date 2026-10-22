@@ -36,7 +36,7 @@
 }
 
 .aside-more:hover {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 @media (max-width: 860px) {

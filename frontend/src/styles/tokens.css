@@ -1,33 +1,37 @@
 /* ------------------------------------------------------------------
    Design tokens — the only place raw values live.
-   Notion-style light theme: white page, warm-gray sidebar, one blue accent,
-   hairline borders, no dark mode.
+   Notion-style warm neutrals, one blue accent, hairline borders.
+   Light is the default; dark pairs every color 1:1 under the same name
+   (bottom of this file) and follows the OS unless data-theme is set.
    Every name here is a public hook: never rename or remove, only add.
-   Usage rules live in .omo/ui-redesign/design-spec.md
+   Usage rules: docs/design-system.md
    ------------------------------------------------------------------ */
 :root {
     /* ---- Color: canvas & surfaces ------------------------------- */
     --bg: #ffffff;              /* page canvas (Notion page white) */
     --surface: #ffffff;         /* cards, inputs, dialogs, sticky bars */
     --surface-soft: #f1f1ef;    /* hover fill, trays, static chips, avatars */
-    --surface-press: #e8e7e4;
-    --input-bg: #f7f7f5;        /* Notion input well; turns white on focus */   /* pressed/active fill for neutral controls */
+    --surface-press: #e8e7e4;   /* pressed/active fill for neutral controls */
+    --input-bg: #f7f7f5;        /* Notion input well; turns surface on focus */
     --sidebar-bg: #f7f7f5;      /* Notion sidebar gray */
     --sidebar-hover: #ebebe9;   /* sidebar row hover / active fill */
 
     /* ---- Color: lines --------------------------------------------- */
     --border: #e9e9e7;          /* default hairline, Notion divider */
-    --border-strong: #d3d1cb;   /* hover border, dashed affordances */
+    --border-strong: #d3d1cb;   /* hover border, default button border */
+    --border-input: #8f8d87;    /* input/checkbox edge: 3.3:1 on bg (WCAG 1.4.11) */
 
     /* ---- Color: text ---------------------------------------------- */
     --text-strong: #1f1e1b;     /* headings, values, control labels */
     --text: #37352f;            /* body */
     --text-muted: #63625e;      /* secondary, labels; AA on sidebar-hover (5.1:1) */
+    --text-subtle: #8a8984;     /* disabled only: 3.5:1, never for information */
     --text-on-accent: #ffffff;
 
     /* ---- Color: the one accent ------------------------------------ */
     --accent: #0075de;          /* primary CTA fill, links, active indicator */
     --accent-hover: #005bab;
+    --accent-text: #005bab;     /* accent as text/icon: links, selected labels, counts */
     --accent-soft: #e7f3f8;     /* selected fill, count chips */
     --accent-border: #b4d6ef;
     --accent-ring: rgba(0, 117, 222, 0.38);   /* 키보드 포커스가 흐려 어디에 있는지 안 보였다(0.2) */
@@ -42,6 +46,8 @@
     --danger-fg: #b3261e;
     --danger-bg: #fdebec;
     --danger-border: #eec4bf;
+    --danger-solid: #b3261e;    /* fill under white text for irreversible actions */
+    --danger-solid-hover: #9c2019;
     --info-fg: #0b5cab;
     --info-bg: #e7f3f8;
     --info-border: #b9d6f5;
@@ -58,11 +64,14 @@
     --primary: var(--accent);
     --primary-hover: var(--accent-hover);
     --attention: var(--danger-fg);
+    --selected-bg: var(--accent-soft);    /* selection, never focus (that is --focus-ring) */
+    --selected-text: var(--accent-text);
 
     /* ---- Overlay -------------------------------------------------- */
     --overlay: rgba(15, 15, 15, 0.4);
 
     /* ---- Spacing: 4px grid ---------------------------------------- */
+    --space-05: 4px;            /* icon–label gap, inside tags */
     --space-1: 6px;             /* 붙어 있는 줄 사이. 4px는 한글 줄이 뛭쳐 보여 6px로 놓았다 */
     --space-2: 8px;
     --space-3: 12px;
@@ -71,6 +80,7 @@
     --space-6: 24px;
     --space-7: 32px;
     --space-8: 48px;
+    --space-9: 64px;            /* page bottom clearance above fixed mobile bars */
 
     /* ---- Control system: three heights, one horizontal padding scale */
     --control-h: 32px;          /* default button / input / select */
@@ -80,17 +90,20 @@
     --control-px: var(--space-3);
     --chip-h-sm: 20px;          /* Notion inline tags */
     --chip-h: 24px;             /* static text chips */
+    --row-min-h: 44px;          /* list rows: a touch target at every width */
+    --dialog-w: 440px;
 
     /* ---- Type ----------------------------------------------------- */
-    --sans: "Inter", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
-    --heading: "Inter", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
+    /* One family: Pretendard's Latin is Inter-derived, so Latin and Hangul share metrics. */
+    --sans: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
+    --heading: var(--sans);
     --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --fs-11: 11px;              /* micro labels, nav group caps */
     --fs-12: 12px;              /* chips, field labels, kickers */
     --fs-13: 14px;              /* meta, help (name kept as a hook; 14px reads easier in Korean) */
     --fs-14: 15px;              /* UI default: body, list text (hook name kept) */
     --fs-16: 16px;
-    --fs-18: 18px;              /* section titles (Notion heading 3) */              /* section titles, dialog message, doc inputs */
+    --fs-18: 18px;              /* section titles, dialog message, doc inputs */
     --fs-20: 20px;              /* mobile page title */
     --fs-24: 24px;              /* page title */
     --fs-30: 30px;              /* reserved: hero numbers only */
@@ -152,4 +165,109 @@
     --bottom-nav-offset: 0px;
 
     --scrollbar-thumb: rgba(55, 53, 47, 0.2);
+}
+
+/* ------------------------------------------------------------------
+   Dark: same names, values paired 1:1 with light. Follows the OS;
+   data-theme="light" | "dark" on <html> overrides it.
+   accent is 3.6:1 on dark bg, so text in accent must use --accent-text.
+   ------------------------------------------------------------------ */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #191918;
+        --surface: #202020;
+        --surface-soft: #2a2a28;
+        --surface-press: #33332f;
+        --input-bg: #1f1f1e;
+        --sidebar-bg: #141413;
+        --sidebar-hover: #262624;
+        --border: #2f2e2b;
+        --border-strong: #45443f;
+        --border-input: #6b6a65;
+        --text-strong: #f1f0ec;
+        --text: #d9d8d4;
+        --text-muted: #a3a29c;
+        --text-subtle: #7d7c77;
+        --text-on-accent: #ffffff;
+        --accent: #2272c3;
+        --accent-hover: #1b5fa3;
+        --accent-text: #6cb0f0;
+        --accent-soft: #1a2b3b;
+        --accent-border: #2a4a6a;
+        --accent-ring: rgba(108, 176, 240, 0.5);
+        --success-fg: #5fbf7c;
+        --success-bg: #1c2b20;
+        --success-border: #2f5a3a;
+        --warning-fg: #d9a441;
+        --warning-bg: #2e2615;
+        --warning-border: #5a4720;
+        --danger-fg: #f08077;
+        --danger-bg: #3a1f1d;
+        --danger-border: #6a3330;
+        --danger-solid: #b83229;
+        --danger-solid-hover: #9f2a22;
+        --info-fg: #6cb0f0;
+        --info-bg: #1a2b3b;
+        --info-border: #2a4a6a;
+        --project-4-fg: #b5a9d6;
+        --project-4-bg: #28243a;
+        --project-4-border: #4a4366;
+        --project-5-fg: #7fc0b5;
+        --project-5-bg: #1b2c29;
+        --project-5-border: #2f524c;
+        --overlay: rgba(0, 0, 0, 0.6);
+        --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+        --shadow-2: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
+        --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+        color-scheme: dark;
+    }
+}
+
+:root[data-theme="dark"] {
+    --bg: #191918;
+    --surface: #202020;
+    --surface-soft: #2a2a28;
+    --surface-press: #33332f;
+    --input-bg: #1f1f1e;
+    --sidebar-bg: #141413;
+    --sidebar-hover: #262624;
+    --border: #2f2e2b;
+    --border-strong: #45443f;
+    --border-input: #6b6a65;
+    --text-strong: #f1f0ec;
+    --text: #d9d8d4;
+    --text-muted: #a3a29c;
+    --text-subtle: #7d7c77;
+    --text-on-accent: #ffffff;
+    --accent: #2272c3;
+    --accent-hover: #1b5fa3;
+    --accent-text: #6cb0f0;
+    --accent-soft: #1a2b3b;
+    --accent-border: #2a4a6a;
+    --accent-ring: rgba(108, 176, 240, 0.5);
+    --success-fg: #5fbf7c;
+    --success-bg: #1c2b20;
+    --success-border: #2f5a3a;
+    --warning-fg: #d9a441;
+    --warning-bg: #2e2615;
+    --warning-border: #5a4720;
+    --danger-fg: #f08077;
+    --danger-bg: #3a1f1d;
+    --danger-border: #6a3330;
+    --danger-solid: #b83229;
+    --danger-solid-hover: #9f2a22;
+    --info-fg: #6cb0f0;
+    --info-bg: #1a2b3b;
+    --info-border: #2a4a6a;
+    --project-4-fg: #b5a9d6;
+    --project-4-bg: #28243a;
+    --project-4-border: #4a4366;
+    --project-5-fg: #7fc0b5;
+    --project-5-bg: #1b2c29;
+    --project-5-border: #2f524c;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+    color-scheme: dark;
 }

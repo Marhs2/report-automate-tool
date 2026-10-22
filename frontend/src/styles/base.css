@@ -145,12 +145,12 @@ b {
 }
 
 a {
-    color: var(--accent);
+    color: var(--accent-text);
     text-underline-offset: 0.15em;
 }
 
 a:hover {
-    color: var(--accent-hover);
+    color: var(--text-strong);
 }
 
 hr {

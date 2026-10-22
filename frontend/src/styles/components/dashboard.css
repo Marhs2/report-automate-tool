@@ -40,7 +40,7 @@
 }
 
 .inline-link {
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: var(--fw-medium);
     text-decoration: none;
 }
@@ -219,7 +219,7 @@
 .week-cell.is-danger { border-color: var(--danger-border); background: var(--danger-bg); }
 .week-cell.is-danger .week-state { color: var(--danger-fg); }
 .week-cell.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.week-cell.is-today .week-state { color: var(--accent-hover); }
+.week-cell.is-today .week-state { color: var(--accent-text); }
 .week-cell.is-upcoming { background: var(--surface-soft); border-color: transparent; }
 .week-cell.is-upcoming .week-num { color: var(--text-muted); }
 .week-cell.is-upcoming .week-state { font-weight: var(--fw-regular); }
@@ -308,7 +308,7 @@
     flex-shrink: 0;
     font-size: var(--fs-13);
     font-weight: var(--fw-medium);
-    color: var(--accent);
+    color: var(--accent-text);
     text-decoration: none;
 }
 
