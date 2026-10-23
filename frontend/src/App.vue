@@ -12,6 +12,7 @@ import { ACCOUNT_LINKS, MOBILE_TABS, PRIMARY_NAV } from "./lib/nav";
 import { useMyWeek } from "./composables/useMyWeek";
 import { TODAY_LABELS } from "./lib/weekStatus";
 import { pageParentOverride, pageTitleOverride } from "./composables/usePageMeta";
+import { THEME_OPTIONS, setTheme, themeChoice } from "./composables/useTheme";
 
 const router = useRouter();
 const route = useRoute();
@@ -249,6 +250,21 @@ onUnmounted(() => {
                     <span class="account-menu-label">{{ item.label }}</span>
                     <span class="account-menu-hint">{{ item.hint }}</span>
                 </router-link>
+                <div class="account-menu-theme" role="group" aria-label="화면 밝기">
+                    <span class="account-menu-hint">화면 밝기</span>
+                    <div class="account-menu-seg">
+                        <button
+                            v-for="option in THEME_OPTIONS"
+                            :key="option.id"
+                            type="button"
+                            :class="{ 'is-active': themeChoice === option.id }"
+                            :aria-pressed="themeChoice === option.id"
+                            @click="setTheme(option.id)"
+                        >
+                            {{ option.label }}
+                        </button>
+                    </div>
+                </div>
                 <button type="button" class="account-menu-row is-danger" role="menuitem" @click="logout">
                     <span class="account-menu-label">로그아웃</span>
                 </button>

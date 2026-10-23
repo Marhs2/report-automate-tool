@@ -1,74 +1,136 @@
-/* 설정 화면과 같은 밑줄 탭. */
-.kind-bar {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+/* 작성 화면(회의록 · 영업보고). DESIGN.md "현장 보드": 묻는 것 하나에 보드 하나. */
+
+.kind-seg {
+    align-self: flex-start;
 }
 
+.compose-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
+    gap: var(--space-6);
+    align-items: start;
+}
 
-/* 머리줄은 일일보고 탭(report.vue .write-head)과 같은 모양. 탭을 바꿔도 누가 · 언제 · 상태가 같은 자리에 있다. */
-.write-head {
+.compose-main {
+    min-width: 0;
+}
+
+/* 한 기록의 보드들이라 보드 사이(16px)를 단 사이(24px)보다 좁힌다. */
+.compose-form,
+.compose-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+/* container: 칸 배치가 화면 폭이 아니라 보드 폭을 보고 두 줄 · 한 줄을 고른다. */
+.board {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    container-type: inline-size;
+}
+
+.board-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: calc(var(--control-h-sm) + 2 * var(--space-3));
+    padding: var(--space-3) var(--space-5);
+    border-bottom: 1px solid var(--border);
+}
+
+.board-title {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.board-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-5);
+}
+
+/* 붙은 동안 밑으로 지나가는 보드가 막대 위 틈에 비치지 않게 바탕색 띠째로 붙인다. */
+.save-dock {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    margin-top: calc(-1 * var(--space-3));
+    padding-top: var(--space-3);
+    background: var(--bg);
+}
+
+.save-bar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2) var(--space-3);
-}
-
-/* 양식의 머리줄은 스크롤해도 카드 위에 붙어 있다. 저장이 여기 있다. */
-.compose-card > .write-head {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    margin: calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad)) 0;
-    padding: var(--space-3) var(--card-pad);
-    border-bottom: 1px solid var(--border);
-    border-radius: var(--radius) var(--radius) 0 0;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface);
 }
 
-.write-actions {
+/* style.css가 날짜 칸을 100% 폭으로 묶는다. 넓은 막대에서는 날짜만큼만. */
+.save-date {
+    flex: 0 0 auto;
+    width: auto;
+    font-variant-numeric: tabular-nums;
+}
+
+.save-loading {
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+}
+
+.save-actions {
     display: flex;
+    align-items: center;
     gap: var(--space-2);
     margin-left: auto;
 }
 
-.write-head + .form-error {
-    margin-top: var(--space-3);
+.save-more {
+    display: flex;
+    gap: var(--space-2);
 }
 
-.write-author {
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
+.save-error {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--danger-fg);
+    word-break: keep-all;
 }
 
-.write-date {
-    width: auto;
-    height: var(--control-h-sm);
-    font-size: var(--fs-13);
-}
-
-/* 섹션은 가는 선으로만 나눈다. 카드 안에 카드를 또 두지 않는다.
-   container: 할 일 줄이 화면 폭이 아니라 이 양식의 폭을 보고 한 줄 · 두 줄을 고른다. */
-.compose-layout .compose-card {
-    --card-pad: var(--space-5);
-    gap: 0;
-    padding: var(--card-pad);
-    container-type: inline-size;
-}
-
-/* 제목이 이 기록의 머리글. 테두리 상자 대신 큰 글자와 밑줄로 입력칸임을 보인다. */
+/* 제목은 첫 보드의 머리줄. 테두리 상자 대신 큰 글자와 머리줄 선으로 입력칸임을 보인다. */
 .title-input {
+    display: block;
     width: 100%;
     min-width: 0;
-    margin: var(--space-4) 0 0;
-    padding: var(--space-1) 0 var(--space-2);
+    max-width: none;
+    margin: 0;
+    padding: var(--space-4) var(--space-5);
     border: 0;
-    border-bottom: 2px solid transparent;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
     background: transparent;
-    font: var(--fw-semibold) var(--fs-20) / var(--lh-tight) var(--sans);
+    font: var(--fw-bold) var(--fs-20) / var(--lh-tight) var(--sans);
     color: var(--text-strong);
     outline: none;
+    transition:
+        background var(--dur-fast) var(--ease),
+        box-shadow var(--dur-fast) var(--ease);
 }
 
 .title-input::placeholder {
@@ -77,267 +139,167 @@
 }
 
 .title-input:hover {
-    border-bottom-color: var(--border);
+    background: var(--surface-soft);
 }
 
-.title-input:focus-visible {
-    border-bottom-color: var(--accent);
+/* outline 대신 머리줄 밑 2px 청록 선이 초점 표시다. */
+.title-input:focus {
+    background: transparent;
+    box-shadow: inset 0 -2px 0 var(--accent);
 }
 
-.title-input + .form-section {
-    margin-top: var(--space-3);
-}
-
-.form-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-4) 0;
-    border-top: 1px solid var(--border);
-}
-
-.write-head + .form-section {
-    margin-top: var(--space-4);
-}
-
-.section-title {
-    margin: 0;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-bold);
-    color: var(--text-strong);
-}
-
-.section-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-}
-
-/* 곁들이는 짧은 값(프로젝트 · 일시 · 장소 · 참석자 · 연락처). 넓으면 한 줄에 여럿, 좁아지면 저절로 줄을 바꾼다. */
-.detail-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(12.5rem, 100%), 1fr));
-    gap: var(--space-3) var(--space-4);
-}
-
-/* 회의 정보는 네 칸이라 2 × 2로 둔다. 자동 칸 나눔은 3 + 1이 되어 참석자가 혼자 남았다. */
-.detail-grid.is-pair {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-/* 안건 · 결정, 진행사항 · 추후 진행은 나란히. 양식 폭이 좁으면 위아래로. */
+.field-grid,
 .pair-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-3) var(--space-4);
+    gap: var(--space-4);
 }
 
-@container (max-width: 32.5rem) {
-    .detail-grid.is-pair,
-    .pair-grid {
-        grid-template-columns: minmax(0, 1fr);
+/* 넓으면 이름 · 직함 · 소속이 한 줄, 전화 · 이메일이 한 줄. */
+.contact-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--space-4);
+}
+
+.contact-grid > .is-third {
+    grid-column: span 2;
+}
+
+.contact-grid > .is-half {
+    grid-column: span 3;
+}
+
+@container (max-width: 40rem) {
+    .contact-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .contact-grid > .is-third,
+    .contact-grid > .is-half {
+        grid-column: span 1;
+    }
+
+    .contact-grid > .is-own-row {
+        grid-column: 1 / -1;
     }
 }
 
-/* 글 상자는 내용만큼만. 전역 최소 높이(200px) 때문에 두세 줄 글도 큰 빈 상자가 되던 것을 없앤다. */
+@container (max-width: 32rem) {
+    .field-grid,
+    .pair-grid,
+    .contact-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .contact-grid > .is-own-row {
+        grid-column: auto;
+    }
+}
+
+/* 글 상자는 내용만큼만. 전역 최소 높이(넓은 화면 200px · 폰 160px) 때문에 두세 줄 글도 큰 빈 상자가 되던 것을 없앤다. */
 .textarea.grow {
     min-height: 0;
     overflow-y: hidden;
     resize: none;
 }
 
-/* 할 일 하나가 한 줄: 할 일 · 담당 · 기한 · 빼기. 줄 사이는 틈으로만 나눈다. */
+/* 빈 필수 칸으로 커서를 옮길 때 그 칸이 붙어 있는 저장 막대 밑에 숨지 않게 한다. */
+.compose-form input,
+.compose-form textarea {
+    scroll-margin-top: calc(var(--control-h-lg) * 3);
+}
+
 .follow-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
 }
 
 .follow-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 8.75rem) 9.5rem auto;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) auto auto;
     grid-template-areas: "task owner due remove";
-    gap: var(--space-2);
+    gap: var(--space-2) var(--space-3);
     align-items: center;
+    padding: var(--space-3) var(--space-5);
 }
 
-.follow-task { grid-area: task; }
-.follow-owner { grid-area: owner; }
-.follow-due { grid-area: due; }
-.follow-remove { grid-area: remove; }
+.follow-row + .follow-row {
+    border-top: 1px solid var(--border);
+}
 
-.follow-row .input {
-    width: 100%;
+.follow-task {
+    grid-area: task;
+}
+
+.follow-owner {
+    grid-area: owner;
+}
+
+.follow-due {
+    grid-area: due;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     min-width: 0;
 }
 
-/* 양식이 좁으면(모바일 · 좁은 창) 할 일은 윗줄, 담당 · 기한은 아랫줄. 한 할 일이 두 줄을 넘지 않는다. */
+.follow-remove {
+    grid-area: remove;
+}
+
+.follow-row .input {
+    min-width: 0;
+}
+
+.follow-due-label {
+    flex-shrink: 0;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
+}
+
+/* style.css의 100% 폭을 풀어 날짜만큼만. */
+.follow-due .input {
+    width: auto;
+}
+
+/* 보드가 좁으면 할 일은 윗줄, 담당 · 기한은 아랫줄. 한 할 일이 두 줄을 넘지 않는다. */
 @container (max-width: 35rem) {
     .follow-row {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
         grid-template-areas:
             "task task remove"
             "owner due due";
-        padding-bottom: var(--space-2);
-        border-bottom: 1px solid var(--border);
     }
 
-    .follow-row:last-child {
-        padding-bottom: 0;
-        border-bottom: 0;
+    .follow-due .input {
+        flex: 1 1 auto;
+        width: 100%;
     }
 }
 
-.compose-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(13.75rem, 17.5rem);
-    gap: var(--space-4);
-    align-items: start;
-}
-
-.card {
+.record-body {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-}
-
-.voice-controls {
-    display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-2);
-}
-
-.voice-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    margin: 0 0 0 var(--space-1);
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-}
-
-/* 점은 실제로 녹음 중일 때만. 깜빡이지 않는다. */
-.voice-status.is-live {
-    color: var(--text-strong);
-    font-weight: var(--fw-semibold);
-}
-
-.voice-status.is-live::before {
-    content: "";
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: var(--danger-fg);
-}
-
-/* 마이크 소리가 들어오는지 보여 주는 막대. 녹음 중에만 보인다. */
-.voice-meter {
-    height: 0.25rem;
-    border-radius: 2px;
-    background: var(--border);
-    overflow: hidden;
-}
-
-.voice-meter span {
-    display: block;
-    height: 100%;
-    background: var(--accent);
-    transform-origin: left;
-}
-
-.voice-error {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-}
-
-.mic-help {
-    flex-basis: 100%;
-    margin: 0;
-    padding-left: 1.4em;
-    text-align: left;
-    font-size: var(--fs-13);
-    line-height: 1.7;
-    color: var(--text);
-}
-
-/* 녹음 중에 받아 적은 글. 편집하지 않으니 입력칸이 아니라 읽는 상자로 둔다. */
-.live-text {
-    max-height: 15rem;
-    overflow-y: auto;
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    font-size: var(--fs-14);
-    line-height: var(--lh-relaxed);
-    color: var(--text);
-    white-space: pre-wrap;
-    word-break: keep-all;
-    overflow-wrap: anywhere;
-}
-
-.live-text p {
-    margin: 0;
-}
-
-/* 정리 결과 한 줄. 녹음 단계가 사라진 뒤 날짜 줄 바로 아래에 남는다. */
-.voice-note {
-    margin: var(--space-3) 0 0;
-    font-size: var(--fs-13);
-    line-height: var(--lh-base);
-    color: var(--text);
-    word-break: keep-all;
-}
-
-.voice-skip {
-    align-self: flex-start;
-}
-
-.voice-note + .form-section {
-    margin-top: var(--space-3);
-}
-
-/* 녹음 단계: 버튼 하나가 카드 가운데. 녹음이 시작되면 시간 · 소리 막대 · 받아 적은 글이 그 아래로 붙는다. */
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
-}
-
-.record-stage {
     justify-content: center;
-    min-height: min(27.5rem, 60vh);
     gap: var(--space-4);
-}
-
-.record-stage.is-recording {
-    justify-content: flex-start;
-}
-
-.record-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-3);
+    min-height: min(calc(var(--space-9) * 6), 56vh);
+    padding: var(--space-7) var(--space-5);
     text-align: center;
+}
+
+.record-board.is-recording .record-body {
+    justify-content: flex-start;
 }
 
 .record-btn {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--space-3);
     padding: var(--space-2);
     border: 0;
     border-radius: var(--radius);
@@ -347,16 +309,18 @@
     cursor: pointer;
 }
 
-/* 누르는 동그라미. 녹음 버튼이 동그란 것은 장치에서 익숙한 모양이라서다. 빛 · 깜빡임은 넣지 않는다. */
+/* 동그라미는 기기에서 익숙한 녹음 버튼 모양. 청록은 "시작", 빨강은 "정지"라는 뜻만 진다. */
 .record-disc {
     display: grid;
     place-items: center;
-    width: 5.5rem;
-    height: 5.5rem;
-    border-radius: 50%;
+    width: calc(var(--control-h-lg) * 2);
+    height: calc(var(--control-h-lg) * 2);
+    border-radius: var(--radius-pill);
     background: var(--accent);
     color: var(--text-on-accent);
-    transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+    transition:
+        background var(--dur-fast) var(--ease),
+        transform var(--dur-fast) var(--ease);
 }
 
 .record-btn:hover:not(:disabled) .record-disc {
@@ -371,16 +335,22 @@
     background: var(--danger-solid);
 }
 
+.record-btn.is-stop:hover:not(:disabled) .record-disc {
+    background: var(--danger-solid-hover);
+}
+
+/* 초점 고리는 버튼 상자 대신 동그라미 둘레에. */
 .record-btn:focus-visible {
     outline: none;
 }
 
 .record-btn:focus-visible .record-disc {
-    box-shadow: 0 0 0 0.25rem var(--surface), 0 0 0 0.4375rem var(--accent);
+    outline: 2px solid var(--accent);
+    outline-offset: var(--space-05);
 }
 
 .record-btn:disabled {
-    cursor: default;
+    cursor: not-allowed;
 }
 
 .record-btn:disabled .record-disc {
@@ -391,6 +361,7 @@
 .record-label {
     font-size: var(--fs-16);
     font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
 }
 
 .record-clock {
@@ -399,23 +370,155 @@
     gap: var(--space-2);
     margin: 0;
     font-size: var(--fs-24);
-    font-weight: var(--fw-semibold);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
     color: var(--text-strong);
     font-variant-numeric: tabular-nums;
 }
 
-/* 점은 실제로 녹음 중일 때만 보인다. */
 .record-dot {
-    width: 0.625rem;
-    height: 0.625rem;
-    border-radius: 50%;
+    width: var(--space-3);
+    height: var(--space-3);
+    border-radius: var(--radius-pill);
     background: var(--danger-fg);
 }
 
-.record-status,
-.record-help {
+.record-status {
     margin: 0;
-    max-width: 34em;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+    word-break: keep-all;
+}
+
+/* 소리 막대는 "완료 · 여기 · 진행"이 아니라서 청록 대신 중립색. */
+.voice-meter {
+    width: min(calc(var(--space-9) * 5), 100%);
+    height: var(--space-05);
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--border);
+}
+
+.voice-meter span {
+    display: block;
+    height: 100%;
+    background: var(--text-muted);
+    transform-origin: left;
+}
+
+/* 받아 적은 글은 고치지 않으니 입력칸이 아니라 회색 판 위의 읽는 글. */
+.live-text {
+    align-self: stretch;
+    max-height: calc(var(--space-8) * 5);
+    overflow-y: auto;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text);
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+.live-text p {
+    margin: 0;
+}
+
+.voice-error {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+    text-align: left;
+}
+
+.voice-error-text {
+    margin: 0;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-base);
+    color: var(--danger-fg);
+    word-break: keep-all;
+}
+
+.mic-help {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+    padding-left: var(--space-5);
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text);
+    word-break: keep-all;
+}
+
+.voice-retry {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.summary-note {
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.list-board {
+    display: block;
+}
+
+.list-head {
+    list-style: none;
+    cursor: default;
+}
+
+.list-head::-webkit-details-marker {
+    display: none;
+}
+
+.list-count {
+    margin-left: auto;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.list-toggle {
+    display: none;
+}
+
+.list-board:not([open]) > .list-head {
+    border-bottom: 0;
+}
+
+.list-rows .row {
+    --row-inset: 0px;
+    padding: var(--space-3) var(--space-5);
+    border-radius: 0;
+}
+
+.list-rows .row-sub {
+    font-variant-numeric: tabular-nums;
+}
+
+.list-state {
+    margin: 0;
+    padding: var(--space-4) var(--space-5);
     font-size: var(--fs-14);
     line-height: var(--lh-base);
     color: var(--text-muted);
@@ -423,156 +526,231 @@
     text-wrap: balance;
 }
 
-.record-status {
-    color: var(--text-strong);
-    font-weight: var(--fw-medium);
-    font-variant-numeric: tabular-nums;
-}
-
-.record-stage .voice-meter {
-    width: min(20rem, 100%);
-    align-self: center;
-}
-
-.record-stage .voice-error {
-    justify-content: center;
-    text-align: center;
-}
-
-.record-stage .voice-skip {
-    align-self: center;
-    min-height: var(--control-h-lg);
-    color: var(--text-muted);
-}
-
-/* 넓은 화면에서는 늘 펼쳐 둔다. 접는 것은 좁은 화면에서만. */
-.side-list > summary {
+.list-state.is-error {
     display: flex;
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    color: var(--danger-fg);
+}
+
+.list-state.is-error p {
+    margin: 0;
+}
+
+/* 반짝이는 움직임은 넣지 않는다(MOTION 1). */
+.skel {
+    display: block;
+    border-radius: var(--radius-xs);
+    background: var(--surface-soft);
+}
+
+.skel.is-control {
+    width: 100%;
+    height: var(--control-h);
+    border-radius: var(--radius-sm);
+}
+
+.save-bar .skel.is-control {
+    width: 30%;
+}
+
+.skel.is-heading {
+    width: 40%;
+    height: var(--space-5);
+}
+
+.skel.is-label {
+    width: 30%;
+    height: var(--space-3);
+}
+
+.skel.is-title {
+    width: 70%;
+    height: var(--space-4);
+}
+
+.skel.is-sub {
+    width: 45%;
+    height: var(--space-3);
+}
+
+.skel-head {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border);
+}
+
+.skel-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+}
+
+.skel-field,
+.skel-row {
+    display: flex;
+    flex-direction: column;
     gap: var(--space-2);
-    list-style: none;
-    pointer-events: none;
 }
 
-.side-list > summary .group-meta {
-    margin-left: auto;
+.skel-row {
+    padding: var(--space-3) var(--space-5);
 }
 
-.side-list > summary::-webkit-details-marker {
-    display: none;
+.skel-row + .skel-row {
+    border-top: 1px solid var(--border);
 }
 
-.compose-card > .form-error {
-    margin-bottom: var(--space-3);
+.load-fail {
+    align-items: flex-start;
+    gap: var(--space-3);
 }
 
-.form-error,
-.list-status {
+.fail-text {
     margin: 0;
     font-size: var(--fs-14);
-}
-
-.list-status {
-    color: var(--text-muted);
-}
-
-.form-error,
-.list-status.is-error {
+    line-height: var(--lh-base);
     color: var(--danger-fg);
+    word-break: keep-all;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* DESIGN.md: 두 단 보드는 1100px 초과에서만. */
+@media (max-width: 1100px) {
+    .compose-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 @media (max-width: 860px) {
     .compose-layout {
-        grid-template-columns: 1fr;
+        gap: var(--space-5);
     }
 
-    /* 날짜는 한 줄 전체, 44px 터치 높이. report.vue 모바일 머리줄과 같다. */
-    .write-head {
+    .kind-seg > a {
+        min-height: var(--control-h-lg);
+    }
+
+    /* 폰은 창이 스크롤되고 위 막대(44px + 노치)가 붙어 있다. 그 바로 밑에 붙인다.
+       --topbar-height는 폰에서 64px로 잡혀 있어 실제 막대(45px)와 맞지 않는다. */
+    .save-dock {
+        top: calc(var(--control-h-lg) + env(safe-area-inset-top, 0px));
+    }
+
+    /* 윗줄: 날짜 · 저장. 아랫줄: 상태 · 삭제 · 새로 작성. 녹음 단계는 날짜 · 상태 한 줄. */
+    /* 삭제 · 새로 작성이 두 칸(2~3)에 걸쳐서, 저장 칸(3)은 버튼 폭만큼만 차지하고 날짜가 나머지를 쓴다. */
+    .save-bar {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        padding: var(--space-3);
     }
 
-    .write-date {
-        grid-column: 1 / -1;
+    .save-date {
+        grid-column: 1 / 3;
+        grid-row: 1;
         width: 100%;
-        min-width: 0;
-        height: var(--control-h-lg);
-        font-size: var(--fs-16);
     }
 
-    .write-head .status-chip {
-        grid-column: 1 / -1;
+    .save-actions {
+        display: contents;
+    }
+
+    .save-actions > .btn-primary {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    .save-status {
+        grid-column: 1;
+        grid-row: 2;
         justify-self: start;
     }
 
-    .compose-layout .compose-card {
-        --card-pad: var(--space-4);
+    .save-bar:not(:has(.save-actions)) > .save-status {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    .save-more {
+        grid-column: 2 / 4;
+        grid-row: 2;
+        justify-content: flex-end;
+    }
+
+    .save-error {
+        grid-column: 1 / -1;
+    }
+
+    .board-head {
+        padding: var(--space-3) var(--space-4);
+    }
+
+    .board-body {
+        padding: var(--space-4);
     }
 
     /* style.css가 767px 이하 입력칸을 16px !important로 묶는다(iOS 확대 방지).
        제목은 16px보다 커서 확대가 일어나지 않으니 머리글 크기를 지킨다. */
     .title-input {
+        padding: var(--space-4);
         font-size: var(--fs-20) !important;
-        margin-top: var(--space-3);
     }
 
-    /* 목록은 접어 두고 "내가 쓴 회의록 6건" 한 줄만. 누르면 펼친다. */
-    .side-list > summary {
-        pointer-events: auto;
+    .follow-row {
+        padding: var(--space-3) var(--space-4);
+    }
+
+    .record-body {
+        min-height: min(calc(var(--space-9) * 5), 52vh);
+        padding: var(--space-6) var(--space-4);
+    }
+
+    /* 목록은 접어 두고 "내가 쓴 회의록 2건" 한 줄만. 누르면 펼친다. */
+    .list-head {
+        min-height: calc(var(--control-h-lg) + 2 * var(--space-2));
         cursor: pointer;
-        min-height: var(--control-h-lg);
-        align-items: center;
     }
 
-    .side-list > summary .group-meta {
+    .list-count {
         margin-left: 0;
     }
 
-    .side-list > summary::after {
-        content: "펼치기";
+    .list-toggle {
+        display: inline;
         margin-left: auto;
         font-size: var(--fs-12);
+        font-weight: var(--fw-medium);
         color: var(--text-muted);
     }
 
-    .side-list[open] > summary::after {
+    .list-toggle::after {
+        content: "펼치기";
+    }
+
+    .list-board[open] .list-toggle::after {
         content: "접기";
     }
 
-    .section-head .btn,
-    .voice-controls .btn,
-    .voice-error .btn,
-    .write-actions .btn {
-        min-height: var(--control-h-lg);
+    .list-rows .row,
+    .list-state,
+    .skel-row {
+        padding-left: var(--space-4);
+        padding-right: var(--space-4);
     }
 
-    .follow-remove {
-        min-height: var(--control-h-lg);
+    .compose-form input,
+    .compose-form textarea {
+        scroll-margin-top: calc(var(--control-h-lg) * 4);
     }
-
-    /* 폰은 창이 스크롤되고 위 막대가 붙어 있다. 그 아래에 붙인다. 날짜와 저장이 한 줄, 상태는 그 아래. */
-    .compose-card > .write-head {
-        top: var(--topbar-height);
-    }
-
-    .write-head .write-date {
-        grid-column: 1;
-    }
-
-    .write-actions {
-        grid-column: 2;
-        grid-row: 1;
-        margin-left: 0;
-    }
-
-    /* 저장된 기록은 삭제 · 새로 작성까지 셋이라 다음 줄 전체를 쓴다. */
-    .write-actions:has(.btn-danger) {
-        grid-column: 1 / -1;
-        grid-row: auto;
-    }
-
-    .write-actions:has(.btn-danger) .btn-primary {
-        flex: 1 1 auto;
-    }
-
 }

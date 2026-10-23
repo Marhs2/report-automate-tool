@@ -3,12 +3,11 @@ import { computed, onMounted, ref } from "vue";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser.js";
 import { selectedTeamId } from "../composables/useSelectedTeam.js";
-import { Plus } from "lucide-vue-next";
 import { useDialog } from "../composables/useDialog";
 import AppField from "./ui/AppField.vue";
 import AppPageHeader from "./ui/AppPageHeader.vue";
 
-const props = defineProps({
+defineProps({
     embedded: { type: Boolean, default: false },
 });
 
@@ -29,6 +28,8 @@ const nextPassword = ref("");
 const passwordSaving = ref(false);
 const tempPasswords = ref({});
 const tempSavingId = ref("");
+const isLoading = ref(true);
+const loadError = ref("");
 
 const CHOSUNG = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
 
@@ -47,9 +48,7 @@ const isSelected = (id) => String(selectedUser.value) === String(id);
 const isMe = (user) => String(user.id) === String(selectedUserId.value);
 
 const teamNameOf = (user) => {
-    const found = teams.value.find(
-        (team) => String(team.id) === String(user.team_id),
-    );
+    const found = teams.value.find((team) => String(team.id) === String(user.team_id));
     return found?.team_name || "미지정";
 };
 
@@ -61,9 +60,7 @@ const realTeams = computed(() =>
     teams.value.filter((team) => String(team.team_name).trim() !== "미지정"),
 );
 
-const selectedRecord = computed(() =>
-    users.value.find((user) => isSelected(user.id)) || null,
-);
+const selectedRecord = computed(() => users.value.find((user) => isSelected(user.id)) || null);
 
 const filteredUsers = computed(() => {
     const q = query.value.trim().toLowerCase();
@@ -78,14 +75,18 @@ const filteredUsers = computed(() => {
     if (teamFilter.value === "unassigned") {
         list = list.filter(isUnassigned);
     } else if (teamFilter.value !== "all") {
-        list = list.filter(
-            (user) => String(user.team_id) === String(teamFilter.value),
-        );
+        list = list.filter((user) => String(user.team_id) === String(teamFilter.value));
     }
     return [...list].sort((a, b) =>
         String(a.name || "").localeCompare(String(b.name || ""), "ko"),
     );
 });
+
+const countLabel = computed(() =>
+    filteredUsers.value.length === users.value.length
+        ? `${users.value.length}명`
+        : `${filteredUsers.value.length}/${users.value.length}명`,
+);
 
 /** 초성 묶음은 사람이 많을 때만 쓴다. 몇 명뿐이면 카드가 쪼개져 오히려 읽기 어렵다. */
 const GROUP_THRESHOLD = 12;
@@ -105,6 +106,21 @@ const userGroups = computed(() => {
 const teamCount = (teamId) =>
     users.value.filter((user) => String(user.team_id) === String(teamId)).length;
 
+const filterOptions = computed(() => [
+    { id: "all", label: "전체", count: users.value.length },
+    { id: "unassigned", label: "미지정", count: unassignedCount.value },
+    ...realTeams.value.map((team) => ({
+        id: String(team.id),
+        label: team.team_name,
+        count: teamCount(team.id),
+    })),
+]);
+
+const clearFilters = () => {
+    query.value = "";
+    teamFilter.value = "all";
+};
+
 const jumpToGroup = (letter) => {
     document
         .getElementById(`user-group-${letter}`)
@@ -122,9 +138,7 @@ const assignTeam = async (user, teamId) => {
         console.error("부서 지정 실패:", error);
         const detail = error?.response?.data?.detail;
         showAlert(
-            typeof detail === "string" && detail.trim()
-                ? detail
-                : "부서 지정에 실패했습니다.",
+            typeof detail === "string" && detail.trim() ? detail : "부서 지정에 실패했습니다.",
         );
     } finally {
         assigningId.value = "";
@@ -153,9 +167,7 @@ const saveUser = async () => {
         console.error("사용자 생성 실패:", error);
         const detail = error?.response?.data?.detail;
         const message =
-            typeof detail === "string" && detail.trim()
-                ? detail
-                : "사용자 생성에 실패했습니다.";
+            typeof detail === "string" && detail.trim() ? detail : "사용자 생성에 실패했습니다.";
         showAlert(message);
     } finally {
         isSaving.value = false;
@@ -180,9 +192,7 @@ const saveMyPassword = async () => {
     } catch (error) {
         const detail = error?.response?.data?.detail;
         showAlert(
-            typeof detail === "string" && detail.trim()
-                ? detail
-                : "비밀번호를 바꾸지 못했습니다.",
+            typeof detail === "string" && detail.trim() ? detail : "비밀번호를 바꾸지 못했습니다.",
         );
     } finally {
         passwordSaving.value = false;
@@ -204,17 +214,29 @@ const giveTempPassword = async (user) => {
     } catch (error) {
         const detail = error?.response?.data?.detail;
         showAlert(
-            typeof detail === "string" && detail.trim()
-                ? detail
-                : "임시 비밀번호를 넣지 못했습니다.",
+            typeof detail === "string" && detail.trim() ? detail : "임시 비밀번호를 넣지 못했습니다.",
         );
     } finally {
         tempSavingId.value = "";
     }
 };
 
+const loadUsers = async () => {
+    isLoading.value = true;
+    loadError.value = "";
+    try {
+        users.value = await getUsers();
+    } catch (error) {
+        console.error("사용자 목록 조회 실패:", error);
+        users.value = [];
+        loadError.value = "사용자를 불러오지 못했습니다.";
+    } finally {
+        isLoading.value = false;
+    }
+};
+
 onMounted(async () => {
-    users.value = await getUsers();
+    await loadUsers();
     selectedUser.value = selectedUserId.value ?? "";
     try {
         teams.value = await getTeams();
@@ -226,176 +248,142 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div :class="embedded ? 'settings-pane' : 'page'">
+    <div :class="embedded ? 'users-admin' : 'page'">
         <AppPageHeader v-if="!embedded" subtitle="사용자" />
 
-        <div v-if="users.length > 0" class="user-toolbar">
-            <input
-                v-model="query"
-                class="input"
-                type="search"
-                placeholder="이름 또는 부서 검색"
-                aria-label="사용자 검색"
-            />
-            <span class="user-count"
-                >{{ filteredUsers.length }}/{{ users.length }}명</span
-            >
-        </div>
+        <section class="card board" aria-label="사용자 목록">
+            <div v-if="users.length > 0" class="board-bar">
+                <input
+                    v-model="query"
+                    class="input"
+                    type="search"
+                    placeholder="이름 또는 부서 검색"
+                    aria-label="사용자 검색"
+                />
+                <span class="board-count">{{ countLabel }}</span>
+            </div>
 
-        <div v-if="users.length > 0" class="team-filters" role="tablist" aria-label="부서 필터">
-            <button
-                type="button"
-                class="team-chip"
-                :class="{ 'is-on': teamFilter === 'all' }"
-                @click="teamFilter = 'all'"
-            >
-                전체 {{ users.length }}
-            </button>
-            <button
-                type="button"
-                class="team-chip"
-                :class="{ 'is-on': teamFilter === 'unassigned' }"
-                @click="teamFilter = 'unassigned'"
-            >
-                미지정 {{ unassignedCount }}
-            </button>
-            <button
-                v-for="team in realTeams"
-                :key="team.id"
-                type="button"
-                class="team-chip"
-                :class="{ 'is-on': teamFilter === String(team.id) }"
-                @click="teamFilter = String(team.id)"
-            >
-                {{ team.team_name }} {{ teamCount(team.id) }}
-            </button>
-        </div>
-
-        <nav v-if="userGroups.length > 1" class="letter-jump" aria-label="초성 바로가기">
-            <button
-                v-for="group in userGroups"
-                :key="`jump-${group.letter}`"
-                type="button"
-                class="letter-chip"
-                @click="jumpToGroup(group.letter)"
-            >
-                {{ group.letter }}
-            </button>
-        </nav>
-
- 
-
-        <div v-if="users.length === 0" class="empty-state">
-            등록된 사용자가 없습니다. 아래에서 생성하세요.
-        </div>
-        <div v-else-if="filteredUsers.length === 0" class="empty-state">
-            조건에 맞는 사용자가 없습니다
-        </div>
-        <div v-else class="user-groups">
-            <section
-                v-for="group in userGroups"
-                :id="`user-group-${group.letter}`"
-                :key="group.letter"
-                class="user-group"
-            >
-                <h3 v-if="group.letter" class="letter-head">{{ group.letter }} <span>{{ group.items.length }}</span></h3>
-                <div class="user-rows">
-                    <div
-                        v-for="user in group.items"
-                        :key="user.id"
-                        class="user-row"
-                        :class="{ selected: isMe(user) }"
+            <div v-if="users.length > 0" class="board-tools">
+                <div class="filters" role="group" aria-label="부서 필터">
+                    <button
+                        v-for="option in filterOptions"
+                        :key="option.id"
+                        type="button"
+                        class="filter"
+                        :class="{ 'is-on': teamFilter === option.id }"
+                        :aria-pressed="teamFilter === option.id"
+                        @click="teamFilter = option.id"
                     >
-                        <span class="avatar">{{ String(user.name || "?").slice(0, 1) }}</span>
-                        <span class="user-row-name">
-                            {{ user.name }}
-                            <span v-if="user.is_admin" class="state-chip is-plain is-accent">관리자</span>
-                            <span v-if="isUnassigned(user)" class="state-chip is-plain is-warning">부서 미지정</span>
-                            <span v-if="!user.has_password" class="state-chip is-plain is-danger">비밀번호 없음</span>
-                        </span>
-                        <label class="user-row-team">
-                            <span class="sr-only">부서</span>
-                            <select
-                                class="input"
-                                :value="String(user.team_id || '')"
-                                :disabled="teams.length === 0 || assigningId === String(user.id)"
-                                @change="assignTeam(user, $event.target.value)"
-                            >
-                                <option value="" disabled>부서 선택</option>
-                                <option v-for="team in teams" :key="team.id" :value="String(team.id)">
-                                    {{ team.team_name }}
-                                </option>
-                            </select>
-                        </label>
-                        <span v-if="isMe(user)" class="state-chip is-info user-row-now">로그인 중</span>
-                        <div v-else-if="!user.has_password" class="user-row-temp">
-                            <input
-                                class="input"
-                                type="password"
-                                :value="tempPasswords[user.id] || ''"
-                                placeholder="임시 비밀번호"
-                                minlength="4"
-                                @input="tempPasswords[user.id] = $event.target.value"
-                            />
-                            <button
-                                type="button"
-                                class="btn btn-small"
-                                :disabled="tempSavingId === String(user.id)"
-                                @click="giveTempPassword(user)"
-                            >
-                                넣기
-                            </button>
-                        </div>
-                    </div>
+                        {{ option.label }}
+                        <span class="filter-count">{{ option.count }}</span>
+                    </button>
                 </div>
-            </section>
-        </div>
+                <nav v-if="userGroups.length > 1" class="letter-jump" aria-label="초성 바로가기">
+                    <button
+                        v-for="group in userGroups"
+                        :key="`jump-${group.letter}`"
+                        type="button"
+                        class="letter"
+                        @click="jumpToGroup(group.letter)"
+                    >
+                        {{ group.letter }}
+                    </button>
+                </nav>
+            </div>
 
-        <form v-if="selectedRecord" class="card account-form" @submit.prevent="saveMyPassword">
-            <div class="account-form-head">
-                <h2>내 비밀번호 변경</h2>
-                <p>로그인 중인 {{ selectedRecord.name }} 계정의 비밀번호를 바꿉니다.</p>
+            <div v-if="isLoading" aria-busy="true">
+                <div v-for="n in 6" :key="n" class="skeleton-row" aria-hidden="true">
+                    <span class="skeleton is-avatar"></span>
+                    <span class="skeleton is-name"></span>
+                    <span class="skeleton is-select"></span>
+                </div>
+                <span class="sr-only">사용자를 불러오는 중</span>
             </div>
-            <div class="account-form-grid">
-                <AppField label="현재 비밀번호" for-id="current-password">
-                    <input
-                        id="current-password"
-                        type="password"
-                        v-model="currentPassword"
-                        class="input"
-                        autocomplete="current-password"
-                        required
-                    />
-                </AppField>
-                <AppField label="새 비밀번호" for-id="next-password">
-                    <input
-                        id="next-password"
-                        type="password"
-                        v-model="nextPassword"
-                        class="input"
-                        minlength="4"
-                        autocomplete="new-password"
-                        required
-                    />
-                </AppField>
-                <button class="btn btn-primary account-form-submit" type="submit" :disabled="passwordSaving">
-                    {{ passwordSaving ? "변경 중..." : "변경" }}
-                </button>
+            <div v-else-if="loadError" class="board-state is-error" role="alert">
+                <p>{{ loadError }}</p>
+                <button type="button" class="btn btn-small" @click="loadUsers">다시 시도</button>
             </div>
-            <p class="account-form-note">새 비밀번호는 4자 이상입니다.</p>
-        </form>
+            <div v-else-if="users.length === 0" class="board-state">
+                <p>등록된 사용자가 없습니다. 새 사용자 칸에서 만드세요.</p>
+            </div>
+            <div v-else-if="filteredUsers.length === 0" class="board-state">
+                <p>조건에 맞는 사용자가 없습니다</p>
+                <button type="button" class="btn btn-small btn-ghost" @click="clearFilters">조건 지우기</button>
+            </div>
+            <div v-else>
+                <section
+                    v-for="group in userGroups"
+                    :id="`user-group-${group.letter}`"
+                    :key="group.letter"
+                    class="user-group"
+                >
+                    <h3 v-if="group.letter" class="letter-head">
+                        {{ group.letter }} <span>{{ group.items.length }}</span>
+                    </h3>
+                    <ul class="user-rows">
+                        <li
+                            v-for="user in group.items"
+                            :key="user.id"
+                            class="user-row"
+                            :class="{ 'is-me': isMe(user) }"
+                        >
+                            <span class="avatar user-avatar" aria-hidden="true">{{
+                                String(user.name || "?").slice(0, 1)
+                            }}</span>
+                            <span class="user-who">
+                                <span class="user-name">{{ user.name }}</span>
+                                <span v-if="isMe(user)" class="user-now">로그인 중</span>
+                                <span v-if="user.is_admin" class="tag">관리자</span>
+                                <span v-if="isUnassigned(user)" class="tag is-warning">부서 미지정</span>
+                                <span v-if="!user.has_password" class="tag is-danger">비밀번호 없음</span>
+                            </span>
+                            <label class="user-team">
+                                <span class="sr-only">{{ user.name }} 부서</span>
+                                <select
+                                    class="input"
+                                    :value="String(user.team_id || '')"
+                                    :disabled="teams.length === 0 || assigningId === String(user.id)"
+                                    @change="assignTeam(user, $event.target.value)"
+                                >
+                                    <option value="" disabled>부서 선택</option>
+                                    <option v-for="team in teams" :key="team.id" :value="String(team.id)">
+                                        {{ team.team_name }}
+                                    </option>
+                                </select>
+                            </label>
+                            <div v-if="!isMe(user) && !user.has_password" class="user-temp">
+                                <input
+                                    class="input"
+                                    type="password"
+                                    :value="tempPasswords[user.id] || ''"
+                                    placeholder="임시 비밀번호"
+                                    minlength="4"
+                                    :aria-label="`${user.name} 임시 비밀번호`"
+                                    @input="tempPasswords[user.id] = $event.target.value"
+                                />
+                                <button
+                                    type="button"
+                                    class="btn btn-small"
+                                    :disabled="tempSavingId === String(user.id)"
+                                    @click="giveTempPassword(user)"
+                                >
+                                    넣기
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+            </div>
+        </section>
 
-        <form class="card account-form" @submit.prevent="saveUser">
-            <div class="account-form-head">
-                <h2>새 사용자</h2>
-                <p>이름과 처음 로그인에 쓸 비밀번호를 정합니다.</p>
-            </div>
-            <div class="account-form-grid">
+        <div class="side">
+            <form class="card side-board" aria-labelledby="new-user-title" @submit.prevent="saveUser">
+                <h2 id="new-user-title" class="board-title">새 사용자</h2>
                 <AppField label="이름" for-id="new-user">
                     <input
                         id="new-user"
-                        type="text"
                         v-model="newUser"
+                        type="text"
                         class="input"
                         autocomplete="off"
                         required
@@ -404,21 +392,59 @@ onMounted(async () => {
                 <AppField label="비밀번호" for-id="new-user-password">
                     <input
                         id="new-user-password"
-                        type="password"
                         v-model="newPassword"
+                        type="password"
                         class="input"
                         minlength="4"
                         autocomplete="new-password"
+                        aria-describedby="new-user-password-help"
+                        required
+                    />
+                    <p id="new-user-password-help" class="field-help">4자 이상</p>
+                </AppField>
+                <button class="btn btn-primary" type="submit" :disabled="isSaving">
+                    {{ isSaving ? "생성 중..." : "생성" }}
+                </button>
+            </form>
+
+            <form
+                v-if="selectedRecord"
+                class="card side-board"
+                aria-labelledby="my-password-title"
+                @submit.prevent="saveMyPassword"
+            >
+                <div class="side-head">
+                    <h2 id="my-password-title" class="board-title">내 비밀번호 변경</h2>
+                    <span class="side-meta">{{ selectedRecord.name }}</span>
+                </div>
+                <AppField label="현재 비밀번호" for-id="current-password">
+                    <input
+                        id="current-password"
+                        v-model="currentPassword"
+                        type="password"
+                        class="input"
+                        autocomplete="current-password"
                         required
                     />
                 </AppField>
-                <button class="btn btn-primary account-form-submit" type="submit" :disabled="isSaving">
-                    <Plus :size="14" />
-                    {{ isSaving ? "생성 중..." : "생성" }}
+                <AppField label="새 비밀번호" for-id="next-password">
+                    <input
+                        id="next-password"
+                        v-model="nextPassword"
+                        type="password"
+                        class="input"
+                        minlength="4"
+                        autocomplete="new-password"
+                        aria-describedby="next-password-help"
+                        required
+                    />
+                    <p id="next-password-help" class="field-help">4자 이상</p>
+                </AppField>
+                <button class="btn" type="submit" :disabled="passwordSaving">
+                    {{ passwordSaving ? "변경 중..." : "변경" }}
                 </button>
-            </div>
-            <p class="account-form-note">비밀번호는 4자 이상입니다.</p>
-        </form>
+            </form>
+        </div>
     </div>
 </template>
 

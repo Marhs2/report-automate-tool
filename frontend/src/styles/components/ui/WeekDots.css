@@ -1,0 +1,55 @@
+/* 현장 보드의 표식: 사람마다 월~금 점 다섯 개. DESIGN.md "Identity motif". */
+.week-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    flex-shrink: 0;
+}
+
+.week-dot {
+    display: inline-grid;
+    place-items: center;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+    background: var(--surface-soft);
+    font-size: 0.5rem;
+    line-height: 1;
+    color: var(--text-muted);
+}
+
+.week-dot.is-done,
+.week-dot.is-today-done {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.week-dot.is-missing {
+    background: var(--danger-bg);
+    border-color: var(--danger-fg);
+}
+
+.week-dot.is-today {
+    background: transparent;
+    border: 2px solid var(--accent);
+}
+
+.week-dot.is-today-done {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--accent);
+}
+
+.week-dot.is-future {
+    background: transparent;
+    border-style: dashed;
+}
+
+.week-dot.is-holiday {
+    width: auto;
+    height: auto;
+    padding: 0 1px;
+    border: 0;
+    background: transparent;
+    font-size: var(--fs-11);
+    font-weight: var(--fw-semibold);
+}

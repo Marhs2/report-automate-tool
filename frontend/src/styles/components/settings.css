@@ -1,57 +1,156 @@
-.account-card {
+/* 설정: 왼쪽은 탭과 그 탭의 보드, 오른쪽(넓은 화면)은 내 계정 보드.
+   좁은 화면에서는 계정 한 줄 → 탭 → 보드 순서로 쌓는다. */
+
+.settings-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    min-width: 0;
+}
+
+.account {
     display: flex;
     align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+}
+
+.account-who {
+    display: flex;
+    flex: 1;
+    align-items: center;
     gap: var(--space-3);
+    min-width: 0;
+}
+
+.account-who.is-error {
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
 }
 
 .account-avatar {
     display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
     width: var(--control-h-lg);
     height: var(--control-h-lg);
-    flex-shrink: 0;
     border-radius: var(--radius-pill);
-    background: var(--accent-soft);
-    color: var(--accent-text);
+    background: var(--surface-soft);
+    color: var(--text-strong);
     font-size: var(--fs-16);
     font-weight: var(--fw-bold);
+    line-height: 1;
 }
 
-.account-copy {
-    flex: 1;
+.account-lines {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
     min-width: 0;
 }
 
-.account-name,
-.account-team {
-    margin: 0;
-    word-break: keep-all;
-}
-
 .account-name {
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
     color: var(--text-strong);
 }
 
 .account-team {
-    margin-top: var(--space-1);
     font-size: var(--fs-13);
-    color: var(--text);
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+/* 부서가 없으면 보고를 어디에 낼지 정해지지 않는다: 경고 색 태그로 알린다. */
+.account-flag {
+    display: inline-flex;
+    align-items: center;
+    height: var(--chip-h-sm);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-tag);
+    background: var(--warning-bg);
+    color: var(--warning-fg);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    white-space: nowrap;
+}
+
+.account-error {
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--danger-fg);
 }
 
 .account-logout {
     flex-shrink: 0;
-    min-height: var(--control-h-lg);
 }
 
-@media (max-width: 860px) {
-    .account-card {
-        flex-wrap: wrap;
+.skeleton {
+    display: block;
+    height: 0.75rem;
+    border-radius: var(--radius-xs);
+    background: var(--surface-soft);
+}
+
+.skeleton.is-name {
+    width: 6rem;
+    height: 1rem;
+}
+
+.skeleton.is-team {
+    width: 4rem;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (min-width: 1101px) {
+    .settings {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 18rem;
+        grid-template-areas: "main side";
+        align-items: start;
+        gap: var(--space-6);
+    }
+
+    .settings-main {
+        grid-area: main;
+    }
+
+    .account {
+        grid-area: side;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-5);
+        padding: var(--space-5);
     }
 
     .account-logout {
         width: 100%;
+    }
+}
+
+@media (max-width: 860px) {
+    .account {
+        gap: var(--space-3);
+        padding: var(--space-3) var(--space-4);
     }
 }

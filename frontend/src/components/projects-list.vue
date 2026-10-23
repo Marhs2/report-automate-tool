@@ -48,20 +48,20 @@ const isMine = (report) =>
 
 const canManage = (report) => isMine(report) || isAdmin.value;
 
-const projectNamesOf = (report) => {
-    const parsed = report?.parsed_json;
-    const data = typeof parsed === "string" ? safeJson(parsed) : parsed;
-    return (data?.projects || [])
-        .map((project) => String(project?.projectName || "").trim())
-        .filter(Boolean);
-};
-
 const safeJson = (value) => {
     try {
         return JSON.parse(value);
     } catch {
         return null;
     }
+};
+
+const projectNamesOf = (report) => {
+    const parsed = report?.parsed_json;
+    const data = typeof parsed === "string" ? safeJson(parsed) : parsed;
+    return (data?.projects || [])
+        .map((project) => String(project?.projectName || "").trim())
+        .filter(Boolean);
 };
 
 const projectOptions = computed(() => {
@@ -88,33 +88,6 @@ const filteredReports = computed(() => {
             .toLowerCase();
         return haystack.includes(needle);
     });
-});
-
-const groups = computed(() => {
-    const index = new Map();
-    const dates = [];
-    for (const report of filteredReports.value) {
-        const date = report.report_date ?? "";
-        if (!index.has(date)) {
-            index.set(date, []);
-            dates.push(date);
-        }
-        index.get(date).push(report);
-    }
-    dates.sort((a, b) => String(b).localeCompare(String(a)));
-    return dates.map((date) => ({
-        date,
-        label: formatDate(date),
-        weekday: weekdayLabelOf(date),
-        point: groupPoint(index.get(date)),
-        reports: index.get(date).slice().sort((a, b) => {
-            if (isMine(a) !== isMine(b)) return isMine(a) ? -1 : 1;
-            return String(a.member_name || "").localeCompare(
-                String(b.member_name || ""),
-                "ko",
-            );
-        }),
-    }));
 });
 
 const isoToday = () => {
@@ -150,6 +123,44 @@ const badgesOf = (report) => {
         counts.requests && { key: "is-request", label: `요청 ${counts.requests}` },
     ].filter(Boolean);
 };
+
+/** 날짜마다 보드 하나. 내 보고가 먼저, 그다음 이름순. 줄에 쓸 값은 여기서 한 번만 만든다. */
+const groups = computed(() => {
+    const index = new Map();
+    const dates = [];
+    for (const report of filteredReports.value) {
+        const date = report.report_date ?? "";
+        if (!index.has(date)) {
+            index.set(date, []);
+            dates.push(date);
+        }
+        index.get(date).push(report);
+    }
+    dates.sort((a, b) => String(b).localeCompare(String(a)));
+    return dates.map((date) => ({
+        date,
+        label: formatDate(date),
+        weekday: weekdayLabelOf(date),
+        point: groupPoint(index.get(date)),
+        reports: index
+            .get(date)
+            .slice()
+            .sort((a, b) => {
+                if (isMine(a) !== isMine(b)) return isMine(a) ? -1 : 1;
+                return String(a.member_name || "").localeCompare(String(b.member_name || ""), "ko");
+            })
+            .map((report) => ({
+                id: report.id,
+                name: report.member_name,
+                initial: String(report.member_name || "?").slice(0, 1),
+                mine: isMine(report),
+                manageable: canManage(report),
+                projects: projectNamesOf(report).join(" · "),
+                headline: reportHeadline(report.parsed_json),
+                badges: badgesOf(report),
+            })),
+    }));
+});
 
 const openDetail = (reportId) => {
     router.push({
@@ -195,8 +206,8 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="page">
-        <div class="list-toolbar">
+    <div class="page reports-page">
+        <div class="filter-toolbar reports-filters">
             <input
                 id="report-query"
                 v-model="query"
@@ -206,7 +217,7 @@ onMounted(() => {
                 aria-label="검색"
                 enterkeyhint="search"
             />
-            <select v-model="filterProject" class="input" aria-label="프로젝트">
+            <select v-model="filterProject" class="input reports-project" aria-label="프로젝트">
                 <option value="">전체 프로젝트</option>
                 <option v-for="name in projectOptions" :key="name" :value="name">
                     {{ name }}
@@ -214,80 +225,84 @@ onMounted(() => {
             </select>
         </div>
 
-        <p v-if="filterSummary" class="filter-active">
+        <p v-if="filterSummary" class="reports-active">
             <span>{{ filterSummary }}</span>
             <button type="button" class="btn btn-small btn-ghost" @click="clearFilters">조건 지우기</button>
         </p>
 
-        <p v-if="isLoading" class="list-status" role="status">보고서를 불러오는 중</p>
-        <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
-        <div v-else-if="groups.length === 0" class="empty-state">
-            <p class="empty-title">
-                {{ query.trim() || filterProject ? "맞는 보고가 없어요" : "아직 저장된 일일보고가 없어요" }}
-            </p>
-            <p class="empty-body">
-                {{ filterSummary ? `${filterSummary} 조건에 맞는 보고가 없어요.` : "원문을 붙여 넣으면 AI가 프로젝트별로 정리해 줘요." }}
-            </p>
-            <div v-if="filterSummary" class="empty-actions">
-                <button type="button" class="btn" @click="clearFilters">조건 지우기</button>
-            </div>
-            <div v-else class="empty-actions">
-                <router-link class="btn btn-primary" to="/compose?kind=daily">일일보고 쓰기</router-link>
-            </div>
-        </div>
-
-        <section v-for="group in groups" :key="group.date" class="group-block">
-            <header class="group-head">
-                <h2>{{ group.label }} <span class="day-weekday">{{ group.weekday }}</span></h2>
-                <span class="group-meta">{{ group.point }}</span>
+        <section v-if="isLoading" class="card board" role="status" aria-label="보고서를 불러오는 중">
+            <header class="board-head" aria-hidden="true">
+                <span class="skel skel-title"></span>
+                <span class="skel skel-meta"></span>
             </header>
-            <div class="group has-avatars">
+            <div v-for="n in 3" :key="n" class="report-row is-skel" aria-hidden="true">
+                <span class="skel skel-avatar"></span>
+                <span class="skel-lines">
+                    <span class="skel skel-line"></span>
+                    <span class="skel skel-line is-short"></span>
+                </span>
+            </div>
+        </section>
+
+        <section v-else-if="loadError" class="card board">
+            <div class="board-error" role="alert">
+                <span>{{ loadError }}</span>
+                <button type="button" class="btn btn-small" @click="fetchReports">다시 시도</button>
+            </div>
+        </section>
+
+        <section v-else-if="groups.length === 0" class="card board">
+            <div class="board-empty">
+                <p class="board-empty-title">
+                    {{ filterSummary ? "맞는 보고가 없어요" : "아직 저장된 일일보고가 없어요" }}
+                </p>
+                <p v-if="filterSummary" class="board-empty-body">{{ filterSummary }} 조건에 맞는 보고가 없어요.</p>
+                <button v-if="filterSummary" type="button" class="btn" @click="clearFilters">조건 지우기</button>
+                <router-link v-else class="btn btn-primary" to="/compose?kind=daily">일일보고 쓰기</router-link>
+            </div>
+        </section>
+
+        <section v-for="group in groups" :key="group.date" class="card board" :aria-label="`${group.label} ${group.weekday}요일 보고`">
+            <header class="board-head">
+                <h2 class="date-head">{{ group.label }} <span class="date-head-week">{{ group.weekday }}</span></h2>
+                <span class="board-meta">{{ group.point }}</span>
+            </header>
+            <div class="reports-list">
                 <div
                     v-for="report in group.reports"
                     :key="report.id"
-                    class="row"
+                    class="report-row"
                     role="link"
                     tabindex="0"
                     @click="openDetail(report.id)"
                     @keydown="onRowKeydown($event, report.id)"
                 >
-                    <span class="avatar" :class="{ 'is-me': isMine(report) }">
-                        {{ String(report.member_name || "?").slice(0, 1) }}
-                    </span>
+                    <span class="avatar" :class="{ 'is-me': report.mine }">{{ report.initial }}</span>
                     <!-- 누가 · 어느 프로젝트 → 무슨 일 → 건수. 위에서 아래로 한 칸 안에서 읽힌다. -->
                     <span class="report-main">
                         <span class="report-who">
-                            <span class="report-name">{{ report.member_name }}</span>
-                            <span v-if="isMine(report)" class="me-mark">나</span>
-                            <span class="report-projects">
-                                {{ projectNamesOf(report).join(" · ") || "프로젝트 없음" }}
-                            </span>
+                            <span class="report-name">{{ report.name }}</span>
+                            <span v-if="report.mine" class="me-mark">나</span>
+                            <span class="report-projects">{{ report.projects || "프로젝트 없음" }}</span>
                         </span>
-                        <span v-if="reportHeadline(report.parsed_json)" class="report-headline">
-                            {{ reportHeadline(report.parsed_json) }}
-                        </span>
-                        <span v-if="badgesOf(report).length" class="badges">
-                            <span
-                                v-for="badge in badgesOf(report)"
-                                :key="badge.key"
-                                class="cat-tag"
-                                :class="badge.key"
-                            >{{ badge.label }}</span>
+                        <span v-if="report.headline" class="report-headline">{{ report.headline }}</span>
+                        <span v-if="report.badges.length" class="report-badges">
+                            <span v-for="badge in report.badges" :key="badge.key" class="cat-tag" :class="badge.key">{{ badge.label }}</span>
                         </span>
                     </span>
-                    <span class="row-end">
+                    <span class="report-end">
                         <button
-                            v-if="canManage(report)"
+                            v-if="report.manageable"
                             type="button"
                             class="row-icon-btn"
-                            :aria-label="`${report.member_name} 보고 삭제`"
+                            :aria-label="`${report.name} 보고 삭제`"
                             title="삭제"
                             @click.stop="deleteProjectReport(report.id)"
                             @keydown.stop
                         >
                             <Trash2 :size="16" />
                         </button>
-                        <ChevronRight :size="16" class="row-chevron" />
+                        <ChevronRight :size="16" class="row-chevron" aria-hidden="true" />
                     </span>
                 </div>
             </div>

@@ -186,6 +186,18 @@
     color: var(--text);
 }
 
+/* btn-ghost가 btn-danger보다 뒤에 있어 둘을 함께 쓰면 빨간 글자가 사라졌다. */
+.btn-ghost.btn-danger,
+.btn-ghost.btn-danger:disabled,
+.btn-ghost.btn-danger:disabled:hover {
+    color: var(--danger-fg);
+}
+
+.btn-ghost.btn-danger:hover {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+}
+
 /* Pressed toggle (view switchers, filters). Notion gray fill, like a selected view. */
 .btn.is-active {
     background: var(--surface-press);
@@ -245,7 +257,7 @@
 .field label,
 .field-label {
     font-size: var(--fs-12);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-semibold);
     line-height: var(--lh-tight);
     color: var(--text-muted);
     word-break: keep-all;

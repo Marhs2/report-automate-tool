@@ -507,7 +507,7 @@
 
     .seg > a,
     .seg > button {
-        min-height: var(--control-h);
+        min-height: var(--control-h-lg);
         padding: 0 var(--space-2);
         font-size: var(--fs-14);
     }

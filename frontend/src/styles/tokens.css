@@ -1,74 +1,74 @@
 /* ------------------------------------------------------------------
-   Design tokens — the only place raw values live.
-   Notion-style warm neutrals, one blue accent, hairline borders.
-   Light is the default; dark pairs every color 1:1 under the same name
-   (bottom of this file) and follows the OS unless data-theme is set.
+   Design tokens: the only place raw values live. Direction: "현장 보드"
+   (DESIGN.md). Blue-gray canvas, white board cards, one deep teal accent.
+   Light and dark share every name 1:1. The theme is always resolved to
+   data-theme="light" | "dark" on <html> (index.html boot script + the
+   account-menu toggle), so dark values live in one block only.
    Every name here is a public hook: never rename or remove, only add.
-   Usage rules: docs/design-system.md
    ------------------------------------------------------------------ */
 :root {
     /* ---- Color: canvas & surfaces ------------------------------- */
-    --bg: #ffffff;              /* page canvas (Notion page white) */
+    --bg: #edf1f3;              /* blue-gray field: separates white boards without shadows */
     --surface: #ffffff;         /* cards, inputs, dialogs, sticky bars */
-    --surface-soft: #f1f1ef;    /* hover fill, trays, static chips, avatars */
-    --surface-press: #e8e7e4;   /* pressed/active fill for neutral controls */
-    --input-bg: #ffffff;        /* same white field as cards, so every input looks alike */
-    --sidebar-bg: #f7f7f5;      /* Notion sidebar gray */
-    --sidebar-hover: #ebebe9;   /* sidebar row hover / active fill */
+    --surface-soft: #e9eef1;    /* hover fill, trays, static chips, avatars */
+    --surface-press: #dce3e7;   /* pressed/active fill for neutral controls */
+    --input-bg: #ffffff;
+    --sidebar-bg: #f6f8f9;
+    --sidebar-hover: #e3e9ec;
 
     /* ---- Color: lines --------------------------------------------- */
-    --border: #e9e9e7;          /* default hairline, Notion divider */
-    --border-strong: #d3d1cb;   /* hover border, default button border */
-    --border-input: #8f8d87;    /* input/checkbox edge: 3.3:1 on bg (WCAG 1.4.11) */
+    --border: #d6dee3;          /* hairline between rows and around boards */
+    --border-strong: #bac6cd;   /* hover border, default button border */
+    --border-input: #7d8b95;    /* input/checkbox edge: 3.6:1 on white (WCAG 1.4.11) */
 
     /* ---- Color: text ---------------------------------------------- */
-    --text-strong: #1f1e1b;     /* headings, values, control labels */
-    --text: #37352f;            /* body */
-    --text-muted: #63625e;      /* secondary, labels; AA on sidebar-hover (5.1:1) */
-    --text-subtle: #8a8984;     /* disabled only: 3.5:1, never for information */
+    --text-strong: #13202a;     /* headings, values, control labels */
+    --text: #24323c;            /* body */
+    --text-muted: #4f5d68;      /* secondary: 6.2:1 on bg, 7:1 on white */
+    --text-subtle: #7a8791;     /* disabled only, never for information */
     --text-on-accent: #ffffff;
 
-    /* ---- Color: the one accent ------------------------------------ */
-    --accent: #0075de;          /* primary CTA fill, links, active indicator */
-    --accent-hover: #005bab;
-    --accent-text: #005bab;     /* accent as text/icon: links, selected labels, counts */
-    --accent-soft: #e7f3f8;     /* selected fill, count chips */
-    --accent-border: #b4d6ef;
-    --accent-ring: rgba(0, 117, 222, 0.38);   /* 키보드 포커스가 흐려 어디에 있는지 안 보였다(0.2) */
+    /* ---- Color: the one accent (deep teal) ------------------------ */
+    --accent: #0e7469;          /* primary CTA, active tab, submitted dot: 5.4:1 under white */
+    --accent-hover: #0b5d54;
+    --accent-text: #0b655b;     /* accent as text/icon */
+    --accent-soft: #ddf1ee;     /* selected fill, count chips */
+    --accent-border: #a9d8d1;
+    --accent-ring: rgba(14, 116, 105, 0.4);
 
     /* ---- Color: semantic (tinted chip/notice only) ---------------- */
-    --success-fg: #1a7f37;
-    --success-bg: #edf3ec;
-    --success-border: #b7dbbf;
-    --warning-fg: #8a5c00;
-    --warning-bg: #fbf3db;
-    --warning-border: #e6cfa3;
-    --danger-fg: #b3261e;
-    --danger-bg: #fdebec;
-    --danger-border: #eec4bf;
-    --danger-solid: #b3261e;    /* fill under white text for irreversible actions */
-    --danger-solid-hover: #9c2019;
-    --info-fg: #0b5cab;
-    --info-bg: #e7f3f8;
-    --info-border: #b9d6f5;
+    --success-fg: #1f7a3a;
+    --success-bg: #e6f4ea;
+    --success-border: #b5dec1;
+    --warning-fg: #8a5a00;
+    --warning-bg: #fbf1dc;
+    --warning-border: #e8d3a6;
+    --danger-fg: #b42318;
+    --danger-bg: #fdecea;
+    --danger-border: #f2c4bf;
+    --danger-solid: #b42318;
+    --danger-solid-hover: #912018;
+    --info-fg: #1d5f8c;
+    --info-bg: #e3eff7;
+    --info-border: #b7d3e8;
 
     /* Project accents 4/5 extend the report-doc palette past the 4 semantics. */
-    --project-4-fg: #5c5470;
-    --project-4-bg: #f6f3f9;
-    --project-4-border: #c9c1d8;
-    --project-5-fg: #3f6f68;
-    --project-5-bg: #e8f2ef;
-    --project-5-border: #b7d0cb;
+    --project-4-fg: #5b4f7a;
+    --project-4-bg: #f1eef8;
+    --project-4-border: #cbc2de;
+    --project-5-fg: #7a4a1f;
+    --project-5-bg: #f8efe6;
+    --project-5-border: #e2c9ae;
 
     /* ---- Color roles: aliases only, no new colors ------------------ */
     --primary: var(--accent);
     --primary-hover: var(--accent-hover);
     --attention: var(--danger-fg);
-    --selected-bg: var(--accent-soft);    /* selection, never focus (that is --focus-ring) */
+    --selected-bg: var(--accent-soft);
     --selected-text: var(--accent-text);
 
     /* ---- Overlay -------------------------------------------------- */
-    --overlay: rgba(15, 15, 15, 0.4);
+    --overlay: rgba(10, 20, 26, 0.45);
 
     /* ---- Spacing: 4px grid ---------------------------------------- */
     --space-05: 0.25rem;            /* icon–label gap, inside tags */
@@ -134,15 +134,15 @@
 
     /* ---- Radii: nested surfaces step down one notch ---------------- */
     --radius-xs: 0.25rem;           /* code, text highlights */
-    --radius-tag: 3px;          /* Notion select/status tags */
-    --radius-sm: 0.375rem;           /* controls, trays inside cards */
-    --radius: 0.5rem;              /* cards, toolbars, empty states */
-    --radius-lg: 0.75rem;          /* dialogs, bottom sheets */
+    --radius-tag: 0.375rem;          /* status / category tags */
+    --radius-sm: 0.5rem;           /* controls, trays inside cards */
+    --radius: 0.75rem;              /* cards, toolbars, empty states: white cards on blue-gray read as boards */
+    --radius-lg: 1rem;          /* dialogs, bottom sheets */
     --radius-pill: 9999px;      /* chips, avatars */
 
     /* ---- Elevation: flat by default, shadow only when floating ----- */
-    --shadow-1: 0 0.7px 1.5px rgba(0, 0, 0, 0.02), 0 3px 0.5625rem rgba(0, 0, 0, 0.03);
-    --shadow-2: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 0.375rem rgba(15, 15, 15, 0.1), 0 0.5625rem 1.5rem rgba(15, 15, 15, 0.2);
+    --shadow-1: 0 1px 2px rgba(19, 32, 42, 0.06);
+    --shadow-2: 0 0 0 1px rgba(19, 32, 42, 0.06), 0 0.5rem 1.5rem rgba(19, 32, 42, 0.16);
     --focus-ring: 0 0 0 3px var(--accent-ring);
 
     /* ---- Motion --------------------------------------------------- */
@@ -165,110 +165,59 @@
     --bottom-nav-height: 0px;
     --bottom-nav-offset: 0px;
 
-    --scrollbar-thumb: rgba(55, 53, 47, 0.2);
+    --scrollbar-thumb: rgba(19, 32, 42, 0.22);
 }
 
 /* ------------------------------------------------------------------
-   Dark: same names, values paired 1:1 with light. Follows the OS;
-   data-theme="light" | "dark" on <html> overrides it.
-   accent is 3.6:1 on dark bg, so text in accent must use --accent-text.
+   Dark: same names, paired 1:1. Deep blue-black field, slate boards.
+   Accent fill stays dark enough for white text (5:1); accent as text
+   uses the lighter --accent-text.
    ------------------------------------------------------------------ */
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-        --bg: #191918;
-        --surface: #202020;
-        --surface-soft: #2a2a28;
-        --surface-press: #33332f;
-        --input-bg: #202020;
-        --sidebar-bg: #141413;
-        --sidebar-hover: #262624;
-        --border: #2f2e2b;
-        --border-strong: #45443f;
-        --border-input: #6b6a65;
-        --text-strong: #f1f0ec;
-        --text: #d9d8d4;
-        --text-muted: #a3a29c;
-        --text-subtle: #7d7c77;
-        --text-on-accent: #ffffff;
-        --accent: #2272c3;
-        --accent-hover: #1b5fa3;
-        --accent-text: #6cb0f0;
-        --accent-soft: #1a2b3b;
-        --accent-border: #2a4a6a;
-        --accent-ring: rgba(108, 176, 240, 0.5);
-        --success-fg: #5fbf7c;
-        --success-bg: #1c2b20;
-        --success-border: #2f5a3a;
-        --warning-fg: #d9a441;
-        --warning-bg: #2e2615;
-        --warning-border: #5a4720;
-        --danger-fg: #f08077;
-        --danger-bg: #3a1f1d;
-        --danger-border: #6a3330;
-        --danger-solid: #b83229;
-        --danger-solid-hover: #9f2a22;
-        --info-fg: #6cb0f0;
-        --info-bg: #1a2b3b;
-        --info-border: #2a4a6a;
-        --project-4-fg: #b5a9d6;
-        --project-4-bg: #28243a;
-        --project-4-border: #4a4366;
-        --project-5-fg: #7fc0b5;
-        --project-5-bg: #1b2c29;
-        --project-5-border: #2f524c;
-        --overlay: rgba(0, 0, 0, 0.6);
-        --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-        --shadow-2: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0.5rem 1.5rem rgba(0, 0, 0, 0.5);
-        --scrollbar-thumb: rgba(255, 255, 255, 0.18);
-        color-scheme: dark;
-    }
-}
-
 :root[data-theme="dark"] {
-    --bg: #191918;
-    --surface: #202020;
-    --surface-soft: #2a2a28;
-    --surface-press: #33332f;
-    --input-bg: #202020;
-    --sidebar-bg: #141413;
-    --sidebar-hover: #262624;
-    --border: #2f2e2b;
-    --border-strong: #45443f;
-    --border-input: #6b6a65;
-    --text-strong: #f1f0ec;
-    --text: #d9d8d4;
-    --text-muted: #a3a29c;
-    --text-subtle: #7d7c77;
+    color-scheme: dark;
+    --bg: #0f171c;
+    --surface: #162128;
+    --surface-soft: #1d2a32;
+    --surface-press: #24343d;
+    --input-bg: #121c22;
+    --sidebar-bg: #0c1317;
+    --sidebar-hover: #1d2a32;
+    --border: #26353e;
+    --border-strong: #34464f;
+    --border-input: #5e707b;
+    --text-strong: #eef3f5;
+    --text: #d3dde2;
+    --text-muted: #9aaab4;
+    --text-subtle: #6f808a;
     --text-on-accent: #ffffff;
-    --accent: #2272c3;
-    --accent-hover: #1b5fa3;
-    --accent-text: #6cb0f0;
-    --accent-soft: #1a2b3b;
-    --accent-border: #2a4a6a;
-    --accent-ring: rgba(108, 176, 240, 0.5);
-    --success-fg: #5fbf7c;
-    --success-bg: #1c2b20;
-    --success-border: #2f5a3a;
-    --warning-fg: #d9a441;
-    --warning-bg: #2e2615;
-    --warning-border: #5a4720;
-    --danger-fg: #f08077;
-    --danger-bg: #3a1f1d;
-    --danger-border: #6a3330;
-    --danger-solid: #b83229;
-    --danger-solid-hover: #9f2a22;
-    --info-fg: #6cb0f0;
-    --info-bg: #1a2b3b;
-    --info-border: #2a4a6a;
-    --project-4-fg: #b5a9d6;
-    --project-4-bg: #28243a;
-    --project-4-border: #4a4366;
-    --project-5-fg: #7fc0b5;
-    --project-5-bg: #1b2c29;
-    --project-5-border: #2f524c;
+    --accent: #0d7d70;
+    --accent-hover: #0a685d;
+    --accent-text: #4fd1bf;
+    --accent-soft: #12302d;
+    --accent-border: #1e4a45;
+    --accent-ring: rgba(79, 209, 191, 0.45);
+    --success-fg: #5cc98a;
+    --success-bg: #14291c;
+    --success-border: #24502f;
+    --warning-fg: #e0b04f;
+    --warning-bg: #2c2412;
+    --warning-border: #574519;
+    --danger-fg: #f2867c;
+    --danger-bg: #36191a;
+    --danger-border: #6a2e2b;
+    --danger-solid: #c0362b;
+    --danger-solid-hover: #a42d24;
+    --info-fg: #7cb8e6;
+    --info-bg: #13263a;
+    --info-border: #25476a;
+    --project-4-fg: #b9acdc;
+    --project-4-bg: #241f36;
+    --project-4-border: #463e63;
+    --project-5-fg: #e0b07f;
+    --project-5-bg: #2c2016;
+    --project-5-border: #5a4229;
     --overlay: rgba(0, 0, 0, 0.6);
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0.5rem 1.5rem rgba(0, 0, 0, 0.5);
+    --shadow-2: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0.5rem 1.5rem rgba(0, 0, 0, 0.55);
     --scrollbar-thumb: rgba(255, 255, 255, 0.18);
-    color-scheme: dark;
 }

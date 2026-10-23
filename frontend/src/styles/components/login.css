@@ -1,118 +1,156 @@
-/* 카드 하나를 가운데 띄우지 않는다. 왼쪽은 이 도구가 만드는 결과(보고 한 장), 오른쪽은 폼. */
-.login-page {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    width: 100%;
-    min-height: 100vh;
-}
+/* 로그인: 앱과 같은 청회색 벽에 보드 두 장. 오른쪽 폼 보드가 이 화면의 한 곳이고,
+   왼쪽은 이 도구가 만드는 보고 한 장(예시)이다. 좁은 화면은 소개 한 줄 → 폼만 남긴다. */
 
-.login-side {
+.login {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: var(--space-5);
-    padding: var(--space-8);
-    border-right: 1px solid var(--border);
-    background: var(--sidebar-bg);
+    gap: var(--space-7);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: var(--space-6) var(--space-7) var(--space-8);
+    background: var(--bg);
 }
 
-.login-brand {
+.login-wordmark {
     margin: 0;
-    font: var(--type-title);
-    font-size: var(--fs-30);
-    letter-spacing: -0.02em;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    letter-spacing: -0.01em;
     color: var(--text-strong);
+}
+
+.login-body {
+    display: grid;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+    align-items: center;
+    gap: var(--space-8);
+    width: 100%;
+    max-width: 62rem;
+    margin: 0 auto;
+}
+
+.login-intro {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    min-width: 0;
 }
 
 .login-lead {
-    max-width: 26.25rem;
+    max-width: 28rem;
     margin: 0;
-    font-size: var(--fs-16);
-    line-height: var(--lh-relaxed);
+    font-size: var(--fs-18);
+    line-height: var(--lh-base);
     color: var(--text);
-    word-break: keep-all;
 }
 
 .login-sample {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    max-width: 26.25rem;
-    padding: var(--space-4) var(--space-5);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    box-shadow: var(--shadow-1);
+    max-width: 26rem;
 }
 
-.login-sample p {
+.sample-label {
+    margin: 0 0 var(--space-2);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+}
+
+.sample-board {
+    padding: 0;
+}
+
+.sample-head {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    justify-content: space-between;
+    gap: var(--space-3);
     margin: 0;
-    font-size: var(--fs-14);
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border);
+}
+
+.sample-title {
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
     color: var(--text-strong);
 }
 
-.login-sample .login-sample-head {
-    justify-content: space-between;
-    margin-bottom: var(--space-1);
-    padding-bottom: var(--space-2);
-    border-bottom: 1px solid var(--border);
-    font-weight: var(--fw-semibold);
+.sample-lines {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sample-lines li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+}
+
+.sample-lines li:first-child {
+    border-top: 0;
 }
 
 .login-main {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-8) var(--space-6);
+    min-width: 0;
 }
 
 .login-form {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    width: min(22.5rem, 100%);
+    padding: var(--space-7) var(--space-6);
 }
 
-.login-form .t-desc {
-    margin-top: calc(-1 * var(--space-2));
+/* 전역 .card>.field+.field 여백이 flex 간격에 더해지지 않게 한다. */
+.login-form > .field + .field {
+    margin-top: 0;
 }
 
-.login-field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    font: var(--type-caption);
-    font-weight: var(--fw-semibold);
+.login-title {
+    margin: 0;
+    font-size: var(--fs-24);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    letter-spacing: -0.01em;
     color: var(--text-strong);
 }
 
-.login-field .input {
+.login-desc {
+    margin: calc(var(--space-2) * -1) 0 var(--space-1);
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.login-form .input {
     height: var(--control-h-lg);
 }
 
-.login-form .btn {
-    margin-top: var(--space-2);
+.login-submit {
+    width: 100%;
     min-height: var(--control-h-lg);
+    margin-top: var(--space-2);
 }
 
 @media (max-width: 860px) {
-    .login-page {
+    .login {
+        gap: var(--space-5);
+        padding: calc(var(--space-5) + env(safe-area-inset-top, 0px)) var(--space-4) var(--space-7);
+    }
+
+    .login-body {
         grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: auto 1fr;
-    }
-
-    .login-side {
-        gap: var(--space-2);
-        padding: calc(var(--space-7) + env(safe-area-inset-top, 0px)) var(--space-5) var(--space-5);
-        border-right: 0;
-        border-bottom: 1px solid var(--border);
-    }
-
-    .login-brand {
-        font-size: var(--fs-24);
+        align-content: start;
+        gap: var(--space-5);
     }
 
     .login-lead {
@@ -123,8 +161,7 @@
         display: none;
     }
 
-    .login-main {
-        align-items: flex-start;
-        padding: var(--space-6) var(--space-5);
+    .login-form {
+        padding: var(--space-5) var(--space-4);
     }
 }

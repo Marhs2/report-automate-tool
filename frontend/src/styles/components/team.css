@@ -1,166 +1,182 @@
-/* 팀: 하루치 팀원 목록. 한 사람 한 줄, 누르면 그날 보고가 펼쳐진다. */
-.team-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--space-4);
-}
+/* 팀: 하루치 팀원 보드. 왼쪽은 사람 줄(초점), 오른쪽은 팀장 · 관리자의 부서 집계.
+   DESIGN.md "현장 보드": 흰 보드 · 1px 줄 · 그림자 없음 · 청록은 제출 점과 기본 버튼에만. 값은 tokens.css만. */
 
-.team-day {
+/* ---- 페이지: 사람 보드 + (오늘만) 집계 열 ------------------------------- */
+.team-main,
+.team-aside {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-6);
+    min-width: 0;
 }
 
-.team-date-nav {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    margin-left: calc(-1 * var(--space-2));
+@media (min-width: 1101px) {
+    .team-page.has-aside {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+        align-items: start;
+    }
 }
 
-.team-step {
-    width: var(--control-h);
+/* ---- 보드: 머리 줄 + 1px 줄로 나눈 내용 ---------------------------------- */
+.board {
     padding: 0;
 }
 
-.team-date {
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-.team-summary {
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    font-variant-numeric: tabular-nums;
-}
-
-.team-summary-cards {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-3);
-}
-
-.team-card {
+.board-head {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
     padding: var(--space-4) var(--space-5);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
+    border-bottom: 1px solid var(--border);
 }
 
-.team-card .bar {
-    flex: none;
-}
-
-.team-card .btn {
-    align-self: flex-start;
-}
-
-.team-card-label {
-    margin: 0;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-/* 섹션 제목: 내 현황 · 주간의 카드 제목과 같은 글씨. */
-.team-section-label {
+.board-title {
     margin: 0;
     font-size: var(--fs-16);
     font-weight: var(--fw-bold);
     line-height: var(--lh-tight);
     color: var(--text-strong);
+    word-break: keep-all;
 }
 
-.team-card-num {
-    font-size: var(--fs-24);
+.board-meta {
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+.board-meta-num {
     font-weight: var(--fw-bold);
     color: var(--text-strong);
     font-variant-numeric: tabular-nums;
 }
 
-.team-card-note {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.team-card-note b {
+.board-num {
+    font-size: var(--fs-18);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
     color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
-
-.team-depts {
+.board-body {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
 }
 
-.team-dept {
-    display: grid;
-    grid-template-columns: 4.5rem minmax(0, 1fr) 4rem;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-    padding: var(--space-3) var(--space-4);
+.board-body .bar {
+    width: 100%;
 }
 
-.team-dept + .team-dept {
-    border-top: 1px solid var(--border);
+.board-note {
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text);
+    word-break: keep-all;
 }
 
-.team-dept.is-plain {
-    grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.team-dept-name {
+.board-note b {
     font-weight: var(--fw-semibold);
     color: var(--text-strong);
 }
 
-.team-dept-count {
-    text-align: right;
-    font-weight: var(--fw-bold);
-    font-variant-numeric: tabular-nums;
-    color: var(--text-muted);
-}
-
-.team-dept-count.is-low {
-    color: var(--danger-fg);
-}
-
-.team-dept-count.is-all {
-    color: var(--success-fg);
-}
-
-.team-dept-who {
-    grid-column: 2 / -1;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.team-dept-link {
-    display: block;
-    padding: var(--space-3) var(--space-4);
+.board-foot {
+    padding: var(--space-3) var(--space-5) var(--space-4);
     border-top: 1px solid var(--border);
-    text-align: center;
+}
+
+.board-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--danger-fg);
+    word-break: keep-all;
+}
+
+.board-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-5);
+}
+
+.board-empty-title {
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+/* ---- 사람 보드 머리: 날짜 넘기기 · 전체/이슈만 --------------------------- */
+.team-date-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    margin-left: calc(-1 * var(--space-2));
+}
+
+.team-date {
+    margin: 0;
+    font-size: var(--fs-18);
     font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* 이 화면의 초점: 몇 명 중 몇 명이 냈는지. */
+.team-count-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border);
+}
+
+.team-count {
+    margin: 0;
+    font-size: var(--fs-24);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.team-count b {
+    font-weight: var(--fw-bold);
 }
 
 .team-notyet {
-    margin-top: calc(-1 * var(--space-3));
+    margin: 0;
     font-size: var(--fs-13);
-    color: var(--danger-fg);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    word-break: keep-all;
 }
 
+/* ---- 사람 줄 ---------------------------------------------------------- */
 .team-list {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .team-person + .team-person {
@@ -168,57 +184,144 @@
 }
 
 .team-row {
-    min-height: 3.75rem;
-    padding: var(--space-3) var(--space-4);
-    border-radius: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: var(--row-min-h);
+    padding: var(--space-3) var(--space-5);
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
     text-align: left;
     cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
 }
 
-.team-row:disabled {
+.team-row:hover {
+    background: var(--surface-soft);
+}
+
+.team-row:focus-visible {
+    outline: none;
+    box-shadow: inset var(--focus-ring);
+}
+
+.team-row:disabled,
+.team-row.is-static {
     cursor: default;
-    opacity: 1;
 }
 
 .team-row.is-static:hover {
     background: transparent;
 }
 
-.team-row .avatar {
-    width: 2.25rem;
-    height: 2.25rem;
+.team-row-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.team-row-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-2);
+    min-width: 0;
+}
+
+.team-name {
     font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+/* "나" 표시: 선택 상태와 같은 청록 면. 내 줄을 한눈에 찾는 뜻이다. */
+.team-me {
+    display: inline-flex;
+    align-items: center;
+    height: var(--chip-h-sm);
+    padding: 0 0.375rem;
+    border-radius: var(--radius-tag);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    line-height: 1;
 }
 
 .team-meta {
-    margin-left: var(--space-1);
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: var(--fs-13);
-    font-weight: var(--fw-regular);
+    line-height: var(--lh-tight);
     color: var(--text-muted);
 }
 
+.team-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.team-row-end {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+/* 펼침 표시: 보고가 있는 줄에만. 상태가 바뀔 때만 돈다(MOTION 1). */
+.team-chevron {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: transform var(--dur-fast) var(--ease);
+}
+
+.team-person.is-open .team-chevron {
+    transform: rotate(180deg);
+}
+
+/* 펼친 보고: 보드 안의 트레이. 카드 속 카드가 아니다. */
 .team-lines {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 2.25rem + var(--space-3));
+    margin: 0 var(--space-5) var(--space-4) calc(var(--space-5) + var(--control-h-sm) + var(--space-3));
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
 }
 
 .team-line {
     display: flex;
     align-items: flex-start;
     gap: var(--space-2);
+    margin: 0;
     font-size: var(--fs-14);
     line-height: var(--lh-base);
     color: var(--text);
 }
 
-.team-line :deep(.kind-tag) {
-    margin-top: 2px;
+.team-line > :first-child {
+    margin-top: 0.125rem;
 }
 
 .team-line-text {
+    flex: 1;
     min-width: 0;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
 }
 
 .team-line-project {
@@ -230,45 +333,202 @@
 .team-raw {
     align-self: flex-start;
     margin-top: var(--space-1);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
 }
 
-.team-hint {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-    text-align: center;
+/* ---- 불러오는 중: 줄 모양 그대로 ------------------------------------------ */
+.skel {
+    display: block;
+    border-radius: var(--radius-xs);
+    background: var(--surface-soft);
 }
 
-.team-links {
+.team-skel {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--space-2);
-    padding-top: var(--space-4);
+    flex-direction: column;
+}
+
+.team-skel-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--row-min-h);
+    padding: var(--space-3) var(--space-5);
+}
+
+.team-skel-row + .team-skel-row {
     border-top: 1px solid var(--border);
 }
 
-.team-links .btn {
-    color: var(--accent-text);
+.skel-avatar {
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    border-radius: var(--radius-pill);
 }
 
-@media (max-width: 640px) {
-    .team-summary-cards {
-        grid-template-columns: minmax(0, 1fr);
-    }
+.skel-lines {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-2);
 }
 
+.skel-line {
+    width: 40%;
+    height: 0.75rem;
+}
+
+.skel-line.is-short {
+    width: 24%;
+}
+
+/* ---- 한 번 눌러 가는 곳 ---------------------------------------------------- */
+.team-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+/* ---- 집계 열: 부서 줄 ------------------------------------------------------ */
+.team-cta {
+    align-self: flex-start;
+}
+
+.dept-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dept-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-5);
+}
+
+.dept-row + .dept-row {
+    border-top: 1px solid var(--border);
+}
+
+.dept-line {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+.dept-line .bar {
+    flex: 1;
+}
+
+.dept-name {
+    flex: 0 1 auto;
+    min-width: 3.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.dept-count {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.dept-count.is-low {
+    color: var(--danger-fg);
+}
+
+.dept-count.is-all {
+    color: var(--success-fg);
+}
+
+.dept-who {
+    margin: 0;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+/* ---- 모바일 ------------------------------------------------------------ */
 @media (max-width: 860px) {
+    .board-head,
+    .board-body,
+    .board-error,
+    .board-empty,
+    .team-count-row,
+    .team-row,
+    .team-skel-row,
+    .dept-row {
+        padding-left: var(--space-4);
+        padding-right: var(--space-4);
+    }
+
+    .board-foot {
+        padding-left: var(--space-4);
+        padding-right: var(--space-4);
+    }
+
+    .team-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .team-date-nav {
+        justify-content: space-between;
+        margin-left: 0;
+    }
+
+    .team-date {
+        white-space: normal;
+        text-align: center;
+    }
+
     .team-row {
-        min-height: var(--control-h-lg);
+        min-height: var(--control-h-touch);
+    }
+
+    .team-row-end {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: var(--space-1);
+    }
+
+    .team-chevron {
+        display: none;
     }
 
     .team-lines {
-        padding-left: var(--space-4);
+        margin-left: var(--space-4);
+        margin-right: var(--space-4);
     }
 
     .team-links .btn {
-        min-height: var(--control-h-lg);
+        flex: 1 1 auto;
+        min-height: var(--control-h-touch);
+    }
+
+    .team-cta {
+        align-self: stretch;
+        min-height: var(--control-h-touch);
+    }
+
+    .dept-line {
+        flex-wrap: wrap;
+    }
+
+    .dept-line .bar {
+        order: 1;
+        flex: 1 1 100%;
     }
 }

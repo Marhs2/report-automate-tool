@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ChevronDown, CircleCheck, UploadCloud } from "lucide-vue-next";
+import { ChevronDown } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { useDialog } from "../composables/useDialog";
@@ -24,6 +24,7 @@ import {
 } from "../lib/lineReport.js";
 import LineWriter from "./ui/line-writer.vue";
 import KindTag from "./ui/KindTag.vue";
+import WeekDots from "./ui/WeekDots.vue";
 
 const FOCUS_KIND = { next: "next", issue: "issue", request: "request" };
 const FOCUS_LABEL = { next: "다음", issue: "이슈", request: "요청" };
@@ -60,21 +61,37 @@ const draftSavedAt = ref("");
 const formError = ref("");
 const userName = ref("");
 const alreadySaved = ref(false);
+/** 제출 여부 · 초안을 읽는 동안은 "확인 중". 못 읽으면 다시 시도를 보여 준다. */
+const metaLoading = ref(false);
+const metaError = ref(false);
 const elapsed = ref(0);
 const isDragging = ref(false);
 const knownProjects = ref([]);
-/** 오른쪽 칸: 회의록 · 영업보고 탭처럼 "내가 쓴 일일보고". */
+/** 더 보기 안의 "내가 쓴 일일보고". */
 const myReports = ref([]);
 const { weekDays } = useMyWeek();
 const { weeklyState, weeklyCard } = useMyWeekly();
 const todayIso = todayString();
 const moreOpen = ref(false);
 const TODAY_PLACEHOLDER = "예) MES 운영 문의 2건 처리했고, 엑셀 업로드 검증은 아직 하는 중. 도면이 안 와서 실측이 밀림";
-const WEEK_STATE_LABELS = { saved: "제출함", today: "아직", missing: "빠짐", upcoming: "예정" };
 const dateLabel = computed(() => {
     const [, month, day] = String(date.value || "").split("-").map(Number);
     if (!month || !day) return "";
     return `${month}월 ${day}일 ${weekdayLabelOf(date.value)}요일`;
+});
+
+/* ---- 이번 주 점(월~금) ------------------------------------------------
+   공용 WeekDots가 쓰는 이름으로 바꾼다. 색만으로 말하지 않게 빠진 요일은 글자로도 적는다. */
+const DOT_STATE = { saved: "done", today: "today", missing: "missing", upcoming: "future", holiday: "holiday" };
+const weekDots = computed(() =>
+    weekDays.value.map((day) => ({
+        label: day.weekday,
+        state: day.state === "saved" && day.date === todayIso ? "today-done" : DOT_STATE[day.state] || "future",
+    })),
+);
+const weekNote = computed(() => {
+    const missing = weekDays.value.filter((day) => day.state === "missing").map((day) => day.weekday);
+    return missing.length ? `${missing.join(" · ")} 빠짐` : "빠진 날 없음";
 });
 
 /* ---- 오늘 · 제출 후 ------------------------------------------------
@@ -238,8 +255,10 @@ const loadSavedState = async () => {
             (row) => String(row.member_id) === String(memberId),
         );
         alreadySaved.value = Boolean(mine && (mine.activities || []).some((a) => a.count > 0));
+        metaError.value = false;
     } catch {
         alreadySaved.value = false;
+        metaError.value = true;
     }
 };
 
@@ -281,9 +300,17 @@ const loadDraft = async () => {
 };
 
 const statusLabel = computed(() => {
+    if (metaLoading.value) return "확인 중";
     if (alreadySaved.value) return "제출됨";
     if (draftSavedAt.value) return `임시 저장 · ${draftSavedAt.value}`;
     return "아직 안 냄";
+});
+
+const statusTone = computed(() => {
+    if (metaLoading.value) return "is-plain";
+    if (alreadySaved.value) return "is-success";
+    if (draftSavedAt.value) return "is-warning";
+    return "is-plain";
 });
 
 const statusDetail = computed(() => {
@@ -336,7 +363,7 @@ const loadProjects = async () => {
     } catch {
         names = [];
     }
-    // 최근 순서와 오른쪽 목록은 있으면 좋은 것이다. 목록을 못 불러와도 등록된 이름으로 쓸 수 있어야 한다.
+    // 최근 순서와 지난 보고 목록은 있으면 좋은 것이다. 목록을 못 불러와도 등록된 이름으로 쓸 수 있어야 한다.
     let reports = [];
     try {
         reports = await getReports();
@@ -366,9 +393,19 @@ const registerProject = async (name) => {
 const reportBody = () => input.value;
 
 const refreshMeta = async () => {
-    await loadUserName();
-    await loadSavedState();
-    await Promise.all([loadProjects(), loadDrafts()]);
+    metaLoading.value = true;
+    try {
+        await loadUserName();
+        await loadSavedState();
+        await Promise.all([loadProjects(), loadDrafts()]);
+    } finally {
+        metaLoading.value = false;
+    }
+};
+
+const retryMeta = async () => {
+    await refreshMeta();
+    await loadDraft();
 };
 
 const syncNarrow = () => {
@@ -597,93 +634,102 @@ const sendReport = async () => {
 </script>
 
 <template>
-    <div class="daily-write">
-        <div v-if="!hasUser" class="card">
-            <p class="form-hint">로그인이 필요합니다.</p>
-            <div class="form-actions">
-                <router-link class="btn btn-primary" to="/login">로그인</router-link>
-            </div>
-        </div>
+    <div class="page today-page">
+        <section v-if="!hasUser" class="card today-gate">
+            <p class="today-gate-text">로그인이 필요합니다.</p>
+            <router-link class="btn btn-primary" to="/login">로그인</router-link>
+        </section>
 
-        <div v-else class="today">
-            <div class="today-top">
-                <p class="today-date">
-                    {{ dateLabel }}
-                    <span
-                        class="today-status"
-                        :class="alreadySaved ? 'is-saved' : draftSavedAt ? 'is-draft' : ''"
-                        :title="statusDetail"
-                    >· {{ statusLabel }}</span>
+        <template v-else>
+            <!-- 제출 후: 쓰는 칸 대신 다음 할 일 보드와 이번 주 주간보고 보드. -->
+            <div v-if="savedToday" class="today-done" :class="{ 'has-weekly': weeklyState !== 'saved' }">
+                <section class="card today-board" aria-labelledby="today-done-title">
+                    <header class="today-head">
+                        <div class="today-head-main">
+                            <h2 id="today-done-title" class="today-title">오늘 보고를 냈어요</h2>
+                            <span class="state-chip is-success">제출됨</span>
+                        </div>
+                        <div v-if="weekDots.length" class="today-week">
+                            <span class="today-week-label">이번 주</span>
+                            <WeekDots :days="weekDots" />
+                            <span class="today-week-note">{{ weekNote }}</span>
+                        </div>
+                    </header>
+                    <p class="today-lead">{{ dateLabel }} · 팀 보고와 이번 주 주간보고에 들어갔어요.</p>
+                    <div class="today-group">
+                        <p class="today-caption">다음 할 일 · 오늘 보고에서</p>
+                        <ul v-if="hasFocus" class="today-focus">
+                            <template v-for="column in focusColumns" :key="column.key">
+                                <li v-for="(item, index) in column.items" :key="`${column.key}-${index}`" class="today-focus-item">
+                                    <KindTag :kind="FOCUS_KIND[column.key]" :label="FOCUS_LABEL[column.key]" />
+                                    <span class="today-focus-text">
+                                        {{ item.text }}
+                                        <span v-if="item.project" class="today-focus-project">{{ item.project }}</span>
+                                    </span>
+                                </li>
+                            </template>
+                        </ul>
+                        <p v-else class="today-empty">다음 계획 · 이슈 · 요청이 없어요.</p>
+                    </div>
+                    <footer class="today-links">
+                        <router-link v-if="savedReportId" class="btn btn-ghost" :to="`/report-result/${savedReportId}`">오늘 보고 보기 · 고치기</router-link>
+                        <button type="button" class="btn btn-ghost" @click="writeAnotherDay">다른 날 보고 쓰기</button>
+                    </footer>
+                </section>
+
+                <section v-if="weeklyState !== 'saved'" class="card today-board today-weekly">
+                    <header class="today-head">
+                        <div class="today-head-main">
+                            <h2 class="today-title">이번 주 주간보고</h2>
+                            <span class="state-chip is-warning">{{ weeklyCard.label }}</span>
+                        </div>
+                    </header>
+                    <p class="today-lead">{{ weeklyState === "draft" ? "만드는 중이에요" : "아직 안 만들었어요" }}. 이번 주 일일보고로 금요일까지 만들어요.</p>
+                    <div class="today-links">
+                        <router-link class="btn btn-primary" :to="weeklyCard.to">{{ weeklyCard.action }}</router-link>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 쓰기: 보드 하나. 머리줄(날짜 · 상태 · 이번 주), 쓰는 칸, 바닥줄(더 보기 · 버튼), 접힌 설정. -->
+            <section v-else class="card today-board today-write" :class="{ 'is-lines': useLines }" aria-labelledby="today-write-title">
+                <header class="today-head">
+                    <div class="today-head-main">
+                        <h2 id="today-write-title" class="today-title">{{ dateLabel }}</h2>
+                        <span class="state-chip" :class="statusTone" :title="statusDetail" role="status">{{ statusLabel }}</span>
+                    </div>
+                    <div v-if="weekDots.length" class="today-week">
+                        <span class="today-week-label">이번 주</span>
+                        <WeekDots :days="weekDots" />
+                        <span class="today-week-note">{{ weekNote }}</span>
+                    </div>
+                </header>
+
+                <p v-if="metaError" class="today-error" role="alert">
+                    제출 여부를 확인하지 못했어요.
+                    <button type="button" class="btn btn-small" @click="retryMeta">다시 시도</button>
                 </p>
-                <ol v-if="weekDays.length" class="today-week" aria-label="이번 주 제출">
-                    <li
-                        v-for="day in weekDays"
-                        :key="day.date"
-                        class="today-day"
-                        :class="[`is-${day.state}`, { 'is-current': day.date === date }]"
-                        :aria-label="`${day.weekday}요일 ${WEEK_STATE_LABELS[day.state]}`"
-                    >
-                        <i aria-hidden="true"></i>{{ day.date === todayIso ? "오늘" : day.weekday }}
-                    </li>
-                </ol>
-            </div>
 
-            <section v-if="savedToday" class="today-done" aria-labelledby="today-done-title">
-                <h2 id="today-done-title" class="today-done-title">
-                    <CircleCheck :size="26" aria-hidden="true" />오늘 보고를 냈어요
-                </h2>
-                <p class="today-done-sub">팀 보고와 이번 주 주간보고에 들어갔어요.</p>
-
-                <div class="today-done-group">
-                    <p class="today-done-label">다음 할 일 · 오늘 보고에서</p>
-                    <ul v-if="hasFocus" class="today-done-list">
-                        <template v-for="column in focusColumns" :key="column.key">
-                            <li v-for="(item, index) in column.items" :key="`${column.key}-${index}`" class="today-done-item">
-                                <KindTag :kind="FOCUS_KIND[column.key]" :label="FOCUS_LABEL[column.key]" />
-                                <span>{{ item.text }}<span v-if="item.project" class="today-done-project">{{ item.project }}</span></span>
-                            </li>
-                        </template>
-                    </ul>
-                    <p v-else class="today-done-empty">다음 계획 · 이슈 · 요청이 없어요.</p>
-                </div>
-
-                <router-link v-if="weeklyState !== 'saved'" class="today-weekly" :to="weeklyCard.to">
-                    <span class="today-weekly-text">
-                        <span class="today-weekly-title">이번 주 주간보고를 {{ weeklyState === "draft" ? "만드는 중이에요" : "아직 안 만들었어요" }}</span>
-                        <span class="today-weekly-sub">이번 주 일일보고로 금요일까지 만들어요</span>
-                    </span>
-                    <span class="btn btn-primary today-weekly-btn">{{ weeklyCard.action }}</span>
-                </router-link>
-
-                <div class="today-done-links">
-                    <router-link v-if="savedReportId" class="btn btn-ghost" :to="`/report-result/${savedReportId}`">오늘 보고 보기 · 고치기</router-link>
-                    <button type="button" class="btn btn-ghost" @click="writeAnotherDay">다른 날 보고 쓰기</button>
-                </div>
-            </section>
-
-            <template v-else>
-            <div class="today-box" :class="{ 'is-lines': useLines }">
-                <template v-if="useLines">
-                    <LineWriter
-                        ref="lineWriter"
-                        v-model="input"
-                        :projects="knownProjects"
-                        @add-project="registerProject"
-                    >
-                        <template #dock>
-                            <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
-                            <button
-                                v-if="lineCount"
-                                type="button"
-                                class="btn btn-primary line-send"
-                                @click="saveLines"
-                                :disabled="lineSaving"
-                            >
-                                {{ lineSaving ? "저장 중" : `저장 · ${lineCount}줄` }}
-                            </button>
-                        </template>
-                    </LineWriter>
-                </template>
+                <LineWriter
+                    v-if="useLines"
+                    ref="lineWriter"
+                    v-model="input"
+                    :projects="knownProjects"
+                    @add-project="registerProject"
+                >
+                    <template #dock>
+                        <p v-if="formError" class="today-error" role="alert">{{ formError }}</p>
+                        <button
+                            v-if="lineCount"
+                            type="button"
+                            class="btn btn-primary line-send"
+                            @click="saveLines"
+                            :disabled="lineSaving"
+                        >
+                            {{ lineSaving ? "저장 중" : `저장 · ${lineCount}줄` }}
+                        </button>
+                    </template>
+                </LineWriter>
 
                 <textarea
                     v-else-if="buttonType === 'text'"
@@ -697,38 +743,34 @@ const sendReport = async () => {
 
                 <div
                     v-else
-                    class="field file-drop-area today-drop"
+                    class="today-drop"
                     :class="{ 'is-dragging': isDragging }"
                     @dragover="onDragOver"
                     @dragenter="onDragOver"
                     @dragleave="onDragLeave"
                     @drop="onDrop"
                 >
-                    <UploadCloud :size="22" aria-hidden="true" />
-                    <p class="file-drop-copy">
-                        PPTX 파일을 고르거나 여기로 놓으세요
-                    </p>
-                    <label class="file-drop-pick" for="pptx-input">파일 고르기</label>
+                    <p class="today-drop-copy">PPTX 파일을 고르거나 여기로 놓으세요</p>
+                    <label class="btn today-drop-pick" for="pptx-input">파일 고르기</label>
                     <input
                         id="pptx-input"
-                        class="file-drop-input"
+                        class="today-drop-input"
                         type="file"
                         accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                         @change="uploadFile"
                     />
-                    <p v-if="file" class="file-name">
-                        {{ file.name }}
-                        <button type="button" class="file-clear" @click="clearFile">지우기</button>
+                    <p v-if="file" class="today-drop-file">
+                        <span>{{ file.name }}</span>
+                        <button type="button" class="btn btn-danger btn-small" @click="clearFile">지우기</button>
                     </p>
                 </div>
 
-                <div class="today-foot">
-                    <span class="today-foot-note" role="status">
-                        {{ draftSavedAt ? `${draftSavedAt}에 임시 저장됨` : alreadySaved ? "제출한 보고가 있어요" : "" }}
-                    </span>
+                <p v-if="formError && !useLines" class="today-error" role="alert">{{ formError }}</p>
+
+                <div class="today-bar">
                     <button
                         type="button"
-                        class="btn btn-ghost btn-small today-more-toggle"
+                        class="btn btn-ghost today-more-toggle"
                         :aria-expanded="moreOpen"
                         aria-controls="today-more"
                         @click="moreOpen = !moreOpen"
@@ -736,6 +778,25 @@ const sendReport = async () => {
                         {{ moreOpen ? "접기" : "더 보기" }}
                         <ChevronDown :size="16" class="today-more-icon" aria-hidden="true" />
                     </button>
+                    <div v-if="!useLines" class="today-actions">
+                        <button
+                            v-if="buttonType === 'text'"
+                            type="button"
+                            class="btn today-save"
+                            @click="saveDraft"
+                            :disabled="aiLoading || draftSaving || !input.trim()"
+                        >
+                            {{ draftSaving ? "저장 중..." : "임시 저장" }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary today-send"
+                            @click="sendReport"
+                            :disabled="aiLoading"
+                        >
+                            {{ aiLoading ? "정리하는 중" : "AI로 정리하기" }}
+                        </button>
+                    </div>
                 </div>
 
                 <div v-if="moreOpen" id="today-more" class="today-more">
@@ -744,8 +805,8 @@ const sendReport = async () => {
                         <input type="date" id="date" class="input today-more-date" v-model="date" required />
                     </div>
                     <div class="today-more-row">
-                        <span class="today-more-label">쓰는 방식</span>
-                        <div class="seg" role="tablist" aria-label="입력 방식">
+                        <span class="today-more-label" id="today-mode-label">쓰는 방식</span>
+                        <div class="seg" role="tablist" aria-labelledby="today-mode-label">
                             <button
                                 v-for="mode in inputModes"
                                 :key="mode.id"
@@ -761,13 +822,13 @@ const sendReport = async () => {
                     </div>
                     <div v-if="buttonType === 'text' && !useLines" class="today-more-row">
                         <span class="today-more-label">틀 넣기</span>
-                        <div class="template-chips" role="group" aria-label="붙여넣기 형식">
+                        <div class="today-templates" role="group" aria-label="붙여넣기 형식">
                             <button
                                 v-for="template in PASTE_TEMPLATES"
                                 :key="template.id"
                                 type="button"
                                 class="btn btn-small"
-                                :class="{ on: activeTemplateId === template.id }"
+                                :class="{ 'is-active': activeTemplateId === template.id }"
                                 :aria-pressed="activeTemplateId === template.id"
                                 :title="template.hint"
                                 @click="insertTemplate(template)"
@@ -782,71 +843,44 @@ const sendReport = async () => {
                             <router-link v-if="myReports.length" class="today-more-link" to="/reports">전체 보기</router-link>
                         </div>
                         <!-- 임시 저장은 제출이 아니라 목록에 없다. 없어진 줄 알지 않게 따로 보여 준다. -->
-                        <button
-                            v-for="draft in myDrafts"
-                            :key="draft.report_date"
-                            type="button"
-                            class="row"
-                            :class="{ 'is-current': draft.report_date === date }"
-                            @click="date = draft.report_date"
-                        >
-                            <span class="row-main">
-                                <span class="row-title">{{ draft.preview || "내용 없음" }}</span>
-                                <span class="row-sub">{{ draftDateLabel(draft.report_date) }} · 임시 저장 · 아직 제출 안 됨</span>
-                            </span>
-                        </button>
-                        <p v-if="!myReports.length && !myDrafts.length" class="today-more-empty">아직 없어요. 제출하면 여기에 쌓여요.</p>
-                        <router-link
-                            v-for="row in myReports.slice(0, 5)"
-                            :key="row.id"
-                            class="row"
-                            :to="`/report-result/${row.id}`"
-                        >
-                            <span class="row-main">
-                                <span class="row-title">{{ row.title }}</span>
-                                <span class="row-sub">{{ row.date }}</span>
-                            </span>
-                        </router-link>
+                        <div class="today-more-list">
+                            <button
+                                v-for="draft in myDrafts"
+                                :key="draft.report_date"
+                                type="button"
+                                class="row"
+                                :class="{ 'is-current': draft.report_date === date }"
+                                @click="date = draft.report_date"
+                            >
+                                <span class="row-main">
+                                    <span class="row-title">{{ draft.preview || "내용 없음" }}</span>
+                                    <span class="row-sub">{{ draftDateLabel(draft.report_date) }} · 임시 저장 · 아직 제출 안 됨</span>
+                                </span>
+                            </button>
+                            <router-link
+                                v-for="row in myReports.slice(0, 5)"
+                                :key="row.id"
+                                class="row"
+                                :to="`/report-result/${row.id}`"
+                            >
+                                <span class="row-main">
+                                    <span class="row-title">{{ row.title }}</span>
+                                    <span class="row-sub">{{ row.date }}</span>
+                                </span>
+                            </router-link>
+                            <p v-if="!myReports.length && !myDrafts.length" class="today-empty">아직 없어요. 제출하면 여기에 쌓여요.</p>
+                        </div>
                     </div>
                     <div v-if="draftSavedAt" class="today-more-row">
                         <button type="button" class="btn btn-danger btn-small" @click="discardDraft">이 초안 버리기</button>
                     </div>
                 </div>
-            </div>
-
-            <p v-if="formError && !useLines" class="form-error" role="alert">
-                {{ formError }}
-            </p>
-
-            <template v-if="!useLines">
-                <p class="today-hint">줄글로 편하게 써도 돼요. 프로젝트와 완료 · 진행 · 이슈는 AI가 나누고, 결과를 확인한 뒤 저장하면 제출돼요.</p>
-                <div class="today-actions">
-                    <button
-                        v-if="buttonType === 'text'"
-                        type="button"
-                        class="btn today-save"
-                        @click="saveDraft"
-                        :disabled="aiLoading || draftSaving || !input.trim()"
-                    >
-                        {{ draftSaving ? "저장 중..." : "임시 저장" }}
-                    </button>
-                    <button
-                        type="button"
-                        class="btn btn-primary today-send"
-                        @click="sendReport"
-                        :disabled="aiLoading"
-                    >
-                        {{ aiLoading ? "정리하는 중" : "AI로 정리하기" }}
-                    </button>
-                </div>
-            </template>
-
-            </template>
+            </section>
 
             <router-link class="today-other" :to="{ path: '/compose', query: { kind: 'meeting' } }">
                 회의록이나 영업보고 쓰기
             </router-link>
-        </div>
+        </template>
     </div>
     <Teleport to="body">
         <div v-if="aiLoading" class="submit-wait" role="status" aria-live="polite">

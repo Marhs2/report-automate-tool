@@ -1,279 +1,457 @@
-.settings-pane {
+/* 관리 > 사용자: 보드 하나에 사람 한 줄씩, 초성 묶음은 보드 안의 옅은 띠. 넓은 화면에서는 오른쪽 기둥에 새 사용자 · 내 비밀번호 보드.
+   로그인 중인 줄만 청록 면(여기). 부서 미지정은 경고 색, 비밀번호 없음은 로그인을 막으므로 위험 색. */
+
+.users-admin {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
     min-width: 0;
 }
 
-.user-toolbar {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
+.board {
+    padding: 0;
+    overflow: clip;
+}
+
+.board-bar {
     position: sticky;
     top: 0;
     z-index: 2;
-    background: var(--bg);
-    padding: var(--space-2) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
 }
 
-.user-toolbar .input {
+.board-bar .input {
     flex: 1;
     min-width: 0;
 }
 
-.user-count {
+.board-count {
     flex-shrink: 0;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
-.team-filters,
-.letter-jump {
+.board-title {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.board-state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-5);
+}
+
+.board-state p {
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.board-state.is-error p {
+    color: var(--danger-fg);
+}
+
+.board-tools {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    border-bottom: 1px solid var(--border);
+}
+
+.filters {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-    margin-bottom: var(--space-3);
 }
 
-.team-chip,
-.letter-chip {
-    flex-shrink: 0;
-    min-height: var(--control-h);
+.filter {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--control-h-sm);
     padding: 0 var(--space-3);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
+    font: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease);
+}
+
+.filter:hover {
+    background: var(--surface-soft);
+}
+
+.filter:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.filter.is-on {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-weight: var(--fw-semibold);
+}
+
+.filter-count {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.filter.is-on .filter-count {
+    color: var(--accent-text);
+}
+
+.letter-jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.letter {
+    min-width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
     font: inherit;
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     cursor: pointer;
 }
 
-.team-chip.is-on,
-.letter-chip.is-on {
-    background: var(--accent-soft);
-    border-color: var(--accent);
-    color: var(--accent-text);
+.letter:hover {
+    background: var(--surface-soft);
+    color: var(--text-strong);
 }
 
-.team-chip:focus-visible,
-.letter-chip:focus-visible {
+.letter:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
 }
 
-.team-gap {
-    margin: 0 0 var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--warning-border);
-    border-radius: var(--radius);
-    background: var(--warning-bg);
-    color: var(--warning-fg);
-    font-size: var(--fs-13);
-    word-break: keep-all;
-}
-
-.team-gap-copy {
-    margin: 0;
-}
-
-.user-groups {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    margin-bottom: var(--space-5);
+.user-group {
+    scroll-margin-top: 4.5rem;
 }
 
 .letter-head {
-    margin: 0 0 var(--space-2);
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: 0;
+    padding: var(--space-1) var(--space-5);
+    border-top: 1px solid var(--border);
+    background: var(--surface-soft);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+}
+
+.user-group:first-child .letter-head {
+    border-top: 0;
 }
 
 .letter-head span {
     font-weight: var(--fw-medium);
     color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
 .user-rows {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
 .user-row {
     display: grid;
-    grid-template-columns: var(--control-h) minmax(0, 1.2fr) minmax(10rem, 13.75rem) minmax(10rem, 15rem);
+    grid-template-columns: var(--control-h-sm) minmax(0, 1fr) minmax(9rem, 12rem);
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--border);
+    gap: var(--space-2) var(--space-3);
+    min-height: var(--row-min-h);
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--border);
 }
 
-.user-row:last-child {
-    border-bottom: none;
+.user-row:first-child {
+    border-top: 0;
 }
 
-.user-row.selected {
+.user-row.is-me {
     background: var(--accent-soft);
 }
 
-.user-row-name {
+.user-row.is-me .user-avatar {
+    background: var(--surface);
+}
+
+.user-who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
     min-width: 0;
+}
+
+.user-name {
+    min-width: 0;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    overflow-wrap: anywhere;
+}
+
+.user-now {
+    font-size: var(--fs-12);
+    font-weight: var(--fw-bold);
+    color: var(--accent-text);
+    white-space: nowrap;
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    height: var(--chip-h-sm);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-tag);
+    background: var(--surface-press);
+    color: var(--text-strong);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    white-space: nowrap;
+}
+
+.tag.is-warning {
+    background: var(--warning-bg);
+    color: var(--warning-fg);
+}
+
+.tag.is-danger {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+}
+
+.user-team .input {
+    width: 100%;
+}
+
+.user-temp {
+    display: flex;
+    grid-column: 2 / -1;
+    align-items: center;
+    gap: var(--space-2);
+    max-width: 24rem;
+}
+
+.user-temp .input {
+    flex: 1;
+    min-width: 0;
+}
+
+.side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    min-width: 0;
+}
+
+.side-board {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.side-board .btn {
+    align-self: flex-start;
+}
+
+/* 전역 .card>.field+.field 여백이 flex 간격에 더해져 칸 사이가 벌어지지 않게 한다. */
+.side-board > .field + .field {
+    margin-top: 0;
+}
+
+.side-head {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: var(--space-2);
-    font-size: var(--fs-14);
-    font-weight: var(--fw-medium);
-    color: var(--text-strong);
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
 }
 
-.user-row-name em {
-    font-style: normal;
-    font-size: var(--fs-11);
-    font-weight: var(--fw-semibold);
+.side-meta {
+    font-size: var(--fs-13);
     color: var(--text-muted);
+    overflow-wrap: anywhere;
 }
 
-.user-row-team .input {
-    width: 100%;
-    min-width: 0;
-}
-
-.user-row-now {
-    justify-self: start;
-}
-
-.user-row-name .state-chip {
-    height: 1.25rem;
-    padding: 0 var(--space-2);
-    font-size: var(--fs-11);
-}
-
-.user-row-temp {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+.skeleton-row {
+    display: flex;
     align-items: center;
-    gap: var(--space-2);
-    min-width: 0;
+    gap: var(--space-3);
+    min-height: var(--row-min-h);
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--border);
 }
 
-.user-row-temp .input {
-    width: 100%;
-    min-width: 0;
+.skeleton-row:first-child {
+    border-top: 0;
+}
+
+.skeleton {
+    display: block;
+    height: 0.75rem;
+    border-radius: var(--radius-xs);
+    background: var(--surface-soft);
+}
+
+.skeleton.is-avatar {
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    border-radius: var(--radius-pill);
+}
+
+.skeleton.is-name {
+    width: 7rem;
+}
+
+.skeleton.is-select {
+    width: 11rem;
+    height: var(--control-h);
+    margin-left: auto;
+    border-radius: var(--radius-sm);
 }
 
 .sr-only {
     position: absolute;
     width: 1px;
     height: 1px;
-    padding: 0;
     margin: -1px;
+    padding: 0;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
 }
 
-.account-form + .account-form {
-    margin-top: var(--space-4);
+@media (min-width: 1101px) {
+    .users-admin {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 20rem;
+        align-items: start;
+        gap: var(--space-6);
+    }
+
+    .side {
+        position: sticky;
+        top: var(--space-6);
+    }
+
+    .side-board .btn {
+        align-self: stretch;
+    }
 }
 
-.account-form-head h2 {
-    margin: 0;
-    font-size: var(--fs-16);
-    color: var(--text-strong);
-}
-
-.account-form-head p,
-.account-form-note {
-    margin: var(--space-1) 0 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-    word-break: keep-all;
-}
-
-.account-form-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-    gap: var(--space-3);
-    align-items: end;
-    margin-top: var(--space-4);
-}
-
-.account-form-grid :deep(.input) {
-    width: 100%;
-    min-width: 0;
-}
-
-.account-form-note {
-    margin-top: var(--space-2);
+@media (min-width: 861px) and (max-width: 1100px) {
+    .side {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+    }
 }
 
 @media (max-width: 860px) {
-    .user-toolbar {
-        top: var(--topbar-height);
+    /* 문서가 스크롤되므로 검색 줄은 위쪽 앱 바 바로 아래에 붙는다. */
+    .board-bar {
+        top: calc(var(--control-h-lg) + env(safe-area-inset-top, 0px));
+        padding: var(--space-3) var(--space-4);
     }
 
-    /* 부서 칩은 몇 개뿐이라 줄을 바꾼다. 옆으로 밀면 스크롤바가 없어 끝 칩이 잘린 것처럼 보였다. */
+    .board-tools,
+    .board-state {
+        padding: var(--space-3) var(--space-4);
+    }
+
+    .filter,
+    .letter {
+        min-height: var(--control-h-lg);
+        font-size: var(--fs-14);
+    }
+
+    .letter {
+        min-width: var(--control-h-lg);
+    }
+
+    /* 부서 칩은 몇 개뿐이라 줄을 바꾼다. 초성은 많아서 옆으로 민다. */
     .letter-jump {
         flex-wrap: nowrap;
+        margin: 0 calc(var(--space-4) * -1);
+        padding: 0 var(--space-4);
         overflow-x: auto;
         overscroll-behavior-x: contain;
         scrollbar-width: none;
-        margin-right: calc(var(--space-1) * -1);
-        padding-bottom: var(--space-1);
     }
 
     .letter-jump::-webkit-scrollbar {
         display: none;
     }
 
-    .team-chip,
-    .letter-chip {
-        min-height: var(--control-h-lg);
-        font-size: var(--fs-14);
+    .letter-head {
+        padding: var(--space-1) var(--space-4);
+    }
+
+    .user-group {
+        scroll-margin-top: calc(var(--control-h-lg) * 2 + var(--space-7));
     }
 
     .user-row {
-        grid-template-columns: var(--control-h) minmax(0, 1fr);
-        align-items: center;
-        gap: var(--space-2) var(--space-3);
-        padding: var(--space-3);
+        grid-template-columns: var(--control-h-sm) minmax(0, 1fr);
+        padding: var(--space-3) var(--space-4);
     }
 
-    .user-row-team,
-    .user-row-temp,
-    .user-row-now {
-        grid-column: 1 / -1;
+    .user-team {
+        grid-column: 2 / -1;
     }
 
-    .user-row-team .input,
-    .user-row-temp .input {
-        height: var(--control-h-lg);
-        font-size: var(--fs-16);
+    .user-temp {
+        max-width: none;
     }
 
-    .user-row-temp .btn {
-        min-height: var(--control-h-lg);
+    .side-board .btn {
+        align-self: stretch;
     }
 
-    .account-form-grid {
-        grid-template-columns: 1fr;
+    .skeleton-row {
+        padding: var(--space-3) var(--space-4);
     }
 
-    .account-form-grid :deep(.input) {
-        height: var(--control-h-lg);
-        font-size: var(--fs-16);
-    }
-
-    .account-form-submit {
-        width: 100%;
-        min-height: var(--control-h-lg);
+    .skeleton.is-select {
+        width: 35%;
     }
 }

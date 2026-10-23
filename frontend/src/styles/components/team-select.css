@@ -1,36 +1,197 @@
-.settings-pane {
+/* 내 부서: 보드 하나에 부서가 한 줄씩. 줄 하나가 라디오 하나이고, 고른 줄만 청록(여기)으로 칠한다. */
+
+.team-pick {
     min-width: 0;
 }
 
-/* 카드 그리드(.select-grid/.select-card)는 components.css 전역 규칙을 쓴다. */
-.team-toolbar {
+.board {
+    padding: 0;
+    overflow: clip;
+}
+
+.board-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-4);
+    min-height: calc(var(--control-h) + var(--space-6));
+    padding: var(--space-3) var(--space-5);
+    border-bottom: 1px solid var(--border);
+}
+
+.board-title {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.board-search {
+    width: min(16rem, 100%);
+}
+
+.board-state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-5);
+}
+
+.board-state p {
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+}
+
+.board-state.is-error p {
+    color: var(--danger-fg);
+}
+
+.team-option {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    margin-bottom: var(--space-3);
+    width: 100%;
+    min-height: var(--row-min-h);
+    padding: var(--space-3) var(--space-5);
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
 }
 
-.team-toolbar .input {
-    flex: 1;
+.team-option:first-child {
+    border-top: 0;
+}
+
+.team-option:hover {
+    background: var(--surface-soft);
+}
+
+.team-option:focus-visible {
+    outline: none;
+    box-shadow: inset var(--focus-ring);
+}
+
+.team-option.is-mine {
+    background: var(--accent-soft);
+}
+
+.team-radio {
+    flex-shrink: 0;
+    width: 1.125rem;
+    height: 1.125rem;
+    border: 2px solid var(--border-input);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+}
+
+.team-option.is-mine .team-radio {
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: inset 0 0 0 3px var(--surface);
+}
+
+.team-name {
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.team-mine {
+    flex-shrink: 0;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--accent-text);
+    white-space: nowrap;
 }
 
 .team-count {
     flex-shrink: 0;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
+    margin-left: auto;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
-.team-on {
-    color: var(--accent-text);
-    font-weight: var(--fw-semibold);
+.skeleton-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--row-min-h);
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--border);
 }
 
-.team-note {
-    margin: var(--space-3) 0 var(--space-5);
-    font-size: var(--fs-12);
-    color: var(--text);
-    word-break: keep-all;
+.skeleton-row:first-child {
+    border-top: 0;
 }
 
+.skeleton {
+    display: block;
+    height: 0.75rem;
+    border-radius: var(--radius-xs);
+    background: var(--surface-soft);
+}
+
+.skeleton.is-radio {
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: var(--radius-pill);
+}
+
+.skeleton.is-name {
+    width: 7rem;
+}
+
+.skeleton.is-count {
+    width: 2.5rem;
+    margin-left: auto;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (max-width: 860px) {
+    .board-head {
+        padding: var(--space-3) var(--space-4);
+    }
+
+    .board-search {
+        width: 100%;
+    }
+
+    .board-state {
+        padding: var(--space-4);
+    }
+
+    .team-option,
+    .skeleton-row {
+        min-height: calc(var(--control-h-lg) + var(--space-3));
+        padding: var(--space-3) var(--space-4);
+    }
+}

@@ -1,6 +1,8 @@
+/* 프로젝트 흐름: 날마다 보드 하나, 옆에 이슈 보드. 보드 사이 공백 표시는 바탕(--bg) 위에 놓인다. */
+
 .filters {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(10.5rem, auto);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
 }
@@ -8,10 +10,9 @@
 .filter-select {
   width: 100%;
   min-width: 0;
-  height: var(--control-h);
 }
 
-.view-chips {
+.view-seg {
   display: flex;
   height: var(--control-h);
 }
@@ -22,227 +23,227 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+  min-height: var(--control-h-sm);
+  margin-top: calc(-1 * var(--space-3));
 }
 
-.flow-meta p {
+.flow-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   margin: 0;
-  font-size: var(--fs-13);
-  color: var(--text);
 }
 
-.text-toggle {
-  min-height: var(--control-h-lg);
+.future-toggle {
+  margin-left: auto;
+}
+
+/* ---- Board pieces shared by day and issue boards ----------------- */
+
+.day-board,
+.issue-board {
   padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
+  overflow: hidden;
+}
+
+.board-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 3.25rem;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.board-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-16);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.day-week {
   font-size: var(--fs-13);
-  font-weight: var(--fw-semibold);
-  color: var(--accent-text);
-  cursor: pointer;
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
 }
 
-.open-issues {
-  margin-bottom: var(--space-6);
-  padding: var(--space-4);
-}
-
-.open-issues h2 {
-  margin: 0 0 var(--space-3);
+.board-meta {
+  flex-shrink: 0;
   font-size: var(--fs-13);
-  font-weight: var(--fw-semibold);
-  color: var(--text);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.issue-group + .issue-group {
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
+.board-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+}
+
+.board-state p {
+  margin: 0;
+  font-size: var(--fs-14);
+  line-height: var(--lh-base);
+  color: var(--text-muted);
+  word-break: keep-all;
+}
+
+.board-state.is-error p {
+  color: var(--danger-fg);
+}
+
+/* 보드 모양의 빈 줄. MOTION 1: 움직이지 않는다. */
+.skeleton-bar {
+  display: block;
+  height: 0.75rem;
+  border-radius: var(--radius-xs);
+  background: var(--surface-soft);
+}
+
+.skeleton-bar.is-title {
+  width: 6rem;
+  align-self: center;
+}
+
+.skeleton-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+}
+
+.skeleton-line + .skeleton-line {
   border-top: 1px solid var(--border);
 }
 
-.issue-group h3 {
-  margin: 0 0 var(--space-2);
-  font-size: var(--fs-12);
-  font-weight: var(--fw-semibold);
-  color: var(--text);
+.skeleton-bar.is-tag {
+  width: 2.25rem;
+  height: var(--chip-h-sm);
+}
+
+.skeleton-bar.is-text {
+  width: 60%;
+}
+
+/* ---- Two columns when the issue board has room beside the flow --- */
+
+.timeline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+@media (min-width: 1101px) {
+  .timeline.has-issues {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+  }
+
+  .timeline.has-issues .issue-board {
+    position: sticky;
+    top: var(--space-4);
+    grid-column: 2;
+    grid-row: 1;
+    max-height: calc(100dvh - var(--topbar-height) - var(--space-7));
+    overflow-y: auto;
+  }
+
+  .timeline.has-issues .flow {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
+
+/* ---- Issue board ------------------------------------------------- */
+
+.issue-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 묶음 머리는 보드 안의 쟁반(--surface-soft). 상태는 색과 말을 같이 쓴다. */
+.issue-group-head {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-h);
+  margin: 0;
+  padding: var(--space-1) var(--space-5);
+  background: var(--surface-soft);
 }
 
 .issue-row {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: var(--space-1);
   width: 100%;
   margin: 0;
-  padding: var(--space-2) 0;
+  padding: var(--space-3) var(--space-5);
   border: 0;
   border-top: 1px solid var(--border);
   background: transparent;
+  font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur) var(--ease);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.issue-group-head + .issue-row {
+  border-top: 0;
 }
 
 .issue-row:hover {
   background: var(--surface-soft);
 }
 
-.issue-group .issue-row:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.issue-row:hover .issue-text {
-  color: var(--text-strong);
-}
-
-.issue-row.is-open {
-  box-shadow: inset var(--space-1) 0 0 var(--danger-fg);
-  padding-left: var(--space-3);
-}
-
-.issue-row.is-done {
-  box-shadow: inset var(--space-1) 0 0 var(--success-fg);
-  padding-left: var(--space-3);
-}
-
-.issue-row.is-quiet {
-  box-shadow: inset var(--space-1) 0 0 var(--border-strong);
-  padding-left: var(--space-3);
-}
-
-.issue-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+.issue-row:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
 }
 
 .issue-text {
   font-size: var(--fs-14);
+  line-height: var(--lh-base);
   color: var(--text-strong);
   word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .issue-meta {
-  font-size: var(--fs-12);
-  color: var(--text);
-}
-
-.flow {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-/* Notion page section: a hairline above each day, no box around it. */
-.day {
-  border: 0;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
-  padding: var(--space-4) 0;
-  background: transparent;
-}
-
-.flow > .day:first-child {
-  border-top: 0;
-}
-
-.day-head {
-  margin-bottom: var(--space-3);
-}
-
-.day-entry {
-  position: relative;
-  display: block;
-  width: 100%;
-  margin: 0;
-  padding: 0 var(--space-6) 0 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
-}
-
-.entry-go {
-  position: absolute;
-  top: var(--space-2);
-  right: 0;
+  font-size: var(--fs-13);
+  line-height: var(--lh-tight);
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.day-entry + .day-entry {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-}
-
-.day-entry:hover .v {
-  color: var(--text-strong);
-}
-
-.day-entry:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.entry-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.avatar {
-  width: var(--control-h-sm);
-  height: var(--control-h-sm);
-  border-radius: var(--radius-pill);
-  background: var(--surface-soft);
-  color: var(--text-strong);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: var(--fw-bold);
-  font-size: var(--fs-12);
-  flex-shrink: 0;
-}
-
-.entry-name {
-  margin: 0;
-  font-size: var(--fs-14);
-}
-
-.flow-line {
-  display: grid;
-  grid-template-columns: var(--control-h-lg) 1fr;
-  gap: var(--space-2);
-  align-items: start;
-  padding: var(--space-1) 0;
-}
-
-.k {
-  justify-self: start;
-  margin-top: 1px;
-}
-
-.v {
-  margin: 0;
-  font-size: var(--fs-14);
-  color: var(--text-strong);
-  line-height: var(--lh-base);
-  word-break: keep-all;
-}
+/* ---- Day boards -------------------------------------------------- */
 
 .gap {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin: var(--space-2) 0;
-  color: var(--text);
-  font-size: var(--fs-12);
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .gap::before,
@@ -253,37 +254,131 @@
   background: var(--border);
 }
 
+.entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  width: 100%;
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.board-head + .entry {
+  border-top: 0;
+}
+
+.entry:hover {
+  background: var(--surface-soft);
+}
+
+.entry:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
+.entry-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.entry-name {
+  overflow: hidden;
+  font-size: var(--fs-14);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  color: var(--text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-go {
+  flex-shrink: 0;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--text-muted);
+}
+
+.entry-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  grid-column: 1;
+  min-width: 0;
+}
+
+.entry-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+}
+
+.entry-line .cat-tag {
+  margin-top: 0.125rem;
+}
+
+.entry-text {
+  font-size: var(--fs-14);
+  line-height: var(--lh-base);
+  color: var(--text);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.entry:hover .entry-text {
+  color: var(--text-strong);
+}
+
+/* ---- Mobile ------------------------------------------------------ */
+
 @media (max-width: 860px) {
   .filters {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .view-chips {
+  .filter-select {
+    height: var(--control-h-lg);
+  }
+
+  .view-seg {
     width: 100%;
     height: auto;
   }
 
-  .filter-select {
+  .flow-meta {
+    margin-top: calc(-1 * var(--space-2));
+  }
+
+  .future-toggle {
     height: var(--control-h-lg);
-    font-size: var(--fs-16);
   }
 
-
-  .flow-line {
-    grid-template-columns: var(--control-h) 1fr;
-  }
-
-  .day {
-    padding: var(--space-4) 0;
+  .board-head,
+  .issue-group-head,
+  .issue-row,
+  .entry,
+  .skeleton-line,
+  .board-state {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
   }
 
   .issue-row {
-    min-height: calc(var(--control-h) + var(--space-4));
-    align-items: flex-start;
+    min-height: var(--control-h-lg);
   }
 
-  .issue-text,
-  .flow-line span {
-    overflow-wrap: anywhere;
+  .entry {
+    padding-right: var(--space-3);
   }
 }

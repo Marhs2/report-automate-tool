@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, nextTick } from "vue";
-import { Trash2, Check, Sparkles, Plus, X, ChevronDown } from "lucide-vue-next";
+import { Trash2, X, ChevronDown } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
 
@@ -98,7 +98,6 @@ const fetchProjectNames = async () => {
     } catch (error) {
         console.error("프로젝트 명 조회 실패:", error);
         projectNames.value = [];
-        // 조용히 비우면 "0개 등록"으로 보여서 설정이 비어 있는 줄 안다.
         loadError.value =
             "프로젝트 명을 불러오지 못했습니다. 백엔드가 켜져 있는지 확인해주세요.";
     } finally {
@@ -291,32 +290,40 @@ const applyNewProject = async (item) => {
     }
 };
 
+const suggestionLabel = (item, doneLabel, busyLabel, idleLabel) => {
+    if (appliedNames.value.has(item.projectName)) return doneLabel;
+    if (applyingName.value === item.projectName) return busyLabel;
+    return idleLabel;
+};
+
+const suggestionLocked = (item) =>
+    applyingName.value === item.projectName || appliedNames.value.has(item.projectName);
+
 onMounted(() => {
     fetchProjectNames();
 });
 </script>
 
 <template>
-    <div :class="embedded ? 'settings-pane' : 'page'">
-        <section class="list-section">
-            <div class="section-head">
-                <div class="section-title">
-                    <h2>등록된 프로젝트</h2>
-                </div>
+    <div :class="embedded ? 'projects-pane' : 'page'">
+        <section class="card board" aria-labelledby="project-board-title">
+            <header class="board-head">
+                <h2 id="project-board-title" class="board-title">등록된 프로젝트</h2>
                 <button
                     type="button"
-                    class="btn btn-primary btn-small"
+                    class="btn btn-small"
+                    :aria-expanded="showAdd"
+                    aria-controls="project-add-form"
                     @click="toggleAdd"
                 >
-                    <Plus v-if="!showAdd" :size="14" />
-                    <X v-else :size="14" />
-                    {{ showAdd ? "취소" : "프로젝트" }}
+                    {{ showAdd ? "취소" : "프로젝트 추가" }}
                 </button>
-            </div>
+            </header>
 
             <form
                 v-if="showAdd"
-                class="card add-form"
+                id="project-add-form"
+                class="add-form"
                 @submit.prevent="addProjectName"
             >
                 <div class="field">
@@ -324,8 +331,8 @@ onMounted(() => {
                     <input
                         id="name-input"
                         ref="nameInput"
-                        type="text"
                         v-model="newName"
+                        type="text"
                         class="input"
                         placeholder="예: 일일보고 취합"
                     />
@@ -334,26 +341,23 @@ onMounted(() => {
                     <label for="keywords-input">키워드</label>
                     <input
                         id="keywords-input"
-                        type="text"
                         v-model="newKeywords"
+                        type="text"
                         class="input"
                         placeholder="쉼표로 구분"
                     />
                 </div>
-                <button class="btn btn-primary add-btn" type="submit">
-                    <Plus :size="14" />
-                    등록
-                </button>
+                <button class="btn btn-primary add-submit" type="submit">등록</button>
             </form>
 
-            <p v-if="loadError" class="error-text" role="alert">{{ loadError }}</p>
-
-            <!-- 설정과 실제 보고가 따로 놀지 않게, 보고서에만 있는 이름을 바로 등록한다. -->
-            <div v-if="unregisteredNames.length" class="unregistered">
-                <p class="unregistered-copy">
-                    보고서에는 있는데 등록되지 않은 프로젝트 {{ unregisteredNames.length }}개
+            <!-- 설정과 실제 보고가 따로 놀지 않게, 보고서에만 있는 이름을 바로 등록한다.
+                 등록 목록을 못 불러왔으면 모든 이름이 미등록처럼 보여 중복 등록을 부르므로 숨긴다. -->
+            <div v-if="unregisteredNames.length && !loadError" class="unregistered">
+                <p class="unregistered-title">
+                    보고서에는 있는데 등록되지 않은 프로젝트
+                    <strong>{{ unregisteredNames.length }}개</strong>
                 </p>
-                <div class="unregistered-chips">
+                <div class="unregistered-actions">
                     <button
                         v-for="name in unregisteredNames"
                         :key="name"
@@ -362,13 +366,12 @@ onMounted(() => {
                         :disabled="registeringName === name"
                         @click="registerUsedName(name)"
                     >
-                        <Plus :size="13" />
-                        {{ name }}
+                        {{ name }} 등록
                     </button>
                     <button
                         v-if="unregisteredNames.length > 1"
                         type="button"
-                        class="btn btn-primary btn-small"
+                        class="btn btn-small"
                         :disabled="Boolean(registeringName)"
                         @click="registerAllUsedNames"
                     >
@@ -377,256 +380,206 @@ onMounted(() => {
                 </div>
             </div>
 
-            <div v-if="isLoading" class="empty-state">불러오는 중...</div>
-            <div
-                v-else-if="projectNames.length === 0 && !showAdd"
-                class="empty-state"
-            >
-                등록된 프로젝트 명이 없습니다
+            <div v-if="isLoading" aria-busy="true">
+                <div v-for="n in 5" :key="n" class="skeleton-row" aria-hidden="true">
+                    <span class="skeleton is-name"></span>
+                    <span class="skeleton is-chip"></span>
+                    <span class="skeleton is-chip"></span>
+                </div>
+                <span class="sr-only">프로젝트 명을 불러오는 중</span>
             </div>
-            <div v-else-if="projectNames.length" class="project-list">
-                <article
+            <div v-else-if="loadError" class="board-state is-error" role="alert">
+                <p>{{ loadError }}</p>
+                <button type="button" class="btn btn-small" @click="fetchProjectNames">다시 시도</button>
+            </div>
+            <p v-else-if="projectNames.length === 0 && !showAdd" class="board-state">
+                등록된 프로젝트 명이 없습니다
+            </p>
+            <ul v-else-if="projectNames.length" class="project-rows">
+                <li
                     v-for="item in projectNames"
                     :key="item.name"
                     class="project-row"
-                    :class="{ editing: editingName === item.name }"
+                    :class="{ 'is-editing': editingName === item.name }"
                 >
-                    <div class="project-row-head" @click="toggleRow(item)">
-                        <h3 class="project-name">{{ item.name }}</h3>
-                        <div
-                            v-if="editingName !== item.name"
-                            class="keyword-chips"
+                    <div class="project-head">
+                        <button
+                            type="button"
+                            class="project-open"
+                            :aria-expanded="editingName === item.name"
+                            @click="toggleRow(item)"
                         >
-                            <span
-                                v-for="keyword in previewKeywords(item.keywords)"
-                                :key="keyword"
-                                class="chip chip-muted"
-                            >
-                                {{ keyword }}
+                            <span class="project-name">{{ item.name }}</span>
+                            <span v-if="editingName !== item.name" class="keyword-chips">
+                                <span
+                                    v-for="keyword in previewKeywords(item.keywords)"
+                                    :key="keyword"
+                                    class="chip"
+                                >
+                                    {{ keyword }}
+                                </span>
+                                <span v-if="extraKeywordCount(item.keywords)" class="chip is-muted">
+                                    +{{ extraKeywordCount(item.keywords) }}
+                                </span>
+                                <span v-if="!keywordList(item.keywords).length" class="keyword-none">
+                                    키워드 없음
+                                </span>
                             </span>
-                            <span
-                                v-if="extraKeywordCount(item.keywords)"
-                                class="chip chip-more"
-                            >
-                                +{{ extraKeywordCount(item.keywords) }}
-                            </span>
-                            <span
-                                v-if="!keywordList(item.keywords).length"
-                                class="chip-empty"
-                            >
-                                키워드 없음
-                            </span>
-                        </div>
-                        <div class="card-actions">
-                            <button
-                                type="button"
-                                class="btn btn-icon danger"
-                                title="삭제"
-                                @click.stop="removeProjectName(item.name)"
-                            >
-                                <Trash2 :size="14" />
-                            </button>
-                        </div>
+                        </button>
+                        <button
+                            type="button"
+                            class="icon-btn project-delete"
+                            title="삭제"
+                            :aria-label="`${item.name} 삭제`"
+                            @click.stop="removeProjectName(item.name)"
+                        >
+                            <Trash2 :size="16" />
+                        </button>
                     </div>
 
-                    <div
-                        v-if="editingName === item.name"
-                        class="project-row-edit"
-                        @click.stop
-                    >
+                    <div v-if="editingName === item.name" class="project-edit" @click.stop>
                         <div class="keyword-chips">
-                            <span
-                                v-for="keyword in editingChips"
-                                :key="keyword"
-                                class="chip chip-edit"
-                            >
+                            <span v-for="keyword in editingChips" :key="keyword" class="chip keyword-token">
                                 {{ keyword }}
                                 <button
                                     type="button"
-                                    class="chip-remove"
+                                    class="token-remove"
                                     :aria-label="`${keyword} 삭제`"
                                     @click="removeEditingChip(keyword)"
                                 >
-                                    <X :size="11" />
+                                    <X :size="14" />
                                 </button>
                             </span>
-                            <span v-if="!editingChips.length" class="chip-empty">
-                                키워드 없음
-                            </span>
+                            <span v-if="!editingChips.length" class="keyword-none">키워드 없음</span>
                         </div>
-                        <div style="display: flex; gap: 5px; align-items: center;">
+                        <div class="project-edit-bar">
                             <input
-                                type="text"
                                 v-model="chipDraft"
-                                class="input chip-input"
+                                type="text"
+                                class="input token-input"
                                 placeholder="키워드 추가 후 Enter"
+                                :aria-label="`${item.name} 키워드 추가`"
                                 @keydown.enter.prevent="addEditingChip"
                             />
                             <div class="edit-actions">
                                 <button
+                                    type="button"
                                     class="btn btn-primary btn-small"
                                     :disabled="savingName === item.name"
                                     @click="saveKeywords(item)"
                                 >
-                                    <Check :size="14" />
                                     {{ savingName === item.name ? "저장 중..." : "저장" }}
                                 </button>
-                                <button class="btn btn-small" @click="cancelEdit">
-                                    <X :size="14" />
-                                    취소
-                                </button>
+                                <button type="button" class="btn btn-small" @click="cancelEdit">취소</button>
                             </div>
-
                         </div>
                     </div>
-                </article>
-            </div>
+                </li>
+            </ul>
         </section>
 
-        <section class="card recommend-card">
-            <button
-                type="button"
-                class="recommend-toggle"
-                :aria-expanded="recommendOpen"
-                @click="recommendOpen = !recommendOpen"
-            >
-                <span class="recommend-toggle-copy">
-                    키워드 추출
-                </span>
-                <ChevronDown
-                    :size="16"
-                    class="recommend-chevron"
-                    :class="{ open: recommendOpen }"
-                />
-            </button>
+        <section class="card board recommend">
+            <h2 class="recommend-heading">
+                <button
+                    type="button"
+                    class="recommend-toggle"
+                    :aria-expanded="recommendOpen"
+                    aria-controls="recommend-body"
+                    @click="recommendOpen = !recommendOpen"
+                >
+                    <span>키워드 추출</span>
+                    <ChevronDown :size="18" class="recommend-chevron" :class="{ 'is-open': recommendOpen }" />
+                </button>
+            </h2>
 
-            <div v-if="recommendOpen" class="recommend-body">
-                <div class="recommend-grid">
-                    <div class="field">
-                        <label for="source-text">원문</label>
-                        <textarea
-                            id="source-text"
-                            v-model="sourceText"
-                            class="textarea"
-                            rows="5"
-                            placeholder="보고서 원문을 붙여넣으세요"
-                        ></textarea>
-                    </div>
-                    <div class="recommend-side">
-                        <p v-if="recommendError" class="error-text">
-                            {{ recommendError }}
-                        </p>
-                        <button
-                            class="btn btn-primary"
-                            :disabled="isRecommending"
-                            @click="requestRecommendation"
-                        >
-                            <Sparkles :size="14" />
-                            {{ isRecommending ? "분석 중..." : "추천 받기" }}
-                        </button>
-                    </div>
+            <div v-if="recommendOpen" id="recommend-body" class="recommend-body">
+                <div class="field">
+                    <label for="source-text">원문</label>
+                    <textarea
+                        id="source-text"
+                        v-model="sourceText"
+                        class="textarea"
+                        rows="5"
+                        placeholder="보고서 원문을 붙여넣으세요"
+                    ></textarea>
+                </div>
+                <div class="recommend-actions">
+                    <p v-if="recommendError" class="recommend-error" role="alert">
+                        {{ recommendError }}
+                    </p>
+                    <button
+                        type="button"
+                        class="btn"
+                        :disabled="isRecommending"
+                        @click="requestRecommendation"
+                    >
+                        {{ isRecommending ? "분석 중..." : "추천 받기" }}
+                    </button>
                 </div>
 
-                <div
-                    v-if="recommendation && !hasRecommendation"
-                    class="empty-suggest"
-                >
-                    원문에서 근거를 찾지 못했습니다. 프로젝트명이 드러나는 문장을
-                    포함해보세요.
-                </div>
+                <p v-if="recommendation && !hasRecommendation" class="suggest-empty">
+                    원문에서 근거를 찾지 못했습니다. 프로젝트명이 드러나는 문장을 포함해보세요.
+                </p>
 
-                <div
-                    v-if="recommendation?.keywordAdditions?.length"
-                    class="suggest-block"
-                >
+                <div v-if="recommendation?.keywordAdditions?.length" class="suggest-group">
                     <h3 class="suggest-title">기존 프로젝트에 키워드 추가</h3>
-                    <div class="suggest-grid">
-                        <article
+                    <ul class="suggest-rows">
+                        <li
                             v-for="item in recommendation.keywordAdditions"
                             :key="item.projectName"
-                            class="suggest-card"
+                            class="suggest-row"
                         >
-                            <div class="suggest-card-head">
-                                <h4>{{ item.projectName }}</h4>
+                            <div class="suggest-head">
+                                <span class="suggest-name">{{ item.projectName }}</span>
                                 <button
-                                    class="btn btn-primary btn-small"
-                                    :disabled="
-                                        applyingName === item.projectName ||
-                                        appliedNames.has(item.projectName)
-                                    "
+                                    type="button"
+                                    class="btn btn-small"
+                                    :disabled="suggestionLocked(item)"
                                     @click="applyKeywordAddition(item)"
                                 >
-                                    {{
-                                        appliedNames.has(item.projectName)
-                                            ? "반영됨"
-                                            : applyingName === item.projectName
-                                              ? "반영 중..."
-                                              : "반영"
-                                    }}
+                                    {{ suggestionLabel(item, "반영됨", "반영 중...", "반영") }}
                                 </button>
                             </div>
                             <div class="keyword-chips">
-                                <span
-                                    v-for="keyword in item.suggestedKeywords"
-                                    :key="keyword"
-                                    class="chip is-accent"
-                                >
+                                <span v-for="keyword in item.suggestedKeywords" :key="keyword" class="chip">
                                     {{ keyword }}
                                 </span>
                             </div>
                             <p class="suggest-reason">{{ item.reason }}</p>
-                        </article>
-                    </div>
+                        </li>
+                    </ul>
                 </div>
 
-                <div
-                    v-if="recommendation?.newProjects?.length"
-                    class="suggest-block"
-                >
+                <div v-if="recommendation?.newProjects?.length" class="suggest-group">
                     <h3 class="suggest-title">신규 프로젝트 후보</h3>
-                    <div class="suggest-grid">
-                        <article
+                    <ul class="suggest-rows">
+                        <li
                             v-for="item in recommendation.newProjects"
                             :key="item.projectName"
-                            class="suggest-card is-new"
+                            class="suggest-row"
                         >
-                            <div class="suggest-card-head">
-                                <h4>{{ item.projectName }}</h4>
+                            <div class="suggest-head">
+                                <span class="suggest-name">{{ item.projectName }}</span>
                                 <button
-                                    class="btn btn-primary btn-small"
-                                    :disabled="
-                                        applyingName === item.projectName ||
-                                        appliedNames.has(item.projectName)
-                                    "
+                                    type="button"
+                                    class="btn btn-small"
+                                    :disabled="suggestionLocked(item)"
                                     @click="applyNewProject(item)"
                                 >
-                                    {{
-                                        appliedNames.has(item.projectName)
-                                            ? "등록됨"
-                                            : applyingName === item.projectName
-                                              ? "등록 중..."
-                                              : "등록"
-                                    }}
+                                    {{ suggestionLabel(item, "등록됨", "등록 중...", "등록") }}
                                 </button>
                             </div>
                             <div class="keyword-chips">
-                                <span
-                                    v-for="keyword in item.suggestedKeywords"
-                                    :key="keyword"
-                                    class="chip chip-new"
-                                >
+                                <span v-for="keyword in item.suggestedKeywords" :key="keyword" class="chip">
                                     {{ keyword }}
                                 </span>
-                                <span
-                                    v-if="!(item.suggestedKeywords || []).length"
-                                    class="chip-empty"
-                                >
+                                <span v-if="!(item.suggestedKeywords || []).length" class="keyword-none">
                                     키워드 없음
                                 </span>
                             </div>
                             <p class="suggest-reason">{{ item.reason }}</p>
-                        </article>
-                    </div>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </section>

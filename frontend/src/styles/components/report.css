@@ -1,120 +1,81 @@
-/* 오늘: 날짜 · 쓰는 칸 하나 · 정리 버튼 하나. 날짜, 쓰는 방식, 틀, 지난 보고, 버리기는 "더 보기" 안에 있다. */
-.today {
+/* 오늘 한 일 (/): 현장 보드. 흰 보드 하나에 머리줄(날짜 · 상태 · 이번 주 점), 쓰는 칸,
+   바닥줄(더 보기 · 버튼), 접힌 설정이 가로줄로 나뉘어 들어간다. 제출한 날은 보드 둘(다음 할 일 · 주간보고).
+   값은 모두 tokens.css. 공용 틀(.card .btn .seg .row .state-chip .submit-wait)은 components.css · patterns.css. */
+
+/* ---- 보드: 줄마다 패딩을 주고 가로줄로 나눈다. 카드 패딩은 줄이 갖는다. ---- */
+
+.today-board {
     display: flex;
     flex-direction: column;
-    gap: var(--space-5);
-    width: 100%;
-    max-width: var(--content-max);
-    margin: 0 auto;
-    padding: var(--space-5) var(--space-7) var(--space-8);
-}
-
-.today-top {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-}
-
-.today-date {
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.today-status {
-    font-weight: var(--fw-medium);
-    color: var(--text-muted);
-}
-
-.today-status.is-saved {
-    color: var(--success-fg);
-}
-
-.today-status.is-draft {
-    color: var(--warning-fg);
-}
-
-/* 이번 주: 요일 글자 위에 점 하나. 색만으로 말하지 않게 aria-label에 상태를 적는다. */
-.today-week {
-    display: flex;
-    gap: var(--space-4);
-    margin: 0;
     padding: 0;
-    list-style: none;
+    --board-x: var(--space-5);
 }
 
-.today-day {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-.today-day i {
-    width: 0.75rem;
-    height: 0.75rem;
-    border: 2px solid var(--border-input);
-    border-radius: var(--radius-pill);
-}
-
-.today-day.is-saved i {
-    border-color: var(--success-fg);
-    background: var(--success-fg);
-}
-
-.today-day.is-missing i {
-    border-color: var(--danger-fg);
-}
-
-.today-day.is-today i {
-    border-color: var(--warning-fg);
-    background: var(--warning-bg);
-}
-
-.today-day.is-current {
-    color: var(--text-strong);
-}
-
-.today-box {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    overflow: hidden;
-}
-
-.today-box:has(.today-input:focus) {
+.today-write:has(.today-input:focus) {
     border-color: var(--accent);
     box-shadow: var(--focus-ring);
 }
 
-.today-box.is-lines {
-    border: 0;
-    background: transparent;
-    overflow: visible;
+/* 머리줄: 왼쪽 날짜와 상태, 오른쪽 이번 주 점. 좁으면 두 줄로 내려간다. */
+.today-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+    min-height: 3.5rem;
+    padding: var(--space-3) var(--board-x);
+    border-bottom: 1px solid var(--border);
 }
 
-.today-box.is-lines:has(.today-input:focus) {
-    box-shadow: none;
+.today-head-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    min-width: 0;
 }
 
+.today-title {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+    word-break: keep-all;
+}
+
+.today-week {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+.today-week-label {
+    color: var(--text);
+}
+
+/* ---- 쓰는 칸 ---- */
+
+/* 테두리 없는 넓은 칸. 포커스는 보드 테두리가 보여 준다(.today-write:has(:focus)). */
 .today-input {
     display: block;
     width: 100%;
-    min-height: 18.75rem;
-    padding: var(--space-5);
+    min-height: 16rem;
+    padding: var(--space-4) var(--board-x);
     border: 0;
     background: transparent;
     color: var(--text-strong);
     font: inherit;
     font-size: var(--fs-16);
-    line-height: 1.8;
+    line-height: var(--lh-relaxed);
     resize: vertical;
     outline: none;
 }
@@ -123,58 +84,154 @@
     color: var(--text-muted);
 }
 
-.today-drop {
-    margin: var(--space-4);
+/* 한 줄씩(좁은 화면): LineWriter가 보드 안에서 줄 목록 + 아래 붙는 입력 칸을 그린다. */
+.today-write.is-lines > .line-writer {
+    padding: var(--space-3) var(--board-x) 0;
 }
 
-.today-foot {
+/* PPTX: 점선 칸. 파일 입력은 숨기고 라벨이 버튼이다. */
+.today-drop {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: var(--space-3);
-    min-height: var(--control-h-lg);
-    padding: 0 var(--space-2) 0 var(--space-5);
-    border-top: 1px solid var(--border);
+    margin: var(--space-4) var(--board-x);
+    padding: var(--space-7) var(--space-5);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+    text-align: center;
+    transition:
+        border-color var(--dur-fast) var(--ease),
+        background var(--dur-fast) var(--ease);
 }
 
-.today-box.is-lines .today-foot {
-    border-top: 0;
-    padding-left: 0;
+.today-drop:hover,
+.today-drop:focus-within,
+.today-drop.is-dragging {
+    border-color: var(--accent);
+    background: var(--accent-soft);
 }
 
-.today-foot-note {
-    flex: 1;
+.today-drop-copy {
+    margin: 0;
+    font-size: var(--fs-14);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+}
+
+.today-drop-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.today-drop-file {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin: 0;
     font-size: var(--fs-13);
-    color: var(--text-muted);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    overflow-wrap: anywhere;
+}
+
+/* ---- 알림 줄 ---- */
+
+.today-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin: 0;
+    padding: var(--space-3) var(--board-x);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-base);
+    color: var(--danger-fg);
+}
+
+/* LineWriter 아래 붙는 칸(dock) 안에서는 가로줄 없이 글만. */
+.today-write.is-lines .line-compose .today-error {
+    padding: 0;
+    border-top: 0;
+}
+
+/* ---- 바닥줄: 더 보기 왼쪽, 버튼 오른쪽. 화면의 주 버튼은 AI로 정리하기 하나. ---- */
+
+.today-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--board-x);
+    border-top: 1px solid var(--border);
+    background: var(--surface);
 }
 
 .today-more-toggle {
-    color: var(--accent-text);
-    font-weight: var(--fw-semibold);
+    margin-left: calc(-1 * var(--space-3));
+    color: var(--text-muted);
+}
+
+.today-more-toggle:hover {
+    color: var(--text-strong);
+}
+
+.today-more-icon {
+    transition: transform var(--dur-fast) var(--ease);
 }
 
 .today-more-toggle[aria-expanded="true"] .today-more-icon {
     transform: rotate(180deg);
 }
 
+.today-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.today-actions .btn {
+    height: var(--control-h-lg);
+    padding: 0 var(--space-5);
+    font-size: var(--fs-14);
+    font-weight: var(--fw-semibold);
+}
+
+.today-send {
+    min-width: 10rem;
+}
+
+/* ---- 더 보기: 날짜 · 쓰는 방식 · 틀 · 내가 쓴 일일보고 · 초안 버리기. 줄마다 가로줄. ---- */
+
 .today-more {
     display: flex;
     flex-direction: column;
     border-top: 1px solid var(--border);
-    background: var(--input-bg);
-}
-
-.today-box.is-lines .today-more {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
 }
 
 .today-more-row,
 .today-more-block {
+    padding: var(--space-3) var(--board-x);
+}
+
+.today-more-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-5);
+    gap: var(--space-2) var(--space-3);
 }
 
 .today-more-row + .today-more-row,
@@ -183,193 +240,175 @@
     border-top: 1px solid var(--border);
 }
 
-.today-more-block {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    border-top: 1px solid var(--border);
-}
-
-.today-more-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: var(--control-h);
-}
-
 .today-more-label {
-    min-width: 4.5rem;
+    min-width: 5rem;
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
     color: var(--text-muted);
+    word-break: keep-all;
 }
 
 .today-more-date {
     width: auto;
 }
 
-.today-more-link {
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-}
-
-.today-more-empty {
-    padding: var(--space-2) 0;
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.today-more-block .row {
-    padding-left: 0;
-    padding-right: 0;
-}
-
-.today-hint {
-    margin-top: calc(-1 * var(--space-2));
-    font-size: var(--fs-13);
-    line-height: var(--lh-base);
-    color: var(--text-muted);
-}
-
-.today-actions {
+.today-templates {
     display: flex;
-    gap: var(--space-3);
+    flex-wrap: wrap;
+    gap: var(--space-2);
 }
 
-.today-actions .btn {
-    height: 3.25rem;
-    border-radius: var(--radius-lg);
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-}
-
-.today-save {
-    flex: 1;
-}
-
-.today-send {
-    flex: 2;
-}
-
-/* 오늘 · 제출 후: 쓰는 칸 대신 다음 할 일과 이번 주 주간보고. */
-.today-done {
+.today-more-block {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
 }
 
-.today-done-title {
+.today-more-head {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: var(--fs-24);
-    font-weight: var(--fw-bold);
-    color: var(--text-strong);
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: var(--control-h-sm);
 }
 
-.today-done-title svg {
-    color: var(--success-fg);
-}
-
-.today-done-sub {
-    margin-top: calc(-1 * var(--space-2));
-    color: var(--text-muted);
-}
-
-.today-done-group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-4) var(--space-5);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-}
-
-.today-done-label {
+.today-more-link {
+    flex-shrink: 0;
     font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
+    white-space: nowrap;
+}
+
+.today-more-list {
+    display: flex;
+    flex-direction: column;
+    --row-inset: 0px;
+}
+
+.today-more-list .row {
+    padding-left: 0;
+    padding-right: 0;
+    border-radius: 0;
+}
+
+.today-more-list .row-title,
+.today-more-list .row-sub {
+    white-space: normal;
+}
+
+/* ---- 제출 후: 다음 할 일 보드 + 이번 주 주간보고 보드 ---- */
+
+.today-done {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+}
+
+.today-lead {
+    margin: 0;
+    padding: var(--space-3) var(--board-x);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.today-group {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--border);
+}
+
+.today-caption {
+    margin: 0;
+    padding: var(--space-3) var(--board-x) var(--space-2);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
     color: var(--text-muted);
 }
 
-.today-done-list {
+.today-focus {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-.today-done-item {
+.today-focus-item {
     display: flex;
     align-items: flex-start;
-    gap: var(--space-2);
+    gap: var(--space-3);
+    min-height: var(--row-min-h);
+    padding: var(--space-3) var(--board-x);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-14);
     line-height: var(--lh-base);
     color: var(--text-strong);
 }
 
-.today-done-item :deep(.kind-tag) {
-    margin-top: 2px;
+.today-focus-item :deep(.kind-tag) {
+    margin-top: 0.1875rem;
 }
 
-.today-done-project {
+.today-focus-text {
+    min-width: 0;
+    word-break: keep-all;
+}
+
+.today-focus-project {
     margin-left: var(--space-2);
     font-size: var(--fs-12);
     color: var(--text-muted);
 }
 
-.today-done-empty {
+.today-empty {
+    margin: 0;
+    padding: var(--space-3) var(--board-x);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
     color: var(--text-muted);
 }
 
-.today-weekly {
+.today-more-list .today-empty {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.today-links {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-4) var(--space-5);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    color: var(--text);
-    text-decoration: none;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--board-x);
+    border-top: 1px solid var(--border);
 }
 
-.today-weekly:hover {
-    border-color: var(--border-strong);
-    color: var(--text);
+.today-links .btn-ghost {
+    margin-left: calc(-1 * var(--space-4));
+    color: var(--accent-text);
 }
 
-.today-weekly-text {
+.today-links .btn-ghost + .btn-ghost {
+    margin-left: 0;
+}
+
+/* ---- 로그인 전 ---- */
+
+.today-gate {
     display: flex;
-    flex: 1;
     flex-direction: column;
-    gap: 2px;
-    min-width: 0;
+    align-items: flex-start;
+    gap: var(--space-3);
 }
 
-.today-weekly-title {
-    font-weight: var(--fw-semibold);
+.today-gate-text {
+    margin: 0;
+    font: var(--type-heading);
     color: var(--text-strong);
 }
 
-.today-weekly-sub {
-    font-size: var(--fs-13);
-    color: var(--text-muted);
-}
-
-.today-done-links {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--space-2);
-}
-
-.today-done-links .btn {
-    color: var(--accent-text);
-}
+/* ---- 다른 보고로 가는 줄 ---- */
 
 .today-other {
     align-self: center;
@@ -378,6 +417,7 @@
     color: var(--text-muted);
     font-size: var(--fs-14);
     font-weight: var(--fw-medium);
+    text-decoration: none;
 }
 
 .today-other:hover {
@@ -385,193 +425,84 @@
     color: var(--text-strong);
 }
 
-.template-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
+/* ---- 넓은 화면: 제출 후 두 보드를 나란히 ---- */
+
+@media (min-width: 1101px) {
+    .today-done.has-weekly {
+        grid-template-columns: minmax(0, 1.6fr) minmax(16rem, 1fr);
+    }
 }
 
-.template-chips .on {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-    color: var(--text-strong);
-}
-
-.form-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    margin-top: var(--space-4);
-}
-
-.form-error {
-    margin-top: var(--space-3);
-    color: var(--danger-fg);
-    font-size: var(--fs-13);
-}
-
-.form-hint {
-    margin: 0;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-/* 드래그해서 놓는 칸. 파일 입력은 숨기고 라벨을 버튼처럼 쓴다. */
-.file-drop-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-7) var(--space-5);
-    border: 1px dashed var(--border-strong);
-    border-radius: var(--radius);
-    background: var(--input-bg);
-    text-align: center;
-    transition:
-        border-color var(--dur-fast) var(--ease),
-        background var(--dur-fast) var(--ease);
-}
-
-.file-drop-area svg {
-    color: var(--text);
-}
-
-.file-drop-area:hover,
-.file-drop-area:focus-within,
-.file-drop-area.is-dragging {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-}
-
-.file-drop-copy {
-    margin: 0;
-    font-size: var(--fs-14);
-    font-weight: var(--fw-medium);
-    color: var(--text-strong);
-}
-
-.file-drop-pick {
-    display: inline-flex;
-    align-items: center;
-    height: var(--control-h-sm);
-    padding: 0 var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    color: var(--text-strong);
-    cursor: pointer;
-    transition:
-        border-color var(--dur-fast) var(--ease),
-        background var(--dur-fast) var(--ease);
-}
-
-.file-drop-pick:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-soft);
-}
-
-.file-drop-input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    border: 0;
-}
-
-.file-name {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.file-clear {
-    padding: 0;
-    border: none;
-    background: none;
-    font: inherit;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-medium);
-    color: var(--danger-fg);
-    cursor: pointer;
-}
+/* ---- 좁은 화면 ---- */
 
 @media (max-width: 860px) {
-
-    .file-drop-copy {
-        font-size: var(--fs-14);
+    .today-board {
+        --board-x: var(--space-4);
     }
 
-    .file-drop-pick {
-        min-height: var(--control-h-lg);
-        height: var(--control-h-lg);
-        padding: 0 var(--space-5);
-    }
-
-    .form-actions {
-        position: sticky;
-        bottom: calc(var(--bottom-nav-offset) + var(--space-2));
-        z-index: 8;
-        flex-wrap: wrap;
-        justify-content: stretch;
-        margin: var(--space-4) calc(var(--space-4) * -1) calc(var(--space-4) * -1);
-        padding: var(--space-3) var(--space-4);
-        background: var(--surface);
-        border-top: 1px solid var(--border);
-    }
-
-    .form-actions .btn {
-        flex: 1 1 calc(50% - var(--space-2));
-    }
-
-    .form-actions .btn-primary {
-        flex: 1 1 100%;
-    }
-
-    /* 카드가 화면 아래까지 차야 입력 영역이 처음부터 엄지 자리(하단)에 있다. */
-    
-}
-
-@media (max-width: 860px) {
-    .today {
-        gap: var(--space-4);
-        padding: var(--space-4) var(--space-4) var(--space-8);
-    }
-
-    .today-week {
-        gap: var(--space-3);
+    .today-head {
+        align-items: flex-start;
     }
 
     .today-input {
         min-height: 13.75rem;
-        padding: var(--space-4);
     }
 
-    .today-more-row,
-    .today-more-block {
-        padding: var(--space-3) var(--space-4);
+    .today-drop {
+        padding: var(--space-6) var(--space-4);
     }
 
-    /* 손이 닿는 아래쪽에 버튼을 붙인다(하단 탭 바로 위). */
-    .today-actions {
+    .today-drop-pick {
+        min-height: var(--control-h-lg);
+    }
+
+    /* 버튼은 엄지 자리. 하단 탭 바로 위에 붙어 따라온다. */
+    .today-bar {
         position: sticky;
         bottom: var(--bottom-nav-offset);
         z-index: var(--z-sticky);
-        margin: 0 calc(-1 * var(--space-4));
-        padding: var(--space-2) var(--space-4);
-        background: var(--bg);
     }
 
-    .today-actions .btn {
-        height: var(--control-h-lg);
+    .today-actions {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .today-save {
+        flex: 1 1 0;
+    }
+
+    .today-send {
+        flex: 2 1 0;
+        min-width: 0;
+    }
+
+    .today-more-row > .today-more-label {
+        min-width: 100%;
+    }
+
+    .today-more .seg > button {
+        min-height: var(--control-h-lg);
+    }
+
+    .today-more-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--control-h-lg);
+    }
+
+    .today-other {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--control-h-lg);
+    }
+
+    .today-more-date {
+        width: 100%;
+    }
+
+    .today-links .btn {
+        flex: 1 1 100%;
+        margin-left: 0;
     }
 }

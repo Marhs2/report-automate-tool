@@ -1,200 +1,301 @@
+/* 제출 기록: 사람(행) × 평일(열) 보드. 칸은 DESIGN.md 주간 점 표식을 누를 수 있는 크기로 키운 것.
+   보드 머리글에 오늘 아직 안 낸 사람이 먼저 읽힌다. 팀장이 이 화면에서 정하는 일이 그것이다. */
+
 .team-filter {
     width: auto;
     min-width: 8rem;
 }
 
-.grid-summary {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2) var(--space-4);
-    margin-bottom: var(--space-3);
-    font-size: var(--fs-13);
-}
+/* ---- Board ----------------------------------------------------- */
 
-.grid-summary p {
-    margin: 0;
-}
-
-.summary-today {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    color: var(--danger-fg);
-    word-break: keep-all;
-}
-
-.summary-today.is-done {
-    color: var(--success-fg);
-}
-
-.summary-rate {
-    color: var(--text-muted);
-}
-
-.grid-tools {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-    margin-left: auto;
-}
-
-.name-search {
-    position: relative;
-    display: flex;
-    align-items: center;
-    color: var(--text-muted);
-}
-
-.name-search svg {
-    position: absolute;
-    left: 0.625rem;
-    pointer-events: none;
-}
-
-.name-search .input {
-    width: 10rem;
-    height: var(--control-h);
-    padding-left: 1.875rem;
-    font-size: var(--fs-13);
-}
-
-.grid-summary .btn.on {
-    border-color: var(--text-strong);
-    background: var(--accent-soft);
-}
-
-.grid-card {
+.board {
     padding: 0;
     overflow: hidden;
 }
 
-/* 표 안에서 스크롤해야 날짜 머리줄(위)과 이름 열(왼쪽)이 둘 다 고정된다. */
-.grid-scroll {
-    max-height: max(20rem, calc(100dvh - 18.75rem));
-    overflow: auto;
+.board-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-4) var(--space-5);
 }
 
-thead th {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    background: var(--surface);
-    box-shadow: inset 0 -1px 0 var(--border);
+.board-head-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
 }
 
-thead th.col-who {
-    z-index: 3;
+.board-title {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    word-break: keep-all;
 }
 
-.sub-grid {
-    width: 100%;
-    border-collapse: collapse;
+.board-title.is-missing {
+    color: var(--danger-fg);
+}
+
+.board-names {
+    margin: 0;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+.board-rate {
+    margin: 0;
+    padding-top: 0.125rem;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.board-rate strong {
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
+}
+
+.board-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--border);
+}
+
+.name-search {
+    width: 11rem;
+    height: var(--control-h-sm);
     font-size: var(--fs-13);
 }
 
-.sub-grid th,
-.sub-grid td {
-    padding: 0;
-    border-bottom: 1px solid var(--border);
+/* ---- States ---------------------------------------------------- */
+
+.board-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-7) var(--space-5);
+    border-top: 1px solid var(--border);
     text-align: center;
 }
 
-.col-who {
+.board-state p {
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+.board-state.is-error p {
+    color: var(--danger-fg);
+}
+
+/* 표와 같은 모양의 빈 줄. MOTION 1: 움직이지 않는다. */
+.skeleton {
+    border-top: 1px solid var(--border);
+}
+
+.skeleton-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    height: var(--row-min-h);
+    padding: 0 var(--space-5);
+    border-bottom: 1px solid var(--border);
+}
+
+.skeleton-bar {
+    display: block;
+    height: 0.75rem;
+    border-radius: var(--radius-xs);
+    background: var(--surface-soft);
+}
+
+.skeleton-bar.is-name {
+    width: 5rem;
+    margin-right: auto;
+}
+
+.skeleton-bar.is-rate {
+    width: 2rem;
+}
+
+.skeleton-dots {
+    display: flex;
+    gap: var(--space-7);
+}
+
+.skeleton-dot {
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-pill);
+}
+
+/* ---- Grid ------------------------------------------------------ */
+/* 표 안에서 스크롤해야 날짜 머리줄(위)과 이름 열(왼쪽)이 둘 다 고정된다. */
+
+.grid-scroll {
+    max-height: max(20rem, calc(100dvh - 22rem));
+    overflow: auto;
+    border-top: 1px solid var(--border);
+    transition: opacity var(--dur) var(--ease);
+}
+
+.grid-scroll.is-busy {
+    opacity: 0.6;
+}
+
+/* separate: collapse된 테두리는 sticky 머리줄과 함께 스크롤되어 사라진다. */
+.grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-tight);
+}
+
+.grid th,
+.grid td {
+    height: var(--row-min-h);
+    padding: 0 var(--space-2);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    text-align: center;
+    vertical-align: middle;
+}
+
+.grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    height: 3.25rem;
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+}
+
+.grid .col-who {
     position: sticky;
     left: 0;
     z-index: 1;
-    min-width: 5.5rem;
-    padding: 0 var(--space-3) !important;
-    background: var(--surface);
-    text-align: left !important;
-    font-weight: var(--fw-semibold);
+    min-width: 7rem;
+    padding: 0 var(--space-5);
+    text-align: left;
+    font-weight: var(--fw-medium);
     color: var(--text-strong);
     white-space: nowrap;
 }
 
-thead .col-who,
-thead .col-day,
-thead .col-rate {
-    height: 3rem;
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
+.grid thead .col-who {
+    z-index: 3;
 }
 
-.col-day {
-    min-width: 2.25rem;
+/* 주 보기: 이름 칸 폭을 정해 두면 남는 폭이 요일 칸에 고르게 간다. */
+.grid.is-week .col-who {
+    width: 13rem;
 }
 
-.is-week .col-day {
-    min-width: 3.25rem;
+.grid .col-day {
+    min-width: 2.5rem;
+}
+
+.grid.is-week .col-day {
+    min-width: 3.5rem;
 }
 
 .day-week,
 .day-num {
     display: block;
-    line-height: 1.3;
+    line-height: var(--lh-tight);
+}
+
+.day-week {
+    font-size: var(--fs-12);
+    font-weight: var(--fw-medium);
 }
 
 .day-num {
+    font-weight: var(--fw-bold);
     color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
 }
 
-thead .col-day.is-today {
+/* 오늘 열: 여기(here)는 강조색. */
+.grid .col-day.is-today {
     background: var(--accent-soft);
 }
 
-thead .col-day.is-holiday .day-num {
+.grid thead .col-day.is-today .day-num {
+    color: var(--accent-text);
+}
+
+.grid thead .col-day.is-holiday .day-num {
     color: var(--danger-fg);
 }
 
-.col-day.is-today {
-    background: var(--accent-soft);
-}
-
-.col-rate {
+.grid .col-rate {
     min-width: 3.5rem;
-    padding: 0 var(--space-3) !important;
-    font-variant-numeric: tabular-nums;
+    padding-right: var(--space-5);
     color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.col-rate.has-missed {
+.grid .col-rate.has-missed {
     color: var(--danger-fg);
     font-weight: var(--fw-semibold);
 }
 
-.team-row th,
-.team-row td {
-    height: 2.25rem;
+/* ---- Team rows: a tray inside the board ------------------------- */
+
+.grid .team-row th,
+.grid .team-row td {
     background: var(--surface-soft);
-    font-size: var(--fs-12);
+    font-size: var(--fs-13);
 }
 
-.team-row .col-who {
-    padding: 0 var(--space-2) !important;
-}
-
-.team-row .col-day.is-today {
+.grid .team-row .col-day.is-today {
     background: var(--accent-soft);
+}
+
+.grid .team-row .col-who {
+    padding-left: var(--space-3);
 }
 
 .team-toggle {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
-    min-height: 2rem;
-    padding: 0 var(--space-1);
+    height: var(--control-h);
+    padding: 0 var(--space-2) 0 var(--space-1);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
     font: inherit;
-    font-size: var(--fs-12);
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
-    color: var(--text);
+    color: var(--text-strong);
     cursor: pointer;
     white-space: nowrap;
+}
+
+.team-toggle:hover {
+    background: var(--surface-press);
 }
 
 .team-toggle:focus-visible {
@@ -202,180 +303,244 @@ thead .col-day.is-holiday .day-num {
     box-shadow: var(--focus-ring);
 }
 
-.team-size {
-    font-weight: var(--fw-regular, 400);
+.team-toggle svg {
+    flex-shrink: 0;
     color: var(--text-muted);
 }
 
-.team-meta {
-    padding: 0 var(--space-3) !important;
-    text-align: left !important;
+.team-size {
+    font-weight: var(--fw-regular);
     color: var(--text-muted);
+}
+
+.grid .team-meta {
+    padding-left: var(--space-3);
+    text-align: left;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
 .team-count {
-    font-variant-numeric: tabular-nums;
     color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
 .team-count.is-done {
-    color: var(--success-fg);
     font-weight: var(--fw-semibold);
+    color: var(--text-strong);
 }
 
 .team-count.is-missed {
-    color: var(--danger-fg);
     font-weight: var(--fw-semibold);
+    color: var(--danger-fg);
 }
 
-tbody tr:not(.team-row) {
-    height: 2.5rem;
-}
+/* ---- Marks: the week dots at tap-target size -------------------- */
 
-.cell-mark {
+.mark {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.75rem;
-    height: 1.75rem;
+    width: var(--control-h);
+    height: var(--control-h);
+    padding: 0;
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
     font: inherit;
     font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
     color: var(--text-muted);
 }
 
-.is-done .cell-mark {
-    background: var(--success-bg);
-    color: var(--success-fg);
+.dot {
+    display: inline-grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft);
+    color: var(--text-muted);
+}
+
+.mark.is-done {
     cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
 }
 
-.is-done .cell-mark:hover {
-    outline: 1px solid var(--success-fg);
+.mark.is-done .dot,
+.board-legend .dot.is-done {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--text-on-accent);
 }
 
-.is-done .cell-mark:focus-visible {
+.mark.is-done:hover {
+    background: var(--accent-soft);
+}
+
+.mark.is-done:hover .dot {
+    border-color: var(--accent-hover);
+    background: var(--accent-hover);
+}
+
+.mark.is-done:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
 }
 
-.is-missed .cell-mark {
+.mark.is-missed .dot,
+.board-legend .dot.is-missed {
+    border-color: var(--danger-fg);
     background: var(--danger-bg);
     color: var(--danger-fg);
 }
 
-.is-off .cell-mark {
-    color: var(--danger-fg);
+.mark.is-future .dot,
+.board-legend .dot.is-future {
+    border-style: dashed;
+    background: transparent;
 }
 
-.grid-legend {
+.mark.is-today,
+.legend-word.is-today {
+    color: var(--accent-text);
+}
+
+/* ---- Legend ---------------------------------------------------- */
+
+.board-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2) var(--space-4);
+    gap: var(--space-2) var(--space-5);
     margin: 0;
-    padding: var(--space-3) var(--space-4);
-    font-size: var(--fs-12);
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-13);
     color: var(--text-muted);
 }
 
-.grid-legend span {
+.board-legend span {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: var(--space-2);
 }
 
-.legend-mark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.125rem;
-    height: 1.125rem;
-    border-radius: 0.25rem;
+.board-legend .dot {
+    width: 1rem;
+    height: 1rem;
+}
+
+.legend-word {
     font-style: normal;
-    font-size: 0.6875rem;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
 }
 
-.legend-mark.is-done {
-    background: var(--success-bg);
-    color: var(--success-fg);
-}
-
-.legend-mark.is-missed {
-    background: var(--danger-bg);
-    color: var(--danger-fg);
-}
-
-.legend-mark.is-text {
-    width: auto;
-    padding: 0 2px;
-    white-space: nowrap;
-}
-
-.legend-mark.is-off {
-    color: var(--danger-fg);
-}
+/* ---- Mobile ----------------------------------------------------- */
 
 @media (max-width: 860px) {
-    .view-nav {
-        flex-wrap: wrap;
-    }
-
     .team-filter {
         flex: 1;
         min-height: var(--control-h-lg);
-        font-size: var(--fs-16);
     }
 
-    .grid-summary .btn {
-        min-height: var(--control-h-lg);
+    .board-head,
+    .board-tools,
+    .board-legend,
+    .board-state {
+        padding-left: var(--space-4);
+        padding-right: var(--space-4);
     }
 
-    .grid-tools {
-        width: 100%;
-        margin-left: 0;
+    .board-tools {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
     }
 
     .name-search {
-        flex: 1;
-    }
-
-    .name-search .input {
+        grid-column: 1 / -1;
         width: 100%;
         height: var(--control-h-lg);
-        font-size: var(--fs-16);
+        font-size: var(--fs-14);
+    }
+
+    .board-tools .btn {
+        height: var(--control-h-lg);
+        padding: 0 var(--space-2);
+        font-size: var(--fs-13);
+    }
+
+    .skeleton-row {
+        padding: 0 var(--space-4);
+    }
+
+    .skeleton-dots {
+        gap: var(--space-4);
     }
 
     .grid-scroll {
-        max-height: max(18.75rem, calc(100dvh - 23.75rem));
+        max-height: max(18.75rem, calc(100dvh - 24rem));
     }
 
-    tbody tr:not(.team-row) {
-        height: 2.75rem;
+    .grid th,
+    .grid td {
+        padding: 0;
     }
 
-    .team-row th,
-    .team-row td {
-        height: 2.75rem;
+    /* 주 보기는 고정 폭 표: 요일 다섯 칸과 제출 칸이 390px 보드 안에 들어가고 이름만 줄임표로 줄어든다. */
+    .grid.is-week {
+        table-layout: fixed;
     }
 
-    .is-week .col-day {
+    .grid .col-who {
+        min-width: 4rem;
+        padding: 0 var(--space-2) 0 var(--space-3);
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .grid.is-week .col-who {
+        width: auto;
+    }
+
+    .grid .team-row .col-who {
+        padding-left: var(--space-2);
+    }
+
+    .grid .col-day,
+    .grid.is-week .col-day {
+        min-width: var(--control-h-lg);
+    }
+
+    .grid.is-week .col-day,
+    .grid.is-week .col-rate {
+        width: var(--control-h-lg);
+    }
+
+    .grid .col-rate {
         min-width: 2.5rem;
+        padding: 0 var(--space-2) 0 0;
     }
 
-    .col-who {
-        min-width: 4.25rem;
-        padding: 0 var(--space-2) !important;
+    .mark {
+        width: var(--control-h-lg);
+        height: var(--control-h-lg);
     }
 
-    .col-rate {
-        min-width: 2.75rem;
-        padding: 0 var(--space-2) !important;
+    .team-toggle {
+        flex-wrap: wrap;
+        min-height: var(--control-h-lg);
+        height: auto;
+        padding-top: var(--space-1);
+        padding-bottom: var(--space-1);
+        white-space: normal;
+        text-align: left;
     }
 
-    .cell-mark {
-        width: 2rem;
-        height: 2rem;
+    .team-name {
+        word-break: keep-all;
     }
 }

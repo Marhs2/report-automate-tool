@@ -1,11 +1,14 @@
 <template>
     <div class="page report-doc">
-        <!-- 제목 한 줄에 사람·날짜·상태를 모은다. 예전에는 제목과 아래 띠에 두 번 적혀 있었다. -->
+        <!-- 위에 붙는 저장 머리줄: 사람 · 날짜 · 크기 · 상태 왼쪽, 다시 정리 · 저장 오른쪽. -->
         <header class="detail-head">
             <div class="detail-title">
                 <h1>{{ userName || "일일보고" }}</h1>
-                <span class="detail-date">{{ formatDotDate(reportDate) || "날짜 없음" }}</span>
-                <span class="status-chip" :class="stateChip.tone">{{ stateChip.label }}</span>
+                <template v-if="reportData || isLoading">
+                    <span class="detail-date">{{ formatDotDate(reportDate) || "날짜 없음" }}</span>
+                    <span v-if="reportData && canEdit && sizeLabel" class="detail-meta">{{ sizeLabel }}</span>
+                    <span class="status-chip" :class="stateChip.tone">{{ stateChip.label }}</span>
+                </template>
                 <button
                     v-if="canAdminEdit && !adminEditing"
                     type="button"
@@ -29,12 +32,7 @@
                     {{ saveLabel }}
                 </button>
             </div>
-            <p v-if="reportData && canEdit" class="detail-summary">
-                {{ sizeLabel }}<template v-if="!savedReportId"> · AI가 만든 초안이에요. 원문과 대조하고 고친 뒤 저장하세요.</template>
-            </p>
         </header>
-
-
 
         <Teleport to="body">
             <div
@@ -60,7 +58,7 @@
                                 {{ project.projectName || `프로젝트 ${index + 1}` }}
                             </button>
                             <button
-                                class="edit-drop"
+                                class="btn btn-danger btn-small edit-drop"
                                 type="button"
                                 @click="deleteReportProject(index)"
                             >
@@ -86,7 +84,18 @@
             </div>
         </Teleport>
 
-        <div v-if="isLoading" class="empty-state">불러오는 중...</div>
+        <!-- 불러오는 중: 보드 모양 그대로 빈 막대. -->
+        <div v-if="isLoading" class="card detail-skeleton" role="status" aria-live="polite">
+            <i class="is-title" aria-hidden="true"></i>
+            <i aria-hidden="true"></i>
+            <i class="is-short" aria-hidden="true"></i>
+            <p>보고서를 불러오는 중</p>
+        </div>
+
+        <div v-else-if="loadError" class="card detail-empty">
+            <p class="detail-empty-title is-danger">보고서를 불러오지 못했어요.</p>
+            <button type="button" class="btn" @click="loadSaved(route.params.id)">다시 시도</button>
+        </div>
 
         <div v-else-if="reportData" class="content-container">
             <div class="json-container">
@@ -106,7 +115,7 @@
                 </div>
                 <div
                     v-if="!canEdit && reportData.projects.length > 1"
-                    class="project-nav"
+                    class="card project-nav"
                     role="group"
                     aria-label="프로젝트 이동"
                 >
@@ -115,13 +124,14 @@
                         :key="`nav-${project._uid || index}`"
                         type="button"
                         class="project-nav-chip"
+                        :data-accent="projectAccentIndex(index)"
                         @click="scrollToProject(index)"
                     >
                         {{ project.projectName || `프로젝트 ${index + 1}` }}
                     </button>
                 </div>
 
-                <!-- 읽기 모드: 제출된 보고를 문서처럼 본다. -->
+                <!-- 읽기: 제출된 보고를 문서처럼 본다. -->
                 <template v-if="!canEdit">
                 <div
                     v-for="(project, projectIndex) in reportData.projects"
@@ -131,6 +141,7 @@
                     :data-accent="projectAccentIndex(projectIndex)"
                 >
                     <div class="project-head">
+                        <i class="project-dot" aria-hidden="true"></i>
                         <h2 class="read-project-name">
                             {{ project.projectName || `프로젝트 ${projectIndex + 1}` }}
                         </h2>
@@ -150,6 +161,7 @@
                 </div>
                 </template>
 
+                <!-- 고치기(넓은 화면): 프로젝트마다 보드 하나, 분류는 가로줄로 나뉜 줄. -->
                 <template v-else-if="!isNarrow">
                 <div
                     v-for="(project, projectIndex) in reportData.projects"
@@ -214,7 +226,7 @@
                             </button>
                         </div>
                     </div>
-                    <!-- 빈 분류는 줄을 차지하지 않고 여기 칩으로만 둔다. 누르면 그 분류가 열리고 첫 줄에 커서가 간다. -->
+                    <!-- 빈 분류는 줄을 차지하지 않고 여기 버튼으로만 둔다. 누르면 그 분류가 열리고 첫 줄에 커서가 간다. -->
                     <div v-if="emptyDeskFields(project).length" class="empty-fields">
                         <span class="empty-fields-label">비어 있음</span>
                         <button
@@ -231,6 +243,7 @@
                 <button class="btn add-project-btn" type="button" @click="openProjectPopup()">프로젝트 추가</button>
                 </template>
 
+                <!-- 고치기(좁은 화면): 프로젝트 하나씩, 종류를 고르고 한 줄씩 넣는다. -->
                 <template v-else>
                 <div v-if="activeProject" class="card projects-container">
                     <div class="edit-current">
@@ -240,7 +253,7 @@
                             placeholder="프로젝트 이름"
                             aria-label="프로젝트 이름"
                         />
-                        <button type="button" class="edit-more" @click="openProjectPopup(activeIndex)">더보기</button>
+                        <button type="button" class="btn btn-ghost edit-more" @click="openProjectPopup(activeIndex)">더보기</button>
                     </div>
                     <!-- 빈 분류는 숨긴다. 아래 종류 버튼으로 고르고 넣으면 나타난다. -->
                     <section
@@ -261,7 +274,7 @@
                             />
                             <button
                                 type="button"
-                                class="edit-remove"
+                                class="btn btn-danger edit-remove"
                                 @click="removeRow(activeProject, col.key, itemIndex)"
                             >
                                 삭제
@@ -302,14 +315,13 @@
                 >
                     프로젝트 추가
                 </button>
-
                 </template>
             </div>
 
             <aside v-if="rawData" class="card raw-container">
                 <div class="raw-head">
                     <h2>원문</h2>
-                    <button type="button" class="raw-fold" :aria-expanded="rawOpen" @click="rawOpen = !rawOpen">
+                    <button type="button" class="btn btn-ghost btn-small raw-fold" :aria-expanded="rawOpen" @click="rawOpen = !rawOpen">
                         {{ rawOpen ? "접기" : "펼치기" }}
                     </button>
                 </div>
@@ -323,8 +335,11 @@
             </aside>
         </div>
 
-        <div v-else class="empty-state">
-            보고서 데이터가 없습니다. 보고서를 먼저 제출해주세요.
+        <!-- 비어 있음: 정리한 결과가 없으면 쓰는 화면으로 보낸다. -->
+        <div v-else class="card detail-empty">
+            <p class="detail-empty-title">정리할 보고가 없어요.</p>
+            <p class="detail-empty-text">오늘 한 일에서 보고를 먼저 보내 주세요.</p>
+            <router-link class="btn btn-primary" to="/">오늘 한 일 쓰기</router-link>
         </div>
     </div>
 </template>
@@ -357,6 +372,8 @@ const reportDate = ref("");
 const aiLoading = ref(false);
 const saving = ref(false);
 const isLoading = ref(false);
+/** 저장된 보고를 못 불러왔을 때. "데이터 없음"과 섞이면 안 된다. */
+const loadError = ref(false);
 const savedReportId = ref(null);
 const savedMemberId = ref(null);
 const {
@@ -634,6 +651,7 @@ const loadDraft = () => {
     activeIndex.value = 0;
     savedReportId.value = null;
     savedMemberId.value = null;
+    loadError.value = false;
     const stored = sessionStorage.getItem("reportData");
     reportData.value = stored
         ? normalizeReportIssues(toEditable(JSON.parse(stored)))
@@ -645,6 +663,7 @@ const loadDraft = () => {
 
 const loadSaved = async (id) => {
     isLoading.value = true;
+    loadError.value = false;
     activeIndex.value = 0;
     savedReportId.value = id;
     reportData.value = null;
@@ -660,6 +679,7 @@ const loadSaved = async (id) => {
         console.error("보고서 불러오기 실패:", error);
         showAlert("보고서를 불러오지 못했습니다.");
         reportData.value = null;
+        loadError.value = true;
     } finally {
         isLoading.value = false;
     }
@@ -792,7 +812,7 @@ const addField = (project, key) => {
 const filledDeskFields = (project) => DESK_FIELDS.filter((col) => (project[col.key] || []).length);
 const emptyDeskFields = (project) => DESK_FIELDS.filter((col) => !(project[col.key] || []).length);
 
-/** index 다음에 빈 줄을 넣고 커서를 옮긴다. 엔터(한글 조합 중 제외), '+ 줄 추가', 빈 분류 칩이 함께 쓴다. */
+/** index 다음에 빈 줄을 넣고 커서를 옮긴다. 엔터(한글 조합 중 제외), '+ 줄 추가', 빈 분류 버튼이 함께 쓴다. */
 const addLineAfter = async (event, projectIndex, key, index) => {
     if (event) {
         if (event.isComposing) return;

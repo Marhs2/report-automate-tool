@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-vue-next";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
 import { isAdmin, leaderTeamId } from "../composables/useSession";
@@ -27,6 +27,10 @@ const today = todayIso();
 /** 이보다 많으면 처음에 부서를 접고 이름 검색을 둔다. */
 const MANY_PEOPLE = 12;
 const TODAY_NAME_LIMIT = 6;
+/** 처음 불러오는 동안 표 자리에 그리는 빈 줄 수. */
+const SKELETON_ROWS = 6;
+const SKELETON_DOTS = 5;
+
 const mode = ref("week");
 const anchor = ref(today);
 // 팀장은 자기 부서부터 본다. 다른 부서도 고를 수 있다.
@@ -122,6 +126,26 @@ const todayMissing = computed(() => {
 const todayMissingShown = computed(() => todayMissing.value.slice(0, TODAY_NAME_LIMIT));
 const todayMissingMore = computed(() => Math.max(0, todayMissing.value.length - TODAY_NAME_LIMIT));
 
+const isFirstLoad = computed(() => isLoading.value && !activities.value.length);
+const hasPeople = computed(() => activities.value.length > 0);
+
+/** 보드 머리글: 팀장이 여기서 정하는 일(오늘 누구를 챙길지)이 먼저 읽힌다. */
+const headTitle = computed(() => {
+    if (isFirstLoad.value) return "불러오는 중";
+    if (loadError.value || !hasPeople.value) return "제출 현황";
+    if (todayMissing.value.length) return `오늘 아직 안 냄 ${todayMissing.value.length}명`;
+    if (days.value.includes(today)) return "오늘 모두 제출했어요";
+    return "제출 현황";
+});
+
+const emptyReason = computed(() => {
+    const needle = query.value.trim();
+    if (needle) return `'${needle}' 이름이 없습니다`;
+    if (onlyMissed.value) return "빠진 날이 있는 사람이 없습니다";
+    if (filterTeam.value !== "all") return "이 부서에는 이 기간에 볼 사람이 없습니다";
+    return "이 기간에 볼 사람이 없습니다";
+});
+
 const load = async () => {
     isLoading.value = true;
     loadError.value = "";
@@ -199,7 +223,7 @@ onMounted(() => {
             <div class="view-head-text">
                 <p class="view-period">
                     {{ label }}
-                    <span v-if="isCurrent" class="cat-tag is-progress">{{ currentLabel }}</span>
+                    <span v-if="isCurrent" class="chip is-accent">{{ currentLabel }}</span>
                 </p>
             </div>
             <div class="view-nav">
@@ -236,28 +260,38 @@ onMounted(() => {
             </div>
         </header>
 
-        <div class="grid-summary">
-            <p v-if="todayMissing.length" class="summary-today" :title="todayMissing.join(', ')">
-                <strong>오늘 아직 안 냄 {{ todayMissing.length }}명</strong>
-                <span>
-                    {{ todayMissingShown.join(", ") }}<template v-if="todayMissingMore"> 외 {{ todayMissingMore }}명</template>
-                </span>
-            </p>
-            <p v-else-if="days.includes(today)" class="summary-today is-done">
-                <strong>오늘 모두 제출했어요</strong>
-            </p>
-            <p class="summary-rate">
-                제출 {{ totals.submitted }}/{{ totals.due }}<template v-if="totals.due"> · {{ totals.pct }}%</template>
-            </p>
-            <div class="grid-tools">
-                <label v-if="isMany" class="name-search">
-                    <Search :size="14" aria-hidden="true" />
-                    <input v-model="query" class="input" type="search" placeholder="이름 찾기" aria-label="이름 찾기" />
-                </label>
+        <section class="card board" aria-label="일일보고 제출 표" :aria-busy="isLoading">
+            <header class="board-head">
+                <div class="board-head-text">
+                    <h2
+                        class="board-title"
+                        :class="{ 'is-missing': !isFirstLoad && todayMissing.length }"
+                        :title="todayMissing.length ? todayMissing.join(', ') : undefined"
+                    >
+                        {{ headTitle }}
+                    </h2>
+                    <p v-if="!isFirstLoad && todayMissing.length" class="board-names">
+                        {{ todayMissingShown.join(", ") }}<template v-if="todayMissingMore"> 외 {{ todayMissingMore }}명</template>
+                    </p>
+                </div>
+                <p v-if="hasPeople && !loadError && rows.length" class="board-rate">
+                    제출 <strong>{{ totals.submitted }}/{{ totals.due }}</strong><template v-if="totals.due"> · {{ totals.pct }}%</template>
+                </p>
+            </header>
+
+            <div class="board-tools">
+                <input
+                    v-if="isMany"
+                    v-model="query"
+                    class="input name-search"
+                    type="search"
+                    placeholder="이름 찾기"
+                    aria-label="이름 찾기"
+                />
                 <button
                     type="button"
                     class="btn btn-small"
-                    :class="{ on: onlyMissed }"
+                    :class="{ 'is-active': onlyMissed }"
                     :aria-pressed="onlyMissed"
                     @click="onlyMissed = !onlyMissed"
                 >
@@ -266,118 +300,136 @@ onMounted(() => {
                 <button
                     type="button"
                     class="btn btn-small"
-                    :class="{ on: missedFirst }"
+                    :class="{ 'is-active': missedFirst }"
                     :aria-pressed="missedFirst"
                     @click="missedFirst = !missedFirst"
                 >
                     빠진 날 많은 순
                 </button>
             </div>
-        </div>
 
-        <p v-if="isLoading && !activities.length" class="list-status" role="status">불러오는 중</p>
-        <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
-        <div v-else-if="!rows.length" class="empty-state">
-            {{ query.trim() ? `'${query.trim()}' 이름이 없습니다` : onlyMissed ? "빠진 날이 있는 사람이 없습니다" : "이 기간에 볼 사람이 없습니다" }}
-        </div>
+            <div v-if="isFirstLoad" class="skeleton" role="status" aria-label="제출 현황 불러오는 중">
+                <div v-for="n in SKELETON_ROWS" :key="n" class="skeleton-row" aria-hidden="true">
+                    <i class="skeleton-bar is-name"></i>
+                    <span class="skeleton-dots">
+                        <i v-for="d in SKELETON_DOTS" :key="d" class="skeleton-dot"></i>
+                    </span>
+                    <i class="skeleton-bar is-rate"></i>
+                </div>
+            </div>
 
-        <section v-else class="card grid-card" aria-label="일일보고 제출 표">
-            <div class="grid-scroll">
-                <table class="sub-grid" :class="`is-${mode}`">
-                    <thead>
-                        <tr>
-                            <th scope="col" class="col-who">이름</th>
-                            <th
-                                v-for="header in headers"
-                                :key="header.date"
-                                scope="col"
-                                class="col-day"
-                                :class="{ 'is-today': header.date === today, 'is-holiday': header.holidayName }"
-                                :title="header.holidayName || undefined"
-                            >
-                                <span class="day-week">{{ header.weekLabel }}</span>
-                                <span class="day-num">{{ header.day }}</span>
-                            </th>
-                            <th scope="col" class="col-rate">제출</th>
-                        </tr>
-                    </thead>
-                    <tbody v-for="team in rows" :key="teamKey(team)">
-                        <tr class="team-row" :class="{ 'is-collapsed': isCollapsed(team) }">
-                            <th scope="rowgroup" class="col-who">
-                                <button
-                                    type="button"
-                                    class="team-toggle"
-                                    :aria-expanded="!isCollapsed(team)"
-                                    @click="toggleTeam(team)"
-                                >
-                                    <ChevronRight v-if="isCollapsed(team)" :size="14" aria-hidden="true" />
-                                    <ChevronDown v-else :size="14" aria-hidden="true" />
-                                    <span class="team-name">{{ team.teamName }}</span>
-                                    <span class="team-size">{{ team.members.length }}명</span>
-                                </button>
-                            </th>
-                            <template v-if="isCollapsed(team)">
-                                <td
-                                    v-for="count in team.dayCounts"
-                                    :key="count.date"
+            <div v-else-if="loadError" class="board-state is-error" role="alert">
+                <p>{{ loadError }}</p>
+                <button type="button" class="btn btn-small" @click="load">다시 시도</button>
+            </div>
+
+            <div v-else-if="!rows.length" class="board-state">
+                <p>{{ emptyReason }}</p>
+                <button v-if="query.trim()" type="button" class="btn btn-small" @click="query = ''">검색 지우기</button>
+                <button v-else-if="onlyMissed" type="button" class="btn btn-small" @click="onlyMissed = false">모두 보기</button>
+                <button v-else-if="filterTeam !== 'all'" type="button" class="btn btn-small" @click="filterTeam = 'all'">전체 부서 보기</button>
+            </div>
+
+            <template v-else>
+                <div class="grid-scroll" :class="{ 'is-busy': isLoading }">
+                    <table class="grid" :class="`is-${mode}`">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="col-who">이름</th>
+                                <th
+                                    v-for="header in headers"
+                                    :key="header.date"
+                                    scope="col"
                                     class="col-day"
-                                    :class="{ 'is-today': count.date === today }"
+                                    :class="{ 'is-today': header.date === today, 'is-holiday': header.holidayName }"
+                                    :title="header.holidayName || undefined"
                                 >
-                                    <span class="team-count" :class="dayCountTone(count)">{{ dayCountText(count) }}</span>
-                                </td>
-                                <td class="col-rate" :class="{ 'has-missed': team.submitted < team.due }">
+                                    <span class="day-week">{{ header.weekLabel }}</span>
+                                    <span class="day-num">{{ header.day }}</span>
+                                </th>
+                                <th scope="col" class="col-rate">제출</th>
+                            </tr>
+                        </thead>
+                        <tbody v-for="team in rows" :key="teamKey(team)">
+                            <tr class="team-row">
+                                <th scope="rowgroup" class="col-who">
+                                    <button
+                                        type="button"
+                                        class="team-toggle"
+                                        :aria-expanded="!isCollapsed(team)"
+                                        @click="toggleTeam(team)"
+                                    >
+                                        <ChevronRight v-if="isCollapsed(team)" :size="16" aria-hidden="true" />
+                                        <ChevronDown v-else :size="16" aria-hidden="true" />
+                                        <span class="team-name">{{ team.teamName }}</span>
+                                        <span class="team-size">{{ team.members.length }}명</span>
+                                    </button>
+                                </th>
+                                <template v-if="isCollapsed(team)">
+                                    <td
+                                        v-for="count in team.dayCounts"
+                                        :key="count.date"
+                                        class="col-day"
+                                        :class="{ 'is-today': count.date === today }"
+                                    >
+                                        <span class="team-count" :class="dayCountTone(count)">{{ dayCountText(count) }}</span>
+                                    </td>
+                                    <td class="col-rate" :class="{ 'has-missed': team.submitted < team.due }">
+                                        {{ team.submitted }}/{{ team.due }}
+                                    </td>
+                                </template>
+                                <td v-else :colspan="headers.length + 1" class="team-meta">
                                     {{ team.submitted }}/{{ team.due }}
                                 </td>
-                            </template>
-                            <td v-else :colspan="headers.length + 1" class="team-meta">
-                                {{ team.submitted }}/{{ team.due }}
-                            </td>
-                        </tr>
-                        <tr v-for="member in isCollapsed(team) ? [] : team.members" :key="member.memberId">
-                            <th scope="row" class="col-who">{{ member.name }}</th>
-                            <td
-                                v-for="(cell, index) in member.cells"
-                                :key="cell.date"
-                                class="col-day"
-                                :class="[`is-${cell.state}`, { 'is-today': cell.date === today }]"
-                            >
-                                <button
-                                    v-if="cell.state === 'done'"
-                                    type="button"
-                                    class="cell-mark"
-                                    :aria-label="cellTitle(member, headers[index], cell)"
-                                    :title="cellTitle(member, headers[index], cell)"
-                                    @click="openReport(member, cell)"
+                            </tr>
+                            <tr v-for="member in isCollapsed(team) ? [] : team.members" :key="member.memberId" class="member-row">
+                                <th scope="row" class="col-who">{{ member.name }}</th>
+                                <td
+                                    v-for="(cell, index) in member.cells"
+                                    :key="cell.date"
+                                    class="col-day"
+                                    :class="{ 'is-today': cell.date === today }"
                                 >
-                                    <Check :size="15" :stroke-width="2.5" />
-                                </button>
-                                <span
-                                    v-else
-                                    class="cell-mark"
-                                    :aria-label="cellTitle(member, headers[index], cell)"
-                                    :title="cellTitle(member, headers[index], cell)"
-                                >
-                                    <X v-if="cell.state === 'missed'" :size="14" :stroke-width="2.5" />
-                                    <template v-else-if="cell.state === 'off'">휴</template>
-                                    <!-- 요약줄 '오늘 아직 안 냄'과 같은 말로 보인다. 예전에는 예정(·)과 구분이 안 됐다. -->
-                                    <template v-else-if="cell.date === today">아직</template>
-                                    <template v-else>·</template>
-                                </span>
-                            </td>
-                            <td class="col-rate" :class="{ 'has-missed': member.missed }">
-                                {{ member.submitted }}/{{ member.due }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <p class="grid-legend">
-                <span><i class="legend-mark is-done"><Check :size="12" :stroke-width="2.5" /></i>제출 · 눌러서 보기</span>
-                <span><i class="legend-mark is-missed"><X :size="12" :stroke-width="2.5" /></i>미제출</span>
-                <span><i class="legend-mark is-future is-text">아직</i>오늘 아직 안 냄</span>
-                <span><i class="legend-mark is-future">·</i>예정</span>
-                <span><i class="legend-mark is-off">휴</i>공휴일</span>
-            </p>
+                                    <button
+                                        v-if="cell.state === 'done'"
+                                        type="button"
+                                        class="mark is-done"
+                                        :aria-label="cellTitle(member, headers[index], cell)"
+                                        :title="cellTitle(member, headers[index], cell)"
+                                        @click="openReport(member, cell)"
+                                    >
+                                        <span class="dot"><Check :size="14" :stroke-width="3" aria-hidden="true" /></span>
+                                    </button>
+                                    <span
+                                        v-else
+                                        class="mark"
+                                        :class="cell.date === today ? 'is-today' : `is-${cell.state}`"
+                                        role="img"
+                                        :aria-label="cellTitle(member, headers[index], cell)"
+                                        :title="cellTitle(member, headers[index], cell)"
+                                    >
+                                        <span v-if="cell.state === 'missed'" class="dot"><X :size="12" :stroke-width="3" aria-hidden="true" /></span>
+                                        <template v-else-if="cell.state === 'off'">휴</template>
+                                        <!-- 요약줄 '오늘 아직 안 냄'과 같은 말로 보인다. 예전에는 예정(·)과 구분이 안 됐다. -->
+                                        <template v-else-if="cell.date === today">아직</template>
+                                        <span v-else class="dot"></span>
+                                    </span>
+                                </td>
+                                <td class="col-rate" :class="{ 'has-missed': member.missed }">
+                                    {{ member.submitted }}/{{ member.due }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="board-legend">
+                    <span><i class="dot is-done"><Check :size="10" :stroke-width="3" aria-hidden="true" /></i>제출 · 눌러서 보기</span>
+                    <span><i class="dot is-missed"><X :size="9" :stroke-width="3" aria-hidden="true" /></i>미제출</span>
+                    <span><i class="legend-word is-today">아직</i>오늘 아직 안 냄</span>
+                    <span><i class="dot is-future"></i>예정</span>
+                    <span><i class="legend-word">휴</i>공휴일</span>
+                </p>
+            </template>
         </section>
     </div>
 </template>

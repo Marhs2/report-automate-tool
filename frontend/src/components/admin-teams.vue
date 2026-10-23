@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { Plus } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
 import AppPageHeader from "./ui/AppPageHeader.vue";
@@ -55,10 +54,14 @@ const setLeader = async (team, value) => {
 const filteredTeams = computed(() => {
     const q = query.value.trim().toLowerCase();
     if (!q) return teams.value;
-    return teams.value.filter((team) =>
-        String(teamLabel(team)).toLowerCase().includes(q),
-    );
+    return teams.value.filter((team) => String(teamLabel(team)).toLowerCase().includes(q));
 });
+
+const countLabel = computed(() =>
+    filteredTeams.value.length === teams.value.length
+        ? `${teams.value.length}개`
+        : `${filteredTeams.value.length}/${teams.value.length}개`,
+);
 
 const saveTeam = async () => {
     const name = newTeam.value.trim();
@@ -84,7 +87,7 @@ const saveTeam = async () => {
     }
 };
 
-onMounted(async () => {
+const loadAll = async () => {
     isLoading.value = true;
     loadError.value = "";
     try {
@@ -98,80 +101,76 @@ onMounted(async () => {
     } finally {
         isLoading.value = false;
     }
-});
+};
+
+onMounted(loadAll);
 </script>
 
 <template>
-    <div :class="embedded ? 'settings-pane' : 'page'">
+    <div :class="embedded ? 'teams-admin' : 'page'">
         <AppPageHeader v-if="!embedded" subtitle="부서" />
 
-        <div v-if="teams.length > 0" class="team-toolbar">
-            <input
-                v-model="query"
-                class="input"
-                type="search"
-                placeholder="부서 이름 검색"
-                aria-label="부서 이름 검색"
-            />
-            <span class="team-count"
-                >{{ filteredTeams.length }}/{{ teams.length }}개</span
-            >
-        </div>
-
-        <div v-if="isLoading" class="empty-state">부서를 불러오는 중...</div>
-        <div v-else-if="loadError" class="empty-state">{{ loadError }}</div>
-        <div v-else-if="teams.length === 0" class="empty-state">
-            등록된 부서가 없습니다. 아래에서 만드세요.
-        </div>
-        <div v-else-if="filteredTeams.length === 0" class="empty-state">
-            '{{ query.trim() }}'에 해당하는 부서가 없습니다
-        </div>
-        <div v-else class="team-board">
-            <div
-                v-for="team in filteredTeams"
-                :key="team.id"
-                class="select-card"
-            >
-                <span class="avatar">{{
-                    String(teamLabel(team) || "?").slice(0, 1)
-                }}</span>
-                <span class="select-card-name">{{ teamLabel(team) }}</span>
-                <span class="select-card-meta">{{ memberCountOf(team) }}명</span>
-                <select
-                    class="input team-leader"
-                    :value="leaderValue(team)"
-                    :disabled="leaderSaving === team.id || !memberCountOf(team)"
-                    :aria-label="`${teamLabel(team)} 팀장`"
-                    @change="setLeader(team, $event.target.value)"
-                >
-                    <option value="">팀장 없음</option>
-                    <option v-for="member in membersOf(team)" :key="member.id" :value="String(member.id)">
-                        팀장 · {{ member.name }}
-                    </option>
-                </select>
-            </div>
-        </div>
-
-        <form class="card add-card" @submit.prevent="saveTeam">
-            <h2>새 부서</h2>
-            <div class="add-row">
+        <section class="card board" aria-label="부서 목록">
+            <div v-if="teams.length > 0" class="board-bar">
                 <input
-                    id="new-team"
-                    type="text"
-                    v-model="newTeam"
+                    v-model="query"
                     class="input"
-                    placeholder="부서 이름을 입력하세요"
-                    required
+                    type="search"
+                    placeholder="부서 이름 검색"
+                    aria-label="부서 이름 검색"
                 />
-                <button
-                    class="btn btn-primary"
-                    type="submit"
-                    :disabled="isSaving"
-                >
-                    <Plus :size="14" />
-                    {{ isSaving ? "생성 중..." : "생성" }}
-                </button>
+                <span class="board-count">{{ countLabel }}</span>
             </div>
+
+            <div v-if="isLoading" aria-busy="true">
+                <div v-for="n in 4" :key="n" class="skeleton-row" aria-hidden="true">
+                    <span class="skeleton is-name"></span>
+                    <span class="skeleton is-select"></span>
+                </div>
+                <span class="sr-only">부서를 불러오는 중</span>
+            </div>
+            <div v-else-if="loadError" class="board-state is-error" role="alert">
+                <p>{{ loadError }}</p>
+                <button type="button" class="btn btn-small" @click="loadAll">다시 시도</button>
+            </div>
+            <div v-else-if="teams.length === 0" class="board-state">
+                <p>등록된 부서가 없습니다. 새 부서 칸에서 만드세요.</p>
+            </div>
+            <div v-else-if="filteredTeams.length === 0" class="board-state">
+                <p>'{{ query.trim() }}'에 해당하는 부서가 없습니다</p>
+                <button type="button" class="btn btn-small btn-ghost" @click="query = ''">검색 지우기</button>
+            </div>
+            <ul v-else class="team-rows">
+                <li v-for="team in filteredTeams" :key="team.id" class="team-row">
+                    <span class="team-text">
+                        <span class="team-name">{{ teamLabel(team) }}</span>
+                        <span class="team-count">{{ memberCountOf(team) }}명</span>
+                    </span>
+                    <select
+                        class="input team-leader"
+                        :value="leaderValue(team)"
+                        :disabled="leaderSaving === team.id || !memberCountOf(team)"
+                        :aria-label="`${teamLabel(team)} 팀장`"
+                        @change="setLeader(team, $event.target.value)"
+                    >
+                        <option value="">팀장 없음</option>
+                        <option v-for="member in membersOf(team)" :key="member.id" :value="String(member.id)">
+                            팀장 · {{ member.name }}
+                        </option>
+                    </select>
+                </li>
+            </ul>
+        </section>
+
+        <form class="card side-board" aria-labelledby="new-team-title" @submit.prevent="saveTeam">
+            <h2 id="new-team-title" class="board-title">새 부서</h2>
+            <div class="field">
+                <label for="new-team">부서 이름</label>
+                <input id="new-team" v-model="newTeam" type="text" class="input" autocomplete="off" required />
+            </div>
+            <button class="btn btn-primary" type="submit" :disabled="isSaving">
+                {{ isSaving ? "생성 중..." : "생성" }}
+            </button>
         </form>
     </div>
 </template>

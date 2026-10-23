@@ -1,5 +1,9 @@
-/* 제목 줄 하나에 사람·날짜·상태·저장을 모은다. 스크롤해도 위에 붙어 있어 긴 보고 중간에서도 저장할 수 있다.
-   예전에는 저장 칸이 아래에 떠 있어 모바일에서 입력칸을 가렸다. */
+/* 분석 결과 · 보고 수정 (/report-result/:id?): 위에 붙는 저장 머리줄, 프로젝트마다 보드 하나, 오른쪽 원문 보드.
+   문서 틀(.content-container .projects-container .field-group .task-row .raw-container)은 report-doc.css.
+   값은 모두 tokens.css. */
+
+/* ---- 머리줄: 스크롤해도 위에 붙어 긴 보고 중간에서도 저장한다. 바탕은 필드색이라 보드가 그 아래로 지나간다. ---- */
+
 .detail-head {
     position: sticky;
     top: 0;
@@ -8,11 +12,43 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
-    margin: calc(-1 * var(--space-3)) 0 0;
+    gap: var(--space-2) var(--space-4);
+    margin: 0;
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
+}
+
+.detail-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    min-width: 0;
+}
+
+.detail-title h1 {
+    margin: 0;
+    font-size: var(--fs-24);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    letter-spacing: -0.01em;
+    color: var(--text-strong);
+}
+
+.detail-date,
+.detail-meta {
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    word-break: keep-all;
+}
+
+.detail-title .status-chip,
+.detail-title .btn {
+    align-self: center;
 }
 
 .detail-actions {
@@ -22,83 +58,77 @@
     margin-left: auto;
 }
 
-.project-more {
-    flex-shrink: 0;
-    width: var(--control-h-sm);
-    padding: 0;
-    justify-content: center;
+/* ---- 불러오는 중 · 못 불러옴 · 비어 있음 ---- */
+
+.detail-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.detail-skeleton i {
+    display: block;
+    width: 100%;
+    height: var(--space-4);
+    border-radius: var(--radius-xs);
+    background: var(--surface-soft);
+}
+
+.detail-skeleton i.is-title {
+    width: 40%;
+    height: var(--space-5);
+}
+
+.detail-skeleton i.is-short {
+    width: 60%;
+}
+
+.detail-skeleton p {
+    margin: var(--space-1) 0 0;
+    font-size: var(--fs-13);
+    line-height: var(--lh-base);
     color: var(--text-muted);
 }
 
-/* 빈 분류는 줄 대신 칩 한 줄. */
-.empty-fields {
+.detail-empty {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: var(--space-2);
-    margin-top: var(--space-2);
-    padding-top: var(--space-3);
-    border-top: 1px dashed var(--border);
 }
 
-.empty-fields-label {
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-.empty-field-add {
-    border-style: dashed;
-    color: var(--text-muted);
-}
-
-.detail-title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2) var(--space-3);
-    min-width: 0;
-}
-
-/* 다른 화면의 큰 제목과 같은 크기. */
-.detail-title h1 {
+.detail-empty-title {
     margin: 0;
-    font-family: var(--heading);
-    font-size: var(--fs-32);
-    font-weight: var(--fw-bold);
-    line-height: 1.2;
-    letter-spacing: -0.02em;
+    font: var(--type-heading);
     color: var(--text-strong);
 }
 
-.detail-date {
-    font-size: var(--fs-13);
-    color: var(--text);
+.detail-empty-title.is-danger {
+    color: var(--danger-fg);
 }
 
-.detail-title .status-chip {
-    align-self: center;
-    font-size: var(--fs-12);
-}
-
-.detail-summary {
-    flex-basis: 100%;
+.detail-empty-text {
     margin: 0;
-    font-size: var(--fs-13);
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
     color: var(--text-muted);
 }
+
+.detail-empty .btn {
+    margin-top: var(--space-2);
+}
+
+/* ---- 추출이 빈 결과 ---- */
 
 .empty-extract {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    border-style: dashed;
 }
 
 .empty-extract h2 {
     margin: 0;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
+    font: var(--type-heading);
     color: var(--text-strong);
 }
 
@@ -113,77 +143,10 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-    margin-top: var(--space-1);
+    margin-top: var(--space-2);
 }
 
-.reextract {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin: 0 0 var(--space-3);
-    padding: var(--space-3) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-}
-
-.reextract p {
-    margin: 0;
-    min-width: 0;
-    font-size: var(--fs-13);
-    line-height: 1.45;
-    color: var(--text);
-    word-break: keep-all;
-}
-
-.reextract-btn {
-    flex: none;
-    width: auto;
-}
-
-/* 읽기 모드: 입력칸 대신 문서로 읽는다. */
-.read-project-name {
-    margin: 0;
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    word-break: keep-all;
-}
-
-/* 읽기: 분류 태그 한 칸 + 항목 목록. 편집 화면과 같은 줄 구조다. */
-.read-block {
-    display: grid;
-    grid-template-columns: 6rem minmax(0, 1fr);
-    gap: var(--space-3);
-    align-items: start;
-}
-
-.read-block + .read-block {
-    margin-top: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border);
-}
-
-.read-block h3 {
-    margin: 2px 0 0;
-    font-size: var(--fs-13);
-}
-
-.read-list {
-    margin: 0;
-    padding-left: var(--space-5);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-}
-
-.read-list li {
-    font-size: var(--fs-14);
-    color: var(--text-strong);
-    line-height: var(--lh-relaxed);
-    word-break: keep-all;
-}
+/* ---- 프로젝트 보드 ---- */
 
 .projects-container {
     scroll-margin-top: calc(var(--topbar-height) + var(--space-4));
@@ -194,38 +157,102 @@
     border-bottom: 1px solid var(--border);
 }
 
+/* 원문의 형광 표시와 같은 색. 어느 프로젝트의 줄이 원문 어디서 왔는지 잇는 색 키다. */
 .project-dot {
     flex-shrink: 0;
     width: var(--space-2);
     height: var(--space-2);
-    border-radius: 50%;
+    border-radius: var(--radius-pill);
     background: var(--project-accent, var(--accent));
 }
 
+.project-more {
+    flex-shrink: 0;
+    width: var(--control-h-sm);
+    padding: 0;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+/* 빈 분류는 줄 대신 버튼 한 줄. */
+.empty-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+}
+
+.empty-fields-label {
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+}
+
+.empty-field-add {
+    border-style: dashed;
+    color: var(--text-muted);
+}
+
+/* ---- 읽기 ---- */
+
+.read-project-name {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.read-block {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
+    padding: var(--space-3) 0;
+}
+
+.read-block + .read-block {
+    border-top: 1px solid var(--border);
+}
+
+.read-block h3 {
+    margin: 0;
+    padding-top: 0.125rem;
+    font-size: var(--fs-13);
+}
+
+.read-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+    padding-left: var(--space-5);
+}
+
+.read-list li {
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+/* 프로젝트가 여럿일 때 위에서 건너뛰는 줄. */
 .project-nav {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-}
-
-.project-nav-label {
-    margin-right: var(--space-2);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    word-break: keep-all;
 }
 
 .project-nav-chip {
     --project-accent: var(--accent);
     display: inline-flex;
     align-items: center;
-    gap: var(--space-2);
     max-width: 15rem;
     height: var(--control-h-sm);
     padding: 0 var(--space-3);
@@ -233,8 +260,8 @@
     border-radius: var(--radius-sm);
     background: var(--surface);
     font: inherit;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
     color: var(--text-strong);
     white-space: nowrap;
     overflow: hidden;
@@ -247,109 +274,31 @@
     background: var(--surface-soft);
 }
 
-.project-nav-chip[data-accent="1"] {
-    --project-accent: var(--info-fg);
+.project-nav-chip:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
 }
 
-.project-nav-chip[data-accent="2"] {
-    --project-accent: var(--warning-fg);
-}
+.project-nav-chip[data-accent="1"] { --project-accent: var(--info-fg); }
+.project-nav-chip[data-accent="2"] { --project-accent: var(--warning-fg); }
+.project-nav-chip[data-accent="3"] { --project-accent: var(--success-fg); }
+.project-nav-chip[data-accent="4"] { --project-accent: var(--project-4-fg); }
+.project-nav-chip[data-accent="5"] { --project-accent: var(--project-5-fg); }
 
-.project-nav-chip[data-accent="3"] {
-    --project-accent: var(--success-fg);
-}
-
-.project-nav-chip[data-accent="4"] {
-    --project-accent: var(--project-4-fg);
-}
-
-.project-nav-chip[data-accent="5"] {
-    --project-accent: var(--project-5-fg);
-}
-
-@media (max-width: 860px) {
-    /* 폰은 창 전체가 스크롤되고 뒤로 가기 막대가 위에 붙어 있다. 그 아래에 붙는다. */
-    .detail-head {
-        top: var(--topbar-height);
-        align-items: flex-start;
-        gap: var(--space-2);
-        margin-bottom: var(--space-3);
-    }
-
-    .detail-actions {
-        flex-wrap: nowrap;
-        width: 100%;
-    }
-
-    .detail-actions .btn-primary {
-        flex: 1 1 auto;
-    }
-
-    .detail-actions .btn {
-        min-height: var(--control-h-lg);
-    }
-
-    .detail-title {
-        width: 100%;
-    }
-
-    .detail-title h1 {
-        font-size: var(--fs-24);
-    }
-
-    .reextract-btn {
-        min-height: var(--control-h-lg);
-    }
-
-    .project-nav {
-        flex-wrap: nowrap;
-        align-items: stretch;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-    }
-
-    .project-nav-label {
-        flex: none;
-        align-self: center;
-    }
-
-    .project-nav-chip {
-        flex: none;
-        max-width: 13.75rem;
-        min-height: var(--control-h-lg);
-    }
-}
-
-.report-doc .save-bar {
-    margin-top: var(--space-2);
-}
-
-.edit-quiet {
-    min-height: var(--control-h-lg);
-    padding: 0 var(--space-1);
-    border: 0;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-size: var(--fs-16);
-    cursor: pointer;
-}
-
-.edit-quiet:disabled {
-    opacity: 0.5;
-    cursor: default;
-}
+/* ---- 고치기(좁은 화면): 프로젝트 하나 · 종류 고르기 · 한 줄 넣기 ---- */
 
 .edit-current {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
 }
 
 .edit-current .input {
-    min-width: 0;
     flex: 1;
+    min-width: 0;
     min-height: var(--control-h-lg);
     font-size: var(--fs-16);
     font-weight: var(--fw-semibold);
@@ -357,43 +306,35 @@
 
 .edit-more {
     flex: none;
-    min-height: var(--control-h-lg);
-    padding: 0 var(--space-2);
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
     color: var(--accent-text);
-    font: inherit;
-    font-size: var(--fs-16);
-    cursor: pointer;
 }
 
-.edit-more:hover {
-    background: var(--surface-soft);
-    color: var(--text-strong);
+.edit-bucket {
+    padding: var(--space-3) 0;
 }
 
 .edit-bucket + .edit-bucket {
-    margin-top: var(--space-3);
+    border-top: 1px solid var(--border);
 }
 
 .edit-bucket h2 {
-    margin: 0.3125rem 0;
+    margin: 0 0 var(--space-2);
     font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
 }
 
 .edit-row {
     display: flex;
     align-items: center;
     gap: var(--space-2);
+}
+
+.edit-row + .edit-row {
     margin-top: var(--space-2);
 }
 
 .edit-row .input {
-    min-width: 0;
     flex: 1;
+    min-width: 0;
     min-height: var(--control-h-lg);
     font-size: var(--fs-16);
 }
@@ -401,23 +342,16 @@
 .edit-remove {
     flex: none;
     min-width: var(--control-h-lg);
-    min-height: var(--control-h-lg);
     padding: 0 var(--space-2);
-    border: 0;
-    background: transparent;
-    color: var(--danger-fg);
-    font: inherit;
-    font-size: var(--fs-14);
-    cursor: pointer;
 }
 
 .edit-empty {
-    margin: 0;
-    min-height: var(--control-h-lg);
     display: flex;
     align-items: center;
-    border-top: 1px solid var(--border);
+    min-height: var(--control-h-lg);
+    margin: 0;
     font-size: var(--fs-14);
+    line-height: var(--lh-base);
     color: var(--text-muted);
 }
 
@@ -425,7 +359,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    margin-top: var(--space-4);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
 }
 
 .edit-kinds {
@@ -440,7 +376,7 @@
     min-width: 0;
     min-height: var(--control-h-lg);
     padding: 0 var(--space-2);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text-strong);
@@ -454,7 +390,7 @@
 }
 
 .edit-kinds button:hover {
-    border-color: var(--border-strong);
+    border-color: var(--border-input);
 }
 
 .edit-kinds button.is-on {
@@ -471,16 +407,18 @@
 
 .edit-entry {
     display: flex;
-    gap: var(--space-2);
     align-items: center;
+    gap: var(--space-2);
 }
 
 .edit-entry .input {
-    min-width: 0;
     flex: 1;
+    min-width: 0;
     min-height: var(--control-h-lg);
     font-size: var(--fs-16);
 }
+
+/* ---- 프로젝트 고르기 대화상자 ---- */
 
 .edit-pick-list {
     display: flex;
@@ -493,22 +431,13 @@
 
 .edit-pick-row {
     display: flex;
-    gap: var(--space-2);
     align-items: center;
-}
-
-.edit-pick-row .edit-pick {
-    flex: 1;
-    min-width: 0;
-}
-
-.edit-pick-row .edit-drop {
-    flex: none;
-    margin: 0;
-    padding: 0 var(--space-1);
+    gap: var(--space-2);
 }
 
 .edit-pick {
+    flex: 1;
+    min-width: 0;
     min-height: var(--control-h-lg);
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
@@ -526,66 +455,134 @@
     background: var(--accent-soft);
 }
 
+.edit-pick:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.edit-drop {
+    flex: none;
+}
+
 .edit-project-add {
     display: flex;
-    gap: var(--space-2);
     align-items: center;
+    gap: var(--space-2);
     margin-bottom: var(--space-3);
 }
 
 .edit-project-add .input {
-    min-width: 0;
     flex: 1;
+    min-width: 0;
     min-height: var(--control-h-lg);
 }
 
-.edit-drop {
-    display: flex;
-    align-items: center;
-    min-height: var(--control-h-lg);
-    margin: 0 0 var(--space-2);
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--danger-fg);
-    font: inherit;
-    font-size: var(--fs-16);
-    cursor: pointer;
-}
+/* ---- 원문 보드 ---- */
 
-.app-dialog-actions .edit-quiet {
-    color: var(--danger-fg);
+.raw-container {
+    top: calc(var(--space-8) + var(--space-5));
 }
 
 .raw-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-2);
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
 }
 
 .raw-container .raw-head h2 {
     margin: 0;
     padding: 0;
     border: 0;
-    font-size: var(--fs-14);
+    font-size: var(--fs-16);
     font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
     color: var(--text-strong);
 }
 
 .raw-fold {
-    min-height: var(--control-h-sm);
-    padding: 0 var(--space-2);
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
+    flex: none;
+    margin-right: calc(-1 * var(--space-2));
     color: var(--accent-text);
-    font: inherit;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    cursor: pointer;
 }
 
-.raw-fold:hover {
-    background: var(--surface-soft);
+/* ---- 좁은 화면 ---- */
+
+@media (max-width: 860px) {
+    /* 폰은 창 전체가 스크롤되고 앱 바가 위에 붙어 있다. 그 아래에 붙는다. */
+    .detail-head {
+        top: var(--topbar-height);
+        align-items: flex-start;
+        gap: var(--space-2);
+    }
+
+    .detail-title {
+        width: 100%;
+    }
+
+    .detail-title h1 {
+        font-size: var(--fs-20);
+    }
+
+    /* 상태가 이름 옆에 먼저, 크기 글은 그 다음 줄로. */
+    .detail-meta {
+        order: 1;
+        flex-basis: 100%;
+    }
+
+    .reextract-btn,
+    .detail-title .btn {
+        min-height: var(--control-h-lg);
+    }
+
+    /* 다시 정리와 저장을 한 줄에. 붙어 있는 머리줄이 화면을 덜 가린다. */
+    .detail-actions {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .detail-actions .btn-primary {
+        grid-column: auto;
+    }
+
+    .detail-actions .btn-primary:only-child {
+        grid-column: 1 / -1;
+    }
+
+    .reextract-btn {
+        padding-left: var(--space-3);
+        padding-right: var(--space-3);
+    }
+
+    .project-head:has(.read-project-name) {
+        display: flex;
+        align-items: center;
+    }
+
+    .project-nav {
+        flex-wrap: nowrap;
+        align-items: stretch;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+    }
+
+    .project-nav-chip {
+        flex: none;
+        max-width: 13.75rem;
+        min-height: var(--control-h-lg);
+    }
+
+    .read-block {
+        grid-template-columns: 1fr;
+        gap: var(--space-2);
+    }
+
+    .raw-container {
+        top: auto;
+    }
 }

@@ -15,8 +15,16 @@
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css" />
     </noscript>
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#191918" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#edf1f3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f171c" media="(prefers-color-scheme: dark)" />
+    <!-- 첫 그림 전에 테마를 정한다. 늦게 정하면 다크 사용자가 흰 화면을 한 번 본다. 규칙은 src/composables/useTheme.js와 같다. -->
+    <script>
+      (function () {
+        var saved = localStorage.getItem("report-theme");
+        var dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>일일보고</title>
   </head>

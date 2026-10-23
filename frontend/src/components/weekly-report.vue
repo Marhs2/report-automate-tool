@@ -5,19 +5,20 @@ import { selectedUserId } from "../composables/useSelectedUser";
 import { isAdmin, leaderTeamId } from "../composables/useSession";
 import { useDialog } from "../composables/useDialog";
 import { saveAs } from "file-saver";
-import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Trash2 } from "lucide-vue-next";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import { projectsFromDeck, toWeeklyDeck } from "../lib/weeklyDeck";
 import { useSidebar } from "../composables/useSidebar";
 import WeeklyCollection from "./weekly-collection.vue";
+import WeekDots from "./ui/WeekDots.vue";
 import {
     isFutureDate,
     mondayOf,
+    todayString,
     weekdayLabelOf,
     weekKeyOfDates,
     weekRangeLabel,
 } from "../lib/dateScope";
-
 
 const router = useRouter();
 const { isNarrow } = useSidebar();
@@ -31,13 +32,19 @@ const {
 } = useApi();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
 
+/* ---- 상태 ------------------------------------------------------------ */
 const selects = ref([]);
 const weekDays = ref([]);
 const userId = ref(selectedUserId.value || "");
 const weeklyReport = ref(null);
 const isLoading = ref(false);
 const myDays = ref({});
+const weekLoading = ref(false);
+const weekError = ref("");
+const listError = ref("");
+const showRange = ref(false);
 
+/* ---- 날짜 도우미 ----------------------------------------------------- */
 const formatLocalDate = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -86,6 +93,13 @@ const workdaysBetween = (start, end) => {
     return days;
 };
 
+const shortDay = (dateStr) => {
+    const parts = String(dateStr).split("-");
+    if (parts.length < 3) return dateStr;
+    return `${Number(parts[1])}.${Number(parts[2])}`;
+};
+
+/* ---- 기간 ------------------------------------------------------------ */
 const openingWeek = thisWorkWeek();
 const rangeStart = ref(openingWeek.start);
 const rangeEnd = ref(openingWeek.end);
@@ -132,22 +146,20 @@ const resetThisWeek = () => {
     applyRange(week.start, week.end);
 };
 
+const prevWeek = () => shiftRange(-1);
+const nextWeek = () => shiftRange(1);
+
 const isThisWeek = computed(() => {
     const week = thisWorkWeek();
     return rangeStart.value === week.start && rangeEnd.value === week.end;
 });
-
-const shortDay = (dateStr) => {
-    const parts = String(dateStr).split("-");
-    if (parts.length < 3) return dateStr;
-    return `${Number(parts[1])}.${Number(parts[2])}`;
-};
 
 const headerTitle = computed(() => {
     if (!rangeStart.value || !rangeEnd.value) return "주간 보고서";
     return `${shortDay(rangeStart.value)} ~ ${shortDay(rangeEnd.value)}`;
 });
 
+/* ---- 날 고르기 ------------------------------------------------------- */
 const isDayOn = (dayDate) => selects.value.includes(dayDate);
 
 const toggleSelectDay = (dayDate) => {
@@ -160,37 +172,31 @@ const toggleSelectDay = (dayDate) => {
     );
 };
 
-const reportRange = (report) => {
-    const days = [...(report?.selectedDate || [])]
-        .map(normalizeDay)
-        .filter(Boolean)
-        .sort();
-    if (!days.length) return "";
-    if (days.length === 1) return days[0];
-    return `${days[0]} ~ ${days[days.length - 1]}`;
-};
-
-
-const prevWeek = () => shiftRange(-1);
-const nextWeek = () => shiftRange(1);
-
 /** 내가 그 날 일일보고를 냈는지. 주간보고는 내 일일보고만으로 만든다. */
 const hasMine = (dayDate) => (myDays.value[dayDate] || 0) > 0;
 
 /** 아직 오지 않은 날. 월요일에 화~금이 기본으로 켜져 있으면 끝난 주처럼 보인다. */
 const isFutureDay = (dayDate) => isFutureDate(dayDate);
-
-/** 날짜 칸 상태 태그 색. 쓴 날은 완료색, 아직 안 온 날은 회색, 보고 없는 날은 표시만. */
-const dayTone = (dayDate) => {
-    if (isFutureDay(dayDate)) return "is-next";
-    return hasMine(dayDate) ? "is-done" : "is-muted";
-};
-
-const showRange = ref(false);
+const isToday = (dayDate) => dayDate === todayString();
 
 const dayState = (dayDate) => {
     if (isFutureDay(dayDate)) return hasMine(dayDate) ? "예정 · 작성함" : "예정";
-    return hasMine(dayDate) ? "작성함" : "보고 없음";
+    if (hasMine(dayDate)) return "작성함";
+    return isToday(dayDate) ? "오늘 아직" : "보고 없음";
+};
+
+const dayTitle = (dayDate) => {
+    if (!hasMine(dayDate)) return "이 날 작성한 일일보고가 없습니다";
+    return isFutureDay(dayDate) ? "아직 오지 않은 날입니다" : null;
+};
+
+/** 팀 목록과 같은 점 언어로 그 날의 상태 하나. */
+const dotOf = (dayDate) => {
+    let state = "missing";
+    if (hasMine(dayDate)) state = isToday(dayDate) ? "today-done" : "done";
+    else if (isFutureDay(dayDate)) state = "future";
+    else if (isToday(dayDate)) state = "today";
+    return { label: weekdayName(dayDate), state };
 };
 
 const weekGroups = computed(() => {
@@ -210,6 +216,7 @@ const weekGroups = computed(() => {
         return {
             key: group.key,
             days: group.days,
+            dots: group.days.map(dotOf),
             label: `${shortDay(group.days[0])} ~ ${shortDay(group.days[group.days.length - 1])}`,
             summary: written ? `선택 ${picked}` : "보고 없음",
             picked,
@@ -218,6 +225,7 @@ const weekGroups = computed(() => {
 });
 
 const foldWeeks = computed(() => isNarrow.value && weekGroups.value.length > 1);
+const showWeekHeads = computed(() => weekGroups.value.length > 1);
 const openWeek = ref("");
 
 watch(weekGroups, (groups) => {
@@ -232,32 +240,20 @@ watch(weekGroups, (groups) => {
 
 weekDays.value = workdaysBetween(rangeStart.value, rangeEnd.value);
 
-const deleteWeekly = async (reportId) => {
-    const report = (weeklyReport.value || []).find((row) => String(row.id) === String(reportId));
-    // 목록 API는 memberId다. member_id만 보면 본인 보고서도 소유자가 비어 삭제가 막힌다.
-    const ownerId = report?.memberId ?? report?.member_id;
-    if (
-        !report ||
-        (String(ownerId) !== String(userId.value) && !isAdmin.value)
-    ) {
-        showAlert("자신의 주간 보고만 삭제할 수 있습니다.");
-        return;
-    }
-    if (!(await askConfirm("이 주간 보고서를 삭제할까요?"))) return;
-    isLoading.value = true;
-    try {
-        await deleteWeeklyReport(reportId);
-        showAlert("주간 보고서를 삭제했습니다.");
-        await fetchWeeklyReport();
-    } catch (error) {
-        const detail = error.response?.data?.detail;
-        console.error("주간 보고서 삭제 실패:", error);
-        showAlert(detail || "주간 보고서 삭제에 실패했습니다. 다시 시도해주세요.");
-    } finally {
-        isLoading.value = false;
-    }
-};
+const writtenDayCount = computed(() => weekDays.value.filter((day) => hasMine(day)).length);
 
+/** 지난 평일인데 일일보고가 없는 날. 초안에 '빠진 요일'로 적힌다. */
+const missingDayCount = computed(
+    () => weekDays.value.filter((day) => !hasMine(day) && !isFutureDay(day)).length,
+);
+
+const createSummary = computed(() => {
+    const bits = [`선택 ${selects.value.length}일`];
+    if (missingDayCount.value) bits.push(`미제출 ${missingDayCount.value}일은 초안에 표시돼요`);
+    return bits.join(" · ");
+});
+
+/* ---- 초안 만들기 ----------------------------------------------------- */
 /* 초안을 만드는 동안(AI 호출) 일일보고 추출과 같은 기다림 화면을 띄운다. 단계는 경과 시간으로만 넘긴다. */
 const DRAFT_STAGES = ["일일보고를 모으고 있어요", "프로젝트별로 묶고 있어요", "주간 문장으로 다듬고 있어요"];
 const draftWaiting = ref(false);
@@ -322,10 +318,13 @@ const sendDates = async () => {
     }
 };
 
+/* ---- 조회 ------------------------------------------------------------ */
 /** 고른 기간에 내가 낸 일일보고만 조회해 선택 가능한 날짜를 정한다. */
 const loadMyWeek = async () => {
     myDays.value = {};
+    weekError.value = "";
     if (!rangeStart.value || !rangeEnd.value || !userId.value) return;
+    weekLoading.value = true;
     try {
         const rows = await getUserActivities(
             Number(rangeStart.value.slice(0, 4)),
@@ -347,6 +346,9 @@ const loadMyWeek = async () => {
         );
     } catch (error) {
         console.error("내 일일보고 조회 실패:", error);
+        weekError.value = "이 기간의 내 일일보고를 불러오지 못했어요.";
+    } finally {
+        weekLoading.value = false;
     }
 };
 
@@ -356,11 +358,13 @@ const fetchWeeklyReport = async () => {
         return;
     }
     isLoading.value = true;
+    listError.value = "";
     try {
         weeklyReport.value = await getWeeklyReport(userId.value);
     } catch (error) {
         console.error("주간 보고서 조회 실패:", error);
         weeklyReport.value = [];
+        listError.value = "내 주간 보고서 목록을 불러오지 못했어요.";
     } finally {
         isLoading.value = false;
     }
@@ -368,6 +372,16 @@ const fetchWeeklyReport = async () => {
 
 const viewReport = (report) => {
     router.push(`/weekly-detail/${report.id}`);
+};
+
+const reportRange = (report) => {
+    const days = [...(report?.selectedDate || [])]
+        .map(normalizeDay)
+        .filter(Boolean)
+        .sort();
+    if (!days.length) return "";
+    if (days.length === 1) return days[0];
+    return `${days[0]} ~ ${days[days.length - 1]}`;
 };
 
 /* 주간보고는 한 주에 하나다.
@@ -400,16 +414,43 @@ const existingWeekly = computed(() => {
     return weeklyGroups.value.find((group) => group.key === key) || null;
 });
 
-/** 지난 평일인데 일일보고가 없는 날. 초안에 '빠진 요일'로 적힌다. */
-const missingDayCount = computed(
-    () => weekDays.value.filter((day) => !hasMine(day) && !isFutureDay(day)).length,
-);
+const projectNamesOf = (report) => {
+    const deck = toWeeklyDeck(report?.report);
+    const names = [...(deck.done || []), ...(deck.next || [])]
+        .map((section) => String(section.title || "").trim())
+        .filter(Boolean);
+    if (names.length) return [...new Set(names)];
+    return (report?.report?.projects || [])
+        .map((project) => project.projectName)
+        .filter(Boolean);
+};
 
-const createSummary = computed(() => {
-    const bits = [`선택 ${selects.value.length}일`];
-    if (missingDayCount.value) bits.push(`미제출 ${missingDayCount.value}일은 초안에 표시돼요`);
-    return bits.join(" · ");
-});
+/* ---- 삭제 · 정리 ------------------------------------------------------ */
+const deleteWeekly = async (reportId) => {
+    const report = (weeklyReport.value || []).find((row) => String(row.id) === String(reportId));
+    // 목록 API는 memberId다. member_id만 보면 본인 보고서도 소유자가 비어 삭제가 막힌다.
+    const ownerId = report?.memberId ?? report?.member_id;
+    if (
+        !report ||
+        (String(ownerId) !== String(userId.value) && !isAdmin.value)
+    ) {
+        showAlert("자신의 주간 보고만 삭제할 수 있습니다.");
+        return;
+    }
+    if (!(await askConfirm("이 주간 보고서를 삭제할까요?"))) return;
+    isLoading.value = true;
+    try {
+        await deleteWeeklyReport(reportId);
+        showAlert("주간 보고서를 삭제했습니다.");
+        await fetchWeeklyReport();
+    } catch (error) {
+        const detail = error.response?.data?.detail;
+        console.error("주간 보고서 삭제 실패:", error);
+        showAlert(detail || "주간 보고서 삭제에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+        isLoading.value = false;
+    }
+};
 
 /** 같은 주에 남은 옛 문서를 한 번에 치운다. */
 const cleanupOlder = async (group) => {
@@ -434,6 +475,25 @@ const cleanupOlder = async (group) => {
     } finally {
         isLoading.value = false;
     }
+};
+
+/* ---- 내려받기 -------------------------------------------------------- */
+const periodEndOf = (report) => {
+    const sortedDates = [...(report.selectedDate || [])]
+        .map((d) => formatLocalDate(new Date(d)))
+        .sort();
+    return sortedDates[sortedDates.length - 1] || "";
+};
+
+/** 팀 폴더에 그대로 넣을 수 있게 실제 파일명 규칙을 따른다: DXel 주간보고 20260918_경영지원센터 */
+const fileBaseName = (report) => {
+    const stamp = periodEndOf(report).replaceAll("-", "");
+    const center = String(report.report?.center || "").trim();
+    const owner =
+        center && center !== "미지정"
+            ? center
+            : report.memberName || `사용자${report.memberId}`;
+    return `DXel 주간보고 ${stamp}_${owner}`;
 };
 
 const downloadReport = async (report) => {
@@ -510,8 +570,6 @@ const downloadReport = async (report) => {
         const missing = [];
         const missing_count = missing.length;
 
-
-
         const data = {
             selectedDate: selectedDateRange,
             created_date,
@@ -529,33 +587,13 @@ const downloadReport = async (report) => {
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         });
 
-        const filename = `${fileBaseName(report)}.docx`;
-
-        saveAs(out, filename);
+        saveAs(out, `${fileBaseName(report)}.docx`);
     } catch (error) {
         console.error("보고서 다운로드 실패:", error);
         showAlert("Word 파일을 만들지 못했습니다. 페이지를 새로고침한 뒤 다시 받아 주세요.");
     } finally {
         isLoading.value = false;
     }
-};
-
-const periodEndOf = (report) => {
-    const sortedDates = [...(report.selectedDate || [])]
-        .map((d) => formatLocalDate(new Date(d)))
-        .sort();
-    return sortedDates[sortedDates.length - 1] || "";
-};
-
-/** 팀 폴더에 그대로 넣을 수 있게 실제 파일명 규칙을 따른다: DXel 주간보고 20260918_경영지원센터 */
-const fileBaseName = (report) => {
-    const stamp = periodEndOf(report).replaceAll("-", "");
-    const center = String(report.report?.center || "").trim();
-    const owner =
-        center && center !== "미지정"
-            ? center
-            : report.memberName || `사용자${report.memberId}`;
-    return `DXel 주간보고 ${stamp}_${owner}`;
 };
 
 const downloadPptx = async (report) => {
@@ -566,8 +604,7 @@ const downloadPptx = async (report) => {
     isLoading.value = true;
     try {
         const blob = await downloadWeeklyPptx(report.id);
-        const filename = `${fileBaseName(report)}.pptx`;
-        saveAs(blob, filename);
+        saveAs(blob, `${fileBaseName(report)}.pptx`);
     } catch (error) {
         console.error("PPT 다운로드 실패:", error);
         showAlert("PPT 다운로드 중 오류가 발생했습니다.");
@@ -576,18 +613,7 @@ const downloadPptx = async (report) => {
     }
 };
 
-
-const projectNamesOf = (report) => {
-    const deck = toWeeklyDeck(report?.report);
-    const names = [...(deck.done || []), ...(deck.next || [])]
-        .map((section) => String(section.title || "").trim())
-        .filter(Boolean);
-    if (names.length) return [...new Set(names)];
-    return (report?.report?.projects || [])
-        .map((project) => project.projectName)
-        .filter(Boolean);
-};
-
+/* ---- 시작 ------------------------------------------------------------ */
 watch(
     selectedUserId,
     async (id) => {
@@ -605,150 +631,172 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="page weekly-report-page">
-        <!-- 1. 초안 만들기: 기간 → 날 고르기 → 만들기. 위에서 아래로 한 번에 끝난다. -->
-        <section class="wk-card wk-create" aria-labelledby="create-title">
-            <!-- 세 카드 모두 같은 머리줄: 제목 · 기간 · 오른쪽 조작. -->
-            <header class="group-head wk-head">
+    <div class="page weekly-page">
+        <!-- 1. 초안 만들기. 이 화면의 초점: 기간 → 날 고르기 → 만들기 한 버튼. -->
+        <section class="card board board-create" aria-labelledby="create-title">
+            <header class="board-head">
                 <h2 id="create-title">주간 초안 만들기</h2>
-                <span class="wk-period">
-                    {{ headerTitle }}
-                    <span v-if="isThisWeek" class="cat-tag is-progress">이번 주</span>
-                </span>
-                <div class="wk-head-nav">
+                <div class="board-tools">
                     <div class="stepper" role="group" aria-label="주 이동">
-                        <button type="button" aria-label="이전 주" @click="prevWeek" :disabled="isLoading">
+                        <button type="button" aria-label="이전 주" :disabled="isLoading" @click="prevWeek">
                             <ChevronLeft :size="16" />
                         </button>
-                        <button type="button" class="stepper-reset" @click="resetThisWeek" :disabled="isLoading || isThisWeek">
+                        <button type="button" class="stepper-reset" :disabled="isLoading || isThisWeek" @click="resetThisWeek">
                             이번 주
                         </button>
-                        <button type="button" aria-label="다음 주" @click="nextWeek" :disabled="isLoading">
+                        <button type="button" aria-label="다음 주" :disabled="isLoading" @click="nextWeek">
                             <ChevronRight :size="16" />
                         </button>
                     </div>
                     <button
                         type="button"
-                        class="btn btn-ghost btn-small range-toggle"
+                        class="btn btn-ghost"
                         :class="{ 'is-active': showRange }"
                         :aria-expanded="showRange"
                         aria-controls="week-range"
                         @click="showRange = !showRange"
                     >
-                        <CalendarRange :size="16" />
                         기간 지정
                     </button>
                 </div>
             </header>
 
-            <div v-if="showRange" id="week-range" class="week-range">
+            <p class="view-period create-period">
+                {{ headerTitle }}
+                <span v-if="isThisWeek" class="chip is-accent">이번 주</span>
+            </p>
+
+            <div v-if="showRange" id="week-range" class="range-tray">
                 <label>
-                    <span>시작</span>
-                    <input
-                        class="input"
-                        type="date"
-                        :value="rangeStart"
-                        :disabled="isLoading"
-                        @change="pickStart($event.target.value)"
-                    />
+                    시작
+                    <input class="input" type="date" :value="rangeStart" :disabled="isLoading" @change="pickStart($event.target.value)" />
                 </label>
                 <label>
-                    <span>끝</span>
-                    <input
-                        class="input"
-                        type="date"
-                        :value="rangeEnd"
-                        :disabled="isLoading"
-                        @change="pickEnd($event.target.value)"
-                    />
+                    끝
+                    <input class="input" type="date" :value="rangeEnd" :disabled="isLoading" @change="pickEnd($event.target.value)" />
                 </label>
             </div>
 
-            <p class="wk-hint">일일보고를 쓴 날만 고를 수 있어요. 고른 날의 내용으로 초안을 만들어요.</p>
+            <div v-if="weekError" class="board-error" role="alert">
+                <span>{{ weekError }}</span>
+                <button type="button" class="btn btn-small" :disabled="weekLoading" @click="loadMyWeek">다시 시도</button>
+            </div>
 
-            <div class="week-folds">
-                <div v-for="group in weekGroups" :key="group.key" class="week-fold">
+            <div v-else-if="weekLoading" class="day-tiles is-skeleton" role="status" aria-label="내 일일보고를 불러오는 중">
+                <span v-for="n in 5" :key="n" class="day-tile is-placeholder" aria-hidden="true">
+                    <span class="skel skel-short"></span>
+                    <span class="skel skel-wide"></span>
+                    <span class="skel skel-short"></span>
+                </span>
+            </div>
+
+            <div v-else class="weeks">
+                <div v-for="group in weekGroups" :key="group.key" class="week">
                     <button
                         v-if="foldWeeks"
                         type="button"
-                        class="week-fold-head"
+                        class="week-head"
                         :aria-expanded="openWeek === group.key"
                         @click="openWeek = openWeek === group.key ? '' : group.key"
                     >
                         <span>{{ group.label }}</span>
-                        <span class="week-fold-meta">{{ group.summary }}</span>
+                        <WeekDots :days="group.dots" />
+                        <span class="week-head-meta">{{ group.summary }}</span>
                         <ChevronDown :size="16" :class="{ 'is-open': openWeek === group.key }" />
                     </button>
+                    <div v-else-if="showWeekHeads" class="week-head">
+                        <span>{{ group.label }}</span>
+                        <WeekDots :days="group.dots" />
+                        <span class="week-head-meta">{{ group.summary }}</span>
+                    </div>
                     <div
                         v-if="!foldWeeks || openWeek === group.key"
-                        class="day-chips"
+                        class="day-tiles"
                         role="group"
                         :aria-label="group.label"
                     >
                         <button
-                            v-for="dayDate in group.days"
+                            v-for="(dayDate, index) in group.days"
                             :key="dayDate"
                             type="button"
-                            class="day-chip"
+                            class="day-tile"
                             :class="{
-                                on: isDayOn(dayDate),
-                                'is-blank': !hasMine(dayDate),
+                                'is-on': isDayOn(dayDate),
+                                'is-written': hasMine(dayDate),
                                 'is-future': isFutureDay(dayDate),
                             }"
                             :aria-pressed="isDayOn(dayDate)"
                             :disabled="!hasMine(dayDate)"
-                            :title="hasMine(dayDate) ? (isFutureDay(dayDate) ? '아직 오지 않은 날입니다' : null) : '이 날 작성한 일일보고가 없습니다'"
+                            :title="dayTitle(dayDate)"
                             @click="toggleSelectDay(dayDate)"
                         >
-                            <span class="day-chip-name">{{ weekdayName(dayDate) }}</span>
-                            <span class="day-chip-date">{{ shortDay(dayDate) }}</span>
-                            <span class="cat-tag day-chip-state" :class="dayTone(dayDate)">{{ dayState(dayDate) }}</span>
+                            <span class="tile-day">{{ weekdayName(dayDate) }}</span>
+                            <span class="tile-date">{{ shortDay(dayDate) }}</span>
+                            <span class="tile-state">
+                                <span aria-hidden="true"><WeekDots :days="[group.dots[index]]" /></span>
+                                {{ dayState(dayDate) }}
+                            </span>
+                            <span v-if="isDayOn(dayDate)" class="tile-check" aria-hidden="true">
+                                <Check :size="13" :stroke-width="3" />
+                            </span>
                         </button>
                     </div>
                 </div>
+                <p v-if="!writtenDayCount" class="board-note">
+                    이 기간에 쓴 일일보고가 없어요. 오늘 보고를 쓰면 여기서 고를 수 있어요.
+                    <router-link class="btn btn-ghost btn-small" to="/">오늘 보고 쓰기</router-link>
+                </p>
             </div>
 
             <!-- 같은 주 보고가 이미 있으면 그걸 여는 게 먼저다. 새로 만들기는 보조 버튼으로 내린다. -->
-            <div v-if="existingWeekly" class="callout is-warning" role="status">
-                <FileText :size="20" class="callout-icon" aria-hidden="true" />
+            <div v-if="existingWeekly" class="callout is-warning existing-callout" role="status">
                 <div class="callout-text">
                     <p class="callout-title">이 주의 주간보고가 이미 있어요</p>
                     <p class="callout-body">새 초안을 만들면 지금 있는 주간보고가 새 내용으로 바뀌어요.</p>
                 </div>
-                <button
-                    type="button"
-                    class="btn btn-primary"
-                    :disabled="isLoading"
-                    @click="viewReport(existingWeekly.latest)"
-                >
+                <button type="button" class="btn btn-primary" :disabled="isLoading" @click="viewReport(existingWeekly.latest)">
                     기존 보고 열기
                 </button>
             </div>
 
-            <div class="wk-foot">
+            <footer class="board-foot">
                 <p class="create-summary">{{ createSummary }}</p>
                 <button
                     type="button"
-                    class="btn create-week-btn"
+                    class="btn create-btn"
                     :class="{ 'btn-primary': !existingWeekly }"
-                    @click="sendDates()"
                     :disabled="isLoading || selects.length === 0"
+                    @click="sendDates()"
                 >
                     {{ isLoading ? "만드는 중..." : existingWeekly ? "새 초안으로 다시 만들기" : "주간 초안 만들기" }}
                 </button>
-            </div>
+            </footer>
         </section>
 
-        <!-- 2. 만든 보고서: 기간 · 프로젝트를 읽고, 내려받기는 바로 옆에서. -->
-        <section class="wk-card group-block wk-made" aria-labelledby="made-title">
-            <div class="group-head wk-head">
+        <!-- 2. 만든 보고서: 주마다 한 줄. 열기는 줄, 내려받기는 줄 안의 버튼. -->
+        <section class="card board board-made" aria-labelledby="made-title">
+            <header class="board-head">
                 <h2 id="made-title">내가 만든 주간 보고서</h2>
-                <span v-if="weeklyGroups.length" class="group-meta">{{ weeklyGroups.length }}건</span>
+                <span v-if="weeklyGroups.length" class="board-meta">{{ weeklyGroups.length }}건</span>
+            </header>
+
+            <div v-if="listError" class="board-error" role="alert">
+                <span>{{ listError }}</span>
+                <button type="button" class="btn btn-small" :disabled="isLoading" @click="fetchWeeklyReport">다시 시도</button>
             </div>
-            <div class="group">
-                <p v-if="weeklyGroups.length === 0" class="group-empty">
-                    아직 만든 주간 보고서가 없어요. 위에서 날을 고르고 초안을 만들어 보세요.
-                </p>
+
+            <div v-else-if="weeklyReport === null" class="board-list" role="status" aria-label="주간 보고서 목록을 불러오는 중">
+                <div v-for="n in 2" :key="n" class="skel-row" aria-hidden="true">
+                    <span class="skel skel-wide"></span>
+                    <span class="skel skel-short"></span>
+                </div>
+            </div>
+
+            <p v-else-if="weeklyGroups.length === 0" class="board-note">
+                아직 만든 주간 보고서가 없어요. 날을 고르고 초안을 만들면 여기에 쌓여요.
+            </p>
+
+            <div v-else class="board-list">
                 <div
                     v-for="group in weeklyGroups"
                     :key="group.key"
@@ -759,14 +807,20 @@ onMounted(async () => {
                     @click="!isLoading && viewReport(group.latest)"
                     @keydown.enter="!isLoading && viewReport(group.latest)"
                 >
-                    <FileText :size="18" class="made-icon" aria-hidden="true" />
                     <span class="row-main">
                         <span class="row-title">{{ group.label }}</span>
-                        <span class="row-sub">
-                            {{ projectNamesOf(group.latest).join(" · ") || "프로젝트 없음" }}
-                        </span>
+                        <span class="row-sub">{{ projectNamesOf(group.latest).join(" · ") || "프로젝트 없음" }}</span>
                     </span>
-                    <span class="row-end made-actions" @click.stop @keydown.stop>
+                    <ChevronRight :size="16" class="row-chevron" aria-hidden="true" />
+                    <span class="made-actions" @click.stop @keydown.stop>
+                        <button type="button" class="btn btn-small" :disabled="isLoading" @click="downloadReport(group.latest)">
+                            <Download :size="14" />
+                            Word
+                        </button>
+                        <button v-if="!isNarrow" type="button" class="btn btn-small" :disabled="isLoading" @click="downloadPptx(group.latest)">
+                            <Download :size="14" />
+                            PPT
+                        </button>
                         <button
                             v-if="group.older.length"
                             type="button"
@@ -777,39 +831,25 @@ onMounted(async () => {
                         >
                             이전 초안 {{ group.older.length }}개 정리
                         </button>
-                        <button type="button" class="btn btn-small" @click="downloadReport(group.latest)" :disabled="isLoading">
-                            <Download :size="14" />
-                            Word
-                        </button>
-                        <button
-                            v-if="!isNarrow"
-                            type="button"
-                            class="btn btn-small"
-                            @click="downloadPptx(group.latest)"
-                            :disabled="isLoading"
-                        >
-                            <Download :size="14" />
-                            PPT
-                        </button>
                         <button
                             type="button"
-                            class="row-icon-btn"
+                            class="row-icon-btn made-delete"
                             :aria-label="`${group.label} 삭제`"
                             title="삭제"
-                            @click="deleteWeekly(group.latest.id)"
                             :disabled="isLoading"
+                            @click="deleteWeekly(group.latest.id)"
                         >
                             <Trash2 :size="16" />
                         </button>
                     </span>
-                    <ChevronRight :size="16" class="row-chevron" />
                 </div>
             </div>
         </section>
 
         <!-- 3. 취합: 관리자는 전 부서, 팀장은 자기 부서를 한 PPT로. 팀원에게는 없다. -->
-        <WeeklyCollection v-if="isAdmin || leaderTeamId" class="wk-card wk-collect" />
+        <WeeklyCollection v-if="isAdmin || leaderTeamId" class="card board board-collect" />
     </div>
+
     <Teleport to="body">
         <div v-if="draftWaiting" class="submit-wait" role="status" aria-live="polite">
             <div class="submit-wait-card">

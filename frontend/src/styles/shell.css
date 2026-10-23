@@ -42,12 +42,10 @@
     background: var(--surface-soft);
 }
 
+/* 현장 보드: 회색 트레이 없이 글자 탭만 둔다. 지금 있는 곳은 청록 바탕 하나로만 표시한다. */
 .appbar-tabs {
     display: inline-flex;
-    gap: 2px;
-    padding: 3px;
-    border-radius: var(--radius);
-    background: var(--surface-soft);
+    gap: var(--space-1);
 }
 
 .appbar-tab {
@@ -67,10 +65,13 @@
     color: var(--text-strong);
 }
 
+.appbar-tab:hover {
+    background: var(--surface-soft);
+}
+
 .appbar-tab.is-active {
-    background: var(--surface);
-    color: var(--text-strong);
-    box-shadow: var(--shadow-1);
+    background: var(--accent-soft);
+    color: var(--accent-text);
 }
 
 .appbar-tab:focus-visible {
@@ -189,6 +190,42 @@
     color: var(--text-muted);
 }
 
+.account-menu-theme {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    margin-bottom: var(--space-1);
+    border-bottom: 1px solid var(--border);
+}
+
+.account-menu-seg {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+}
+
+.account-menu-seg button {
+    min-height: var(--control-h-sm);
+    border: 0;
+    border-radius: calc(var(--radius-sm) - 2px);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
+}
+
+.account-menu-seg button.is-active {
+    background: var(--surface);
+    color: var(--text-strong);
+    box-shadow: var(--shadow-1);
+}
+
 .account-menu-row.is-danger {
     justify-content: center;
     color: var(--danger-fg);
@@ -253,7 +290,7 @@
 
 .page-hero-title {
     margin: 0;
-    font-size: var(--fs-32);
+    font-size: var(--fs-30);
     font-weight: var(--fw-bold);
     letter-spacing: -0.02em;
     line-height: 1.2;

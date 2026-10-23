@@ -100,11 +100,21 @@ const kindFromQuery = (value) => {
 const kind = ref(kindFromQuery(route.query.kind));
 const recordId = ref(null);
 const records = ref([]);
-const isLoading = ref(false);
+// records가 어느 종류의 목록인지. 종류를 바꾸는 동안 앞 종류의 목록이 새 제목 아래 보이지 않게 한다.
+const recordsKind = ref("");
+const recordLoading = ref(false);
 const isSaving = ref(false);
-const loadError = ref("");
+// 기록 하나를 못 받으면 양식 자리에, 목록을 못 받으면 목록 보드 안에 알린다.
+const recordError = ref("");
+const listError = ref("");
 const formError = ref("");
 let loadedKey = "";
+
+// /compose/:id를 처음 열어 기록이 아직 붙지 않은 동안. 종류를 몰라서 양식 대신 빈 모양이나 오류를 보인다.
+const recordPending = computed(() => Boolean(route.params.id) && kind.value === "daily");
+const isDailyTab = computed(() => kind.value === "daily" && !route.params.id);
+const activeKind = computed(() => (recordPending.value ? "" : kind.value));
+const listReady = computed(() => recordsKind.value === kind.value);
 
 const blankFollow = () => ({ task: "", owner: "", due: "" });
 
@@ -198,11 +208,25 @@ const applyRecord = (row) => {
 };
 
 const loadRecords = async () => {
-    if (!["meeting", "general", "sales"].includes(kind.value)) {
+    const forKind = kind.value;
+    if (!["meeting", "general", "sales"].includes(forKind)) {
         records.value = [];
+        recordsKind.value = forKind;
         return;
     }
-    records.value = await getWorkRecords(kind.value);
+    records.value = await getWorkRecords(forKind);
+    recordsKind.value = forKind;
+};
+
+/** 목록 보드의 다시 시도. 쓰던 양식은 그대로 두고 목록만 다시 받는다. */
+const reloadRecords = async () => {
+    listError.value = "";
+    try {
+        await loadRecords();
+    } catch (error) {
+        console.error("목록 조회 실패:", error);
+        listError.value = errorText(error, "기록을 불러오지 못했습니다.");
+    }
 };
 
 const loadFromRoute = async () => {
@@ -210,13 +234,18 @@ const loadFromRoute = async () => {
     const key = id ? `edit:${id}` : `new:${route.query.kind || "daily"}`;
     if (key === loadedKey) return;
     loadedKey = key;
-    isLoading.value = true;
-    loadError.value = "";
+    recordError.value = "";
+    listError.value = "";
     formError.value = "";
+    let stage = "list";
     try {
         if (id) {
+            stage = "record";
+            recordLoading.value = true;
             const row = await getWorkRecord(id);
+            recordLoading.value = false;
             applyRecord(row);
+            stage = "list";
             await loadRecords();
             return;
         }
@@ -225,7 +254,7 @@ const loadFromRoute = async () => {
         if (next === "daily" || next === "general" || next === "cards") {
             kind.value = "daily";
             records.value = [];
-            isLoading.value = false;
+            recordsKind.value = "daily";
             if (next !== "daily") {
                 loadedKey = "";
                 await router.replace({ path: "/compose", query: { kind: "daily" } });
@@ -238,17 +267,17 @@ const loadFromRoute = async () => {
     } catch (error) {
         loadedKey = "";
         console.error("작성 화면 조회 실패:", error);
-        loadError.value = errorText(error, "기록을 불러오지 못했습니다.");
+        const message = errorText(error, "기록을 불러오지 못했습니다.");
+        if (stage === "record") recordError.value = message;
+        else listError.value = message;
     } finally {
-        isLoading.value = false;
+        recordLoading.value = false;
     }
 };
 
-const switchKind = (next) => {
-    if (String(route.params.id || "") || kind.value !== next) {
-        loadedKey = "";
-    }
-    router.push({ path: "/compose", query: { kind: next } });
+const retryRecord = () => {
+    loadedKey = "";
+    loadFromRoute();
 };
 
 const startNew = () => {
@@ -259,6 +288,11 @@ const startNew = () => {
 const openRecord = (id) => {
     loadedKey = "";
     router.push(`/compose/${id}`);
+};
+
+// 넓은 화면에서는 목록을 늘 펼쳐 둔다. 접고 펴는 것은 좁은 화면에서만.
+const onListHeadClick = (event) => {
+    if (!isNarrow.value) event.preventDefault();
 };
 
 const payload = () => {
@@ -567,61 +601,82 @@ watch(selectedUserId, loadUserName);
 
 <template>
     <div class="page is-wide">
-        <div class="kind-bar">
-            <nav class="app-tabs kind-switch" aria-label="작성">
-                <router-link
-                    v-for="item in COMPOSE_CHOICES"
-                    :key="item.id"
-                    :to="item.to"
-                    class="app-tab"
-                    :class="{ 'is-active': kind === item.id }"
-                    :aria-current="kind === item.id ? 'page' : null"
-                >
-                    {{ item.label }}
-                </router-link>
-            </nav>
-        </div>
+        <nav class="seg kind-seg" aria-label="작성할 보고">
+            <router-link
+                v-for="item in COMPOSE_CHOICES"
+                :key="item.id"
+                :to="item.to"
+                :class="{ 'is-on': activeKind === item.id }"
+                :aria-current="activeKind === item.id ? 'page' : null"
+            >
+                {{ item.label }}
+            </router-link>
+        </nav>
 
-        <Report v-if="kind === 'daily'" />
-        <template v-else>
-        <p v-if="isLoading" class="list-status" role="status">불러오는 중</p>
-        <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
+        <Report v-if="isDailyTab" />
 
-        <div class="compose-layout">
-            <form ref="composeForm" class="card compose-card" novalidate @submit.prevent="save">
-                <!-- 일일보고 탭과 같은 머리줄: 누가 · 언제 · 저장됐는지. -->
-                <div class="write-head">
-                    <input
-                        id="work-date"
-                        v-model="form.reportDate"
-                        class="input write-date"
-                        type="date"
-                        aria-label="작성 날짜"
-                        required
-                    />
-                    <span class="status-chip" :class="recordId ? 'is-saved' : 'is-draft'">
-                        {{ recordId ? "저장됨" : `새 ${KIND_LABELS[kind]}` }}
-                    </span>
-                    <!-- 저장은 머리줄에 붙어 있다. 아래에 떠 있던 저장 칸은 긴 양식에서 내용을 가렸다. -->
-                    <div v-if="showsForm" class="write-actions">
-                        <button v-if="recordId" type="button" class="btn btn-ghost btn-danger" @click="remove">삭제</button>
-                        <button v-if="recordId" type="button" class="btn" @click="startNew">새로 작성</button>
-                        <button type="submit" class="btn btn-primary" :disabled="isSaving">
-                            {{ isSaving ? "저장 중" : recordId ? "수정" : "저장" }}
-                        </button>
+        <div v-else class="compose-layout">
+            <div v-if="recordPending && !recordError" class="compose-main compose-skeleton" aria-busy="true">
+                <p class="sr-only" role="status">기록을 불러오는 중</p>
+                <div class="save-bar" aria-hidden="true">
+                    <span class="skel is-control" />
+                </div>
+                <div class="card board" aria-hidden="true">
+                    <div class="skel-head"><span class="skel is-heading" /></div>
+                    <div class="board-body skel-grid">
+                        <span v-for="n in 4" :key="n" class="skel-field">
+                            <span class="skel is-label" />
+                            <span class="skel is-control" />
+                        </span>
                     </div>
                 </div>
-                <p v-if="showsForm && formError" class="form-error" role="alert">{{ formError }}</p>
+            </div>
+
+            <section v-else-if="recordError" class="card board compose-main" aria-label="기록 열기">
+                <div class="board-body load-fail">
+                    <p class="fail-text" role="alert">{{ recordError }}</p>
+                    <button type="button" class="btn" @click="retryRecord">다시 시도</button>
+                </div>
+            </section>
+
+            <form v-else ref="composeForm" class="compose-main compose-form" novalidate @submit.prevent="save">
+                <div class="save-dock">
+                    <div class="save-bar">
+                        <input
+                            id="work-date"
+                            v-model="form.reportDate"
+                            class="input save-date"
+                            type="date"
+                            aria-label="작성 날짜"
+                            required
+                        />
+                        <span v-if="recordLoading" class="save-status save-loading" role="status">불러오는 중</span>
+                        <span v-else class="status-chip save-status" :class="recordId ? 'is-saved' : 'is-draft'">
+                            {{ recordId ? "저장됨" : `새 ${KIND_LABELS[kind]}` }}
+                        </span>
+                        <div v-if="showsForm" class="save-actions">
+                            <div v-if="recordId" class="save-more">
+                                <button type="button" class="btn btn-danger" @click="remove">삭제</button>
+                                <button type="button" class="btn" @click="startNew">새로 작성</button>
+                            </div>
+                            <button type="submit" class="btn btn-primary" :disabled="isSaving">
+                                {{ isSaving ? "저장 중" : recordId ? "수정" : "저장" }}
+                            </button>
+                        </div>
+                        <p v-if="showsForm && formError" class="save-error" role="alert">{{ formError }}</p>
+                    </div>
+                </div>
 
                 <section
                     v-if="!showsForm"
-                    class="form-section record-stage"
+                    class="card board record-board"
                     :class="{ 'is-recording': recording }"
                     aria-labelledby="sec-voice"
                 >
-                    <h2 id="sec-voice" class="sr-only">회의 녹음</h2>
-                    <!-- 녹음 단계의 주인공은 버튼 하나. 카드 가운데에 크게 두고, 나머지는 그 아래로 모은다. -->
-                    <div class="record-center">
+                    <div class="board-head">
+                        <h2 id="sec-voice" class="board-title">녹음으로 채우기</h2>
+                    </div>
+                    <div class="record-body">
                         <button
                             type="button"
                             class="record-btn"
@@ -639,247 +694,279 @@ watch(selectedUserId, loadUserName);
                             <span class="record-dot" aria-hidden="true" />{{ formatClock(recordSeconds) }}
                         </p>
                         <p v-else-if="voiceStatus" class="record-status" role="status">{{ voiceStatus }}</p>
-                        <p v-else class="record-help">
-                            회의를 시작하면서 누르세요. 정지하면 제목, 안건, 결정, 할 일을 채운 회의록이 열립니다.
-                        </p>
-                    </div>
-                    <div v-if="recording" class="voice-meter" aria-hidden="true">
-                        <span :style="{ transform: `scaleX(${micLevel})` }" />
-                    </div>
-                    <div v-if="recording && form.transcript" ref="liveBox" class="live-text" aria-live="polite">
-                        <p>{{ form.transcript }}</p>
-                    </div>
-                    <div v-else-if="showTranscript" class="live-text">
-                        <p>{{ form.transcript }}</p>
-                    </div>
-
-                    <div v-if="voiceError" class="form-error voice-error" role="alert">
-                        <span>{{ voiceError }}</span>
-                        <ol v-if="micDenied" class="mic-help">
-                            <li><b>브라우저</b> 주소창 왼쪽 아이콘 → 사이트 설정 → 마이크 <b>허용</b> → 새로고침</li>
-                            <li><b>Mac</b> 시스템 설정 → 개인정보 보호 및 보안 → 마이크 → 쓰는 브라우저 켜기</li>
-                            <li><b>Windows</b> 설정 → 개인 정보 및 보안 → 마이크 → 마이크 액세스 켜기</li>
-                            <li><b>iPhone</b> 설정 → Safari → 마이크 → 허용</li>
-                        </ol>
-                        <template v-if="failedChunks.length && !voiceBusy">
-                            <button type="button" class="btn btn-small" @click="finishAndSummarize">
-                                다시 받아 적기
-                            </button>
-                            <button type="button" class="btn btn-ghost btn-small" @click="summarizeWithoutFailed">
-                                받아 적은 데까지 정리
-                            </button>
-                        </template>
-                        <button
-                            v-else-if="showTranscript && !voiceBusy"
-                            type="button"
-                            class="btn btn-small"
-                            @click="summarize"
-                        >
-                            다시 정리
-                        </button>
-                    </div>
-                    <button
-                        v-if="!voiceBusy"
-                        type="button"
-                        class="btn voice-skip"
-                        @click="writeWithoutRecording"
-                    >
-                        녹음 없이 직접 쓰기
-                    </button>
-                </section>
-
-                <template v-if="showsForm">
-                <p v-if="summaryText" class="voice-note" role="status">{{ summaryText }}</p>
-
-                <!-- 제목이 이 기록의 머리글이다. 다른 칸보다 크게 둬서 무엇을 쓰는지 먼저 보이게 한다. -->
-                <input
-                    id="work-title"
-                    v-model="form.title"
-                    class="title-input"
-                    type="text"
-                    aria-label="제목"
-                    :required="kind === 'general'"
-                    :placeholder="kind === 'general' ? '제목' : '제목 (비워 두면 내용으로 붙입니다)'"
-                />
-
-                <section class="form-section" aria-labelledby="sec-basic">
-                    <h2 id="sec-basic" class="section-title">
-                        {{ kind === "meeting" ? "회의 정보" : kind === "sales" ? "프로젝트" : "기본 정보" }}
-                    </h2>
-                    <div class="detail-grid" :class="{ 'is-pair': kind === 'meeting' }">
-                        <AppField
-                            :label="kind === 'sales' ? '프로젝트명' : '관련 프로젝트'"
-                            for-id="work-project"
-                        >
-                            <input
-                                id="work-project"
-                                v-model="form.projectName"
-                                class="input"
-                                type="text"
-                                list="work-project-options"
-                                autocomplete="off"
-                                :required="kind === 'sales'"
-                            />
-                            <datalist id="work-project-options">
-                                <option v-for="name in projectOptions" :key="name" :value="name" />
-                            </datalist>
-                        </AppField>
-                        <template v-if="kind === 'meeting'">
-                            <AppField label="일시" for-id="meeting-at">
-                                <input id="meeting-at" v-model="form.heldAt" class="input" type="datetime-local" />
-                            </AppField>
-                            <AppField label="장소" for-id="meeting-place">
-                                <input id="meeting-place" v-model="form.place" class="input" type="text" />
-                            </AppField>
-                            <AppField label="참석자" for-id="meeting-people">
-                                <input
-                                    id="meeting-people"
-                                    v-model="form.attendees"
-                                    class="input"
-                                    type="text"
-                                    placeholder="쉼표로 구분"
-                                />
-                            </AppField>
-                        </template>
-                    </div>
-                </section>
-
-                <template v-if="kind === 'meeting'">
-                    <section class="form-section" aria-labelledby="sec-meeting">
-                        <h2 id="sec-meeting" class="section-title">회의 내용</h2>
-                        <div class="pair-grid">
-                        <AppField label="안건" for-id="meeting-agenda">
-                            <textarea
-                                id="meeting-agenda"
-                                v-model="form.agenda"
-                                v-autosize
-                                class="textarea grow"
-                                rows="3"
-                                placeholder="- 논의한 주제"
-                            />
-                        </AppField>
-                        <AppField label="결정" for-id="meeting-decisions">
-                            <textarea
-                                id="meeting-decisions"
-                                v-model="form.decisions"
-                                v-autosize
-                                class="textarea grow"
-                                rows="3"
-                                placeholder="- 정해진 것"
-                            />
-                        </AppField>
+                        <div v-if="recording" class="voice-meter" aria-hidden="true">
+                            <span :style="{ transform: `scaleX(${micLevel})` }" />
                         </div>
-                    </section>
-
-                    <section class="form-section" aria-labelledby="sec-follow">
-                        <div class="section-head">
-                            <h2 id="sec-follow" class="section-title">후속 할 일</h2>
-                            <button type="button" class="btn btn-small" @click="addFollowup">할 일 추가</button>
+                        <div v-if="recording && form.transcript" ref="liveBox" class="live-text" aria-live="polite">
+                            <p>{{ form.transcript }}</p>
                         </div>
-                        <!-- 한 할 일이 한 줄: 할 일 · 담당 · 기한 · 빼기. 좁은 화면에서는 두 줄. -->
-                        <div class="follow-list">
-                            <div v-for="(row, index) in form.followups" :key="index" class="follow-row">
-                                <input
-                                    v-model="row.task"
-                                    class="input follow-task"
-                                    type="text"
-                                    placeholder="할 일"
-                                    :aria-label="`후속 할 일 ${index + 1}`"
-                                />
-                                <input
-                                    v-model="row.owner"
-                                    class="input follow-owner"
-                                    type="text"
-                                    placeholder="담당"
-                                    :aria-label="`후속 할 일 ${index + 1} 담당`"
-                                />
-                                <input
-                                    v-model="row.due"
-                                    class="input follow-due"
-                                    type="date"
-                                    :aria-label="`후속 할 일 ${index + 1} 기한`"
-                                />
-                                <button
-                                    type="button"
-                                    class="btn btn-small btn-danger follow-remove"
-                                    :aria-label="`후속 할 일 ${index + 1} 빼기`"
-                                    @click="removeFollowup(index)"
-                                >
-                                    빼기
-                                </button>
+                        <div v-else-if="showTranscript" class="live-text">
+                            <p>{{ form.transcript }}</p>
+                        </div>
+
+                        <div v-if="voiceError" class="voice-error" role="alert">
+                            <p class="voice-error-text">{{ voiceError }}</p>
+                            <ol v-if="micDenied" class="mic-help">
+                                <li><b>브라우저</b> 주소창 왼쪽 아이콘 → 사이트 설정 → 마이크 <b>허용</b> → 새로고침</li>
+                                <li><b>Mac</b> 시스템 설정 → 개인정보 보호 및 보안 → 마이크 → 쓰는 브라우저 켜기</li>
+                                <li><b>Windows</b> 설정 → 개인 정보 및 보안 → 마이크 → 마이크 액세스 켜기</li>
+                                <li><b>iPhone</b> 설정 → Safari → 마이크 → 허용</li>
+                            </ol>
+                            <div v-if="!voiceBusy && (failedChunks.length || showTranscript)" class="voice-retry">
+                                <template v-if="failedChunks.length">
+                                    <button type="button" class="btn btn-small" @click="finishAndSummarize">
+                                        다시 받아 적기
+                                    </button>
+                                    <button type="button" class="btn btn-ghost btn-small" @click="summarizeWithoutFailed">
+                                        받아 적은 데까지 정리
+                                    </button>
+                                </template>
+                                <button v-else type="button" class="btn btn-small" @click="summarize">다시 정리</button>
                             </div>
                         </div>
-                    </section>
-                </template>
 
-                <section v-else-if="kind === 'general'" class="form-section" aria-labelledby="sec-body">
-                    <h2 id="sec-body" class="section-title">내용</h2>
-                    <AppField label="본문" for-id="general-body">
-                        <textarea id="general-body" v-model="form.body" v-autosize class="textarea grow" rows="6" required />
-                    </AppField>
+                        <button v-if="!voiceBusy" type="button" class="btn voice-skip" @click="writeWithoutRecording">
+                            녹음 없이 직접 쓰기
+                        </button>
+                    </div>
                 </section>
 
                 <template v-else>
-                    <section class="form-section" aria-labelledby="sec-contact">
-                        <h2 id="sec-contact" class="section-title">담당자</h2>
-                        <div class="detail-grid">
-                            <AppField label="담당자명" for-id="sales-name">
-                                <input id="sales-name" v-model="form.contactName" class="input" type="text" required />
-                            </AppField>
-                            <AppField label="직함" for-id="sales-title">
-                                <input id="sales-title" v-model="form.jobTitle" class="input" type="text" />
-                            </AppField>
-                            <AppField label="소속" for-id="sales-org">
-                                <input id="sales-org" v-model="form.organization" class="input" type="text" />
-                            </AppField>
-                            <AppField label="전화번호 (또는 이메일)" for-id="sales-phone">
-                                <input id="sales-phone" v-model="form.phone" class="input" type="tel" />
-                            </AppField>
-                            <AppField label="이메일" for-id="sales-email">
-                                <input id="sales-email" v-model="form.email" class="input" type="email" />
+                    <p v-if="summaryText" class="callout is-info summary-note" role="status">{{ summaryText }}</p>
+
+                    <!-- 제목이 이 기록의 머리글이라 첫 보드의 머리줄 자리에 크게 둔다. -->
+                    <section class="card board" aria-labelledby="sec-basic">
+                        <h2 id="sec-basic" class="sr-only">
+                            {{ kind === "meeting" ? "회의 정보" : kind === "sales" ? "프로젝트" : "기본 정보" }}
+                        </h2>
+                        <input
+                            id="work-title"
+                            v-model="form.title"
+                            class="title-input"
+                            type="text"
+                            aria-label="제목"
+                            :required="kind === 'general'"
+                            :placeholder="kind === 'general' ? '제목' : '제목 (비워 두면 내용으로 붙입니다)'"
+                        />
+                        <div class="board-body">
+                            <div class="field-grid">
+                                <AppField
+                                    :label="kind === 'sales' ? '프로젝트명' : '관련 프로젝트'"
+                                    for-id="work-project"
+                                >
+                                    <input
+                                        id="work-project"
+                                        v-model="form.projectName"
+                                        class="input"
+                                        type="text"
+                                        list="work-project-options"
+                                        autocomplete="off"
+                                        :required="kind === 'sales'"
+                                    />
+                                    <datalist id="work-project-options">
+                                        <option v-for="name in projectOptions" :key="name" :value="name" />
+                                    </datalist>
+                                </AppField>
+                                <template v-if="kind === 'meeting'">
+                                    <AppField label="일시" for-id="meeting-at">
+                                        <input id="meeting-at" v-model="form.heldAt" class="input" type="datetime-local" />
+                                    </AppField>
+                                    <AppField label="장소" for-id="meeting-place">
+                                        <input id="meeting-place" v-model="form.place" class="input" type="text" />
+                                    </AppField>
+                                    <AppField label="참석자" for-id="meeting-people">
+                                        <input
+                                            id="meeting-people"
+                                            v-model="form.attendees"
+                                            class="input"
+                                            type="text"
+                                            placeholder="쉼표로 구분"
+                                        />
+                                    </AppField>
+                                </template>
+                            </div>
+                        </div>
+                    </section>
+
+                    <template v-if="kind === 'meeting'">
+                        <section class="card board" aria-labelledby="sec-meeting">
+                            <div class="board-head">
+                                <h2 id="sec-meeting" class="board-title">회의 내용</h2>
+                            </div>
+                            <div class="board-body">
+                                <div class="pair-grid">
+                                    <AppField label="안건" for-id="meeting-agenda">
+                                        <textarea
+                                            id="meeting-agenda"
+                                            v-model="form.agenda"
+                                            v-autosize
+                                            class="textarea grow"
+                                            rows="3"
+                                            placeholder="- 논의한 주제"
+                                        />
+                                    </AppField>
+                                    <AppField label="결정" for-id="meeting-decisions">
+                                        <textarea
+                                            id="meeting-decisions"
+                                            v-model="form.decisions"
+                                            v-autosize
+                                            class="textarea grow"
+                                            rows="3"
+                                            placeholder="- 정해진 것"
+                                        />
+                                    </AppField>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="card board" aria-labelledby="sec-follow">
+                            <div class="board-head">
+                                <h2 id="sec-follow" class="board-title">후속 할 일</h2>
+                                <button type="button" class="btn btn-small" @click="addFollowup">할 일 추가</button>
+                            </div>
+                            <!-- 할 일 하나가 한 줄: 할 일 · 담당 · 기한 · 빼기. 보드가 좁으면 두 줄. -->
+                            <div class="follow-list">
+                                <div v-for="(row, index) in form.followups" :key="index" class="follow-row">
+                                    <input
+                                        v-model="row.task"
+                                        class="input follow-task"
+                                        type="text"
+                                        placeholder="할 일"
+                                        :aria-label="`후속 할 일 ${index + 1}`"
+                                    />
+                                    <input
+                                        v-model="row.owner"
+                                        class="input follow-owner"
+                                        type="text"
+                                        placeholder="담당"
+                                        :aria-label="`후속 할 일 ${index + 1} 담당`"
+                                    />
+                                    <!-- 날짜 칸은 자리 표시 글을 못 보여서(iPhone은 빈 칸) 이름을 옆에 붙인다. -->
+                                    <label class="follow-due">
+                                        <span class="follow-due-label" aria-hidden="true">기한</span>
+                                        <input
+                                            v-model="row.due"
+                                            class="input"
+                                            type="date"
+                                            :aria-label="`후속 할 일 ${index + 1} 기한`"
+                                        />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        class="btn btn-small btn-danger follow-remove"
+                                        :aria-label="`후속 할 일 ${index + 1} 빼기`"
+                                        @click="removeFollowup(index)"
+                                    >
+                                        빼기
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+                    </template>
+
+                    <section v-else-if="kind === 'general'" class="card board" aria-labelledby="sec-body">
+                        <div class="board-head">
+                            <h2 id="sec-body" class="board-title">내용</h2>
+                        </div>
+                        <div class="board-body">
+                            <AppField label="본문" for-id="general-body">
+                                <textarea
+                                    id="general-body"
+                                    v-model="form.body"
+                                    v-autosize
+                                    class="textarea grow"
+                                    rows="6"
+                                    required
+                                />
                             </AppField>
                         </div>
                     </section>
 
-                    <section class="form-section" aria-labelledby="sec-progress">
-                        <h2 id="sec-progress" class="section-title">진행</h2>
-                        <div class="pair-grid">
-                        <AppField label="진행사항" for-id="sales-progress">
-                            <textarea
-                                id="sales-progress"
-                                v-model="form.progress"
-                                v-autosize
-                                class="textarea grow"
-                                rows="3"
-                                required
-                            />
-                        </AppField>
-                        <AppField label="추후 진행사항" for-id="sales-next">
-                            <textarea id="sales-next" v-model="form.nextSteps" v-autosize class="textarea grow" rows="2" />
-                        </AppField>
-                        </div>
-                    </section>
-                </template>
+                    <template v-else>
+                        <section class="card board" aria-labelledby="sec-contact">
+                            <div class="board-head">
+                                <h2 id="sec-contact" class="board-title">담당자</h2>
+                            </div>
+                            <div class="board-body">
+                                <div class="contact-grid">
+                                    <AppField class="is-third" label="담당자명" for-id="sales-name">
+                                        <input id="sales-name" v-model="form.contactName" class="input" type="text" required />
+                                    </AppField>
+                                    <AppField class="is-third" label="직함" for-id="sales-title">
+                                        <input id="sales-title" v-model="form.jobTitle" class="input" type="text" />
+                                    </AppField>
+                                    <AppField class="is-third is-own-row" label="소속" for-id="sales-org">
+                                        <input id="sales-org" v-model="form.organization" class="input" type="text" />
+                                    </AppField>
+                                    <AppField class="is-half" label="전화번호 (또는 이메일)" for-id="sales-phone">
+                                        <input id="sales-phone" v-model="form.phone" class="input" type="tel" />
+                                    </AppField>
+                                    <AppField class="is-half" label="이메일" for-id="sales-email">
+                                        <input id="sales-email" v-model="form.email" class="input" type="email" />
+                                    </AppField>
+                                </div>
+                            </div>
+                        </section>
 
+                        <section class="card board" aria-labelledby="sec-progress">
+                            <div class="board-head">
+                                <h2 id="sec-progress" class="board-title">진행</h2>
+                            </div>
+                            <div class="board-body">
+                                <div class="pair-grid">
+                                    <AppField label="진행사항" for-id="sales-progress">
+                                        <textarea
+                                            id="sales-progress"
+                                            v-model="form.progress"
+                                            v-autosize
+                                            class="textarea grow"
+                                            rows="3"
+                                            required
+                                        />
+                                    </AppField>
+                                    <AppField label="추후 진행사항" for-id="sales-next">
+                                        <textarea
+                                            id="sales-next"
+                                            v-model="form.nextSteps"
+                                            v-autosize
+                                            class="textarea grow"
+                                            rows="3"
+                                        />
+                                    </AppField>
+                                </div>
+                            </div>
+                        </section>
+                    </template>
                 </template>
             </form>
 
             <!-- 넓은 화면에서는 옆에 펼쳐 두고, 좁은 화면에서는 접어서 양식 아래 한 줄로 둔다. -->
-            <details class="group-block side-list" :open="!isNarrow">
-                <summary class="group-head">
-                    <h2>내가 쓴 {{ KIND_LABELS[kind] }}</h2>
-                    <span v-if="records.length" class="group-meta">{{ records.length }}건</span>
+            <details v-if="!recordPending" class="card board list-board" :open="!isNarrow || Boolean(listError)">
+                <summary class="board-head list-head" :tabindex="isNarrow ? null : -1" @click="onListHeadClick">
+                    <h2 class="board-title">내가 쓴 {{ KIND_LABELS[kind] }}</h2>
+                    <span v-if="listReady && records.length" class="list-count">{{ records.length }}건</span>
+                    <span class="list-toggle" aria-hidden="true" />
                 </summary>
-                <div class="group">
-                    <p v-if="records.length === 0" class="group-empty">
-                        아직 없어요. 저장하면 여기에 쌓여요.
-                    </p>
+                <div v-if="listError" class="list-state is-error">
+                    <p role="alert">{{ listError }}</p>
+                    <button type="button" class="btn btn-small" @click="reloadRecords">다시 시도</button>
+                </div>
+                <div v-else-if="!listReady" class="list-skeleton" aria-busy="true">
+                    <p class="sr-only" role="status">목록을 불러오는 중</p>
+                    <span v-for="n in 3" :key="n" class="skel-row" aria-hidden="true">
+                        <span class="skel is-title" />
+                        <span class="skel is-sub" />
+                    </span>
+                </div>
+                <p v-else-if="records.length === 0" class="list-state">아직 없어요. 저장하면 여기에 쌓여요.</p>
+                <div v-else class="list-rows">
                     <button
                         v-for="row in records"
                         :key="row.id"
                         type="button"
                         class="row"
                         :class="{ 'is-current': row.id === recordId }"
+                        :aria-current="row.id === recordId ? 'true' : null"
                         @click="openRecord(row.id)"
                     >
                         <span class="row-main">
@@ -892,7 +979,6 @@ watch(selectedUserId, loadUserName);
                 </div>
             </details>
         </div>
-        </template>
     </div>
 </template>
 

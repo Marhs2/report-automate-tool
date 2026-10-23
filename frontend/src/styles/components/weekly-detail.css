@@ -1,187 +1,510 @@
-/* 사람 · 기간 · 상태 · 저장이 한 줄. 스크롤해도 위에 붙고, 수정 중에는 칸 이동 칩이 함께 붙는다. */
-.detail-head {
+/* ------------------------------------------------------------------
+   주간 보고서 읽기 · 수정 (/weekly-detail/:id). DESIGN.md "현장 보드".
+   위에 붙는 저장 머리줄 하나, 그 아래 프로젝트마다 보드 하나.
+   공유 규칙(.card .btn .seg .state-chip .cat-tag, report-doc의 .task-row
+   .add-btn .remove-btn)을 그대로 쓰고 여기서는 배치만 정한다.
+   값은 tokens.css의 토큰만 쓴다.
+   ------------------------------------------------------------------ */
+
+/* ---- 저장 머리줄 ---------------------------------------------------
+   앱 바와 같은 흰 띠. 페이지 여백까지 넓혀서 보드 위를 덮는 도구줄로 읽힌다.
+   그림자 없이 아래 실선 하나로 떠 있음을 알린다. */
+.write-head {
+    --write-bleed: var(--space-7);
     position: sticky;
     top: 0;
     z-index: var(--z-sticky);
     display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0 calc(-1 * var(--write-bleed));
+    padding: var(--space-3) var(--write-bleed);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.write-head-row {
+    display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
-    margin: calc(-1 * var(--space-3)) 0 0;
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
+    gap: var(--space-2) var(--space-4);
+    min-width: 0;
 }
 
-.section-jump {
+.write-who {
     display: flex;
-    flex-basis: 100%;
-    gap: var(--space-2);
-    overflow-x: auto;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
 }
 
-.section-jump-chip {
+.write-name {
+    margin: 0;
+    overflow: hidden;
+    font-size: var(--fs-20);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    letter-spacing: -0.01em;
+    color: var(--text-strong);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    word-break: keep-all;
+}
+
+.write-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    margin: 0;
+    font-size: var(--fs-13);
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.write-period {
+    font-weight: var(--fw-medium);
+    color: var(--text);
+}
+
+.write-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+}
+
+/* "일일보고로"와 "다시 뽑기"가 따로 flex 항목이라 .btn의 gap이 띄어쓰기에 더해진다. */
+.write-reextract {
+    gap: 0;
+}
+
+/* ---- 칸 이동 칩 ----------------------------------------------------
+   누르면 그 보드로 가는 버튼. 회색 트레이 + 굵은 숫자라 동작으로 읽힌다. */
+.write-jump {
+    display: flex;
+    gap: var(--space-1);
+    margin: 0 calc(-1 * var(--write-bleed));
+    padding: 0 var(--write-bleed);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.write-jump::-webkit-scrollbar {
+    display: none;
+}
+
+.write-jump-chip {
     display: inline-flex;
     flex: none;
     align-items: center;
     gap: var(--space-1);
     height: var(--control-h-sm);
     padding: 0 var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
-    font-size: var(--fs-13);
-    cursor: pointer;
-}
-
-.section-jump-chip:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-soft);
-}
-
-.section-jump-count {
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-/* 칩으로 옮겨 갔을 때 고정 머리줄 아래로 들어가지 않게 한다. */
-[id^="jump-"] {
-    scroll-margin-top: 7.5rem;
-}
-
-.detail-title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2) var(--space-3);
-    min-width: 0;
-}
-
-.detail-title h1 {
-    margin: 0;
-    font-family: var(--heading);
-    font-size: var(--fs-24);
-    letter-spacing: -0.02em;
-    color: var(--text-strong);
-}
-
-.detail-period {
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.detail-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: var(--space-2);
-}
-
-.detail-copy-col {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-2);
-}
-
-.read-project-name {
-    margin: 0 0 var(--space-4);
-    font-size: var(--fs-16);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-    word-break: keep-all;
-}
-
-.read-col-head {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    margin: 0 0 var(--space-3);
-    font-family: var(--sans);
-    font-size: var(--fs-13);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.read-col-head span {
-    font-size: var(--fs-11);
-    font-weight: var(--fw-medium);
-    color: var(--text);
-}
-
-.read-kind+.read-kind {
-    margin-top: var(--space-4);
-}
-
-.read-kind h4 {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    margin: 0 0 var(--space-2);
-    font-size: var(--fs-12);
-}
-
-.read-count {
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-.detail-title .state-chip {
-    align-self: center;
-}
-
-/* 읽기 · 수정 전환. 한때 인라인 색으로 칠하던 버튼을 분명한 두 칸으로 바꿨다. */
-.mode-switch {
-    display: inline-flex;
-    padding: 2px;
+    border: 0;
     border-radius: var(--radius-sm);
     background: var(--surface-soft);
-}
-
-.mode-switch button {
-    height: 1.75rem;
-    padding: 0 var(--space-3);
-    border: 0;
-    border-radius: var(--radius-xs);
-    background: transparent;
-    color: var(--text-muted);
+    color: var(--text);
     font: inherit;
     font-size: var(--fs-13);
     font-weight: var(--fw-medium);
+    white-space: nowrap;
     cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
 }
 
-.mode-switch button.is-on {
-    background: var(--surface);
-    box-shadow: 0 0 0 1px var(--border);
+.write-jump-chip:hover {
+    background: var(--surface-press);
     color: var(--text-strong);
-    font-weight: var(--fw-semibold);
 }
 
-.mode-switch button:focus-visible {
+.write-jump-chip:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
 }
 
-.extras-label {
-    margin: var(--space-6) 0 0;
+.write-jump-count {
     font-size: var(--fs-12);
     font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 칩으로 옮겨 갔을 때 붙어 있는 머리줄 아래로 들어가지 않게 한다. */
+[id^="jump-"] {
+    scroll-margin-top: 7.5rem;
+}
+
+/* ---- 보드 ------------------------------------------------------------
+   제목 줄 + 실선, 그 아래 내용. 보드 안에 보드를 두지 않는다. */
+.board {
+    min-width: 0;
+}
+
+.board-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--control-h);
+    margin: 0 0 var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+}
+
+.board-title {
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+/* ---- 접는 보드(details) ----------------------------------------------
+   닫혀 있으면 제목 줄만, 열리면 제목 줄 아래 실선과 내용.
+   꺾쇠는 currentColor 마스크라 두 테마에서 글자색을 따른다. */
+.fold > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.fold > summary::-webkit-details-marker {
+    display: none;
+}
+
+.fold-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--control-h);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+}
+
+.fold[open] > .fold-head {
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+}
+
+.fold-head::after {
+    content: "";
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    margin-left: auto;
+    background: var(--text-muted);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    transition: transform var(--dur-fast) var(--ease);
+}
+
+.fold[open] > .fold-head::after {
+    transform: rotate(180deg);
+}
+
+.fold-head:hover .board-title {
+    color: var(--accent-text);
+}
+
+.fold-head:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.fold-count {
+    flex-shrink: 0;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.fold-hint {
+    min-width: 0;
+    font-size: var(--fs-13);
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+.fold-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.fold-action {
+    flex-shrink: 0;
+}
+
+/* ---- 읽기 -----------------------------------------------------------
+   열 제목은 13px 굵게, 항목은 16px 줄 간격 1.6에 줄 사이 실선. */
+.col-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.col-head-meta {
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.read-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-width: 0;
+}
+
+.read-list li {
+    padding: var(--space-3) 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-strong);
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+.read-list li + li {
+    border-top: 1px solid var(--border);
+}
+
+.read-empty {
+    margin: 0;
+    padding: var(--space-3) 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
     color: var(--text-muted);
 }
 
-/* 공지 제목도 프로젝트 이름처럼 글자로 보이다가 누르면 입력칸이 된다. */
+/* 분류 태그를 왼쪽 칸에 두고 항목을 오른쪽에 쌓는다. 태그는 첫 줄 글자 높이에 맞춘다. */
+.read-group {
+    display: grid;
+    grid-template-columns: 3.75rem minmax(0, 1fr);
+    gap: 0 var(--space-3);
+    align-items: start;
+}
+
+.read-group + .read-group {
+    border-top: 1px solid var(--border);
+}
+
+.read-group-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding-top: var(--space-3);
+    line-height: var(--lh-base);
+}
+
+.read-count {
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.read-section + .read-section {
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
+}
+
+/* ---- 두 칸(진행 현황 · 향후일정) -------------------------------------
+   면 대신 가운데 세로선 하나. 폰에서는 위아래로 쌓고 가로선으로 나눈다. */
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 var(--space-5);
+    min-width: 0;
+}
+
+.split > .split-col + .split-col {
+    padding-left: var(--space-5);
+    border-left: 1px solid var(--border);
+}
+
+.split-col {
+    min-width: 0;
+}
+
+/* ---- 수정 -----------------------------------------------------------
+   report-doc.css가 줄 입력칸의 모양을, 여기는 보드 안 배치를 맡는다. */
+.split > .field-group {
+    margin: 0;
+    padding: 0;
+}
+
+.split > .field-group > h2 {
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.project-block .project-head {
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+}
+
+.task-row {
+    align-items: flex-start;
+}
+
+/* 한 줄짜리 입력칸. 글이 늘면 growEditor가 높이를 키운다. */
+.task-editor {
+    min-height: var(--control-h);
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+    line-height: var(--lh-base);
+    resize: none;
+    overflow: hidden;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-4);
+    min-width: 0;
+}
+
+.meta-grid .input {
+    width: 100%;
+    min-width: 0;
+}
+
+/* PPT 전용 칸: 제목 한 줄 아래 접는 보드 셋. 페이지 간격(24px)보다 촘촘하게 붙인다. */
+.extras {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+.extras-label {
+    margin: var(--space-2) 0 0;
+    font: var(--type-section);
+    color: var(--text-strong);
+}
+
+.notice-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: var(--space-3) 0;
+}
+
+.notice-block + .notice-block {
+    border-top: 1px solid var(--border);
+}
+
+.notice-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2);
+    align-items: center;
+    min-width: 0;
+}
+
+.notice-head .input {
+    width: 100%;
+    min-width: 0;
+}
+
 .report-doc .notice-title-input {
     font-size: var(--fs-16);
+}
+
+.notice-block .add-btn {
+    align-self: flex-start;
 }
 
 /* report-doc.css가 줄의 입력칸을 모두 flex: 1로 두어 날짜가 반을 차지했다. */
 .report-doc .task-row .event-when {
     flex: 0 0 4.5rem;
+}
+
+/* ---- 센터 협업 표 --------------------------------------------------- */
+.collab-grid {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.collab-head,
+.collab-row {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.collab-head {
+    padding: 0 0 var(--space-2);
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+}
+
+.collab-row:last-child {
+    border-bottom: 0;
+}
+
+.collab-code {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding-top: var(--space-2);
+    font-size: var(--fs-14);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
+}
+
+.collab-cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.collab-cell .add-btn {
+    align-self: flex-start;
+}
+
+.collab-cell-label {
+    display: none;
+    font-size: var(--fs-12);
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
 }
 
 .collab-add {
@@ -193,17 +516,86 @@
 }
 
 .collab-add-label {
-    font-size: var(--fs-12);
+    font-size: var(--fs-13);
     font-weight: var(--fw-semibold);
     color: var(--text-muted);
 }
 
-/* 형식 고르기 창: 세 형식을 슬라이드 축소판으로 나란히. 색은 PPT 마스터(남색 본문 · 흰/회색 머리줄)를 따른다. */
+/* ---- 상태 보드: 불러오는 중 · 못 불러옴 · 비어 있음 ------------------- */
+.write-state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-4);
+}
+
+.write-state-text {
+    flex: 1 1 16rem;
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+    word-break: keep-all;
+}
+
+.write-state-text.is-error {
+    color: var(--danger-fg);
+}
+
+/* 뼈대: 보드와 같은 자리에 같은 크기의 회색 막대. 움직이지 않는다(MOTION 1). */
+.write-skeleton .split-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+}
+
+.skel {
+    display: block;
+    height: 0.875rem;
+    border-radius: var(--radius-xs);
+    background: var(--surface-soft);
+}
+
+.skel.is-title {
+    width: 40%;
+    height: 1.125rem;
+}
+
+.skel.is-head {
+    width: 30%;
+    height: 0.75rem;
+}
+
+.skel.is-short {
+    width: 60%;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ---- 형식 고르기 창 ----------------------------------------------------
+   세 형식을 슬라이드 축소판으로 나란히. 슬라이드 색은 테마가 아니라
+   backend/templates/weekly_member_master.pptx(남색 본문 · 흰/회색 머리줄)를
+   따라야 하므로 여기 한 곳에만 둔 고정값이다. 화면 UI는 토큰만 쓴다. */
 .layout-dialog {
     width: min(57.5rem, 100%);
     --slide-bg: #e3f3fb;
     --slide-body: #1f4566;
     --slide-ink: #1f4566;
+    --slide-head: #ffffff;
+    --slide-head-next: #d4d4d4;
+    --slide-text: #ffffff;
+    --slide-rule: rgba(255, 255, 255, 0.4);
 }
 
 .layout-options {
@@ -225,6 +617,7 @@
     font: inherit;
     text-align: left;
     cursor: pointer;
+    transition: border-color var(--dur-fast) var(--ease);
 }
 
 .layout-option:hover {
@@ -250,15 +643,16 @@
 .slide {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--space-1);
     aspect-ratio: 16 / 9;
-    padding: 0.375rem 0.5rem 0.5rem;
+    padding: var(--space-1) var(--space-2) var(--space-2);
     overflow: hidden;
+    border-radius: var(--radius-xs);
     background: var(--slide-bg);
 }
 
 .slide-title {
-    font-size: 0.6875rem;
+    font-size: var(--fs-11);
     font-weight: var(--fw-bold);
     color: var(--slide-ink);
 }
@@ -278,16 +672,16 @@
 }
 
 .slide-head {
-    padding: 3px 0.25rem;
-    background: #fff;
-    font-size: 0.5625rem;
+    padding: 2px var(--space-05);
+    background: var(--slide-head);
+    font-size: var(--fs-11);
     font-weight: var(--fw-bold);
     text-align: center;
     color: var(--slide-ink);
 }
 
 .slide-head.is-next {
-    background: #d4d4d4;
+    background: var(--slide-head-next);
 }
 
 .slide-cell {
@@ -295,9 +689,9 @@
     flex-direction: column;
     gap: 1px;
     min-width: 0;
-    padding: 0.25rem;
-    border-right: 1px dashed rgba(255, 255, 255, 0.4);
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.4);
+    padding: var(--space-05);
+    border-right: 1px dashed var(--slide-rule);
+    border-bottom: 1px dashed var(--slide-rule);
 }
 
 .slide-cell.is-lead {
@@ -307,216 +701,151 @@
     overflow: hidden;
     align-self: center;
     border-bottom: 0;
-    font-size: 0.5625rem;
+    font-size: var(--fs-11);
     font-weight: var(--fw-bold);
     text-align: center;
-    color: #fff;
+    color: var(--slide-text);
 }
 
 .slide-line {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: 0.5625rem;
-    line-height: 1.4;
-    color: #fff;
+    font-size: var(--fs-11);
+    line-height: var(--lh-tight);
+    color: var(--slide-text);
 }
 
 .slide-line.is-head {
     font-weight: var(--fw-bold);
 }
 
-.read-list {
-    margin: 0;
-    padding-left: var(--space-5);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+/* ==== 작은 노트북(861~1100px) ======================================== */
+@media (max-width: 1100px) and (min-width: 861px) {
+    .write-head {
+        --write-bleed: var(--space-5);
+    }
+
+    .meta-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
-.read-empty {
-    margin: 0;
-    font-size: var(--fs-14);
-    color: var(--text-muted);
-}
-
-.read-list li {
-    font-size: var(--fs-14);
-    color: var(--text-strong);
-    line-height: var(--lh-base);
-    word-break: keep-all;
-}
-
-.read-support {
-    margin: 0 0 var(--space-1);
-    font-size: var(--fs-12);
-    color: var(--text);
-}
-
-.extras-card .read-kind:first-of-type {
-    margin-top: 0;
-}
-
-/* 비어 있는 PPT 칸은 "0건" 카드로 늘어놓지 않고 한 줄로 알린다. */
-.extras-note {
-    margin: 0;
-    padding: var(--space-3) var(--space-4);
-    border: 1px dashed var(--border);
-    border-radius: var(--radius);
-    font-size: var(--fs-12);
-    color: var(--text);
-    word-break: keep-all;
-}
-
-/* 접히는 보조 카드: 공지사항 · 주요 이벤트 · 센터 협업 현황.
-   비어 있을 때는 한 줄로 접어 두고, 내용이 있으면 펼친 상태로 연다.
-   노션 토글처럼 박스 없이 줄 사이 선만 둔다. */
-.fold-card,
-.meta-card {
-    padding: var(--space-3) 0;
-    border: 0;
-    border-bottom: 1px solid var(--border);
-    border-radius: 0;
-    background: transparent;
-}
-
-.fold-card>summary {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    cursor: pointer;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.fold-card[open]>summary {
-    margin-bottom: var(--space-4);
-}
-
-.fold-title {
-    font-size: var(--fs-14);
-    font-weight: var(--fw-semibold);
-    color: var(--text-strong);
-}
-
-.fold-count {
-    padding: 0 var(--space-2);
-    border-radius: var(--radius-sm);
-    background: var(--surface-soft);
-    font-size: var(--fs-11);
-    font-weight: var(--fw-semibold);
-    color: var(--text);
-}
-
-.fold-hint {
-    margin-left: auto;
-    font-size: var(--fs-12);
-    color: var(--text-muted);
-}
-
-.fold-block+.fold-block {
-    margin-top: var(--space-3);
-}
-
-/* 공지 하나 = 제목 줄 + 세부 줄. 카드 안에 또 카드를 두지 않고 가는 선으로만 나눈다. */
-.notice-block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    min-width: 0;
-    padding: var(--space-3) 0;
-    border-top: 1px solid var(--border);
-}
-
-.fold-block-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-2);
-    margin-bottom: 0;
-    min-width: 0;
-    width: 100%;
-}
-
-.fold-block-head .input {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-}
-
-.fold-block-head .btn {
-    width: auto;
-    min-width: calc(var(--control-h-lg) + var(--space-3));
-    height: var(--control-h);
-    padding: 0 var(--space-3);
-}
-
-.notice-block .add-btn {
-    align-self: flex-start;
-}
-
-.fold-card .add-project,
-.add-notice-btn {
-    margin-top: var(--space-3);
-}
-
-/* 센터 협업: 지원 | 진행 현황 | 향후일정. 폰에서는 센터마다 두 칸을 위아래로. */
-.collab-grid {
-    display: flex;
-    flex-direction: column;
-    border-top: 1px solid var(--border);
-}
-
-.collab-head,
-.collab-row {
-    display: grid;
-    grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--space-3);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.collab-head {
-    padding: var(--space-2) 0;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
-.collab-code {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-    padding-top: var(--space-2);
-    font-size: var(--fs-14);
-    font-weight: var(--fw-bold);
-    color: var(--text-strong);
-}
-
-.collab-drop {
-    font-weight: var(--fw-medium);
-}
-
-.collab-cell {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    min-width: 0;
-}
-
-.collab-cell .add-btn {
-    align-self: flex-start;
-}
-
-.collab-cell-label {
-    display: none;
-    font-size: var(--fs-12);
-    font-weight: var(--fw-semibold);
-    color: var(--text-muted);
-}
-
+/* ==== 폰(<=860px) ==================================================== */
 @media (max-width: 860px) {
+    /* 앱 바가 위에 붙어 있으니 그 바로 아래에 붙는다. */
+    .write-head {
+        --write-bleed: var(--space-4);
+        top: calc(var(--control-h-lg) + env(safe-area-inset-top, 0px));
+    }
+
+    .write-head-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    /* 이름과 주차를 한 줄에. 붙어 있는 머리줄이 화면을 덜 가리게. */
+    .write-who {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--space-1) var(--space-2);
+    }
+
+    .write-name {
+        font-size: var(--fs-16);
+    }
+
+    /* 동작은 한 줄: 수정 중에는 복사를 뺀다(읽기에서 쓴다). 저장이 남는 폭을 다 쓴다. */
+    .write-actions {
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+    }
+
+    .write-actions > .btn {
+        flex: none;
+        min-height: var(--control-h-lg);
+    }
+
+    .write-actions > .seg {
+        display: inline-flex;
+        flex: none;
+        width: auto;
+    }
+
+    .write-actions .seg > button {
+        min-height: var(--control-h-lg);
+        padding: 0 var(--space-3);
+    }
+
+    .write-actions > .write-save,
+    .write-head:not(.is-editing) .write-copy {
+        flex: 1 1 auto;
+    }
+
+    .write-head.is-editing .write-copy {
+        display: none;
+    }
+
+    .write-jump-chip {
+        height: var(--control-h-lg);
+    }
+
+    [id^="jump-"] {
+        scroll-margin-top: 15rem;
+    }
+
+    .split {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-4) 0;
+    }
+
+    /* 세로로 쌓일 때 선만 있으면 '향후일정' 제목이 위 목록에 붙는다. 선 위아래로 숨을 둔다. */
+    .split > .split-col + .split-col {
+        padding-top: var(--space-4);
+        padding-left: 0;
+        border-left: 0;
+        border-top: 1px solid var(--border);
+    }
+
+    .meta-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .fold-head {
+        flex-wrap: wrap;
+        row-gap: var(--space-1);
+    }
+
+    /* 안내는 둘째 줄로, 꺾쇠는 첫 줄 끝에 남긴다. */
+    .fold-hint {
+        order: 3;
+        flex-basis: 100%;
+    }
+
+    /* order: 요약과 PPT 형식 버튼을 꺾쇠(::after) 뒤 줄로 내린다. */
+    .meta-head .board-title {
+        flex: 1 1 auto;
+    }
+
+    .meta-head .fold-meta {
+        order: 2;
+        flex-basis: 100%;
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+
+    .meta-head .fold-action {
+        order: 3;
+        min-height: var(--control-h-lg);
+    }
+
+    .notice-head .btn {
+        min-height: var(--control-h-lg);
+    }
+
     .collab-head {
         display: none;
     }
@@ -533,242 +862,11 @@
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
-    }
-}
-
-.meta-card>summary {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    cursor: pointer;
-    font-size: var(--fs-13);
-    color: var(--text);
-}
-
-.meta-summary {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-strong);
-    font-weight: var(--fw-medium);
-}
-
-.layout-chip {
-    margin-left: auto;
-    flex-shrink: 0;
-}
-
-.meta-edit {
-    flex-shrink: 0;
-    color: var(--text-muted);
-}
-
-.meta-card[open]>summary {
-    margin-bottom: var(--space-4);
-}
-
-.json-container,
-.project-block,
-.split,
-.split-col,
-.meta-grid {
-    min-width: 0;
-    max-width: 100%;
-}
-
-.meta-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-3);
-}
-
-.meta-grid :deep(.input) {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-}
-
-.project-head {
-    min-width: 0;
-}
-
-/* 줄 끝에 붙는 작은 아이콘 버튼. 텍스트 '삭제' 버튼이 항목마다 반복되던 것을 대체한다. */
-.row-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: var(--control-h-sm);
-    height: var(--control-h-sm);
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition:
-        background var(--dur-fast) var(--ease),
-        color var(--dur-fast) var(--ease);
-}
-
-.row-btn:hover,
-.row-btn:focus-visible {
-    background: var(--danger-bg);
-    color: var(--danger-fg);
-}
-
-.add-item {
-    display: inline-flex;
-    align-items: center;
-    align-self: flex-start;
-    gap: var(--space-1);
-    padding: var(--space-1) var(--space-2);
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    font: inherit;
-    font-size: var(--fs-13);
-    color: var(--text);
-    cursor: pointer;
-}
-
-.add-item:hover {
-    background: var(--surface-soft);
-    color: var(--text-strong);
-}
-
-.add-project {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    width: 100%;
-    padding: var(--space-3);
-    border: 1px dashed var(--border-strong);
-    border-radius: var(--radius);
-    background: transparent;
-    font: inherit;
-    font-size: var(--fs-13);
-    font-weight: var(--fw-medium);
-    color: var(--text);
-    cursor: pointer;
-}
-
-.add-project:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-soft);
-    color: var(--text-strong);
-}
-
-/* 두 칸은 면 대신 가운데 세로선으로 나눈다. */
-.split {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 0;
-    align-items: stretch;
-}
-
-.split > .split-col + .split-col {
-    padding-left: var(--space-5);
-    border-left: 1px solid var(--border);
-}
-
-.split > .split-col:first-child {
-    padding-right: var(--space-5);
-}
-
-.split-col {
-    margin-bottom: 0;
-}
-
-.task-row {
-    align-items: flex-start;
-}
-
-/* 데스크톱에서 '진행 현황 · 향후일정'이 12px 흐린 글자라 항목(15px)보다 약해 구획이 안 보였다. */
-@media (min-width: 861px) {
-    .report-doc .project-block .field-group h2 {
-        margin-bottom: var(--space-2);
-        font-size: var(--fs-13);
-        color: var(--text-strong);
-    }
-}
-
-.task-editor {
-    min-height: var(--control-h);
-    resize: none;
-    overflow: hidden;
-    line-height: var(--lh-relaxed);
-}
-
-.project-block {
-    overflow: hidden;
-}
-
-/* 고정 저장 바의 위치·테두리·그림자는 report-doc.css의 .report-doc .save-bar가 담당한다. */
-.save-actions {
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-}
-
-
-@media (max-width: 1100px) {
-
-    .meta-grid,
-    .split {
-        grid-template-columns: minmax(0, 1fr);
+        padding-top: 0;
     }
 
-    /* 세로로 쌓일 때 선만 있으면 '향후일정' 제목이 위 목록에 붙는다. 선 위아래로 숨을 둔다. */
-    .split > .split-col + .split-col {
-        margin-top: var(--space-4);
-        padding-top: var(--space-4);
-        padding-left: 0;
-        border-left: 0;
-        border-top: 1px solid var(--border);
-    }
-
-    .split > .split-col:first-child {
-        padding-right: 0;
-    }
-}
-
-@media (max-width: 860px) {
-    .detail-head {
-        top: var(--topbar-height);
-    }
-
-    /* 붙어 있는 머리줄이 화면을 덜 가리게 동작은 한 줄. 수정 중에는 복사를 뺀다(읽기에서 쓴다). */
-    .detail-actions {
-        display: flex;
-        flex-wrap: nowrap;
-        width: 100%;
-        gap: var(--space-2);
-    }
-
-    .detail-actions > .btn,
-    .detail-actions > .mode-switch {
-        flex: none;
-        width: auto;
-    }
-
-    .detail-actions > .mode-switch {
-        grid-template-columns: repeat(2, auto);
-    }
-
-    .detail-actions > .btn-primary {
-        flex: 1 1 auto;
-    }
-
-    .detail-copy-col.is-editing {
-        display: none;
-    }
-
-    .mode-switch {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .collab-add .btn {
+        min-height: var(--control-h-lg);
     }
 
     .layout-options {
@@ -778,63 +876,6 @@
     .slide {
         aspect-ratio: auto;
         min-height: 7.5rem;
-    }
-
-    .mode-switch button {
-        min-height: var(--control-h-lg);
-    }
-
-    .detail-actions .btn,
-    .detail-copy-col .btn {
-        min-height: var(--control-h-lg);
-    }
-
-    .detail-copy-col:not(.is-editing) {
-        flex: 1 1 0;
-    }
-
-    /* 폰에서는 요약 한 줄, 'PPT · 형식'과 '수정'은 다음 줄. 한 줄에 두면 끝의 '수정'이 잘렸다. */
-    .meta-card>summary {
-        flex-wrap: wrap;
-        row-gap: var(--space-2);
-    }
-
-    .meta-summary {
-        flex: 1 1 100%;
-        white-space: normal;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-    }
-
-    .layout-chip {
-        margin-left: 0;
-    }
-
-    .meta-edit {
-        margin-left: auto;
-    }
-
-    .fold-card>summary {
-        flex-wrap: wrap;
-        align-items: flex-start;
-        row-gap: var(--space-1);
-    }
-
-    .fold-hint {
-        flex-basis: 100%;
-        margin-left: 0;
-    }
-
-    .save-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        width: 100%;
-        margin-left: 0;
-    }
-
-    .save-actions .btn {
-        width: 100%;
     }
 
     .task-editor {

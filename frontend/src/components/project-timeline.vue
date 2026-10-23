@@ -19,6 +19,8 @@ const router = useRouter();
 const { getProjectNames, getProjectTimeline, getUsers } = useApi();
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+/** 불러오는 동안 보드 자리에 그리는 빈 줄 수. */
+const SKELETON_LINES = 3;
 
 const projectNames = ref([]);
 const timeline = ref([]);
@@ -26,9 +28,12 @@ const selectedProject = ref("");
 const selectedMember = ref("");
 const isLoading = ref(false);
 const isLoadingTimeline = ref(false);
+const loadError = ref("");
+const timelineError = ref("");
 
 const fetchInitialData = async () => {
   isLoading.value = true;
+  loadError.value = "";
   try {
     projectNames.value = await getProjectNames();
     // 들어오자마자 "프로젝트를 선택해주세요"만 있는 빈 화면을 보여주지 않는다.
@@ -39,6 +44,7 @@ const fetchInitialData = async () => {
     }
   } catch (error) {
     console.error("Error fetching initial data:", error);
+    loadError.value = "프로젝트 목록을 불러오지 못했습니다.";
   } finally {
     isLoading.value = false;
   }
@@ -56,14 +62,21 @@ const fetchTimeline = async () => {
     return;
   }
   isLoadingTimeline.value = true;
+  timelineError.value = "";
   try {
     timeline.value = await getProjectTimeline(selectedProject.value);
   } catch (error) {
     console.error("Error fetching timeline:", error);
     timeline.value = [];
+    timelineError.value = "보고를 불러오지 못했습니다.";
   } finally {
     isLoadingTimeline.value = false;
   }
+};
+
+const retry = () => {
+  if (loadError.value) fetchInitialData();
+  else fetchTimeline();
 };
 
 const projectMembers = computed(() => {
@@ -187,7 +200,7 @@ const displayDate = (value) => {
   return `${year}년 ${monthDay}`;
 };
 
-const summaryLine = computed(() => {
+const summaryParts = computed(() => {
   const shown = flowEntries.value.length;
   const people = new Set(
     flowEntries.value.map((entry) => String(entry.member_id || "")).filter(Boolean),
@@ -195,7 +208,7 @@ const summaryLine = computed(() => {
   const parts = [`보고 ${shown}건`];
   if (totalDays.value) parts.push(`${totalDays.value}일`);
   if (!selectedMember.value && people.size) parts.push(`작성 ${people.size}명`);
-  return parts.join(" · ");
+  return parts;
 });
 
 const weekday = (value) => {
@@ -236,13 +249,17 @@ const compactRows = (entry) => {
 
 const issueBoard = computed(() => buildIssueBoard(filteredTimeline.value));
 
-const hasIssueBoard =
-  computed(() =>
-    issueBoard.value.open.length +
-      issueBoard.value.unmentioned.length +
-      issueBoard.value.resolved.length >
-    0,
-  );
+const issueGroups = computed(() => [
+  { id: "open", label: "미해결", tone: "is-danger", items: issueBoard.value.open },
+  { id: "omit", label: "이후 언급 없음", tone: "", items: issueBoard.value.unmentioned },
+  { id: "done", label: "해결", tone: "is-success", items: issueBoard.value.resolved },
+]);
+
+const issueTotal = computed(() =>
+  issueGroups.value.reduce((sum, group) => sum + group.items.length, 0),
+);
+
+const hasIssueBoard = computed(() => issueTotal.value > 0);
 
 const issueMeta = (item) => {
   const who =
@@ -290,85 +307,104 @@ onMounted(() => {
   <div class="page is-wide">
     <!-- 일일보고 목록과 같은 한 줄 필터. 라벨 대신 첫 옵션이 무엇을 고르는지 말한다. -->
     <div class="filters">
-        <select
-          id="timeline-project"
-          v-model="selectedProject"
-          class="input filter-select"
-          aria-label="프로젝트"
-          @change="onProjectChange"
-        >
-          <option value="">프로젝트 선택</option>
-          <option v-for="name in projectNames" :key="name" :value="name">
-            {{ name }}
-          </option>
-        </select>
+      <select
+        id="timeline-project"
+        v-model="selectedProject"
+        class="input filter-select"
+        aria-label="프로젝트"
+        @change="onProjectChange"
+      >
+        <option value="">프로젝트 선택</option>
+        <option v-for="name in projectNames" :key="name" :value="name">
+          {{ name }}
+        </option>
+      </select>
 
-        <!-- 전체 인원을 다 넣고, 이 프로젝트 보고 건수를 옆에 적는다. -->
-        <select
-          id="timeline-member"
-          v-model="selectedMember"
-          class="input filter-select"
-          aria-label="보고자"
-          :disabled="!selectedProject || isLoadingTimeline"
+      <!-- 전체 인원을 다 넣고, 이 프로젝트 보고 건수를 옆에 적는다. -->
+      <select
+        id="timeline-member"
+        v-model="selectedMember"
+        class="input filter-select"
+        aria-label="보고자"
+        :disabled="!selectedProject || isLoadingTimeline"
+      >
+        <option value="">전체 보고자</option>
+        <option
+          v-for="user in memberOptions"
+          :key="user.id"
+          :value="user.id"
         >
-          <option value="">전체 보고자</option>
-          <option
-            v-for="user in memberOptions"
-            :key="user.id"
-            :value="user.id"
-          >
-            {{ user.name }}{{ user.count ? ` (${user.count})` : " (보고 없음)" }}
-          </option>
-        </select>
+          {{ user.name }}{{ user.count ? ` (${user.count})` : " (보고 없음)" }}
+        </option>
+      </select>
 
-        <div class="seg view-chips" role="group" aria-label="보기">
-          <button
-            v-for="item in VIEWS"
-            :key="item.id"
-            type="button"
-            :class="{ 'is-on': view === item.id }"
-            :aria-pressed="view === item.id"
-            @click="view = item.id"
-          >
-            {{ item.label }}
-          </button>
-        </div>
+      <div class="seg view-seg" role="group" aria-label="보기">
+        <button
+          v-for="item in VIEWS"
+          :key="item.id"
+          type="button"
+          :class="{ 'is-on': view === item.id }"
+          :aria-pressed="view === item.id"
+          @click="view = item.id"
+        >
+          {{ item.label }}
+        </button>
+      </div>
     </div>
 
-    <div v-if="selectedProject && !isLoading" class="flow-meta">
-      <p v-if="!isLoadingTimeline && filteredTimeline.length">{{ summaryLine }}</p>
+    <div v-if="selectedProject && !isLoading && !loadError" class="flow-meta">
+      <p v-if="!isLoadingTimeline && !timelineError && filteredTimeline.length" class="flow-chips">
+        <span v-for="part in summaryParts" :key="part" class="chip">{{ part }}</span>
+      </p>
       <button
         v-if="futureCount"
         type="button"
-        class="text-toggle"
+        class="btn btn-small btn-ghost future-toggle"
+        :class="{ 'is-active': includeFuture }"
+        :aria-pressed="includeFuture"
         @click="includeFuture = !includeFuture"
       >
         {{ includeFuture ? "오늘까지만" : `예정 ${futureCount}건 보기` }}
       </button>
     </div>
 
-    <div v-if="isLoading" class="empty-state">데이터를 불러오는 중...</div>
+    <section
+      v-if="isLoading || isLoadingTimeline"
+      class="card day-board skeleton"
+      role="status"
+      :aria-label="isLoading ? '프로젝트 불러오는 중' : '보고 불러오는 중'"
+    >
+      <div class="board-head" aria-hidden="true">
+        <i class="skeleton-bar is-title"></i>
+      </div>
+      <div v-for="n in SKELETON_LINES" :key="n" class="skeleton-line" aria-hidden="true">
+        <i class="skeleton-bar is-tag"></i>
+        <i class="skeleton-bar is-text"></i>
+      </div>
+    </section>
 
-    <div v-else-if="!selectedProject" class="empty-state">
-      <p>프로젝트를 선택해주세요</p>
-    </div>
+    <section v-else-if="loadError || timelineError" class="card board-state is-error" role="alert">
+      <p>{{ loadError || timelineError }}</p>
+      <button type="button" class="btn btn-small" @click="retry">다시 시도</button>
+    </section>
 
-    <div v-else-if="isLoadingTimeline" class="empty-state">
-      타임라인을 불러오는 중...
-    </div>
+    <section v-else-if="!selectedProject" class="card board-state">
+      <p v-if="projectNames.length">프로젝트를 고르면 보고 흐름이 나옵니다</p>
+      <p v-else>아직 일일보고에 적힌 프로젝트가 없습니다</p>
+    </section>
 
-    <div v-else-if="filteredTimeline.length === 0" class="empty-state">
+    <section v-else-if="filteredTimeline.length === 0" class="card board-state">
       <p v-if="selectedMember">
         {{ selectedMemberName || "선택한 보고자" }}의 보고가 없습니다
       </p>
       <p v-else-if="futureCount && !includeFuture">
         오늘까지 올라온 보고가 없습니다. 예정된 보고 {{ futureCount }}건이 있습니다.
       </p>
-      <p v-else>해당 프로젝트의 보고 이력이 없습니다</p>
+      <p v-else>이 프로젝트의 보고 이력이 없습니다</p>
       <button
         v-if="selectedMember"
         type="button"
-        class="btn"
+        class="btn btn-small"
         @click="clearMemberFilter"
       >
         전체 보고자 보기
@@ -376,103 +412,77 @@ onMounted(() => {
       <button
         v-else-if="futureCount && !includeFuture"
         type="button"
-        class="btn"
+        class="btn btn-small"
         @click="includeFuture = true"
       >
         예정도 보기
       </button>
-    </div>
+    </section>
 
-    <div v-else class="timeline-container">
+    <div v-else class="timeline" :class="{ 'has-issues': hasIssueBoard }">
+      <aside v-if="hasIssueBoard" class="card issue-board" aria-labelledby="issue-board-title">
+        <header class="board-head">
+          <h2 id="issue-board-title" class="board-title">이슈</h2>
+          <span class="board-meta">{{ issueTotal }}건</span>
+        </header>
 
-      <section v-if="hasIssueBoard" class="card open-issues">
-        <h2>이슈</h2>
-
-        <div v-if="issueBoard.open.length" class="issue-group">
-          <h3><span class="state-chip is-warning">열린 이슈 {{ issueBoard.open.length }}</span></h3>
-          <button
-            v-for="(item, index) in issueBoard.open"
-            :key="`open-${item.member_id}-${item.firstDate}-${index}`"
-            type="button"
-            class="issue-row is-open"
-            @click="openIssueEntry(item)"
-          >
-            <span class="issue-copy">
+        <template v-for="group in issueGroups" :key="group.id">
+          <section v-if="group.items.length" class="issue-group" :aria-label="group.label">
+            <h3 class="issue-group-head">
+              <span class="state-chip" :class="group.tone">{{ group.label }} {{ group.items.length }}</span>
+            </h3>
+            <button
+              v-for="(item, index) in group.items"
+              :key="`${group.id}-${item.member_id}-${item.firstDate}-${index}`"
+              type="button"
+              class="issue-row"
+              @click="openIssueEntry(item)"
+            >
               <span class="issue-text">{{ item.text }}</span>
               <span class="issue-meta">{{ issueMeta(item) }}</span>
-            </span>
-          </button>
-        </div>
-
-        <div v-if="issueBoard.unmentioned.length" class="issue-group">
-          <h3><span class="state-chip">이후 언급 없음 {{ issueBoard.unmentioned.length }}</span></h3>
-          <button
-            v-for="(item, index) in issueBoard.unmentioned"
-            :key="`omit-${item.member_id}-${item.firstDate}-${index}`"
-            type="button"
-            class="issue-row is-quiet"
-            @click="openIssueEntry(item)"
-          >
-            <span class="issue-copy">
-              <span class="issue-text">{{ item.text }}</span>
-              <span class="issue-meta">{{ issueMeta(item) }}</span>
-            </span>
-          </button>
-        </div>
-
-        <div v-if="issueBoard.resolved.length" class="issue-group">
-          <h3><span class="state-chip is-success">해결 {{ issueBoard.resolved.length }}</span></h3>
-          <button
-            v-for="(item, index) in issueBoard.resolved"
-            :key="`done-${item.member_id}-${item.firstDate}-${index}`"
-            type="button"
-            class="issue-row is-done"
-            @click="openIssueEntry(item)"
-          >
-            <span class="issue-copy">
-              <span class="issue-text">{{ item.text }}</span>
-              <span class="issue-meta">{{ issueMeta(item) }}</span>
-            </span>
-          </button>
-        </div>
-      </section>
+            </button>
+          </section>
+        </template>
+      </aside>
 
       <div class="flow">
-        <template v-for="group in flowGroups" :key="group.date">
-          <div v-if="group.gap" class="gap">{{ group.gap }}일 공백</div>
+        <section v-if="!flowGroups.length" class="card board-state">
+          <p>이슈가 적힌 보고가 없습니다</p>
+          <button type="button" class="btn btn-small" @click="view = 'all'">전체 보기</button>
+        </section>
 
-          <article class="day">
-            <h2 class="date-head day-head">
-              {{ displayDate(group.date) }}
-              <span class="date-head-week">{{ weekday(group.date) }}</span>
-              <span v-if="group.entries.length > 1" class="date-head-meta">
+        <template v-for="group in flowGroups" :key="group.date">
+          <p v-if="group.gap" class="gap">{{ group.gap }}일 공백</p>
+
+          <article class="card day-board">
+            <header class="board-head">
+              <h2 class="board-title">
+                {{ displayDate(group.date) }}
+                <span class="day-week">{{ weekday(group.date) }}</span>
+              </h2>
+              <span v-if="group.entries.length > 1" class="board-meta">
                 {{ group.entries.length }}건
               </span>
-            </h2>
+            </header>
 
             <button
               v-for="entry in group.entries"
               :key="entry.report_id || `${entry.member_id}-${group.date}`"
               type="button"
-              class="day-entry"
+              class="entry"
               @click="openEntry(entry)"
             >
-              <ChevronRight class="entry-go" :size="16" aria-hidden="true" />
-              <header v-if="!selectedMember" class="entry-header">
-                <span class="avatar">{{
-                  String(entry.member_name || "?").slice(0, 1)
-                }}</span>
-                <h3 class="entry-name">{{ entry.member_name }}</h3>
-              </header>
-
-              <div
-                v-for="(row, rowIndex) in compactRows(entry)"
-                :key="rowIndex"
-                class="flow-line"
-              >
-                <span class="k cat-tag" :class="KIND_TAGS[row.label]">{{ row.label }}</span>
-                <p class="v">{{ row.text }}</p>
-              </div>
+              <span v-if="!selectedMember" class="entry-who">
+                <span class="avatar">{{ String(entry.member_name || "?").slice(0, 1) }}</span>
+                <span class="entry-name">{{ entry.member_name }}</span>
+              </span>
+              <span class="entry-lines">
+                <span v-for="(row, rowIndex) in compactRows(entry)" :key="rowIndex" class="entry-line">
+                  <span class="cat-tag" :class="KIND_TAGS[row.label]">{{ row.label }}</span>
+                  <span class="entry-text">{{ row.text }}</span>
+                </span>
+              </span>
+              <ChevronRight class="entry-go" :size="18" aria-hidden="true" />
             </button>
           </article>
         </template>

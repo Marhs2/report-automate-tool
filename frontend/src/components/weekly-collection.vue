@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { saveAs } from "file-saver";
-import { Check, ChevronLeft, ChevronRight, CircleAlert, Download } from "lucide-vue-next";
+import { ChevronLeft, ChevronRight, Download } from "lucide-vue-next";
 import useApi from "../composables/useApi";
 import { useDialog } from "../composables/useDialog";
 
@@ -36,12 +36,18 @@ const toggleTeam = (team) => {
 };
 const sortedMembers = (team) => [...team.members].sort((a, b) => Number(a.submitted) - Number(b.submitted));
 const shownMembers = (team) => (isTeamOpen(team) ? sortedMembers(team) : sortedMembers(team).slice(0, MEMBER_PREVIEW));
+const ratioOf = (team) => (team.total ? Math.round((team.submitted / team.total) * 100) : 0);
 
 const isThisWeek = computed(() => week.value === thisMonday());
 /** 팀장이면 서버가 자기 부서만 돌려준다(scope: "team"). */
 const isTeam = computed(() => status.value?.scope === "team");
 const scopeLabel = computed(() => (isTeam.value ? status.value?.teams?.[0]?.name || "부서" : "전체"));
 const missing = computed(() => (status.value ? status.value.total - status.value.submitted : 0));
+const statusLine = computed(() => {
+    if (!status.value) return "";
+    if (status.value.complete) return `${isTeam.value ? "부서원이 모두" : "모든 부서가"} 주간보고를 냈어요.`;
+    return `아직 ${missing.value}명이 주간보고를 내지 않았어요.`;
+});
 
 const load = async () => {
     isLoading.value = true;
@@ -101,10 +107,10 @@ onMounted(load);
 </script>
 
 <template>
-    <section class="group-block collection" aria-labelledby="collection-title">
-        <div class="group-head collection-head">
+    <section class="collection" aria-labelledby="collection-title">
+        <header class="collection-head">
             <h2 id="collection-title">{{ isTeam ? `${scopeLabel} 취합` : "전체 취합" }}</h2>
-            <span v-if="status" class="group-meta" :class="{ 'is-done': status.complete }">
+            <span v-if="status" class="collection-meta" :class="{ 'is-done': status.complete }">
                 {{ status.week.label }} · 주간보고 {{ status.submitted }}/{{ status.total }}명 제출
             </span>
             <div class="stepper" role="group" aria-label="취합할 주">
@@ -118,57 +124,61 @@ onMounted(load);
                     <ChevronRight :size="16" />
                 </button>
             </div>
+        </header>
+
+        <div v-if="loadError" class="collection-error" role="alert">
+            <span>{{ loadError }}</span>
+            <button type="button" class="btn btn-small" :disabled="isLoading" @click="load">다시 시도</button>
         </div>
 
-        <p v-if="isLoading && !status" class="list-status" role="status">불러오는 중</p>
-        <p v-else-if="loadError" class="list-status is-error" role="alert">{{ loadError }}</p>
+        <div v-else-if="isLoading && !status" class="team-list" role="status" aria-label="취합 현황을 불러오는 중">
+            <div v-for="n in 3" :key="n" class="team-row is-skeleton" aria-hidden="true">
+                <span class="skel skel-name"></span>
+                <span class="bar"></span>
+                <span class="skel skel-count"></span>
+            </div>
+        </div>
+
         <template v-else-if="status">
-            <p class="collection-note">
-                {{ status.complete
-                    ? `${isTeam ? "부서원이 모두" : "모든 부서가"} 주간보고를 냈어요. 한 파일로 합친 PPT를 만들 수 있어요.`
-                    : `아직 ${missing}명이 주간보고를 내지 않았어요. 다 모이면 ${scopeLabel} PPT를 만들 수 있어요.` }}
-            </p>
-            <div class="group collection-teams">
-                <div v-for="team in status.teams" :key="team.id ?? team.name" class="row collection-team">
-                    <span class="row-main">
-                        <span class="row-title">{{ team.name }}</span>
-                        <span class="collection-members">
-                            <span
-                                v-for="member in shownMembers(team)"
-                                :key="member.id"
-                                class="cat-tag"
-                                :class="member.submitted ? 'is-done' : 'is-issue'"
-                            >
-                                <Check v-if="member.submitted" :size="12" :stroke-width="2.5" aria-hidden="true" />
-                                <CircleAlert v-else :size="12" aria-hidden="true" />
-                                {{ member.name }} {{ member.submitted ? "제출" : "미제출" }}
-                            </span>
-                            <button
-                                v-if="team.members.length > MEMBER_PREVIEW"
-                                type="button"
-                                class="collection-more"
-                                :aria-expanded="isTeamOpen(team)"
-                                @click="toggleTeam(team)"
-                            >
-                                {{ isTeamOpen(team) ? "접기" : `더보기 +${team.members.length - MEMBER_PREVIEW}명` }}
-                            </button>
-                        </span>
+            <p class="collection-status">{{ statusLine }}</p>
+
+            <p v-if="!status.teams.length" class="collection-note">취합할 부서가 없어요.</p>
+
+            <div v-else class="team-list">
+                <div v-for="team in status.teams" :key="team.id ?? team.name" class="team-row">
+                    <span class="team-name">{{ team.name }}</span>
+                    <span class="bar" role="img" :aria-label="`${team.total}명 중 ${team.submitted}명 제출`">
+                        <span :class="{ 'is-full': team.total > 0 && team.submitted >= team.total }" :style="{ width: `${ratioOf(team)}%` }"></span>
                     </span>
-                    <span class="row-end group-meta">{{ team.submitted }}/{{ team.total }}</span>
+                    <span class="team-count" :class="{ 'is-short': team.submitted < team.total }">{{ team.submitted }}/{{ team.total }}명</span>
+                    <span class="team-members">
+                        <span
+                            v-for="member in shownMembers(team)"
+                            :key="member.id"
+                            class="cat-tag"
+                            :class="member.submitted ? 'is-done' : 'is-issue'"
+                        >
+                            {{ member.name }} {{ member.submitted ? "제출" : "미제출" }}
+                        </span>
+                        <button
+                            v-if="team.members.length > MEMBER_PREVIEW"
+                            type="button"
+                            class="team-more"
+                            :aria-expanded="isTeamOpen(team)"
+                            @click="toggleTeam(team)"
+                        >
+                            {{ isTeamOpen(team) ? "접기" : `더보기 +${team.members.length - MEMBER_PREVIEW}명` }}
+                        </button>
+                    </span>
                 </div>
             </div>
-            <div class="collection-actions">
-                <button
-                    type="button"
-                    class="btn"
-                    :class="status.complete ? 'btn-primary' : ''"
-                    :disabled="isMaking || !status.submitted"
-                    @click="makeDeck"
-                >
+
+            <footer class="collection-foot">
+                <button type="button" class="btn" :disabled="isMaking || !status.submitted" @click="makeDeck">
                     <Download :size="14" />
                     {{ isMaking ? "만드는 중" : status.complete ? `${scopeLabel} PPT 만들기` : "낸 사람만으로 PPT 만들기" }}
                 </button>
-            </div>
+            </footer>
         </template>
     </section>
 </template>
