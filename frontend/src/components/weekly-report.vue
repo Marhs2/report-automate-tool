@@ -19,6 +19,7 @@ import {
     weekKeyOfDates,
     weekRangeLabel,
 } from "../lib/dateScope";
+import { periodTotals } from "../lib/carryOver";
 
 const router = useRouter();
 const { isNarrow } = useSidebar();
@@ -29,6 +30,7 @@ const {
     deleteWeeklyReport,
     downloadWeeklyPptx,
     getUserActivities,
+    getReports,
 } = useApi();
 const { alert: showAlert, confirm: askConfirm } = useDialog();
 
@@ -43,6 +45,18 @@ const weekLoading = ref(false);
 const weekError = ref("");
 const listError = ref("");
 const showRange = ref(false);
+/** 고른 기간에 낸 일일보고의 완료 · 진행 · 이슈 수. 주간 회고 도구(Sunsama)처럼 "무엇을 했는지"를 먼저 보여 준다. */
+const totals = ref(null);
+const loadTotals = async () => {
+    totals.value = null;
+    if (!rangeStart.value || !rangeEnd.value || !userId.value) return;
+    try {
+        totals.value = periodTotals(await getReports(), userId.value, rangeStart.value, rangeEnd.value);
+    } catch {
+        totals.value = null;
+    }
+};
+const pastDays = computed(() => weekDays.value.filter((day) => !isFutureDate(day)).length);
 
 /* ---- 날짜 도우미 ----------------------------------------------------- */
 const formatLocalDate = (d) =>
@@ -179,10 +193,12 @@ const hasMine = (dayDate) => (myDays.value[dayDate] || 0) > 0;
 const isFutureDay = (dayDate) => isFutureDate(dayDate);
 const isToday = (dayDate) => dayDate === todayString();
 
+/** 쓴 날은 "작성함" 대신 그날 끝낸 일 수를 적는다. */
 const dayState = (dayDate) => {
     if (isFutureDay(dayDate)) return hasMine(dayDate) ? "예정 · 작성함" : "예정";
-    if (hasMine(dayDate)) return "작성함";
-    return isToday(dayDate) ? "오늘 아직" : "보고 없음";
+    if (!hasMine(dayDate)) return "보고 없음";
+    const day = totals.value?.byDay?.[dayDate];
+    return day?.done ? `완료 ${day.done}` : "작성함";
 };
 
 const dayTitle = (dayDate) => {
@@ -197,6 +213,7 @@ const dotOf = (dayDate) => {
     else if (isFutureDay(dayDate)) state = "future";
     else if (isToday(dayDate)) state = "today";
     return { label: weekdayName(dayDate), state };
+};
 };
 
 const weekGroups = computed(() => {
@@ -323,6 +340,7 @@ const sendDates = async () => {
 const loadMyWeek = async () => {
     myDays.value = {};
     weekError.value = "";
+    loadTotals();
     if (!rangeStart.value || !rangeEnd.value || !userId.value) return;
     weekLoading.value = true;
     try {
@@ -681,6 +699,27 @@ onMounted(async () => {
                 <span>{{ weekError }}</span>
                 <button type="button" class="btn btn-small" :disabled="weekLoading" @click="loadMyWeek">다시 시도</button>
             </div>
+
+            <dl v-if="totals?.days" class="wk-done" :aria-label="isThisWeek ? '이번 주 한 일' : '이 기간에 한 일'">
+                <div class="wk-done-cell">
+                    <dt>쓴 날</dt>
+                    <dd>{{ totals.days }}<small>/{{ pastDays || weekDays.length }}일</small></dd>
+                </div>
+                <div class="wk-done-cell is-done">
+                    <dt>완료</dt>
+                    <dd>{{ totals.done }}</dd>
+                </div>
+                <div class="wk-done-cell is-progress">
+                    <dt>진행</dt>
+                    <dd>{{ totals.progress }}</dd>
+                </div>
+                <div class="wk-done-cell" :class="{ 'is-issue': totals.issues }">
+                    <dt>이슈</dt>
+                    <dd>{{ totals.issues }}</dd>
+                </div>
+            </dl>
+
+            <p class="wk-hint">일일보고를 쓴 날만 고를 수 있어요. 고른 날의 내용으로 초안을 만들어요.</p>
 
             <div v-else-if="weekLoading" class="day-tiles is-skeleton" role="status" aria-label="내 일일보고를 불러오는 중">
                 <span v-for="n in 5" :key="n" class="day-tile is-placeholder" aria-hidden="true">

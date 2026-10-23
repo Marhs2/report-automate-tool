@@ -502,3 +502,52 @@ button.week-head:focus-visible {
         height: var(--control-h-lg);
     }
 }
+
+/* 이 기간에 한 일: 쓴 날 · 완료 · 진행 · 이슈. 날 고르기 위에서 한 주를 숫자로 먼저 본다. */
+.wk-done {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+}
+
+.wk-done-cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-05);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.wk-done-cell dt {
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.wk-done-cell dd {
+    margin: 0;
+    font-size: var(--fs-24);
+    font-weight: var(--fw-bold);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.wk-done-cell dd small {
+    margin-left: 2px;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+}
+
+.wk-done-cell.is-done dd { color: var(--success-fg); }
+.wk-done-cell.is-progress dd { color: var(--accent-text); }
+.wk-done-cell.is-issue dd { color: var(--warning-fg); }
+
+@media (max-width: 480px) {
+    .wk-done {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

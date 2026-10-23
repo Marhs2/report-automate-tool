@@ -6,7 +6,6 @@ import { useDialog } from "../composables/useDialog";
 import { selectedUserId } from "../composables/useSelectedUser";
 import AppField from "./ui/AppField.vue";
 import Report from "./report.vue";
-import { COMPOSE_CHOICES } from "../lib/nav";
 import { Mic, Square } from "lucide-vue-next";
 import { useMeetingRecorder } from "../composables/useMeetingRecorder";
 import { useMeetingChunks } from "../composables/useMeetingChunks";

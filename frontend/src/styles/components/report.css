@@ -425,6 +425,12 @@
     color: var(--text-strong);
 }
 
+.template-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
 /* ---- 넓은 화면: 제출 후 두 보드를 나란히 ---- */
 
 @media (min-width: 1101px) {
@@ -504,5 +510,103 @@
     .today-links .btn {
         flex: 1 1 100%;
         margin-left: 0;
+    }
+}
+
+/* 지난 보고에서 이어서: 쓰는 칸 위의 짧은 목록. 줄마다 끝냄 · 하는 중을 눌러 오늘 보고에 넣는다. */
+.today-carry {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+}
+
+.today-carry-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-2);
+    margin: 0;
+    font-size: var(--fs-16);
+    font-weight: var(--fw-bold);
+    color: var(--text-strong);
+}
+
+.today-carry-sub {
+    font-size: var(--fs-13);
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+}
+
+.today-carry-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.today-carry-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--row-min-h);
+    padding: var(--space-1) 0;
+}
+
+.today-carry-item + .today-carry-item {
+    border-top: 1px solid var(--border);
+}
+
+.today-carry-text {
+    min-width: 0;
+    color: var(--text-strong);
+    word-break: keep-all;
+}
+
+.today-carry-item.is-used .today-carry-text {
+    color: var(--text-muted);
+}
+
+.today-carry-project {
+    margin-left: var(--space-2);
+    font-size: var(--fs-13);
+    color: var(--text-muted);
+}
+
+.today-carry-actions {
+    display: inline-flex;
+    gap: var(--space-1);
+}
+
+.today-carry-done {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-05);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-semibold);
+    color: var(--success-fg);
+}
+
+.today-carry-more {
+    align-self: flex-start;
+}
+
+@media (max-width: 640px) {
+    .today-carry {
+        padding: var(--space-3) var(--space-4);
+    }
+
+    .today-carry-item {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .today-carry-actions,
+    .today-carry-done {
+        grid-column: 2;
     }
 }

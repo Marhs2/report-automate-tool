@@ -15,6 +15,7 @@ import { todayString, weekdayLabelOf } from "../lib/dateScope";
 import { useMyWeek } from "../composables/useMyWeek";
 import { useMyWeekly } from "../composables/useMyWeekly";
 import { focusColumnsOf } from "../lib/focusColumns";
+import { addReportLine, carryItems } from "../lib/carryOver";
 import { myRecentReports } from "../lib/reportSummary";
 import {
     linesToReportJson,
@@ -117,9 +118,47 @@ const writeAnotherDay = () => {
     writeAnyway.value = true;
     moreOpen.value = true;
 };
+// 쓰기 전에는 지난 보고의 계획을, 제출 뒤에는 오늘 보고의 다음 할 일을 같은 값에서 읽는다.
+loadFocus();
 watch(savedToday, (now) => {
     if (now) loadFocus();
-}, { immediate: true });
+});
+
+/* ---- 오늘 · 지난 보고에서 이어 쓰기 -----------------------------------
+   스탠드업 도구(Slack 워크플로 · Geekbot)가 "어제 계획한 일"부터 묻는 것처럼,
+   지난 보고의 다음 계획 · 이슈를 쓰는 칸 위에 놓는다. 누르면 그 줄이 오늘 보고에 들어간다. */
+const CARRY_PREVIEW = 4;
+const carryAll = ref(false);
+const carry = computed(() => (date.value === todayIso ? carryItems(focus.value, todayIso) : []));
+const carryShown = computed(() => (carryAll.value ? carry.value : carry.value.slice(0, CARRY_PREVIEW)));
+const carryDate = computed(() => {
+    const [, month, day] = String(focus.value?.date || "").split("-").map(Number);
+    return month && day ? `${month}월 ${day}일` : "";
+});
+/** 계획은 끝냈는지 · 하는 중인지, 이슈는 풀렸는지 · 그대로인지 고른다. */
+const CARRY_ACTIONS = {
+    plan: [
+        { kind: "완료", label: "끝냄" },
+        { kind: "진행", label: "하는 중" },
+    ],
+    issue: [
+        { kind: "완료", label: "해결" },
+        { kind: "이슈", label: "아직" },
+    ],
+    request: [
+        { kind: "완료", label: "받음" },
+        { kind: "요청", label: "아직" },
+    ],
+};
+const CARRY_TAG = {
+    plan: { kind: "next", label: "계획" },
+    issue: { kind: "issue", label: "이슈" },
+    request: { kind: "request", label: "요청" },
+};
+const carryUsed = (item) => input.value.includes(`- ${item.text}`);
+const useCarry = (item, kind) => {
+    input.value = addReportLine(input.value, { project: item.project, kind, text: item.text });
+};
 
 /** 아직 제출 안 한 임시 저장. 제출하면 서버가 지운다. */
 const myDrafts = ref([]);
@@ -710,26 +749,92 @@ const sendReport = async () => {
                     <button type="button" class="btn btn-small" @click="retryMeta">다시 시도</button>
                 </p>
 
-                <LineWriter
-                    v-if="useLines"
-                    ref="lineWriter"
-                    v-model="input"
-                    :projects="knownProjects"
-                    @add-project="registerProject"
-                >
-                    <template #dock>
-                        <p v-if="formError" class="today-error" role="alert">{{ formError }}</p>
-                        <button
-                            v-if="lineCount"
-                            type="button"
-                            class="btn btn-primary line-send"
-                            @click="saveLines"
-                            :disabled="lineSaving"
-                        >
-                            {{ lineSaving ? "저장 중" : `저장 · ${lineCount}줄` }}
-                        </button>
-                    </template>
-                </LineWriter>
+            <section v-if="savedToday" class="today-done" aria-labelledby="today-done-title">
+                <h2 id="today-done-title" class="today-done-title">
+                    <CircleCheck :size="26" aria-hidden="true" />오늘 보고를 냈어요
+                </h2>
+                <p class="today-done-sub">팀 보고와 이번 주 주간보고에 들어갔어요.</p>
+
+                <div class="today-done-group">
+                    <p class="today-done-label">다음 할 일 · 오늘 보고에서</p>
+                    <ul v-if="hasFocus" class="today-done-list">
+                        <template v-for="column in focusColumns" :key="column.key">
+                            <li v-for="(item, index) in column.items" :key="`${column.key}-${index}`" class="today-done-item">
+                                <KindTag :kind="FOCUS_KIND[column.key]" :label="FOCUS_LABEL[column.key]" />
+                                <span>{{ item.text }}<span v-if="item.project" class="today-done-project">{{ item.project }}</span></span>
+                            </li>
+                        </template>
+                    </ul>
+                    <p v-else class="today-done-empty">다음 계획 · 이슈 · 요청이 없어요.</p>
+                </div>
+
+                <router-link v-if="weeklyState !== 'saved'" class="today-weekly" :to="weeklyCard.to">
+                    <span class="today-weekly-text">
+                        <span class="today-weekly-title">이번 주 주간보고를 {{ weeklyState === "draft" ? "만드는 중이에요" : "아직 안 만들었어요" }}</span>
+                        <span class="today-weekly-sub">이번 주 일일보고로 금요일까지 만들어요</span>
+                    </span>
+                    <span class="btn btn-primary today-weekly-btn">{{ weeklyCard.action }}</span>
+                </router-link>
+
+                <div class="today-done-links">
+                    <router-link v-if="savedReportId" class="btn btn-ghost" :to="`/report-result/${savedReportId}`">오늘 보고 보기 · 고치기</router-link>
+                    <button type="button" class="btn btn-ghost" @click="writeAnotherDay">다른 날 보고 쓰기</button>
+                </div>
+            </section>
+
+            <template v-else>
+            <section v-if="carry.length && buttonType === 'text'" class="today-carry" aria-labelledby="today-carry-title">
+                <p id="today-carry-title" class="today-carry-title">
+                    지난 보고에서 이어서 <span class="today-carry-sub">{{ carryDate }} 보고 · 누르면 오늘 보고에 들어가요</span>
+                </p>
+                <ul class="today-carry-list">
+                    <li v-for="item in carryShown" :key="item.key" class="today-carry-item" :class="{ 'is-used': carryUsed(item) }">
+                        <KindTag :kind="CARRY_TAG[item.source].kind" :label="CARRY_TAG[item.source].label" />
+                        <span class="today-carry-text">
+                            {{ item.text }}<span v-if="item.project" class="today-carry-project">{{ item.project }}</span>
+                        </span>
+                        <span v-if="carryUsed(item)" class="today-carry-done"><CircleCheck :size="16" aria-hidden="true" />넣음</span>
+                        <span v-else class="today-carry-actions">
+                            <button
+                                v-for="action in CARRY_ACTIONS[item.source]"
+                                :key="action.kind"
+                                type="button"
+                                class="btn btn-small"
+                                :aria-label="`${item.text}: ${action.label}`"
+                                @click="useCarry(item, action.kind)"
+                            >
+                                {{ action.label }}
+                            </button>
+                        </span>
+                    </li>
+                </ul>
+                <button v-if="carry.length > CARRY_PREVIEW" type="button" class="link-btn today-carry-more" @click="carryAll = !carryAll">
+                    {{ carryAll ? "접기" : `${carry.length - CARRY_PREVIEW}개 더 보기` }}
+                </button>
+            </section>
+
+            <div class="today-box" :class="{ 'is-lines': useLines }">
+                <template v-if="useLines">
+                    <LineWriter
+                        ref="lineWriter"
+                        v-model="input"
+                        :projects="knownProjects"
+                        @add-project="registerProject"
+                    >
+                        <template #dock>
+                            <p v-if="formError" class="today-error" role="alert">{{ formError }}</p>
+                            <button
+                                v-if="lineCount"
+                                type="button"
+                                class="btn btn-primary line-send"
+                                @click="saveLines"
+                                :disabled="lineSaving"
+                            >
+                                {{ lineSaving ? "저장 중" : `저장 · ${lineCount}줄` }}
+                            </button>
+                        </template>
+                    </LineWriter>
+                </template>
 
                 <textarea
                     v-else-if="buttonType === 'text'"
@@ -881,6 +986,7 @@ const sendReport = async () => {
                 회의록이나 영업보고 쓰기
             </router-link>
         </template>
+        </div>
     </div>
     <Teleport to="body">
         <div v-if="aiLoading" class="submit-wait" role="status" aria-live="polite">
