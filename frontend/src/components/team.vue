@@ -17,7 +17,7 @@ const { getReports, getUsers, getTeams } = useApi();
 /** 남의 임시 저장은 볼 수 없지만 내 것은 안다. 내 줄만 "임시 저장"으로 보여 준다. */
 const { todayState } = useMyWeek();
 /** 팀장: 우리 부서 오늘 제출 · 주간 취합. 관리자: 부서별 오늘 제출 · 전체 주간 취합. 내 현황과 같은 값. */
-const { role, teamToday, myTeam, pct, collection, isMaking, makeDeck } = useTeamSummary();
+const { role, teamToday, myTeam, pct, collection, myWeeklyTeam } = useTeamSummary();
 
 const today = todayString();
 const date = ref(today);
@@ -257,17 +257,13 @@ onMounted(load);
                 </section>
                 <section v-if="collection" class="card board" aria-labelledby="team-collect-mine-title">
                     <header class="board-head">
-                        <h2 id="team-collect-mine-title" class="board-title">이번 주 주간 취합</h2>
-                        <span class="board-num">{{ collection.submitted }} / {{ collection.total }}명</span>
+                        <h2 id="team-collect-mine-title" class="board-title">이번 주 부서 주간보고</h2>
+                        <span class="state-chip" :class="myWeeklyTeam?.submitted ? 'is-success' : 'is-warning'">{{ myWeeklyTeam?.submitted ? "만듦" : "아직 안 만듦" }}</span>
                     </header>
                     <div class="board-body">
-                        <span class="bar" role="img" :aria-label="`${collection.total}명 중 ${collection.submitted}명 주간보고 제출`">
-                            <span :class="{ 'is-full': collection.complete }" :style="{ width: `${pct(collection.submitted, collection.total)}%` }"></span>
-                        </span>
-                        <button v-if="collection.complete" type="button" class="btn btn-primary team-cta" :disabled="isMaking" @click="makeDeck">
-                            {{ isMaking ? "만드는 중" : "부서 PPT 만들기" }}
-                        </button>
-                        <p v-else class="board-note">다 모이면 부서 PPT를 만들 수 있어요.</p>
+                        <p v-if="myWeeklyTeam?.submitted" class="board-note">{{ myWeeklyTeam.authorName || "팀장" }} 작성 · {{ collection.week.label }}</p>
+                        <router-link v-if="myWeeklyTeam?.submitted" class="btn" :to="`/weekly-detail/${myWeeklyTeam.weeklyId}`">주간보고 열기</router-link>
+                        <router-link v-else class="btn btn-primary" to="/weekly">부서 주간보고 만들기</router-link>
                     </div>
                 </section>
             </template>
@@ -294,14 +290,15 @@ onMounted(load);
                 <section v-if="collection" class="card board" aria-labelledby="team-collect-title">
                     <header class="board-head">
                         <h2 id="team-collect-title" class="board-title">전체 주간 취합</h2>
-                        <span class="board-meta">{{ collection.week.label }} · <b class="board-meta-num">{{ collection.submitted }} / {{ collection.total }}명</b></span>
+                        <span class="board-meta">{{ collection.week.label }} · <b class="board-meta-num">{{ collection.submitted }} / {{ collection.total }}개 부서</b></span>
                     </header>
                     <ul class="dept-list">
                         <li v-for="team in collection.teams" :key="team.id ?? team.name" class="dept-row">
                             <div class="dept-line">
                                 <span class="dept-name">{{ team.name }}</span>
-                                <span class="dept-count">{{ team.submitted }}/{{ team.total }}명</span>
+                                <span class="dept-count" :class="team.submitted ? 'is-all' : 'is-low'">{{ team.submitted ? "제출" : "미제출" }}</span>
                             </div>
+                            <p v-if="team.submitted" class="dept-who">{{ team.authorName }} 작성</p>
                         </li>
                     </ul>
                     <div class="board-foot">

@@ -43,10 +43,12 @@ export function addReportLine(raw, { project, kind, text }) {
 }
 
 /** 이 기간에 내가 낸 일일보고를 모아 센다. 주간 화면 머리의 "이번 주 한 일". */
+/** memberId는 한 사람 또는 여러 사람(부서 주간보고)의 id 배열. */
 export function periodTotals(reports, memberId, start, end) {
+    const ids = new Set([].concat(memberId).map(String));
     const totals = { days: 0, done: 0, progress: 0, issues: 0, byDay: {} };
     for (const row of reports || []) {
-        if (String(row?.member_id) !== String(memberId)) continue;
+        if (!ids.has(String(row?.member_id))) continue;
         const day = String(row?.report_date || "");
         if (!day || day < start || day > end) continue;
         const counts = reportCounts(row.parsed_json);

@@ -33,7 +33,7 @@ from weekly_deck import (
     merge_last_week_next,
     next_sections_of,
     pick_previous_weekly,
-    replace_member_week,
+    replace_team_week,
 )
 from meeting_notes import (
     ASR_API_KEY,
@@ -521,6 +521,13 @@ def ensure_runtime_schema():
         team_columns = conn.execute("PRAGMA table_info(teams)").fetchall()
         if team_columns and not any(column["name"] == "leader_id" for column in team_columns):
             conn.execute("ALTER TABLE teams ADD COLUMN leader_id INTEGER")
+        # 주간보고는 부서에 하나다. 예전 개인 주간보고는 쓴 사람의 부서로 넣어 목록에 남긴다.
+        weekly_columns = conn.execute("PRAGMA table_info(weekly_reports)").fetchall()
+        if weekly_columns and not any(column["name"] == "team_id" for column in weekly_columns):
+            conn.execute("ALTER TABLE weekly_reports ADD COLUMN team_id INTEGER")
+            conn.execute(
+                "UPDATE weekly_reports SET team_id = (SELECT team_id FROM members WHERE members.id = weekly_reports.member_id) WHERE team_id IS NULL"
+            )
         member_columns = conn.execute("PRAGMA table_info(members)").fetchall()
         if member_columns and not any(
             column["name"] == "password_hash" for column in member_columns
@@ -1824,20 +1831,49 @@ def normalize_selected_dates(selects):
     return sorted(normalized)
 
 
-def generate_weekly_report(member_id, selects, *, persist=True):
+def require_weekly_writer(conn, actor_id: int, member_id: int) -> int:
+    """부서 주간보고는 팀장만 만든다. 관리자는 그 사람의 부서 것을 대신 만들 수 있다. 부서 id를 돌려준다."""
+    led = led_team_id(conn, member_id)
+    if int(actor_id) == int(member_id) and led is not None:
+        return led
+    if member_is_admin(conn, actor_id):
+        if led is not None:
+            return led
+        row = conn.execute("SELECT team_id FROM members WHERE id = ?", (member_id,)).fetchone()
+        if row and row["team_id"] is not None:
+            return int(row["team_id"])
+    raise HTTPException(status_code=403, detail="주간보고는 팀장만 만들 수 있습니다.")
+
+
+def require_weekly_editor(conn, actor_id: int, row) -> None:
+    """주간보고 수정 · 삭제: 관리자, 그 부서 팀장. 부서가 없는 옛 행은 만든 사람."""
+    if member_is_admin(conn, actor_id):
+        return
+    team_id = row["team_id"]
+    if team_id is not None and led_team_id(conn, actor_id) == int(team_id):
+        return
+    if team_id is None and int(row["member_id"]) == int(actor_id):
+        return
+    raise HTTPException(status_code=403, detail="부서 팀장만 주간보고를 고칠 수 있습니다.")
+
+
+def generate_weekly_report(member_id, selects, *, team_id, persist=True):
+    """부서 주간보고 초안: 그 부서 사람 모두의 일일보고를 한 보고로 합친다. member_id는 만드는 사람."""
     selects = normalize_selected_dates(selects)
     with get_db() as db:
         res = db.execute(
             """
-            SELECT report_date, parsed_json FROM daily_reports
-            WHERE id IN (
+            SELECT d.report_date, d.parsed_json, m.name FROM daily_reports d
+            JOIN members m ON m.id = d.member_id
+            WHERE d.id IN (
                 SELECT MAX(id) FROM daily_reports
-                WHERE member_id = ? AND report_date IN ({})
-                GROUP BY report_date
+                WHERE member_id IN (SELECT id FROM members WHERE team_id = ?)
+                  AND report_date IN ({})
+                GROUP BY member_id, report_date
             )
-            ORDER BY report_date
+            ORDER BY d.report_date, m.name
             """.format(",".join(["?"] * len(selects))),
-            (member_id, *selects),
+            (team_id, *selects),
         ).fetchall()
 
         if not res:
@@ -1850,11 +1886,12 @@ def generate_weekly_report(member_id, selects, *, persist=True):
             reports.append(daily)
             stamped = dict(daily)
             stamped["_reportDate"] = str(row[0] or "")
+            stamped["_author"] = str(row[2] or "")
             dated_reports.append(stamped)
 
         previous_rows = db.execute(
-            "SELECT selected_date, report_json FROM weekly_reports WHERE member_id = ?",
-            (member_id,),
+            "SELECT selected_date, report_json FROM weekly_reports WHERE team_id = ?",
+            (team_id,),
         ).fetchall()
         previous_candidates = []
         for row in previous_rows:
@@ -1894,6 +1931,7 @@ def generate_weekly_report(member_id, selects, *, persist=True):
                             [
                                 {
                                     "reportDate": daily.get("_reportDate"),
+                                    "author": daily.get("_author"),
                                     "projects": daily.get("projects") or [],
                                 }
                                 for daily in dated_reports
@@ -1956,10 +1994,10 @@ def generate_weekly_report(member_id, selects, *, persist=True):
                 """
                 SELECT m.name, t.team_name
                 FROM members m
-                LEFT JOIN teams t ON m.team_id = t.id
+                LEFT JOIN teams t ON t.id = ?
                 WHERE m.id = ?
                 """,
-                (member_id,),
+                (team_id, member_id),
             ).fetchone()
             report_data = from_legacy(
                 report_data,
@@ -1993,8 +2031,9 @@ def generate_weekly_report(member_id, selects, *, persist=True):
             )
 
         if persist:
-            replace_member_week(
+            replace_team_week(
                 db,
+                team_id,
                 member_id,
                 selects,
                 json.dumps(report_data, ensure_ascii=False),
@@ -2005,9 +2044,10 @@ def generate_weekly_report(member_id, selects, *, persist=True):
 
 @app.post("/weekly-report")
 def weekly_report(data: WeeklyReportRequest, actor_id: int = Depends(current_member_id)):
-    require_own_or_admin(actor_id, data.userId)
+    with get_db() as conn:
+        team_id = require_weekly_writer(conn, actor_id, data.userId)
     selects = normalize_selected_dates(data.selects)
-    report_data = generate_weekly_report(data.userId, selects, persist=False)
+    report_data = generate_weekly_report(data.userId, selects, team_id=team_id, persist=False)
     if report_data is None:
         raise HTTPException(
             status_code=404, detail="선택한 기간에 저장된 일일보고가 없습니다."
@@ -2017,7 +2057,8 @@ def weekly_report(data: WeeklyReportRequest, actor_id: int = Depends(current_mem
 
 @app.post("/weekly")
 def create_weekly(data: CreateWeeklyData, actor_id: int = Depends(current_member_id)):
-    require_own_or_admin(actor_id, data.member_id)
+    with get_db() as conn:
+        team_id = require_weekly_writer(conn, actor_id, data.member_id)
     selects = normalize_selected_dates(data.selects)
     if not selects:
         raise HTTPException(status_code=400, detail="기간(날짜)을 최소 1개 선택해주세요.")
@@ -2031,8 +2072,9 @@ def create_weekly(data: CreateWeeklyData, actor_id: int = Depends(current_member
         )
     report_data = normalize_issues(report_data)
     with get_db() as db:
-        new_id = replace_member_week(
+        new_id = replace_team_week(
             db,
+            team_id,
             data.member_id,
             selects,
             json.dumps(report_data, ensure_ascii=False),
@@ -2396,27 +2438,28 @@ def delete_report(report_id: int, actor_id: int = Depends(current_member_id)):
 def delete_weekly_report(report_id: int, actor_id: int = Depends(current_member_id)):
     with get_db() as db:
         row = db.execute(
-            "SELECT member_id FROM weekly_reports WHERE id = ?",
+            "SELECT member_id, team_id FROM weekly_reports WHERE id = ?",
             (report_id,),
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Weekly report not found")
-        require_own_or_admin(actor_id, row["member_id"], conn=db)
+        require_weekly_editor(db, actor_id, row)
         db.execute("DELETE FROM weekly_reports WHERE id = ?", (report_id,))
     return {"message": "Report deleted successfully"}
 
 
 @app.get("/weekly/{user_id}")
 def get_weekly(user_id: int, actor_id: int = Depends(current_member_id)):
+    """이 사람이 속한 부서의 주간보고 목록. 주간보고는 부서에 하나다."""
     with get_db() as db:
         rows = db.execute(
             """
             SELECT w.id, w.member_id, m.name, t.team_name,
-                   w.selected_date, w.report_json, w.created_at
+                   w.selected_date, w.report_json, w.created_at, w.team_id
             FROM weekly_reports w
             LEFT JOIN members m ON w.member_id = m.id
-            LEFT JOIN teams t ON m.team_id = t.id
-            WHERE w.member_id = ?
+            LEFT JOIN teams t ON t.id = w.team_id
+            WHERE w.team_id = (SELECT team_id FROM members WHERE id = ?)
         """,
             (user_id,),
         ).fetchall()
@@ -2426,6 +2469,8 @@ def get_weekly(user_id: int, actor_id: int = Depends(current_member_id)):
             "id": row[0],
             "memberId": row[1],
             "memberName": row[2],
+            "teamId": row[7],
+            "teamName": row[3] or "",
             "selectedDate": json.loads(row[4]),
             "report": from_legacy(
                 normalize_issues(json.loads(row[5])),
@@ -2445,14 +2490,21 @@ def get_weekly_by_id(weekly_id: int, actor_id: int = Depends(current_member_id))
         row = db.execute(
             """
             SELECT w.id, w.member_id, m.name, t.team_name,
-                   w.selected_date, w.report_json, w.created_at
+                   w.selected_date, w.report_json, w.created_at, t.id
             FROM weekly_reports w
             LEFT JOIN members m ON w.member_id = m.id
-            LEFT JOIN teams t ON m.team_id = t.id
+            LEFT JOIN teams t ON t.id = COALESCE(w.team_id, m.team_id)
             WHERE w.id = ?
         """,
             (weekly_id,),
         ).fetchone()
+        can_edit = False
+        if row:
+            try:
+                require_weekly_editor(db, actor_id, {"team_id": row[7], "member_id": row[1]})
+                can_edit = True
+            except HTTPException:
+                can_edit = False
 
     if not row:
         raise HTTPException(status_code=404, detail="Weekly report not found")
@@ -2462,6 +2514,9 @@ def get_weekly_by_id(weekly_id: int, actor_id: int = Depends(current_member_id))
         "id": row[0],
         "memberId": row[1],
         "memberName": row[2],
+        "teamId": row[7],
+        "teamName": row[3] or "",
+        "canEdit": can_edit,
         "selectedDate": selected,
         "report": from_legacy(
             normalize_issues(json.loads(row[5])),
@@ -2482,7 +2537,7 @@ def export_weekly_pptx(weekly_id: int, actor_id: int = Depends(current_member_id
                    w.selected_date, w.report_json, w.created_at
             FROM weekly_reports w
             LEFT JOIN members m ON w.member_id = m.id
-            LEFT JOIN teams t ON m.team_id = t.id
+            LEFT JOIN teams t ON t.id = COALESCE(w.team_id, m.team_id)
             WHERE w.id = ?
             """,
             (weekly_id,),
@@ -2570,11 +2625,11 @@ def weekly_collection_pptx(week: str = "", partial: int = 0, actor_id: int = Dep
             }
         )
     if team_id is None:
-        scope = f"전체 {len(status['teams'])}개 부서 · {status['submitted']}/{status['total']}명"
+        scope = f"전체 부서 · {status['submitted']}/{status['total']}개 부서 제출"
         label = "전체"
     else:
         label = status["teams"][0]["name"]
-        scope = f"{label} · {status['submitted']}/{status['total']}명"
+        scope = label
     payload = fill_combined_pptx(reports, report_date=cover_date(monday), scope=scope)
     filename = f"주간_보고서_{label}_{status['week']['start']}.pptx"
     return Response(
@@ -2603,12 +2658,12 @@ def update_weekly(
     with get_db() as conn:
         cursor = conn.cursor()
         row = cursor.execute(
-            "SELECT member_id FROM weekly_reports WHERE id = ?",
+            "SELECT member_id, team_id FROM weekly_reports WHERE id = ?",
             (weekly_id,),
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Weekly report not found")
-        require_own_or_admin(actor_id, row["member_id"], conn=conn)
+        require_weekly_editor(conn, actor_id, row)
         cursor.execute(
             "UPDATE weekly_reports SET report_json = ? WHERE id = ?",
             (json.dumps(report_data), weekly_id),

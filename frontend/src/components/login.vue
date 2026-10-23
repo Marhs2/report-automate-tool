@@ -34,7 +34,7 @@ const login = async () => {
         leaderTeamId.value = data.leads_team_id ?? null;
         selectedUserId.value = data.member_id;
         selectedTeamId.value = data.team_id ?? null;
-        router.replace("/");
+        router.replace("/me");
     } catch (error) {
         const detail = error?.response?.data?.detail;
         showAlert(

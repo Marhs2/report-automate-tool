@@ -1,5 +1,4 @@
 import { computed, ref, watch } from "vue";
-import { saveAs } from "file-saver";
 import useApi from "./useApi";
 import { isAdmin, leaderTeamId } from "./useSession";
 import { buildRows, periodDays, todayByTeam, todayIso } from "../lib/submissionGrid";
@@ -9,7 +8,7 @@ import { buildRows, periodDays, todayByTeam, todayIso } from "../lib/submissionG
  * 내 현황(/me)과 팀 화면(/team)이 같은 값을 쓴다.
  */
 export function useTeamSummary() {
-    const { getUserActivities, getTeams, getUsers, getWeeklyCollection, downloadWeeklyCollectionPptx } = useApi();
+    const { getUserActivities, getTeams, getUsers, getWeeklyCollection } = useApi();
 
     const role = computed(() => (isAdmin.value ? "admin" : leaderTeamId.value != null ? "leader" : "member"));
     const thisMonday = () => periodDays("week", todayIso())[0];
@@ -53,7 +52,6 @@ export function useTeamSummary() {
 
     /* ---- 주간 취합 ------------------------------------------------- */
     const collection = ref(null);
-    const isMaking = ref(false);
     const loadCollection = async () => {
         try {
             collection.value = await getWeeklyCollection(thisMonday());
@@ -61,19 +59,10 @@ export function useTeamSummary() {
             collection.value = null;
         }
     };
-    const makeDeck = async () => {
-        if (!collection.value?.complete) return;
-        isMaking.value = true;
-        try {
-            const blob = await downloadWeeklyCollectionPptx(thisMonday(), false);
-            const label = collection.value.scope === "team" ? collection.value.teams?.[0]?.name || "부서" : "전체";
-            saveAs(blob, `DXel 주간보고 ${label} ${collection.value.week.start}.pptx`);
-        } catch (error) {
-            console.error("취합 PPT 만들기 실패:", error);
-        } finally {
-            isMaking.value = false;
-        }
-    };
+    /** 팀장이 보는 우리 부서 이번 주 주간보고(부서에 하나). */
+    const myWeeklyTeam = computed(() =>
+        (collection.value?.teams || []).find((team) => String(team.id) === String(leaderTeamId.value)) || null,
+    );
 
     const loadRoleBlocks = () => {
         teamToday.value = [];
@@ -85,5 +74,5 @@ export function useTeamSummary() {
     // 관리자 · 팀장 여부는 /me 응답 뒤에 정해진다. 그때 블록을 불러온다.
     watch(role, loadRoleBlocks, { immediate: true });
 
-    return { role, teamToday, openTeams, toggleTeam, teamKey, todayTotal, myTeam, pct, collection, isMaking, makeDeck };
+    return { role, teamToday, openTeams, toggleTeam, teamKey, todayTotal, myTeam, pct, collection, myWeeklyTeam };
 }

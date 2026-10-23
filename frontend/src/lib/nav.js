@@ -1,13 +1,16 @@
-/** 위쪽(모바일은 아래쪽) 탭. 하루의 순서대로 세 곳뿐이다. 나머지 화면은 지우지 않고 아래 링크 묶음에서 한 번에 간다. */
+/** 위쪽(모바일은 아래쪽) 탭. 처음 들어오면 현황(대시보드)부터 본다. 나머지 화면은 지우지 않고 아래 링크 묶음에서 한 번에 간다. */
+export const HOME_PATH = "/me";
+
 export const PRIMARY_NAV = [
+    { to: HOME_PATH, label: "현황", navKey: HOME_PATH },
     { to: "/", label: "오늘", navKey: "/" },
     { to: "/team", label: "팀", navKey: "/team" },
     { to: "/weekly", label: "주간", navKey: "/weekly" },
 ];
 
-/** 모바일 하단 탭. 위쪽 탭과 같은 세 곳. */
+/** 모바일 하단 탭. 위쪽 탭과 같은 네 곳. */
 export const MOBILE_TABS = PRIMARY_NAV.map((item) => ({
-    id: item.navKey === "/" ? "today" : item.navKey.slice(1),
+    id: item.navKey === "/" ? "today" : item.navKey === HOME_PATH ? "home" : item.navKey.slice(1),
     to: item.to,
     label: item.label,
     navKeys: [item.navKey],
@@ -29,7 +32,6 @@ export const TEAM_LINKS = [
 
 /** 오른쪽 위 이름 동그라미를 누르면 나오는 메뉴. */
 export const ACCOUNT_LINKS = [
-    { to: "/me", label: "내 현황", hint: "이번 주 · 내 프로젝트" },
     { to: "/settings", label: "설정", hint: "내 부서 · 프로젝트명 · 비밀번호" },
 ];
 

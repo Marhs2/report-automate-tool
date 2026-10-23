@@ -362,7 +362,7 @@ import useApi from "../composables/useApi";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog } from "../composables/useDialog";
 import { selectedUserId } from "../composables/useSelectedUser";
-import { isAdmin } from "../composables/useSession";
+import { isAdmin, leaderTeamId } from "../composables/useSession";
 import {
     COLLAB_CENTERS,
     WEEKLY_LAYOUTS,
@@ -402,11 +402,11 @@ const isUnsaved = computed(() => String(route.params.id || "") === "new");
 /** 읽기 화면의 진행 현황 분류 색. 일일보고와 같은 태그를 쓴다. */
 const KIND_TONES = { done: "is-done", progress: "is-progress", issue: "is-issue", other: "is-next" };
 const saveLabel = computed(() => (isUnsaved.value ? "저장" : "수정 저장"));
-const isMine = computed(() => {
-    if (ownerMemberId.value == null || selectedUserId.value == null) return false;
-    return String(ownerMemberId.value) === String(selectedUserId.value);
-});
-const canEdit = computed(() => isMine.value || isAdmin.value);
+/** 부서 주간보고는 그 부서 팀장과 관리자만 고친다. 저장된 보고는 서버가 알려 주고, 새 초안은 팀장 · 관리자만 만든다. */
+const serverCanEdit = ref(false);
+const canEdit = computed(() =>
+    isUnsaved.value ? isAdmin.value || leaderTeamId.value != null : serverCanEdit.value,
+);
 const emptyMessage = computed(() =>
     isUnsaved.value ? "저장 전 초안이 없습니다. 주간 보고에서 다시 만들어 주세요." : "보고서 데이터가 없습니다.",
 );
@@ -830,8 +830,9 @@ const loadSaved = async (reportId) => {
         if (!reportData.value.author) {
             reportData.value.author = data.memberName || "";
         }
-        userName.value = data.memberName || `사용자 ${data.memberId}`;
+        userName.value = data.teamName || data.memberName || `사용자 ${data.memberId}`;
         ownerMemberId.value = data.memberId ?? null;
+        serverCanEdit.value = Boolean(data.canEdit);
         applyRememberedHeader();
         sessionStorage.setItem("reportData", JSON.stringify(reportData.value));
         sessionStorage.setItem("selectedUser", String(data.memberId));

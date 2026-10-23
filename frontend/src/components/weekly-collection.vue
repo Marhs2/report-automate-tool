@@ -25,19 +25,6 @@ const isLoading = ref(false);
 const isMaking = ref(false);
 const loadError = ref("");
 
-/** 부서마다 처음 보여 줄 사람 수. 안 낸 사람을 앞에 두고, 나머지는 '더보기'로 펼친다. */
-const MEMBER_PREVIEW = 6;
-const openTeams = ref([]);
-const teamKey = (team) => String(team.id ?? team.name);
-const isTeamOpen = (team) => openTeams.value.includes(teamKey(team));
-const toggleTeam = (team) => {
-    const key = teamKey(team);
-    openTeams.value = isTeamOpen(team) ? openTeams.value.filter((k) => k !== key) : [...openTeams.value, key];
-};
-const sortedMembers = (team) => [...team.members].sort((a, b) => Number(a.submitted) - Number(b.submitted));
-const shownMembers = (team) => (isTeamOpen(team) ? sortedMembers(team) : sortedMembers(team).slice(0, MEMBER_PREVIEW));
-const ratioOf = (team) => (team.total ? Math.round((team.submitted / team.total) * 100) : 0);
-
 const isThisWeek = computed(() => week.value === thisMonday());
 /** 팀장이면 서버가 자기 부서만 돌려준다(scope: "team"). */
 const isTeam = computed(() => status.value?.scope === "team");
@@ -45,8 +32,8 @@ const scopeLabel = computed(() => (isTeam.value ? status.value?.teams?.[0]?.name
 const missing = computed(() => (status.value ? status.value.total - status.value.submitted : 0));
 const statusLine = computed(() => {
     if (!status.value) return "";
-    if (status.value.complete) return `${isTeam.value ? "부서원이 모두" : "모든 부서가"} 주간보고를 냈어요.`;
-    return `아직 ${missing.value}명이 주간보고를 내지 않았어요.`;
+    if (status.value.complete) return "모든 부서가 주간보고를 냈어요.";
+    return `아직 ${missing.value}개 부서가 주간보고를 내지 않았어요.`;
 });
 
 const load = async () => {
@@ -89,7 +76,7 @@ const blobMessage = async (error, fallback) => {
 const makeDeck = async () => {
     if (!status.value?.submitted) return;
     const partial = !status.value.complete;
-    if (partial && !(await askConfirm(`아직 ${missing.value}명이 내지 않았어요. 낸 ${status.value.submitted}명만으로 만들까요?`))) {
+    if (partial && !(await askConfirm(`아직 ${missing.value}개 부서가 내지 않았어요. 낸 ${status.value.submitted}개 부서만으로 만들까요?`))) {
         return;
     }
     isMaking.value = true;
@@ -111,7 +98,7 @@ onMounted(load);
         <header class="collection-head">
             <h2 id="collection-title">{{ isTeam ? `${scopeLabel} 취합` : "전체 취합" }}</h2>
             <span v-if="status" class="collection-meta" :class="{ 'is-done': status.complete }">
-                {{ status.week.label }} · 주간보고 {{ status.submitted }}/{{ status.total }}명 제출
+                {{ status.week.label }} · {{ status.submitted }}/{{ status.total }}개 부서 제출
             </span>
             <div class="stepper" role="group" aria-label="취합할 주">
                 <button type="button" aria-label="이전 주" :disabled="isLoading" @click="shift(-1)">
@@ -145,38 +132,24 @@ onMounted(load);
             <p v-if="!status.teams.length" class="collection-note">취합할 부서가 없어요.</p>
 
             <div v-else class="team-list">
-                <div v-for="team in status.teams" :key="team.id ?? team.name" class="team-row">
+                <component
+                    :is="team.submitted ? 'router-link' : 'div'"
+                    v-for="team in status.teams"
+                    :key="team.id ?? team.name"
+                    class="team-row"
+                    :class="{ 'is-missing': !team.submitted }"
+                    v-bind="team.submitted ? { to: `/weekly-detail/${team.weeklyId}` } : {}"
+                >
                     <span class="team-name">{{ team.name }}</span>
-                    <span class="bar" role="img" :aria-label="`${team.total}명 중 ${team.submitted}명 제출`">
-                        <span :class="{ 'is-full': team.total > 0 && team.submitted >= team.total }" :style="{ width: `${ratioOf(team)}%` }"></span>
-                    </span>
-                    <span class="team-count" :class="{ 'is-short': team.submitted < team.total }">{{ team.submitted }}/{{ team.total }}명</span>
-                    <span class="team-members">
-                        <span
-                            v-for="member in shownMembers(team)"
-                            :key="member.id"
-                            class="cat-tag"
-                            :class="member.submitted ? 'is-done' : 'is-issue'"
-                        >
-                            {{ member.name }} {{ member.submitted ? "제출" : "미제출" }}
-                        </span>
-                        <button
-                            v-if="team.members.length > MEMBER_PREVIEW"
-                            type="button"
-                            class="team-more"
-                            :aria-expanded="isTeamOpen(team)"
-                            @click="toggleTeam(team)"
-                        >
-                            {{ isTeamOpen(team) ? "접기" : `더보기 +${team.members.length - MEMBER_PREVIEW}명` }}
-                        </button>
-                    </span>
-                </div>
+                    <span class="team-who">{{ team.submitted ? `${team.authorName} 작성` : team.leaderName ? `팀장 ${team.leaderName}` : "팀장 없음" }}</span>
+                    <span class="cat-tag" :class="team.submitted ? 'is-done' : 'is-issue'">{{ team.submitted ? "제출" : "미제출" }}</span>
+                </component>
             </div>
 
             <footer class="collection-foot">
                 <button type="button" class="btn" :disabled="isMaking || !status.submitted" @click="makeDeck">
                     <Download :size="14" />
-                    {{ isMaking ? "만드는 중" : status.complete ? `${scopeLabel} PPT 만들기` : "낸 사람만으로 PPT 만들기" }}
+                    {{ isMaking ? "만드는 중" : status.complete ? `${scopeLabel} PPT 만들기` : "낸 부서만으로 PPT 만들기" }}
                 </button>
             </footer>
         </template>

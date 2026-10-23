@@ -74,6 +74,7 @@ def create_tables(conn: sqlite3.Connection) -> None:
     CREATE TABLE IF NOT EXISTS weekly_reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         member_id INTEGER NOT NULL,
+        team_id INTEGER,
         selected_date TEXT NOT NULL,
         report_json TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

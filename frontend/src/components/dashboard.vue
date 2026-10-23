@@ -35,7 +35,7 @@ const slashDate = (iso) => {
 };
 const daysBetween = (from, to) => Math.round((parseIso(to) - parseIso(from)) / 86400000);
 
-const { role, teamToday, openTeams, toggleTeam, teamKey, todayTotal, myTeam, pct, collection, isMaking, makeDeck } =
+const { role, teamToday, openTeams, toggleTeam, teamKey, todayTotal, myTeam, pct, collection, myWeeklyTeam } =
     useTeamSummary();
 const { weeklyCard, weeklyEmph } = useMyWeekly();
 const todayText = computed(() => longDate(todayIso()));
@@ -184,18 +184,15 @@ onMounted(() => {
             <section v-if="collection" class="card board" aria-labelledby="all-week-h">
                 <header class="board-head">
                     <h2 id="all-week-h" class="board-title">전체 주간 취합</h2>
-                    <span class="board-meta">{{ collection.week.label }} · <b class="board-meta-num">{{ collection.submitted }}/{{ collection.total }}명</b></span>
+                    <span class="board-meta">{{ collection.week.label }} · <b class="board-meta-num">{{ collection.submitted }}/{{ collection.total }}개 부서</b></span>
                 </header>
                 <ul class="dept-list">
                     <li v-for="team in collection.teams" :key="team.id ?? team.name" class="dept-row">
                         <div class="dept-line">
                             <span class="dept-name">{{ team.name }}</span>
-                            <span class="bar" aria-hidden="true">
-                                <span :class="{ 'is-full': team.submitted === team.total }" :style="{ width: `${pct(team.submitted, team.total)}%` }"></span>
-                            </span>
-                            <span class="dept-count" :class="{ 'is-all': team.submitted === team.total }">{{ team.submitted }}/{{ team.total }}명</span>
-                            <span v-if="team.submitted === team.total" class="state-chip is-success">모두 모임</span>
+                            <span class="dept-count" :class="team.submitted ? 'is-all' : 'is-low'">{{ team.submitted ? "제출" : "미제출" }}</span>
                         </div>
+                        <p v-if="team.submitted" class="dept-who">{{ team.authorName }} 작성</p>
                     </li>
                 </ul>
                 <div class="board-foot">
@@ -311,19 +308,15 @@ onMounted(() => {
 
                 <section class="card board" aria-labelledby="dept-week-h">
                     <header class="board-head">
-                        <h2 id="dept-week-h" class="board-title">우리 부서 주간 취합</h2>
-                        <span v-if="collection" class="board-num">{{ collection.submitted }} / {{ collection.total }}명</span>
+                        <h2 id="dept-week-h" class="board-title">이번 주 부서 주간보고</h2>
+                        <span v-if="collection" class="state-chip" :class="myWeeklyTeam?.submitted ? 'is-success' : 'is-warning'">{{ myWeeklyTeam?.submitted ? "만듦" : "아직 안 만듦" }}</span>
                     </header>
                     <div v-if="collection" class="board-body">
-                        <span class="bar" aria-hidden="true">
-                            <span :class="{ 'is-full': collection.complete }" :style="{ width: `${pct(collection.submitted, collection.total)}%` }"></span>
-                        </span>
-                        <button v-if="collection.complete" type="button" class="btn dash-cta" :disabled="isMaking" @click="makeDeck">
-                            {{ isMaking ? "만드는 중" : "PPT 만들기" }}
-                        </button>
-                        <p v-else class="board-note">다 모이면 부서 PPT를 만들 수 있습니다.</p>
+                        <p v-if="myWeeklyTeam?.submitted" class="board-note">{{ myWeeklyTeam.authorName || "팀장" }} 작성 · {{ collection.week.label }}</p>
+                        <router-link v-if="myWeeklyTeam?.submitted" class="btn" :to="`/weekly-detail/${myWeeklyTeam.weeklyId}`">주간보고 열기</router-link>
+                        <router-link v-else class="btn btn-primary" to="/weekly">부서 주간보고 만들기</router-link>
                     </div>
-                    <p v-else class="board-empty-title">취합 현황을 불러오지 못했습니다.</p>
+                    <p v-else class="board-empty-title">주간보고 현황을 불러오지 못했습니다.</p>
                 </section>
             </div>
 
@@ -360,7 +353,7 @@ onMounted(() => {
                 </header>
                 <div class="board-body weekly-body">
                     <template v-if="weeklyEmph">
-                        <p class="board-note">이번 주 일일보고로 금요일까지 만듭니다.</p>
+                        <p class="board-note">{{ role === "member" ? "팀장이 부서 일일보고를 모아 만듭니다." : "부서 일일보고를 모아 금요일까지 만듭니다." }}</p>
                         <router-link class="btn dash-cta" :class="{ 'btn-primary': !todayHasCta }" :to="weeklyCard.to">{{ weeklyCard.action }}</router-link>
                     </template>
                     <router-link v-else class="btn btn-small" :to="weeklyCard.to">주간보고로 가기</router-link>

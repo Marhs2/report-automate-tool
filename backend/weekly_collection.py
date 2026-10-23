@@ -1,7 +1,7 @@
-"""전 팀 주간보고 취합: 한 주에 누가 냈는지 보고, 낸 보고를 팀 → 사람 순으로 모은다.
+"""주간보고 취합: 부서마다 한 주에 하나인 부서 주간보고를 누가 냈는지 보고, 낸 것을 부서 순으로 모은다.
 
-주간보고는 사람마다 한 주에 하나다(replace_member_week). 같은 주에 여러 행이 남아 있으면 가장 늦게 만든 것을 쓴다.
-관리자 계정은 보고 대상이 아니므로, 그 주에 낸 경우에만 목록에 넣는다.
+부서 주간보고는 팀장(또는 관리자)이 만든다(replace_team_week). 같은 주에 여러 행이 남아 있으면 가장 늦게 만든 것을 쓴다.
+일반 사용자 없이 관리자만 있는 부서는 보고 대상이 아니므로, 그 주에 낸 경우에만 목록에 넣는다.
 """
 
 from __future__ import annotations
@@ -31,11 +31,17 @@ def monday_of(value) -> date:
     return day - timedelta(days=day.weekday())
 
 
-def _latest_by_member(conn, monday: date) -> dict:
+def _latest_by_team(conn, monday: date) -> dict:
     key = monday.isoformat()
     latest = {}
     rows = conn.execute(
-        "SELECT id, member_id, selected_date, report_json, created_at FROM weekly_reports ORDER BY created_at, id"
+        """
+        SELECT w.id, w.team_id, w.member_id, w.selected_date, w.report_json, w.created_at, m.name AS author_name
+        FROM weekly_reports w
+        LEFT JOIN members m ON m.id = w.member_id
+        WHERE w.team_id IS NOT NULL
+        ORDER BY w.created_at, w.id
+        """
     ).fetchall()
     for row in rows:
         try:
@@ -43,7 +49,7 @@ def _latest_by_member(conn, monday: date) -> dict:
         except json.JSONDecodeError:
             continue
         if week_start_of(dates) == key:
-            latest[int(row["member_id"])] = row
+            latest[int(row["team_id"])] = row
     return latest
 
 
@@ -61,41 +67,40 @@ def led_team_id(conn, member_id: int):
 
 
 def collection_status(conn, monday: date, team_id: int | None = None) -> dict:
-    """team_id가 있으면 그 부서만(팀장 취합), 없으면 전 부서(관리자 취합)."""
-    latest = _latest_by_member(conn, monday)
-    members = conn.execute(
+    """team_id가 있으면 그 부서만(팀장), 없으면 전 부서(관리자). 부서마다 냈는지 · 누가 만들었는지."""
+    latest = _latest_by_team(conn, monday)
+    rows = conn.execute(
         """
-        SELECT m.id, m.name, m.is_admin, t.id AS team_id, t.team_name
-        FROM members m
-        LEFT JOIN teams t ON m.team_id = t.id
-        WHERE ? IS NULL OR m.team_id = ?
-        ORDER BY t.id, m.name
+        SELECT t.id, t.team_name, t.leader_id, l.name AS leader_name,
+               SUM(CASE WHEN m.id IS NOT NULL AND IFNULL(m.is_admin, 0) = 0 THEN 1 ELSE 0 END) AS people
+        FROM teams t
+        LEFT JOIN members m ON m.team_id = t.id
+        LEFT JOIN members l ON l.id = t.leader_id
+        WHERE ? IS NULL OR t.id = ?
+        GROUP BY t.id
+        ORDER BY t.id
         """,
         (team_id, team_id),
     ).fetchall()
-    teams, by_team = [], {}
-    for member in members:
-        row = latest.get(int(member["id"]))
-        if member["is_admin"] and row is None:
+    teams = []
+    for team in rows:
+        row = latest.get(int(team["id"]))
+        if not team["people"] and row is None:
             continue
-        team_key = member["team_id"]
-        if team_key not in by_team:
-            by_team[team_key] = {"id": team_key, "name": member["team_name"] or "부서 없음", "members": []}
-            teams.append(by_team[team_key])
-        by_team[team_key]["members"].append(
+        teams.append(
             {
-                "id": int(member["id"]),
-                "name": member["name"],
+                "id": int(team["id"]),
+                "name": team["team_name"],
+                "people": int(team["people"] or 0),
+                "leaderName": team["leader_name"] or "",
                 "submitted": row is not None,
                 "weeklyId": int(row["id"]) if row is not None else None,
+                "authorName": (row["author_name"] or "") if row is not None else "",
                 "createdAt": row["created_at"] if row is not None else None,
             }
         )
-    for team in teams:
-        team["submitted"] = sum(1 for m in team["members"] if m["submitted"])
-        team["total"] = len(team["members"])
-    submitted = sum(team["submitted"] for team in teams)
-    total = sum(team["total"] for team in teams)
+    submitted = sum(1 for team in teams if team["submitted"])
+    total = len(teams)
     friday = monday + timedelta(days=4)
     return {
         "week": {
@@ -113,19 +118,19 @@ def collection_status(conn, monday: date, team_id: int | None = None) -> dict:
 def collected_rows(
     conn, monday: date, *, partial: bool, team_id: int | None = None
 ) -> tuple[dict, list[tuple[dict, dict]]]:
-    """(현황, [(팀 · 사람 정보, weekly_reports 행)]) 를 팀 → 사람 순으로. 다 내지 않았으면 partial일 때만 넘어간다."""
+    """(현황, [(부서 · 만든 사람, weekly_reports 행)]) 를 부서 순으로. 다 내지 않았으면 partial일 때만 넘어간다."""
     status = collection_status(conn, monday, team_id)
     if status["submitted"] == 0:
-        raise CollectionError("이 주에 낸 주간보고가 없습니다.", 404)
+        raise CollectionError("이 주에 낸 부서 주간보고가 없습니다.", 404)
     if not status["complete"] and not partial:
         missing = status["total"] - status["submitted"]
-        raise CollectionError(f"아직 {missing}명이 주간보고를 내지 않았습니다.", 409)
-    latest = _latest_by_member(conn, monday)
+        raise CollectionError(f"아직 {missing}개 부서가 주간보고를 내지 않았습니다.", 409)
+    latest = _latest_by_team(conn, monday)
     out = []
     for team in status["teams"]:
-        for member in team["members"]:
-            if member["submitted"]:
-                out.append(({"teamName": team["name"], "memberName": member["name"]}, latest[member["id"]]))
+        if team["submitted"]:
+            row = latest[team["id"]]
+            out.append(({"teamName": team["name"], "memberName": row["author_name"] or ""}, row))
     return status, out
 
 

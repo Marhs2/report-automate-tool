@@ -1,4 +1,4 @@
-/* 주간 보고: 보드 세 장. 1 초안 만들기(이 화면의 초점) · 2 내가 만든 보고서 · 3 취합(팀장·관리자만).
+/* 주간 보고: 보드 세 장. 1 부서 주간보고 만들기(팀장 · 관리자) · 2 부서 주간 보고서 · 3 취합(관리자만).
    값은 모두 tokens.css. 보드는 공용 .card, 줄은 공용 .row. */
 
 /* 넓은 화면: 만들기 | 만든 보고서, 취합은 아래 전체 폭. 둘은 서로 독립이라 나란히 둔다. */
@@ -22,6 +22,14 @@
 
     .board-collect {
         grid-area: collect;
+    }
+
+    /* 팀원은 만들기 칸이 없다. 목록만 본문 폭으로. */
+    .weekly-page:not(:has(> .board-create)) {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "made"
+            "collect";
     }
 }
 
@@ -130,7 +138,7 @@
 /* ---- 1. 초안 만들기 ---------------------------------------------------- */
 /* 큰 기간 숫자가 이 보드의 머리다. 사람은 "몇 주 치인지"를 먼저 읽는다. */
 .create-period {
-    margin: var(--space-4) 0 0;
+    margin: 10px;
 }
 
 .create-period .chip {

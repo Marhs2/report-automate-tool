@@ -1,14 +1,14 @@
 <script setup>
-import { ChevronLeft, FileBarChart, PenLine, Users } from "lucide-vue-next";
+import { ChevronLeft, FileBarChart, LayoutDashboard, PenLine, Users } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { START_LOCATION, useRoute, useRouter } from "vue-router";
 import useApi from "./composables/useApi";
 import { selectedUserId } from "./composables/useSelectedUser";
 import { selectedTeamId } from "./composables/useSelectedTeam";
 import { hasSession, isAdmin, leaderTeamId, sessionToken } from "./composables/useSession";
 import { useDialog } from "./composables/useDialog";
 import { useSidebar } from "./composables/useSidebar";
-import { ACCOUNT_LINKS, COMPOSE_CHOICES, MOBILE_TABS, PRIMARY_NAV } from "./lib/nav";
+import { ACCOUNT_LINKS, COMPOSE_CHOICES, HOME_PATH, MOBILE_TABS, PRIMARY_NAV } from "./lib/nav";
 import { useMyWeek } from "./composables/useMyWeek";
 import { TODAY_LABELS } from "./lib/weekStatus";
 import { pageParentOverride, pageTitleOverride } from "./composables/usePageMeta";
@@ -59,6 +59,7 @@ const isNavActive = (to) => route.meta.navKey === to;
 
 /** 모바일 하단 탭: 위쪽 탭과 같은 오늘 · 팀 · 주간. */
 const TAB_ICONS = {
+    home: LayoutDashboard,
     today: PenLine,
     team: Users,
     weekly: FileBarChart,
@@ -98,13 +99,15 @@ const goBack = () => {
     else router.push(pageMeta.value.parent?.to || "/");
 };
 
-router.beforeEach((to) => {
+router.beforeEach((to, from) => {
     if (to.meta.public) {
-        if (hasSession() && to.path === "/login") return "/";
+        if (hasSession() && to.path === "/login") return HOME_PATH;
         return true;
     }
     if (!hasSession()) return "/login";
     if (to.meta.admin && !isAdmin.value) return "/settings";
+    // 앱을 처음 열면 현황부터. 그 뒤 "오늘" 탭으로 가는 / 는 그대로 작성 화면이다.
+    if (from === START_LOCATION && to.path === "/") return HOME_PATH;
     return true;
 });
 
@@ -219,7 +222,7 @@ onUnmounted(() => {
     <RouterView v-if="isPublicPage" />
     <template v-else>
     <header class="appbar">
-        <router-link to="/" class="appbar-brand" aria-label="일일보고 처음 화면">일일보고</router-link>
+        <router-link :to="HOME_PATH" class="appbar-brand" aria-label="일일보고 처음 화면">일일보고</router-link>
         <nav class="appbar-tabs" aria-label="주요 메뉴">
             <router-link
                 v-for="item in navItems"

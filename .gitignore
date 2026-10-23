@@ -127,3 +127,7 @@ frontend/src/lib/*.test.js
 anti-slop/
 docs/
 test-data/
+
+test-data
+docs/
+anti-slop/

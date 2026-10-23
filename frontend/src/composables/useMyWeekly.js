@@ -1,15 +1,18 @@
 import { computed, ref, watch } from "vue";
 import useApi from "./useApi";
 import { selectedUserId } from "./useSelectedUser";
+import { isAdmin, leaderTeamId } from "./useSession";
 import { periodDays, todayIso } from "../lib/submissionGrid";
 
 const WEEKLY = {
     none: { label: "안 만듦", tone: "muted", action: "주간보고 만들기", to: "/weekly" },
+    /** 팀원: 부서 주간보고는 팀장이 만든다. */
+    waiting: { label: "팀장 작성 전", tone: "muted", action: "주간 보고서 보기", to: "/weekly" },
     draft: { label: "초안", tone: "warning", action: "이어서 만들기", to: "/weekly-detail/new" },
     saved: { label: "저장됨", tone: "success", action: "주간보고 열기", to: "" },
 };
 
-/** 이번 주 주간보고: 안 만듦 · 초안 · 저장됨. 내 현황(/me)과 오늘 화면(/)이 같이 쓴다. */
+/** 이번 주 부서 주간보고: 안 만듦(팀원은 팀장 작성 전) · 초안 · 저장됨. 내 현황(/me)과 오늘 화면(/)이 같이 쓴다. */
 export function useMyWeekly() {
     const { getWeeklyReport } = useApi();
     const thisMonday = () => periodDays("week", todayIso())[0];
@@ -17,6 +20,7 @@ export function useMyWeekly() {
 
     const weeklyState = computed(() => {
         if (myWeekly.value) return "saved";
+        if (!isAdmin.value && leaderTeamId.value == null) return "waiting";
         try {
             const draft = JSON.parse(sessionStorage.getItem("weeklyDraft") || "null");
             const monday = thisMonday();

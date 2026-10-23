@@ -96,6 +96,7 @@
 .appbar-me {
     display: inline-flex;
     align-items: center;
+    margin: 10px;
     justify-content: center;
     width: var(--control-h);
     height: var(--control-h);
@@ -445,5 +446,3 @@
         padding: var(--space-5) var(--space-4) var(--space-8);
     }
 }
-
-

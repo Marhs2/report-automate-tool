@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import useApi from "../composables/useApi";
 import { selectedUserId } from "../composables/useSelectedUser";
 import { isAdmin, leaderTeamId } from "../composables/useSession";
+import { selectedTeamId } from "../composables/useSelectedTeam";
 import { useDialog } from "../composables/useDialog";
 import { saveAs } from "file-saver";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-vue-next";
@@ -47,11 +48,11 @@ const listError = ref("");
 const showRange = ref(false);
 /** 고른 기간에 낸 일일보고의 완료 · 진행 · 이슈 수. 주간 회고 도구(Sunsama)처럼 "무엇을 했는지"를 먼저 보여 준다. */
 const totals = ref(null);
-const loadTotals = async () => {
+const loadTotals = async (memberIds) => {
     totals.value = null;
-    if (!rangeStart.value || !rangeEnd.value || !userId.value) return;
+    if (!rangeStart.value || !rangeEnd.value || !memberIds.length) return;
     try {
-        totals.value = periodTotals(await getReports(), userId.value, rangeStart.value, rangeEnd.value);
+        totals.value = periodTotals(await getReports(), memberIds, rangeStart.value, rangeEnd.value);
     } catch {
         totals.value = null;
     }
@@ -186,8 +187,10 @@ const toggleSelectDay = (dayDate) => {
     );
 };
 
-/** 내가 그 날 일일보고를 냈는지. 주간보고는 내 일일보고만으로 만든다. */
+/** 그 날 부서에서 한 명이라도 일일보고를 냈는지. 주간보고는 부서에 하나로, 부서 사람 모두의 일일보고로 만든다. */
 const hasMine = (dayDate) => (myDays.value[dayDate] || 0) > 0;
+/** 부서 주간보고는 팀장(또는 관리자)만 만들고 고친다. 팀원은 읽기와 내려받기만. */
+const canWrite = computed(() => isAdmin.value || leaderTeamId.value != null);
 
 /** 아직 오지 않은 날. 월요일에 화~금이 기본으로 켜져 있으면 끝난 주처럼 보인다. */
 const isFutureDay = (dayDate) => isFutureDate(dayDate);
@@ -195,14 +198,13 @@ const isToday = (dayDate) => dayDate === todayString();
 
 /** 쓴 날은 "작성함" 대신 그날 끝낸 일 수를 적는다. */
 const dayState = (dayDate) => {
-    if (isFutureDay(dayDate)) return hasMine(dayDate) ? "예정 · 작성함" : "예정";
+    if (isFutureDay(dayDate)) return hasMine(dayDate) ? `예정 · ${myDays.value[dayDate]}명` : "예정";
     if (!hasMine(dayDate)) return "보고 없음";
-    const day = totals.value?.byDay?.[dayDate];
-    return day?.done ? `완료 ${day.done}` : "작성함";
+    return `${myDays.value[dayDate]}명 작성`;
 };
 
 const dayTitle = (dayDate) => {
-    if (!hasMine(dayDate)) return "이 날 작성한 일일보고가 없습니다";
+    if (!hasMine(dayDate)) return "이 날 부서에서 작성한 일일보고가 없습니다";
     return isFutureDay(dayDate) ? "아직 오지 않은 날입니다" : null;
 };
 
@@ -213,7 +215,6 @@ const dotOf = (dayDate) => {
     else if (isFutureDay(dayDate)) state = "future";
     else if (isToday(dayDate)) state = "today";
     return { label: weekdayName(dayDate), state };
-};
 };
 
 const weekGroups = computed(() => {
@@ -336,12 +337,12 @@ const sendDates = async () => {
 };
 
 /* ---- 조회 ------------------------------------------------------------ */
-/** 고른 기간에 내가 낸 일일보고만 조회해 선택 가능한 날짜를 정한다. */
+/** 고른 기간에 부서 사람들이 낸 일일보고를 조회해 선택 가능한 날짜를 정한다. 값은 그 날 쓴 사람 수. */
 const loadMyWeek = async () => {
     myDays.value = {};
     weekError.value = "";
-    loadTotals();
-    if (!rangeStart.value || !rangeEnd.value || !userId.value) return;
+    totals.value = null;
+    if (!rangeStart.value || !rangeEnd.value || !userId.value || !canWrite.value) return;
     weekLoading.value = true;
     try {
         const rows = await getUserActivities(
@@ -350,21 +351,23 @@ const loadMyWeek = async () => {
             rangeStart.value,
             rangeEnd.value,
         );
-        const mine = (rows || []).find(
-            (row) => String(row.member_id) === String(userId.value),
-        );
+        const teamId = leaderTeamId.value ?? selectedTeamId.value;
+        const team = (rows || []).filter((row) => String(row.team_id) === String(teamId));
         const mineByDay = {};
-        for (const item of mine?.activities || []) {
-            mineByDay[item.report_date] = item.count || 0;
+        for (const row of team) {
+            for (const item of row.activities || []) {
+                if ((item.count || 0) > 0) mineByDay[item.report_date] = (mineByDay[item.report_date] || 0) + 1;
+            }
         }
         myDays.value = mineByDay;
+        loadTotals(team.map((row) => row.member_id));
         // 기본 선택은 오늘까지다. 아직 오지 않은 날은 직접 켜야 들어간다.
         selects.value = weekDays.value.filter(
             (day) => (mineByDay[day] || 0) > 0 && !isFutureDate(day),
         );
     } catch (error) {
-        console.error("내 일일보고 조회 실패:", error);
-        weekError.value = "이 기간의 내 일일보고를 불러오지 못했어요.";
+        console.error("부서 일일보고 조회 실패:", error);
+        weekError.value = "이 기간의 부서 일일보고를 불러오지 못했어요.";
     } finally {
         weekLoading.value = false;
     }
@@ -382,7 +385,7 @@ const fetchWeeklyReport = async () => {
     } catch (error) {
         console.error("주간 보고서 조회 실패:", error);
         weeklyReport.value = [];
-        listError.value = "내 주간 보고서 목록을 불러오지 못했어요.";
+        listError.value = "부서 주간 보고서 목록을 불러오지 못했어요.";
     } finally {
         isLoading.value = false;
     }
@@ -446,13 +449,8 @@ const projectNamesOf = (report) => {
 /* ---- 삭제 · 정리 ------------------------------------------------------ */
 const deleteWeekly = async (reportId) => {
     const report = (weeklyReport.value || []).find((row) => String(row.id) === String(reportId));
-    // 목록 API는 memberId다. member_id만 보면 본인 보고서도 소유자가 비어 삭제가 막힌다.
-    const ownerId = report?.memberId ?? report?.member_id;
-    if (
-        !report ||
-        (String(ownerId) !== String(userId.value) && !isAdmin.value)
-    ) {
-        showAlert("자신의 주간 보고만 삭제할 수 있습니다.");
+    if (!report || !canWrite.value) {
+        showAlert("부서 팀장만 주간 보고를 삭제할 수 있습니다.");
         return;
     }
     if (!(await askConfirm("이 주간 보고서를 삭제할까요?"))) return;
@@ -641,6 +639,11 @@ watch(
     },
 );
 
+// 팀장 · 관리자 여부는 /me 응답 뒤에 정해진다. 그때 만들기 칸의 날짜를 불러온다.
+watch(canWrite, (writable) => {
+    if (writable) loadMyWeek();
+});
+
 onMounted(async () => {
     userId.value = selectedUserId.value || "";
     await loadMyWeek();
@@ -651,9 +654,9 @@ onMounted(async () => {
 <template>
     <div class="page weekly-page">
         <!-- 1. 초안 만들기. 이 화면의 초점: 기간 → 날 고르기 → 만들기 한 버튼. -->
-        <section class="card board board-create" aria-labelledby="create-title">
+        <section v-if="canWrite" class="card board board-create" aria-labelledby="create-title">
             <header class="board-head">
-                <h2 id="create-title">주간 초안 만들기</h2>
+                <h2 id="create-title">부서 주간보고 만들기</h2>
                 <div class="board-tools">
                     <div class="stepper" role="group" aria-label="주 이동">
                         <button type="button" aria-label="이전 주" :disabled="isLoading" @click="prevWeek">
@@ -695,11 +698,6 @@ onMounted(async () => {
                 </label>
             </div>
 
-            <div v-if="weekError" class="board-error" role="alert">
-                <span>{{ weekError }}</span>
-                <button type="button" class="btn btn-small" :disabled="weekLoading" @click="loadMyWeek">다시 시도</button>
-            </div>
-
             <dl v-if="totals?.days" class="wk-done" :aria-label="isThisWeek ? '이번 주 한 일' : '이 기간에 한 일'">
                 <div class="wk-done-cell">
                     <dt>쓴 날</dt>
@@ -719,7 +717,11 @@ onMounted(async () => {
                 </div>
             </dl>
 
-            <p class="wk-hint">일일보고를 쓴 날만 고를 수 있어요. 고른 날의 내용으로 초안을 만들어요.</p>
+            <div v-if="weekError" class="board-error" role="alert">
+                <span>{{ weekError }}</span>
+                <button type="button" class="btn btn-small" :disabled="weekLoading" @click="loadMyWeek">다시 시도</button>
+            </div>
+
 
             <div v-else-if="weekLoading" class="day-tiles is-skeleton" role="status" aria-label="내 일일보고를 불러오는 중">
                 <span v-for="n in 5" :key="n" class="day-tile is-placeholder" aria-hidden="true">
@@ -815,7 +817,7 @@ onMounted(async () => {
         <!-- 2. 만든 보고서: 주마다 한 줄. 열기는 줄, 내려받기는 줄 안의 버튼. -->
         <section class="card board board-made" aria-labelledby="made-title">
             <header class="board-head">
-                <h2 id="made-title">내가 만든 주간 보고서</h2>
+                <h2 id="made-title">부서 주간 보고서</h2>
                 <span v-if="weeklyGroups.length" class="board-meta">{{ weeklyGroups.length }}건</span>
             </header>
 
@@ -832,7 +834,7 @@ onMounted(async () => {
             </div>
 
             <p v-else-if="weeklyGroups.length === 0" class="board-note">
-                아직 만든 주간 보고서가 없어요. 날을 고르고 초안을 만들면 여기에 쌓여요.
+                {{ canWrite ? "아직 만든 부서 주간 보고서가 없어요." : "아직 팀장이 만든 부서 주간 보고서가 없어요." }}
             </p>
 
             <div v-else class="board-list">
@@ -861,7 +863,7 @@ onMounted(async () => {
                             PPT
                         </button>
                         <button
-                            v-if="group.older.length"
+                            v-if="canWrite && group.older.length"
                             type="button"
                             class="btn btn-ghost btn-small"
                             :disabled="isLoading"
@@ -871,6 +873,7 @@ onMounted(async () => {
                             이전 초안 {{ group.older.length }}개 정리
                         </button>
                         <button
+                            v-if="canWrite"
                             type="button"
                             class="row-icon-btn made-delete"
                             :aria-label="`${group.label} 삭제`"
@@ -885,8 +888,8 @@ onMounted(async () => {
             </div>
         </section>
 
-        <!-- 3. 취합: 관리자는 전 부서, 팀장은 자기 부서를 한 PPT로. 팀원에게는 없다. -->
-        <WeeklyCollection v-if="isAdmin || leaderTeamId" class="card board board-collect" />
+        <!-- 3. 취합: 관리자만. 부서 주간보고를 모아 한 PPT로. 팀장은 자기 부서 보고가 곧 취합본이다. -->
+        <WeeklyCollection v-if="isAdmin" class="card board board-collect" />
     </div>
 
     <Teleport to="body">

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
     CAPABILITIES,
     COMPOSE_CHOICES,
+    HOME_PATH,
     LIVE_ROUTE_PATHS,
     MOBILE_TABS,
     MORE_LINKS,
@@ -12,11 +13,14 @@ import {
 } from "./nav.js";
 
 describe("primary navigation", () => {
-    it("keeps three top tabs in the order of the day", () => {
-        assert.equal(primaryNavCount(), 3);
+    it("starts with the dashboard, then the day's tabs", () => {
+        assert.equal(primaryNavCount(), 4);
         assert.equal(PRIMARY_NAV.length, primaryNavCount());
-        assert.deepEqual(PRIMARY_NAV.map((item) => item.label), ["오늘", "팀", "주간"]);
+        assert.deepEqual(PRIMARY_NAV.map((item) => item.label), ["현황", "오늘", "팀", "주간"]);
+        assert.equal(PRIMARY_NAV[0].to, HOME_PATH);
+        assert.equal(HOME_PATH, CAPABILITIES.dashboard);
         assert.equal(PRIMARY_NAV.find((item) => item.label === "오늘")?.to, "/");
+        assert.deepEqual(MOBILE_TABS.map((tab) => tab.id), ["home", "today", "team", "weekly"]);
     });
 
     it("keeps the mobile tab bar at five tabs that all lead somewhere live", () => {

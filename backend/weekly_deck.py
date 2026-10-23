@@ -55,13 +55,13 @@ def next_week_span(end: date) -> str:
     return f"{_md(next_monday)}~{_md(next_monday + timedelta(days=4))}"
 
 
-def replace_member_week(conn, member_id, selects, report_json: str) -> int:
-    """같은 주의 기존 행을 지우고 이 초안을 넣는다. 다른 주는 그대로 둔다."""
+def replace_team_week(conn, team_id, member_id, selects, report_json: str) -> int:
+    """부서 주간보고: 같은 부서 · 같은 주의 기존 행(누가 만들었든)을 지우고 하나만 남긴다. member_id는 만든 사람."""
     week_key = week_start_of(selects)
     for row in conn.execute(
-        "SELECT id, selected_date FROM weekly_reports WHERE member_id = ?",
-        (member_id,),
-    ):
+        "SELECT id, selected_date FROM weekly_reports WHERE team_id = ?",
+        (team_id,),
+    ).fetchall():
         try:
             stale = json.loads(row[1] or "[]")
         except json.JSONDecodeError:
@@ -69,8 +69,8 @@ def replace_member_week(conn, member_id, selects, report_json: str) -> int:
         if week_key and week_start_of(stale) == week_key:
             conn.execute("DELETE FROM weekly_reports WHERE id = ?", (row[0],))
     cursor = conn.execute(
-        "INSERT INTO weekly_reports (member_id, selected_date, report_json) VALUES (?, ?, ?)",
-        (member_id, json.dumps(selects, ensure_ascii=False), report_json),
+        "INSERT INTO weekly_reports (member_id, team_id, selected_date, report_json) VALUES (?, ?, ?, ?)",
+        (member_id, team_id, json.dumps(selects, ensure_ascii=False), report_json),
     )
     return int(cursor.lastrowid)
 
